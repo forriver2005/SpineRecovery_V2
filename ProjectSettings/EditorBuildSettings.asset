@@ -14,4 +14,7 @@ EditorBuildSettings:
   - enabled: 1
     path: Assets/Scenes/HipThrustMinimal.unity
     guid: 7c1c4f7e1b8d4a7c9a3e6f2d5b0c8e11
+  - enabled: 1
+    path: Assets/Scenes/DeadBugRhythmHapticsTest.unity
+    guid: 4b8d9a0e7f6c5d4e3b2a190817161514
   m_configObjects: {}

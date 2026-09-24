@@ -1004,6 +1004,37 @@ CanvasRenderer:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 26575090}
   m_CullTransparentMesh: 1
+--- !u!1 &77036357
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 77036358}
+  m_Layer: 0
+  m_Name: FirstPersonCameraController
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &77036358
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 77036357}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0.4131312, y: 1.2762791, z: 2.0532823}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &81090456
 GameObject:
   m_ObjectHideFlags: 0
@@ -1879,7 +1910,7 @@ MonoBehaviour:
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_Sprite: {fileID: 21300000, guid: fee6f3bedd096d343b5312a6b1ea1414, type: 3}
+  m_Sprite: {fileID: 21300000, guid: bf756805522651741a95ce38376e50e7, type: 3}
   m_Type: 0
   m_PreserveAspect: 0
   m_FillCenter: 1
@@ -2073,7 +2104,7 @@ GameObject:
   - component: {fileID: 261571776}
   - component: {fileID: 261571777}
   m_Layer: 0
-  m_Name: BirdDogPreviewCamera
+  m_Name: DeadBugPreviewCamera
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -2135,7 +2166,7 @@ Camera:
     serializedVersion: 2
     m_Bits: 4294967295
   m_RenderingPath: -1
-  m_TargetTexture: {fileID: 8400000, guid: fc9ab6398e5e00d4d9ec50db975a76ee, type: 2}
+  m_TargetTexture: {fileID: 8400000, guid: 53c64e5190b141b4aad1ba41361cd2a4, type: 2}
   m_TargetDisplay: 0
   m_TargetEye: 3
   m_HDR: 1
@@ -2786,7 +2817,7 @@ MonoBehaviour:
   m_FallbackScreenDPI: 96
   m_DefaultSpriteDPI: 96
   m_DynamicPixelsPerUnit: 1
-  m_PresetInfoIsWorld: 0
+  m_PresetInfoIsWorld: 1
 --- !u!223 &406723957
 Canvas:
   m_ObjectHideFlags: 0
@@ -2931,7 +2962,7 @@ GameObject:
   - component: {fileID: 521654083}
   - component: {fileID: 521654082}
   m_Layer: 5
-  m_Name: BirdDogCard
+  m_Name: DeadbugCard
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -2971,8 +3002,8 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: a41b17853c1d06c43ac7b58c49eaae31, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  actionName: BirdDog
-  targetSceneName: BirdDog
+  actionName: DeadBug
+  targetSceneName: DeadBug
   hitArea: {fileID: 521654081}
   previewAnimator: {fileID: 0}
   selectionHighlight: {fileID: 1821027878}
@@ -2980,7 +3011,7 @@ MonoBehaviour:
   rewindWhenDeselected: 1
   mirrorCoachSequenceInGaming: 1
   coachActionController: {fileID: 1723679892}
-  segmentedStartStateName: birddog_start
+  segmentedStartStateName: deadbug_start
 --- !u!114 &521654083
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -3199,7 +3230,7 @@ MonoBehaviour:
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_Texture: {fileID: 2800000, guid: c8a14b9d2f6e4f3eb1d7a905642c18ee, type: 3}
+  m_Texture: {fileID: 2800000, guid: 1cf53281c1c5dcf408b31977ae933a97, type: 3}
   m_UVRect:
     serializedVersion: 2
     x: 0
@@ -3685,7 +3716,7 @@ PrefabInstance:
     - target: {fileID: 4870552773557632513, guid: 92fdc8607e571ee448d17397903ecb70, type: 3}
       propertyPath: m_Controller
       value: 
-      objectReference: {fileID: 9100000, guid: b431d9c53e1a46eabff7d2b1c2ce5a64, type: 2}
+      objectReference: {fileID: 9100000, guid: d94b88ee531cdfb44b9809b2503459e9, type: 2}
     - target: {fileID: 5159078012444724336, guid: 92fdc8607e571ee448d17397903ecb70, type: 3}
       propertyPath: m_LocalScale.x
       value: 0.8
@@ -4421,7 +4452,7 @@ MonoBehaviour:
       m_Calls:
       - m_Target: {fileID: 1723679895}
         m_TargetAssemblyTypeName: SceneSwitcher, Assembly-CSharp
-        m_MethodName: LoadBirdDogPracticeScene
+        m_MethodName: LoadDeadBugPracticeScene
         m_Mode: 1
         m_Arguments:
           m_ObjectArgument: {fileID: 0}
@@ -4526,7 +4557,7 @@ MonoBehaviour:
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_Texture: {fileID: 8400000, guid: fc9ab6398e5e00d4d9ec50db975a76ee, type: 2}
+  m_Texture: {fileID: 8400000, guid: 53c64e5190b141b4aad1ba41361cd2a4, type: 2}
   m_UVRect:
     serializedVersion: 2
     x: 0
@@ -7043,7 +7074,7 @@ PrefabInstance:
     - target: {fileID: 4870552773557632513, guid: 92fdc8607e571ee448d17397903ecb70, type: 3}
       propertyPath: m_Controller
       value: 
-      objectReference: {fileID: 9100000, guid: b431d9c53e1a46eabff7d2b1c2ce5a64, type: 2}
+      objectReference: {fileID: 9100000, guid: d94b88ee531cdfb44b9809b2503459e9, type: 2}
     - target: {fileID: 5159078012444724336, guid: 92fdc8607e571ee448d17397903ecb70, type: 3}
       propertyPath: m_LocalPosition.x
       value: 0
@@ -10463,7 +10494,7 @@ GameObject:
   m_Component:
   - component: {fileID: 1457926396}
   m_Layer: 0
-  m_Name: BirdDogPreview
+  m_Name: DeadBUgPreview
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -11900,7 +11931,7 @@ MonoBehaviour:
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_text: BirdDog
+  m_text: DeadBug
   m_isRightToLeft: 0
   m_fontAsset: {fileID: 11400000, guid: c51d6bd242c90b6409817346d886d3ef, type: 2}
   m_sharedMaterial: {fileID: 6653073857887410576, guid: c51d6bd242c90b6409817346d886d3ef, type: 2}
@@ -13998,6 +14029,136 @@ CanvasRenderer:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1671282634}
   m_CullTransparentMesh: 1
+--- !u!1001 &1672911664
+PrefabInstance:
+  m_ObjectHideFlags: 0
+  serializedVersion: 2
+  m_Modification:
+    serializedVersion: 3
+    m_TransformParent: {fileID: 0}
+    m_Modifications:
+    - target: {fileID: 1016683534986130, guid: 19049f66439229f46b40c22549c6e40f, type: 3}
+      propertyPath: m_Name
+      value: EnergyNovaBlue
+      objectReference: {fileID: 0}
+    - target: {fileID: 1016683534986130, guid: 19049f66439229f46b40c22549c6e40f, type: 3}
+      propertyPath: m_IsActive
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 4753623713790614, guid: 19049f66439229f46b40c22549c6e40f, type: 3}
+      propertyPath: m_LocalScale.x
+      value: 0.1
+      objectReference: {fileID: 0}
+    - target: {fileID: 4753623713790614, guid: 19049f66439229f46b40c22549c6e40f, type: 3}
+      propertyPath: m_LocalScale.y
+      value: 0.1
+      objectReference: {fileID: 0}
+    - target: {fileID: 4753623713790614, guid: 19049f66439229f46b40c22549c6e40f, type: 3}
+      propertyPath: m_LocalScale.z
+      value: 0.1
+      objectReference: {fileID: 0}
+    - target: {fileID: 4753623713790614, guid: 19049f66439229f46b40c22549c6e40f, type: 3}
+      propertyPath: m_LocalPosition.x
+      value: -2.3694766
+      objectReference: {fileID: 0}
+    - target: {fileID: 4753623713790614, guid: 19049f66439229f46b40c22549c6e40f, type: 3}
+      propertyPath: m_LocalPosition.y
+      value: 2.8071475
+      objectReference: {fileID: 0}
+    - target: {fileID: 4753623713790614, guid: 19049f66439229f46b40c22549c6e40f, type: 3}
+      propertyPath: m_LocalPosition.z
+      value: -5.009356
+      objectReference: {fileID: 0}
+    - target: {fileID: 4753623713790614, guid: 19049f66439229f46b40c22549c6e40f, type: 3}
+      propertyPath: m_LocalRotation.w
+      value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: 4753623713790614, guid: 19049f66439229f46b40c22549c6e40f, type: 3}
+      propertyPath: m_LocalRotation.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 4753623713790614, guid: 19049f66439229f46b40c22549c6e40f, type: 3}
+      propertyPath: m_LocalRotation.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 4753623713790614, guid: 19049f66439229f46b40c22549c6e40f, type: 3}
+      propertyPath: m_LocalRotation.z
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 4753623713790614, guid: 19049f66439229f46b40c22549c6e40f, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 4753623713790614, guid: 19049f66439229f46b40c22549c6e40f, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 4753623713790614, guid: 19049f66439229f46b40c22549c6e40f, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.z
+      value: 0
+      objectReference: {fileID: 0}
+    m_RemovedComponents: []
+    m_RemovedGameObjects: []
+    m_AddedGameObjects: []
+    m_AddedComponents: []
+  m_SourcePrefab: {fileID: 100100000, guid: 19049f66439229f46b40c22549c6e40f, type: 3}
+--- !u!1 &1723020110
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1723020112}
+  - component: {fileID: 1723020111}
+  m_Layer: 0
+  m_Name: ScoreSliderProgress
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 0
+--- !u!114 &1723020111
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1723020110}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 3c22c886182514b43a2c02b794036255, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  poseScorer: {fileID: 577822668}
+  coachController: {fileID: 1723679892}
+  sliderBackground: {fileID: 538972607}
+  sliderFill: {fileID: 1280141148}
+  scoreStarTransform: {fileID: 1575243152}
+  redBelowScore: 50
+  greenAboveScore: 70
+  needsAdjustmentColor: {r: 1, g: 0.48, b: 0.35, a: 1}
+  goodColor: {r: 1, g: 0.85, b: 0.25, a: 1}
+  excellentColor: {r: 0.25, g: 1, b: 0.55, a: 1}
+  starEdgePadding: 0
+  segmentGap: 0.02
+--- !u!4 &1723020112
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1723020110}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: -1.5273163, y: 0.9161049, z: 4.24}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children:
+  - {fileID: 1762914700}
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &1723679887
 GameObject:
   m_ObjectHideFlags: 0
@@ -14123,7 +14284,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   coachAnimator: {fileID: 0}
   sideFeedback: {fileID: 0}
-  actionStateName: animation_pose
+  actionStateName: Deadbug1
   returnIdleWhenActionCompletes: 0
   playRandomIdleVariations: 0
   idleStateNames:
@@ -14154,18 +14315,18 @@ MonoBehaviour:
     upSpeed: 0.75
     downSpeed: 0.75
     loopCount: 3
-  startSegmentState: birddog_start
-  endSegmentState: birddog_end
+  startSegmentState: deadbug_start
+  endSegmentState: deadbug_end
   upSegmentStates:
-  - birddog_1_up
-  - birddog_2_up
-  - birddog_3_up
-  - birddog_4_up
+  - deadbug_1_up
+  - deadbug_2_up
+  - deadbug_3_up
+  - deadbug_4_up
   downSegmentStates:
-  - birddog_1_down
-  - birddog_2_down
-  - birddog_3_down
-  - birddog_4_down
+  - deadbug_1_down
+  - deadbug_2_down
+  - deadbug_3_down
+  - deadbug_4_down
 --- !u!114 &1723679895
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -14263,7 +14424,7 @@ MonoBehaviour:
       m_Calls:
       - m_Target: {fileID: 1723679895}
         m_TargetAssemblyTypeName: SceneSwitcher, Assembly-CSharp
-        m_MethodName: LoadBirdDogGamingScene
+        m_MethodName: LoadDeadBugGamingScene
         m_Mode: 1
         m_Arguments:
           m_ObjectArgument: {fileID: 0}
@@ -14311,6 +14472,37 @@ CanvasRenderer:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1756086793}
   m_CullTransparentMesh: 1
+--- !u!1 &1762914699
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1762914700}
+  m_Layer: 0
+  m_Name: RoadSegments
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &1762914700
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1762914699}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 1723020112}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &1779248085
 GameObject:
   m_ObjectHideFlags: 0
@@ -17086,6 +17278,79 @@ Mesh:
     offset: 0
     size: 0
     path: 
+--- !u!1001 &1923980330
+PrefabInstance:
+  m_ObjectHideFlags: 0
+  serializedVersion: 2
+  m_Modification:
+    serializedVersion: 3
+    m_TransformParent: {fileID: 0}
+    m_Modifications:
+    - target: {fileID: 1619003085413020, guid: 7182aac72a1e35741b71d70e58ffea37, type: 3}
+      propertyPath: m_Name
+      value: EnergyNovaYellow
+      objectReference: {fileID: 0}
+    - target: {fileID: 1619003085413020, guid: 7182aac72a1e35741b71d70e58ffea37, type: 3}
+      propertyPath: m_IsActive
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 4346520131939292, guid: 7182aac72a1e35741b71d70e58ffea37, type: 3}
+      propertyPath: m_LocalScale.x
+      value: 0.1
+      objectReference: {fileID: 0}
+    - target: {fileID: 4346520131939292, guid: 7182aac72a1e35741b71d70e58ffea37, type: 3}
+      propertyPath: m_LocalScale.y
+      value: 0.1
+      objectReference: {fileID: 0}
+    - target: {fileID: 4346520131939292, guid: 7182aac72a1e35741b71d70e58ffea37, type: 3}
+      propertyPath: m_LocalScale.z
+      value: 0.1
+      objectReference: {fileID: 0}
+    - target: {fileID: 4346520131939292, guid: 7182aac72a1e35741b71d70e58ffea37, type: 3}
+      propertyPath: m_LocalPosition.x
+      value: -2.657
+      objectReference: {fileID: 0}
+    - target: {fileID: 4346520131939292, guid: 7182aac72a1e35741b71d70e58ffea37, type: 3}
+      propertyPath: m_LocalPosition.y
+      value: 1.56
+      objectReference: {fileID: 0}
+    - target: {fileID: 4346520131939292, guid: 7182aac72a1e35741b71d70e58ffea37, type: 3}
+      propertyPath: m_LocalPosition.z
+      value: 1.07
+      objectReference: {fileID: 0}
+    - target: {fileID: 4346520131939292, guid: 7182aac72a1e35741b71d70e58ffea37, type: 3}
+      propertyPath: m_LocalRotation.w
+      value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: 4346520131939292, guid: 7182aac72a1e35741b71d70e58ffea37, type: 3}
+      propertyPath: m_LocalRotation.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 4346520131939292, guid: 7182aac72a1e35741b71d70e58ffea37, type: 3}
+      propertyPath: m_LocalRotation.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 4346520131939292, guid: 7182aac72a1e35741b71d70e58ffea37, type: 3}
+      propertyPath: m_LocalRotation.z
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 4346520131939292, guid: 7182aac72a1e35741b71d70e58ffea37, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 4346520131939292, guid: 7182aac72a1e35741b71d70e58ffea37, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 4346520131939292, guid: 7182aac72a1e35741b71d70e58ffea37, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.z
+      value: 0
+      objectReference: {fileID: 0}
+    m_RemovedComponents: []
+    m_RemovedGameObjects: []
+    m_AddedGameObjects: []
+    m_AddedComponents: []
+  m_SourcePrefab: {fileID: 100100000, guid: 7182aac72a1e35741b71d70e58ffea37, type: 3}
 --- !u!1 &1930472427
 GameObject:
   m_ObjectHideFlags: 0
@@ -19626,11 +19891,11 @@ MonoBehaviour:
   maximumActiveNotes: 8
   sameLaneMinimumHitGap: 0.55
   leftFootRightHandLiftStates:
-  - birddog_1_up
-  - birddog_3_up
+  - deadbug_1_up
+  - deadbug_3_up
   rightFootLeftHandLiftStates:
-  - birddog_2_up
-  - birddog_4_up
+  - deadbug_2_up
+  - deadbug_4_up
   useRingArcTargets: 0
   targetVisualPrefab: {fileID: 6522757388179010392, guid: 492a3e4601f47cf46974540bef9bbe44, type: 3}
   targetVisualEulerRotation: {x: 0, y: 0, z: 0}
@@ -20073,13 +20338,48 @@ SceneRoots:
   m_Roots:
   - {fileID: 705507995}
   - {fileID: 1723679891}
+  - {fileID: 1923980330}
+  - {fileID: 77036358}
+  - {fileID: 1672911664}
   - {fileID: 406723958}
   - {fileID: 1133686540}
   - {fileID: 1073672392}
   - {fileID: 1260693150}
   - {fileID: 210931475}
   - {fileID: 1457926396}
+  - {fileID: 1723020112}
   - {fileID: 577822669}
   - {fileID: 2107000001}
   - {fileID: 1579752764}
   - {fileID: 1039262445}
+  - {fileID: 1000000001}
+--- !u!1 &1000000000
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1000000001}
+  - component: {fileID: 1000000002}
+  m_Layer: 0
+  m_Name: RhythmHitHapticsTest
+  m_TagString: Untagged
+  m_IsActive: 1
+--- !u!4 &1000000001
+Transform:
+  m_GameObject: {fileID: 1000000000}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+--- !u!114 &1000000002
+MonoBehaviour:
+  m_GameObject: {fileID: 1000000000}
+  m_Enabled: 1
+  m_Script: {fileID: 11500000, guid: 5f9b6a4f0e7d4a8c9b1e2d3f4a5c6b70, type: 3}
+  m_Name:
+  m_EditorClassIdentifier:
+  rhythmController: {fileID: 0}
+  hapticController: {fileID: 0}

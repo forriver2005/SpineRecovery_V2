@@ -45,6 +45,10 @@ public readonly struct RhythmNoteResult
 
     public RhythmBodyTarget Target { get; }
     public RhythmJudgement Judgement { get; }
+    public bool IsHit =>
+        Judgement == RhythmJudgement.Perfect ||
+        Judgement == RhythmJudgement.Great ||
+        Judgement == RhythmJudgement.Good;
     public float PoseScore { get; }
     public float TimingError { get; }
     public Vector3 LocalHitPosition { get; }

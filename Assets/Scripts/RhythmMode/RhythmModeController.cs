@@ -102,6 +102,7 @@ public sealed class RhythmModeController : MonoBehaviour
 
     private void Awake()
     {
+        EnsureHitHaptics();
         PrepareFixedVisualRoot();
         SkinnedMeshColorAnchorInstaller.EnsureOn(gameObject);
         ResolveReferences();
@@ -110,6 +111,14 @@ public sealed class RhythmModeController : MonoBehaviour
             layout.SetVisible(!followCoachScoringSession && startAutomaticallyWithoutCoach);
         }
         SetVisualEffectVisible(!followCoachScoringSession && startAutomaticallyWithoutCoach);
+    }
+
+    private void EnsureHitHaptics()
+    {
+        if (FindObjectOfType<RhythmHitHapticAdapter>(true) == null)
+        {
+            gameObject.AddComponent<RhythmHitHapticAdapter>();
+        }
     }
 
     private void OnEnable()

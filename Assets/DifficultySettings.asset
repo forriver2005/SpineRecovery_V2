@@ -1,0 +1,32 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 2039e8be70fcd5146919644ee9fbbb59, type: 3}
+  m_Name: DifficultySettings
+  m_EditorClassIdentifier: 
+  relaxedConfig:
+    stabilityThresholdDegPerSec: 8
+    stabilityAlignmentThreshold: 45
+    stabilityAlignmentThresholdLegs: 60
+    maxAngleError: 40
+    perfectAngleThreshold: 8
+  mediumConfig:
+    stabilityThresholdDegPerSec: 5
+    stabilityAlignmentThreshold: 35
+    stabilityAlignmentThresholdLegs: 50
+    maxAngleError: 30
+    perfectAngleThreshold: 5
+  strictConfig:
+    stabilityThresholdDegPerSec: 3
+    stabilityAlignmentThreshold: 25
+    stabilityAlignmentThresholdLegs: 35
+    maxAngleError: 20
+    perfectAngleThreshold: 3

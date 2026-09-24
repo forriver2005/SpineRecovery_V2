@@ -157,6 +157,7 @@ public class DeadBugGamingPoseScorer : MonoBehaviour
     public IReadOnlyList<DeadBugCheckpointScore> SessionScores => sessionScores;
     public float LastSessionAverage => lastSessionAverage;
     public bool IsSessionActive => sessionActive;
+    public bool ScoreHoldFramesOnly => scoreHoldFramesOnly;
     public AnatomicalPoseScore LastFrameScore => lastFrameResult;
     public AnatomicalLimbScores LastLimbScores => lastLimbScores;
     public bool IsCalibrated => calibrated;

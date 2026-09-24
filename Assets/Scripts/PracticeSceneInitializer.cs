@@ -9,6 +9,7 @@ using UnityEngine.UI;
 ///
 /// 新增：支持从本地 JSON 文件或 content URI 加载服务器下发的动作包（CoachMotionPackage）。
 /// </summary>
+[DefaultExecutionOrder(-200)]
 public class PracticeSceneInitializer : MonoBehaviour
 {
     /// <summary>
@@ -59,7 +60,6 @@ public class PracticeSceneInitializer : MonoBehaviour
 
     [Tooltip("SegmentedCoachController 组件。留空则自动查找。")]
     [SerializeField] private SegmentedCoachController segmentedCoachController;
-    private JsonPracticeCoachController jsonPracticeCoachController;
     private bool jsonMotionMode;
 
     [Header("Buttons (Optional - Auto-Find by Name)")]
@@ -180,24 +180,14 @@ public class PracticeSceneInitializer : MonoBehaviour
 
             SpineFlowTrainingSession.CacheMotionPackage(package);
 
-            // 不要禁用 PracticeSessionController - 让它处理介绍和倒数
-            // 只禁用传统的 SegmentedCoachController
-            if (segmentedCoachController != null)
-            {
-                segmentedCoachController.enabled = false;
-            }
-
-            if (coachAnimator == null)
+            if (coachAnimator == null || segmentedCoachController == null)
             {
                 Debug.LogError("[PracticeSceneInitializer] 未找到 JSON 教练 Animator");
                 return;
             }
 
-            jsonPracticeCoachController = coachAnimator.gameObject.AddComponent<JsonPracticeCoachController>();
-            jsonPracticeCoachController.Initialize(
-                coachAnimator,
-                package,
-                FindObjectOfType<MotionRecorder>(true));
+            // Keep the scorer/session event graph on its serialized controller.
+            segmentedCoachController.SetMotionBackend(package);
             jsonMotionMode = true;
 
             // 配置按钮（从 package 读场景名）
@@ -318,7 +308,8 @@ public class PracticeSceneInitializer : MonoBehaviour
             backButton.onClick = new Button.ButtonClickedEvent();
             backButton.onClick.AddListener(() =>
             {
-                UnityEngine.SceneManagement.SceneManager.LoadScene("UserMenu");
+                FindObjectOfType<PracticeSessionController>()?.StopPractice();
+                UnityEngine.SceneManagement.SceneManager.LoadScene("CoachingChoose");
             });
         }
 
@@ -326,7 +317,11 @@ public class PracticeSceneInitializer : MonoBehaviour
         {
             gameButton.onClick = new Button.ButtonClickedEvent();
             gameButton.onClick.AddListener(() =>
-                UnityEngine.SceneManagement.SceneManager.LoadScene("testGaming"));
+            {
+                FindObjectOfType<PracticeSessionController>()?.StopPractice();
+                UnityEngine.SceneManagement.SceneManager.LoadScene(
+                    SpineFlowTrainingSession.ResolveSceneForMobileSession("testGaming"));
+            });
         }
 
         BindJsonStartButtons();
@@ -344,26 +339,15 @@ public class PracticeSceneInitializer : MonoBehaviour
                 string.Equals(buttonName, "NextStep", System.StringComparison.OrdinalIgnoreCase) ||
                 string.Equals(buttonName, "Continue", System.StringComparison.OrdinalIgnoreCase))
             {
-                button.onClick.RemoveAllListeners();
+                button.onClick = new Button.ButtonClickedEvent();
                 button.onClick.AddListener(AdvanceJsonAction);
             }
         }
     }
 
-    private void PlayJsonAction()
-    {
-        if (jsonPracticeCoachController == null)
-        {
-            Debug.LogError("[PracticeSceneInitializer] JSON 教练尚未初始化，无法开始训练", this);
-            return;
-        }
-
-        jsonPracticeCoachController.PlayAction();
-    }
-
     private void AdvanceJsonAction()
     {
-        jsonPracticeCoachController?.AdvanceToNext();
+        segmentedCoachController?.AdvanceToNext();
     }
 
     /// <summary>
@@ -460,19 +444,19 @@ public class PracticeSceneInitializer : MonoBehaviour
         // 绑定按钮事件（添加到现有 listeners 之后，或替换持久化调用）
         if (pracAgainButton != null)
         {
-            pracAgainButton.onClick.RemoveAllListeners();
+            pracAgainButton.onClick = new Button.ButtonClickedEvent();
             pracAgainButton.onClick.AddListener(() => PracticeSceneController.RestartPractice());
         }
 
         if (backButton != null)
         {
-            backButton.onClick.RemoveAllListeners();
+            backButton.onClick = new Button.ButtonClickedEvent();
             backButton.onClick.AddListener(() => PracticeSceneController.LoadCoachingScene());
         }
 
         if (gameButton != null)
         {
-            gameButton.onClick.RemoveAllListeners();
+            gameButton.onClick = new Button.ButtonClickedEvent();
             gameButton.onClick.AddListener(() => PracticeSceneController.LoadGamingScene());
         }
 

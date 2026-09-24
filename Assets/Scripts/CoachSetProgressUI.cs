@@ -14,7 +14,7 @@ public class CoachSetProgressUI : MonoBehaviour
     [SerializeField] private Vector2 anchoredPosition = new Vector2(0f, 180f);
     [SerializeField] private Vector2 size = new Vector2(300f, 64f);
     [SerializeField] private float fontSize = 42f;
-    [SerializeField] private Color backgroundColor = new Color(0f, 0f, 0f, 0.58f);
+    [SerializeField] private Color backgroundColor = new Color(0f, 0f, 0f, 0f);
 
     private void Awake()
     {
@@ -173,6 +173,15 @@ public class CoachSetProgressUI : MonoBehaviour
         }
 
         progressText.alignment = TextAlignmentOptions.Center;
+        var mobileControls = FindObjectOfType<MobileCoachControls>(true);
+        if (mobileControls != null)
+        {
+            var phoneText = mobileControls.GetComponentInChildren<TMP_Text>(true);
+            if (phoneText != null) progressText.font = phoneText.font;
+            progressText.enableAutoSizing = true;
+            progressText.fontSizeMin = 20f;
+            progressText.fontSizeMax = fontSize;
+        }
         progressText.fontSize = fontSize;
         progressText.fontStyle = FontStyles.Bold;
         progressText.color = Color.white;

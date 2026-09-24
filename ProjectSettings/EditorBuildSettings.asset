@@ -6,6 +6,9 @@ EditorBuildSettings:
   serializedVersion: 2
   m_Scenes:
   - enabled: 1
+    path: Assets/Scenes/DeadBugPractice.unity
+    guid: ecead03f6d981dc4d898b11fbfc000ab
+  - enabled: 1
     path: Assets/Scenes/SpineV2Minimal.unity
     guid: 337343efb3e6f5741bcaea6cc036886f
   - enabled: 1

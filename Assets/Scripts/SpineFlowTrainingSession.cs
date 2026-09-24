@@ -49,6 +49,16 @@ public sealed class SpineFlowTrainingSession : MonoBehaviour
     private const string BirdDogPracticeSceneName = "BirdDogPractice";
     private const string MaleBirdDogPracticeSceneName = "maleBirdDogPractice";
     private const string UnifiedPracticeSceneName = "testPractice";
+    private const string DefaultCoachSceneName = DeadBugPracticeSceneName;
+    private const string LegacyCoachSelectionSceneName = "CoachingChoose";
+    private const string LegacyDeadBugGameSceneName = "DeadBugGaming";
+    private const string LegacyBirdDogGameSceneName = "BirdDogGaming";
+    private const string LegacyHipThrustSceneName = "HipThrust";
+    private const string LegacyHipTrustGameSceneName = "HipTrustGaming";
+    private const string LegacyUnifiedGameSceneName = "testGaming";
+    private const string DeadBugGameSceneName = "SpineV2Minimal";
+    private const string BirdDogGameSceneName = "BirdDogMinimal";
+    private const string HipThrustGameSceneName = "HipThrustMinimal";
     private const float MinimumAcceptedMotionDegrees = 8f;
     private const int MinimumAcceptedSamples = 10;
     private const float CoreActionWeight = 1f;
@@ -334,7 +344,79 @@ public sealed class SpineFlowTrainingSession : MonoBehaviour
     /// </summary>
     public static string ResolveSceneForMobileSession(string sceneName)
     {
-        return ResolveSceneForGender(sceneName, IsMaleMobileSession);
+        string genderScene = ResolveSceneForGender(sceneName, IsMaleMobileSession);
+
+        if (string.Equals(genderScene, LegacyCoachSelectionSceneName, StringComparison.Ordinal))
+        {
+            return LegacyCoachSelectionSceneName;
+        }
+
+        if (string.Equals(genderScene, LegacyDeadBugGameSceneName, StringComparison.Ordinal))
+        {
+            return DeadBugGameSceneName;
+        }
+
+        if (string.Equals(genderScene, LegacyBirdDogGameSceneName, StringComparison.Ordinal))
+        {
+            return BirdDogGameSceneName;
+        }
+
+        if (string.Equals(genderScene, LegacyHipThrustSceneName, StringComparison.Ordinal) ||
+            string.Equals(genderScene, LegacyHipTrustGameSceneName, StringComparison.Ordinal))
+        {
+            return HipThrustGameSceneName;
+        }
+
+        if (string.Equals(genderScene, LegacyUnifiedGameSceneName, StringComparison.Ordinal))
+        {
+            return ResolveUnifiedGameScene();
+        }
+
+        return genderScene;
+    }
+
+    private static string ResolveUnifiedGameScene()
+    {
+        string actionId = cachedMotionPackage?.actionId ?? CurrentCoachActionId ?? string.Empty;
+        if (actionId.IndexOf("bird", StringComparison.OrdinalIgnoreCase) >= 0)
+        {
+            return BirdDogGameSceneName;
+        }
+
+        if (actionId.IndexOf("hip", StringComparison.OrdinalIgnoreCase) >= 0)
+        {
+            return HipThrustGameSceneName;
+        }
+
+        return DeadBugGameSceneName;
+    }
+
+    private static string ResolveCoachSceneFromAction(PlannedAction action)
+    {
+        if (action == null || string.IsNullOrWhiteSpace(action.actionId))
+        {
+            return null;
+        }
+
+        string actionId = action.actionId.Trim().ToLowerInvariant()
+            .Replace("-", string.Empty)
+            .Replace("_", string.Empty)
+            .Replace(" ", string.Empty);
+        if (actionId.Contains("birddog"))
+        {
+            return IsMaleMobileSession
+                ? MaleBirdDogPracticeSceneName
+                : BirdDogPracticeSceneName;
+        }
+
+        if (actionId.Contains("deadbug"))
+        {
+            return IsMaleMobileSession
+                ? MaleDeadBugPracticeSceneName
+                : DeadBugPracticeSceneName;
+        }
+
+        return null;
     }
 
     public static string ResolveSceneForGender(string sceneName, bool isMale)
@@ -1097,7 +1179,21 @@ public sealed class SpineFlowTrainingSession : MonoBehaviour
         }
 
         ResetMeasurementsForNewSession();
-        string targetScene = ResolveSceneForMobileSession(startPayload.targetScene?.Trim());
+        string requestedScene = ResolveSceneForMobileSession(startPayload.targetScene?.Trim());
+        string recommendedCoachScene = ResolveCoachSceneFromAction(
+            FindPlannedAction("coach"));
+        string targetScene = requestedScene;
+        if (!string.IsNullOrEmpty(recommendedCoachScene) &&
+            (string.IsNullOrEmpty(requestedScene) ||
+             IsBuiltInCoachScene(requestedScene)))
+        {
+            targetScene = recommendedCoachScene;
+        }
+
+        if (string.IsNullOrEmpty(targetScene))
+        {
+            targetScene = DefaultCoachSceneName;
+        }
         if (!IsSupportedPracticeScene(targetScene))
         {
             Debug.LogError(
@@ -1117,11 +1213,21 @@ public sealed class SpineFlowTrainingSession : MonoBehaviour
 
     private static bool IsSupportedPracticeScene(string sceneName)
     {
-        return string.Equals(sceneName, DeadBugPracticeSceneName, StringComparison.Ordinal) ||
+        return string.Equals(sceneName, LegacyCoachSelectionSceneName, StringComparison.Ordinal) ||
+            string.Equals(sceneName, DeadBugPracticeSceneName, StringComparison.Ordinal) ||
             string.Equals(sceneName, MaleDeadBugPracticeSceneName, StringComparison.Ordinal) ||
             string.Equals(sceneName, BirdDogPracticeSceneName, StringComparison.Ordinal) ||
             string.Equals(sceneName, MaleBirdDogPracticeSceneName, StringComparison.Ordinal) ||
             string.Equals(sceneName, UnifiedPracticeSceneName, StringComparison.Ordinal);
+    }
+
+    private static bool IsBuiltInCoachScene(string sceneName)
+    {
+        return string.Equals(sceneName, LegacyCoachSelectionSceneName, StringComparison.Ordinal) ||
+            string.Equals(sceneName, DeadBugPracticeSceneName, StringComparison.Ordinal) ||
+            string.Equals(sceneName, MaleDeadBugPracticeSceneName, StringComparison.Ordinal) ||
+            string.Equals(sceneName, BirdDogPracticeSceneName, StringComparison.Ordinal) ||
+            string.Equals(sceneName, MaleBirdDogPracticeSceneName, StringComparison.Ordinal);
     }
 
     private void PublishPendingMotionPackage()

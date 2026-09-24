@@ -60,8 +60,22 @@ public sealed class MobileDisplayModeBootstrap : MonoBehaviour
         foreach (Canvas canvas in canvases)
         {
             if (canvas == null) continue;
+            // Avatar labels must remain attached to the models, not cover the
+            // phone viewport as independent full-screen canvases.
+            if (canvas.GetComponentInParent<Animator>() != null &&
+                FindObjectOfType<MobileCoachControls>() != null) continue;
             canvas.renderMode = RenderMode.ScreenSpaceOverlay;
             canvas.worldCamera = null;
+            if (canvas.name == "StartMenuCanvas")
+            {
+                foreach (Transform child in canvas.GetComponentsInChildren<Transform>(true))
+                {
+                    if (Mathf.Abs(Mathf.DeltaAngle(child.localEulerAngles.y, 180f)) < 1f)
+                    {
+                        child.localRotation = Quaternion.identity;
+                    }
+                }
+            }
             CanvasScaler scaler = canvas.GetComponent<CanvasScaler>();
             if (scaler == null) scaler = canvas.gameObject.AddComponent<CanvasScaler>();
             scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
@@ -79,6 +93,15 @@ public sealed class MobileDisplayModeBootstrap : MonoBehaviour
             GameObject go = new GameObject("EventSystem", typeof(EventSystem), typeof(StandaloneInputModule));
             eventSystem = go.GetComponent<EventSystem>();
         }
+
+        // Migrated AR scenes used XRUIInputModule. When the XR packages are
+        // intentionally absent on mobile, keep the EventSystem and provide a
+        // touch-capable fallback instead of leaving every Button inert.
+        if (eventSystem.GetComponent<BaseInputModule>() == null)
+        {
+            eventSystem.gameObject.AddComponent<StandaloneInputModule>();
+        }
+
         eventSystem.sendNavigationEvents = false;
     }
 

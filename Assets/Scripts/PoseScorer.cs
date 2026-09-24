@@ -239,6 +239,12 @@ public class PoseScorer : MonoBehaviour
     [SerializeField] private ScorePopup scorePopup; // 分数弹出显示UI
     [SerializeField] private BodyPartFeedbackUI bodyPartFeedback; // 身体部位提示UI
     [SerializeField] private AvatarBodyPartHighlighter modelBodyPartHighlighter;
+    [Tooltip("Shared tracker motor controller. It only consumes confirmed guidance parts.")]
+    [SerializeField] private CoachHapticFeedbackController hapticFeedback;
+    private readonly HashSet<TrackerWearLocation> hapticLocationOverrides =
+        new HashSet<TrackerWearLocation>();
+    private TargetedExercisePoseGeometry latestTargetedGuidanceGeometry;
+    private bool hasLatestTargetedGuidanceGeometry;
     [SerializeField] private bool enableModelSurfaceHighlight = true;
     [Tooltip("Dead Bug and Bird Dog use body-plane geometry instead of the " +
         "recorded coach pose. Generic preserves the reusable target comparer.")]
@@ -287,6 +293,8 @@ public class PoseScorer : MonoBehaviour
     [Tooltip("可选：用于调试的文字显示")]
     [SerializeField] private Text statusText;
     [SerializeField] private Text scoreText;
+    private TMP_Text mobileStatusText;
+    private TMP_Text mobileScoreText;
     [SerializeField] private Button nextButton;
 
     [Header("Difficulty Configuration")]
@@ -540,12 +548,19 @@ public class PoseScorer : MonoBehaviour
 
     private void Start()
     {
+        var mobileControls = FindObjectOfType<MobileCoachControls>();
+        if (mobileControls != null)
+        {
+            mobileStatusText = mobileControls.transform.Find("MobileStatus")?.GetComponent<TMP_Text>();
+            mobileScoreText = mobileControls.transform.Find("MobileScore")?.GetComponent<TMP_Text>();
+        }
         scoringEngine = new RobustPoseScoringEngine(robustScoring);
         guidanceDiagnosticEngine = new PoseHighlightDiagnosticEngine(
             guidanceDiagnostics);
         EnsureGuidanceState();
         ResolveGuidanceVmcReceiver();
         BuildEffectiveStabilityBones();
+        EnsureHapticFeedbackController();
         // 自动查找 VoicePromptManager
         if (voiceManager == null)
         {
@@ -690,20 +705,28 @@ public class PoseScorer : MonoBehaviour
         scoringEngine = null;
         guidanceDiagnosticEngine?.Dispose();
         guidanceDiagnosticEngine = null;
+        hapticFeedback?.StopAllHaptics();
     }
 
     private void OnDisable()
     {
+        hapticFeedback?.StopAllHaptics();
         ResetVisualGuidanceEvidence();
         modelBodyPartHighlighter?.Hide();
     }
 
     private void Update()
     {
+        if (MobileCoachControls.IsPaused)
+        {
+            hapticFeedback?.StopAllHaptics();
+            return;
+        }
         sessionMotionEvidence.Sample();
 
         if (currentState == State.Idle)
         {
+            UpdateHapticFeedback();
             return;
         }
 
@@ -721,10 +744,13 @@ public class PoseScorer : MonoBehaviour
             UpdateScoring();
         }
 
+        UpdateHapticFeedback();
+
     }
 
     private void HandleSegmentHold(SegmentHoldInfo info)
     {
+        hapticFeedback?.StopAllHaptics();
         bool isFirstHold =
             info.segmentIndex == 0 && info.repeatIndex == 0 && info.setIndex == 0;
 
@@ -784,6 +810,7 @@ public class PoseScorer : MonoBehaviour
 
     private void HandleAllComplete()
     {
+        hapticFeedback?.StopAllHaptics();
         sessionMotionEvidence.Stop();
         TransitionTo(State.Idle, "all segments complete");
         // The final transition can be shorter than the queued completion cue.
@@ -871,6 +898,8 @@ public class PoseScorer : MonoBehaviour
 
     private void TransitionTo(State nextState, string reason)
     {
+        if (nextState == State.Scoring || nextState == State.Idle)
+            hapticFeedback?.StopAllHaptics();
         State previousState = currentState;
         currentState = nextState;
         Debug.Log(
@@ -1647,6 +1676,7 @@ public class PoseScorer : MonoBehaviour
 
     private void UpdateStatusText(string message)
     {
+        if (mobileStatusText != null) mobileStatusText.text = message;
         if (statusText != null)
         {
             statusText.text = message;
@@ -1655,6 +1685,7 @@ public class PoseScorer : MonoBehaviour
 
     private void UpdateScoreText(string message)
     {
+        if (mobileScoreText != null) mobileScoreText.text = message;
         if (scoreText != null)
         {
             scoreText.text = message;
@@ -1860,6 +1891,266 @@ public class PoseScorer : MonoBehaviour
         UpdateCoarseActionReadiness(Time.deltaTime);
     }
 
+    private void EnsureHapticFeedbackController()
+    {
+        if (hapticFeedback == null)
+        {
+            hapticFeedback = FindObjectOfType<CoachHapticFeedbackController>(true);
+        }
+
+        if (hapticFeedback == null)
+        {
+            hapticFeedback = gameObject.AddComponent<CoachHapticFeedbackController>();
+        }
+    }
+
+    private void UpdateHapticFeedback()
+    {
+        EnsureHapticFeedbackController();
+        BuildHapticLocationOverrides();
+        bool guidancePhaseEnabled =
+            currentState == State.WaitingStable ||
+            currentState == State.PreparingScore;
+        bool guidanceInputFresh = guidanceInputIsFresh;
+        hapticFeedback.Tick(
+            guidancePhaseEnabled,
+            guidanceInputFresh,
+            confirmedGuidanceParts,
+            hapticLocationOverrides,
+            MobileCoachControls.IsPaused);
+    }
+
+    private void BuildHapticLocationOverrides()
+    {
+        hapticLocationOverrides.Clear();
+        foreach (BodyPart part in confirmedGuidanceParts)
+        {
+            if (part == BodyPart.Torso)
+            {
+                hapticLocationOverrides.Add(TrackerWearLocation.Chest);
+                hapticLocationOverrides.Add(TrackerWearLocation.Abdomen);
+                continue;
+            }
+
+            if (!UsesTargetedExerciseGuidance ||
+                !hasLatestTargetedGuidanceGeometry ||
+                !TryGetTargetedLimbHapticLocations(
+                    part,
+                    out TrackerWearLocation proximal,
+                    out TrackerWearLocation distal,
+                    out bool useProximal,
+                    out bool useDistal))
+            {
+                continue;
+            }
+
+            if (useProximal)
+            {
+                hapticLocationOverrides.Add(proximal);
+            }
+            if (useDistal)
+            {
+                hapticLocationOverrides.Add(distal);
+            }
+        }
+    }
+
+    private bool TryGetTargetedLimbHapticLocations(
+        BodyPart part,
+        out TrackerWearLocation proximal,
+        out TrackerWearLocation distal,
+        out bool useProximal,
+        out bool useDistal)
+    {
+        proximal = default;
+        distal = default;
+        useProximal = false;
+        useDistal = false;
+
+        if (!TryGetTargetedLimbEvidence(
+                part,
+                out Vector3 direction,
+                out bool directionTracked,
+                out float bendDegrees,
+                out bool bendTracked,
+                out bool expectedActive,
+                out proximal,
+                out distal))
+        {
+            return false;
+        }
+
+        // A Bird Dog support failure may be caused by contact/endpoint drop,
+        // not one anatomical segment. Keep the existing full-limb cue there.
+        if (guidanceExercise == PoseGuidanceExercise.BirdDog && !expectedActive)
+        {
+            useProximal = true;
+            useDistal = true;
+            return true;
+        }
+
+        float proximalSeverity = CalculateProximalHapticSeverity(
+            direction,
+            directionTracked,
+            expectedActive);
+        float distalSeverity = guidanceExercise == PoseGuidanceExercise.BirdDog &&
+            expectedActive && bendTracked
+            ? NormalizeAboveThreshold(
+                bendDegrees,
+                targetedExerciseGuidance.birdDogBendClearAtOrBelowDegrees,
+                targetedExerciseGuidance.birdDogBendActivationAboveDegrees)
+            : 0f;
+
+        const float dominanceMargin = 0.15f;
+        if (proximalSeverity >= distalSeverity + dominanceMargin)
+        {
+            useProximal = true;
+        }
+        else if (distalSeverity >= proximalSeverity + dominanceMargin)
+        {
+            useDistal = true;
+        }
+        else
+        {
+            // Do not guess when the visual region is confirmed but the source
+            // is mixed or temporarily unavailable.
+            useProximal = true;
+            useDistal = true;
+        }
+
+        return true;
+    }
+
+    private bool TryGetTargetedLimbEvidence(
+        BodyPart part,
+        out Vector3 direction,
+        out bool directionTracked,
+        out float bendDegrees,
+        out bool bendTracked,
+        out bool expectedActive,
+        out TrackerWearLocation proximal,
+        out TrackerWearLocation distal)
+    {
+        direction = Vector3.zero;
+        directionTracked = false;
+        bendDegrees = 0f;
+        bendTracked = false;
+        expectedActive = IsExpectedActiveTargetedLimb(part);
+        proximal = default;
+        distal = default;
+
+        bool birdDog = guidanceExercise == PoseGuidanceExercise.BirdDog;
+        switch (part)
+        {
+            case BodyPart.LeftArm:
+                direction = birdDog ? latestTargetedGuidanceGeometry.leftArmLineDirection : latestTargetedGuidanceGeometry.leftArmDirection;
+                directionTracked = birdDog ? latestTargetedGuidanceGeometry.leftArmLineTracked : latestTargetedGuidanceGeometry.leftArmTracked;
+                bendDegrees = latestTargetedGuidanceGeometry.leftArmBendDegrees;
+                bendTracked = latestTargetedGuidanceGeometry.leftArmBendTracked;
+                proximal = TrackerWearLocation.LeftUpperArm;
+                distal = TrackerWearLocation.LeftForearm;
+                return true;
+            case BodyPart.RightArm:
+                direction = birdDog ? latestTargetedGuidanceGeometry.rightArmLineDirection : latestTargetedGuidanceGeometry.rightArmDirection;
+                directionTracked = birdDog ? latestTargetedGuidanceGeometry.rightArmLineTracked : latestTargetedGuidanceGeometry.rightArmTracked;
+                bendDegrees = latestTargetedGuidanceGeometry.rightArmBendDegrees;
+                bendTracked = latestTargetedGuidanceGeometry.rightArmBendTracked;
+                proximal = TrackerWearLocation.RightUpperArm;
+                distal = TrackerWearLocation.RightForearm;
+                return true;
+            case BodyPart.LeftLeg:
+                direction = latestTargetedGuidanceGeometry.leftLegDirection;
+                directionTracked = latestTargetedGuidanceGeometry.leftLegTracked;
+                bendDegrees = latestTargetedGuidanceGeometry.leftLegBendDegrees;
+                bendTracked = latestTargetedGuidanceGeometry.leftLegBendTracked;
+                proximal = TrackerWearLocation.LeftThigh;
+                distal = TrackerWearLocation.LeftLowerLeg;
+                return true;
+            case BodyPart.RightLeg:
+                direction = latestTargetedGuidanceGeometry.rightLegDirection;
+                directionTracked = latestTargetedGuidanceGeometry.rightLegTracked;
+                bendDegrees = latestTargetedGuidanceGeometry.rightLegBendDegrees;
+                bendTracked = latestTargetedGuidanceGeometry.rightLegBendTracked;
+                proximal = TrackerWearLocation.RightThigh;
+                distal = TrackerWearLocation.RightLowerLeg;
+                return true;
+            default:
+                return false;
+        }
+    }
+
+    private bool IsExpectedActiveTargetedLimb(BodyPart part)
+    {
+        if (currentSegmentInfo.segmentKind != TrainingSegmentKind.CoreAction ||
+            currentSegmentInfo.poseGuidanceRule.mode != PoseGuidanceProfileMode.Explicit)
+        {
+            return false;
+        }
+
+        PoseGuidanceRegionMask mask = part == BodyPart.LeftArm
+            ? PoseGuidanceRegionMask.LeftArm
+            : part == BodyPart.RightArm
+                ? PoseGuidanceRegionMask.RightArm
+                : part == BodyPart.LeftLeg
+                    ? PoseGuidanceRegionMask.LeftLeg
+                    : part == BodyPart.RightLeg
+                        ? PoseGuidanceRegionMask.RightLeg
+                        : PoseGuidanceRegionMask.None;
+        return (currentSegmentInfo.poseGuidanceRule.activeRegions & mask) != 0;
+    }
+
+    private float CalculateProximalHapticSeverity(
+        Vector3 direction,
+        bool directionTracked,
+        bool expectedActive)
+    {
+        if (!directionTracked ||
+            !TargetedExercisePoseGuidance.TryCalculateLiftDegrees(
+                guidanceExercise,
+                latestTargetedGuidanceGeometry.bodyPlaneNormal,
+                direction,
+                out float liftDegrees))
+        {
+            return 0f;
+        }
+
+        if (guidanceExercise == PoseGuidanceExercise.BirdDog && expectedActive)
+        {
+            return NormalizeBelowThreshold(
+                liftDegrees,
+                targetedExerciseGuidance.birdDogActiveLiftClearAtOrAboveDegrees,
+                targetedExerciseGuidance.birdDogActiveLiftActivationBelowDegrees);
+        }
+
+        return expectedActive
+            ? NormalizeBelowThreshold(
+                liftDegrees,
+                targetedExerciseGuidance.requiredLiftClearAtOrAboveDegrees,
+                targetedExerciseGuidance.requiredLiftActivationBelowDegrees)
+            : NormalizeAboveThreshold(
+                liftDegrees,
+                targetedExerciseGuidance.unexpectedLiftClearAtOrBelowDegrees,
+                targetedExerciseGuidance.unexpectedLiftActivationAboveDegrees);
+    }
+
+    private static float NormalizeBelowThreshold(
+        float value,
+        float clearAtOrAbove,
+        float activateBelow)
+    {
+        return Mathf.Clamp01((clearAtOrAbove - value) /
+            Mathf.Max(1f, clearAtOrAbove - activateBelow));
+    }
+
+    private static float NormalizeAboveThreshold(
+        float value,
+        float clearAtOrBelow,
+        float activateAbove)
+    {
+        return Mathf.Clamp01((value - clearAtOrBelow) /
+            Mathf.Max(1f, activateAbove - clearAtOrBelow));
+    }
+
     private bool RequiresCoarseActionReadiness =>
         currentSegmentInfo.segmentKind == TrainingSegmentKind.CoreAction &&
         currentSegmentInfo.poseGuidanceRule.mode ==
@@ -1923,8 +2214,9 @@ public class PoseScorer : MonoBehaviour
         PoseHighlightFrameDiagnostics diagnostics;
         if (UsesTargetedExerciseGuidance)
         {
-            TryCaptureTargetedExerciseGeometry(
+            hasLatestTargetedGuidanceGeometry = TryCaptureTargetedExerciseGeometry(
                 out TargetedExercisePoseGeometry geometry);
+            latestTargetedGuidanceGeometry = geometry;
             diagnostics = TargetedExercisePoseGuidance.Evaluate(
                 guidanceExercise,
                 currentSegmentInfo.segmentKind,

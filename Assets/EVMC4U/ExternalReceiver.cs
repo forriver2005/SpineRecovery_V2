@@ -882,6 +882,10 @@ namespace EVMC4U
                         RootPositionTransform.localPosition -= offset;
                     }
                 }
+                else
+                {
+                    Model.transform.localScale = Vector3.one;
+                }
             }
             //ボーン姿勢
             else if (message.address == "/VMC/Ext/Bone/Pos"

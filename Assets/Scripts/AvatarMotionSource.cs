@@ -38,4 +38,13 @@ public sealed class AvatarMotionSource : MonoBehaviour
     {
         inputAvailable = available;
     }
+
+    // Exact telemetry for the SlimeVR bridge; other input producers retain ReportFrame.
+    public void SetReceiverFrame(float remoteTime, int framePackets, int bonePackets, bool available)
+    {
+        RemoteTime = remoteTime;
+        LastPacketframeCounterInFrame = Mathf.Max(0, framePackets);
+        LastBonePacketCounterInFrame = Mathf.Max(0, bonePackets);
+        inputAvailable = available;
+    }
 }

@@ -365,9 +365,10 @@ public class VoicePromptManager : MonoBehaviour
     private static IEnumerator WaitRealtime(float seconds)
     {
         float duration = Mathf.Max(0f, seconds);
-        if (duration > 0f)
+        while (duration > 0f)
         {
-            yield return new WaitForSecondsRealtime(duration);
+            yield return null;
+            if (!MobileCoachControls.IsPaused) duration -= Time.unscaledDeltaTime;
         }
     }
 

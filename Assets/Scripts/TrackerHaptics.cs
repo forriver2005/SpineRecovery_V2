@@ -1,11 +1,8 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
-using System.IO;
-using System.Text.RegularExpressions;
 using UnityEngine;
 using UnityEngine.Networking;
-// Shared transport for discrete rhythm hit feedback.
 
 /// <summary>
 /// Physical locations of the wearable trackers. This is intentionally
@@ -29,7 +26,7 @@ public enum TrackerWearLocation
 public sealed class TrackerMotorEndpoint
 {
     public TrackerWearLocation location;
-    [Tooltip("Tracker IPv4 address, for example 192.168.31.137")]
+    [Tooltip("设备 IPv4 地址，例如 192.168.31.137。")]
     public string address;
     [Min(1)] public int durationMs = 100;
 }
@@ -54,19 +51,22 @@ public sealed class SlimeVrHapticTrackerResponse
 }
 
 /// <summary>
-/// Sends one non-blocking timed pulse to the tracker selected by wear location.
-/// Callers are responsible for invoking PulseOnce only for a confirmed hit.
+/// Sends non-blocking timed pulses to tracker motor HTTP endpoints. The
+/// controller deliberately owns cadence and cancellation so PoseScorer only
+/// supplies confirmed guidance state.
 /// </summary>
 public sealed class CoachHapticFeedbackController : MonoBehaviour
 {
-    [Header("SlimeVR Discovery")]
-    [SerializeField] private string discoveryUrl =
-        "http://127.0.0.1:21111/api/haptics/trackers";
+    public static CoachHapticFeedbackController Instance { get; private set; }
+    private bool applicationPaused;
+    [Header("SlimeVR 自动识别")]
+    [SerializeField] private string discoveryUrl = string.Empty;
     [SerializeField, Min(0.5f)] private float discoveryIntervalSeconds = 2f;
 
-    [Header("Hit Haptics")]
+    [Header("演示设置")]
     [SerializeField] private bool enabledForDemo = true;
     [SerializeField, Min(1)] private int pulseDurationMs = 100;
+    [SerializeField, Min(0.1f)] private float repeatIntervalSeconds = 2f;
     [SerializeField, Min(1)] private int requestTimeoutSeconds = 1;
     [SerializeField] private TrackerMotorEndpoint[] endpoints =
     {
@@ -90,18 +90,57 @@ public sealed class CoachHapticFeedbackController : MonoBehaviour
         new HashSet<TrackerWearLocation>();
     private readonly Dictionary<TrackerWearLocation, int> endpointDurations =
         new Dictionary<TrackerWearLocation, int>();
+    private readonly Dictionary<TrackerWearLocation, float> lastPulseAt =
+        new Dictionary<TrackerWearLocation, float>();
     private readonly Dictionary<TrackerWearLocation, UnityWebRequest> inFlightRequests =
         new Dictionary<TrackerWearLocation, UnityWebRequest>();
-    private readonly HashSet<TrackerWearLocation> missingAddressWarnings =
+    private readonly HashSet<TrackerWearLocation> activeLocations =
         new HashSet<TrackerWearLocation>();
-    private Coroutine discoveryCoroutine;
-    private string lastLoggedDiscoveryStatus;
 
-    public string DiscoveryStatus { get; private set; } =
-        "Waiting for SlimeVR tracker bindings";
+    private bool phaseWasEnabled;
+    private Coroutine discoveryCoroutine;
+
+    public string DiscoveryStatus { get; private set; } = "等待连接修改版 SlimeVR";
+
+    private static readonly TrackerWearLocation[] RightArmMapping =
+    {
+        TrackerWearLocation.RightUpperArm,
+        TrackerWearLocation.RightForearm
+    };
+
+    private static readonly TrackerWearLocation[] LeftArmMapping =
+    {
+        TrackerWearLocation.LeftUpperArm,
+        TrackerWearLocation.LeftForearm
+    };
+
+    private static readonly TrackerWearLocation[] RightLegMapping =
+    {
+        TrackerWearLocation.RightThigh,
+        TrackerWearLocation.RightLowerLeg
+    };
+
+    private static readonly TrackerWearLocation[] LeftLegMapping =
+    {
+        TrackerWearLocation.LeftThigh,
+        TrackerWearLocation.LeftLowerLeg
+    };
+
+    private static readonly TrackerWearLocation[] TorsoMapping =
+    {
+        TrackerWearLocation.Chest,
+        TrackerWearLocation.Abdomen
+    };
 
     private void Awake()
     {
+        if (Instance != null && Instance != this)
+        {
+            enabled = false;
+            Destroy(this);
+            return;
+        }
+        Instance = this;
         RebuildEndpointMap();
     }
 
@@ -115,6 +154,7 @@ public sealed class CoachHapticFeedbackController : MonoBehaviour
 
     private void OnDisable()
     {
+        if (discoveryCoroutine != null) StopCoroutine(discoveryCoroutine);
         discoveryCoroutine = null;
         StopAllHaptics();
     }
@@ -122,10 +162,12 @@ public sealed class CoachHapticFeedbackController : MonoBehaviour
     private void OnDestroy()
     {
         StopAllHaptics();
+        if (Instance == this) Instance = null;
     }
 
     private void OnApplicationPause(bool paused)
     {
+        applicationPaused = paused;
         if (paused)
         {
             StopAllHaptics();
@@ -182,10 +224,10 @@ public sealed class CoachHapticFeedbackController : MonoBehaviour
         return automaticallyDiscoveredLocations.Contains(location);
     }
 
-    /// <summary>Triggers one pulse for a discrete hit result.</summary>
+    /// <summary>Triggers one pulse for a discrete gaming hit.</summary>
     public void PulseOnce(TrackerWearLocation location)
     {
-        if (!enabledForDemo || !isActiveAndEnabled)
+        if (!enabledForDemo || !isActiveAndEnabled || applicationPaused)
         {
             return;
         }
@@ -195,7 +237,100 @@ public sealed class CoachHapticFeedbackController : MonoBehaviour
             RebuildEndpointMap();
         }
 
-        TrySendPulse(location);
+        PulseIfDue(location, true);
+    }
+
+    /// <summary>
+    /// Advances haptic state for one guidance frame. Only confirmed body
+    /// regions are accepted; invalid or stale input cancels the active state.
+    /// </summary>
+    public void Tick(
+        bool guidancePhaseEnabled,
+        bool guidanceInputIsFresh,
+        ICollection<BodyPart> confirmedParts,
+        bool coachIsPaused)
+    {
+        Tick(
+            guidancePhaseEnabled,
+            guidanceInputIsFresh,
+            confirmedParts,
+            null,
+            coachIsPaused);
+    }
+
+    /// <summary>
+    /// Advances the same haptic state machine while optionally accepting
+    /// location-specific debug flags from the editor test tool.
+    /// </summary>
+    public void Tick(
+        bool guidancePhaseEnabled,
+        bool guidanceInputIsFresh,
+        ICollection<BodyPart> confirmedParts,
+        ICollection<TrackerWearLocation> debugLocations,
+        bool coachIsPaused)
+    {
+        bool canPulse = isActiveAndEnabled && !applicationPaused && enabledForDemo &&
+            guidancePhaseEnabled &&
+            guidanceInputIsFresh &&
+            !coachIsPaused;
+
+        if (!canPulse)
+        {
+            if (phaseWasEnabled || activeLocations.Count > 0)
+            {
+                StopAllHaptics();
+            }
+
+            phaseWasEnabled = false;
+            return;
+        }
+
+        phaseWasEnabled = true;
+        HashSet<TrackerWearLocation> requestedLocations =
+             BuildRequestedLocations(confirmedParts, debugLocations);
+        AddConfiguredDebugLocations(requestedLocations, debugLocations);
+
+        foreach (TrackerWearLocation location in requestedLocations)
+        {
+            if (activeLocations.Add(location))
+            {
+                PulseIfDue(location, true);
+            }
+            else
+            {
+                PulseIfDue(location, false);
+            }
+        }
+
+        foreach (TrackerWearLocation location in activeLocations)
+        {
+            if (!requestedLocations.Contains(location) &&
+                inFlightRequests.TryGetValue(location, out UnityWebRequest request))
+            {
+                request.Abort();
+                inFlightRequests.Remove(location);
+            }
+        }
+        activeLocations.RemoveWhere(location => !requestedLocations.Contains(location));
+    }
+
+    private void AddConfiguredDebugLocations(
+        HashSet<TrackerWearLocation> requestedLocations,
+        ICollection<TrackerWearLocation> debugLocations)
+    {
+        if (debugLocations == null)
+        {
+            return;
+        }
+
+        foreach (TrackerWearLocation location in debugLocations)
+        {
+            if (endpointAddresses.TryGetValue(location, out string address) &&
+                !string.IsNullOrWhiteSpace(address))
+            {
+                requestedLocations.Add(location);
+            }
+        }
     }
 
     public void StopAllHaptics()
@@ -206,6 +341,9 @@ public sealed class CoachHapticFeedbackController : MonoBehaviour
         }
 
         inFlightRequests.Clear();
+        activeLocations.Clear();
+        lastPulseAt.Clear();
+        phaseWasEnabled = false;
     }
 
     private void RebuildEndpointMap()
@@ -255,235 +393,39 @@ public sealed class CoachHapticFeedbackController : MonoBehaviour
         catch (Exception exception)
         {
             ClearAutomaticallyDiscoveredEndpoints();
-            DiscoveryStatus = "Android tracker binding provider is unavailable";
-            Debug.LogWarning(
-                $"[Haptics] Failed to read Android tracker bindings: {exception.Message}",
-                this);
+            DiscoveryStatus = "未连接手机端内嵌 SlimeVR";
+            Debug.LogWarning($"[Haptics] 无法读取手机端自动绑定数据：{exception.Message}", this);
             yield break;
         }
 
-        ParseAndApplyTrackerBindings(responseJson, "Android SlimeVR");
+        ParseAndApplyTrackerBindings(responseJson, "手机端内嵌 SlimeVR");
+        Debug.Log($"[Haptics] Provider 返回绑定数据，长度={responseJson?.Length ?? 0}", this);
         yield break;
 #else
+        if (string.IsNullOrWhiteSpace(discoveryUrl))
+        {
+            ClearAutomaticallyDiscoveredEndpoints();
+            DiscoveryStatus = "等待外部 SlimeVR 自动绑定配置";
+            yield break;
+        }
+
         UnityWebRequest request = UnityWebRequest.Get(discoveryUrl);
         request.timeout = Mathf.Max(1, requestTimeoutSeconds);
         yield return request.SendWebRequest();
 
         if (request.result != UnityWebRequest.Result.Success)
         {
-            request.Dispose();
-#if UNITY_EDITOR_WIN || UNITY_STANDALONE_WIN
-            if (TryReadDesktopSlimeVrBindings(out SlimeVrHapticTrackerSnapshot[] trackers))
-            {
-                ApplyDiscoveredTrackers(trackers);
-                DiscoveryStatus = DiscoveryStatus.Replace(
-                    "Discovered",
-                    "Discovered from desktop SlimeVR");
-                LogDiscoveryStatusOnce();
-                yield break;
-            }
-#endif
             ClearAutomaticallyDiscoveredEndpoints();
-            DiscoveryStatus = "SlimeVR tracker bindings are unavailable";
-            LogDiscoveryStatusOnce();
+            DiscoveryStatus = "未连接修改版 SlimeVR（请先启动可执行程序）";
+            request.Dispose();
             yield break;
         }
 
         string responseJson = request.downloadHandler.text;
         request.Dispose();
-        ParseAndApplyTrackerBindings(responseJson, "Modified SlimeVR");
+        ParseAndApplyTrackerBindings(responseJson, "修改版 SlimeVR");
 #endif
     }
-
-#if UNITY_EDITOR_WIN || UNITY_STANDALONE_WIN
-    private static bool TryReadDesktopSlimeVrBindings(
-        out SlimeVrHapticTrackerSnapshot[] trackers)
-    {
-        trackers = null;
-        try
-        {
-            string slimeVrDirectory = Path.Combine(
-                Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
-                "dev.slimevr.SlimeVR");
-            string configPath = Path.Combine(slimeVrDirectory, "vrconfig.yml");
-            string logDirectory = Path.Combine(slimeVrDirectory, "logs");
-            if (!File.Exists(configPath) || !Directory.Exists(logDirectory))
-            {
-                return false;
-            }
-
-            Dictionary<string, string> bodyPositions =
-                ReadDesktopBodyAssignments(configPath);
-            Dictionary<string, string> trackerAddresses =
-                ReadDesktopTrackerAddresses(logDirectory);
-            var snapshots = new List<SlimeVrHapticTrackerSnapshot>();
-
-            foreach (KeyValuePair<string, string> binding in bodyPositions)
-            {
-                if (!trackerAddresses.TryGetValue(binding.Key, out string address))
-                {
-                    continue;
-                }
-
-                snapshots.Add(new SlimeVrHapticTrackerSnapshot
-                {
-                    hardwareId = binding.Key,
-                    name = $"udp://{binding.Key}",
-                    ip = address,
-                    bodyPosition = binding.Value,
-                    status = "OK",
-                    connected = true
-                });
-            }
-
-            trackers = snapshots.ToArray();
-            return trackers.Length > 0;
-        }
-        catch (Exception exception)
-        {
-            Debug.LogWarning(
-                $"[Haptics] Failed to read desktop SlimeVR bindings: {exception.Message}");
-            return false;
-        }
-    }
-
-    private static Dictionary<string, string> ReadDesktopBodyAssignments(
-        string configPath)
-    {
-        var result = new Dictionary<string, string>(
-            StringComparer.OrdinalIgnoreCase);
-        bool readingTrackers = false;
-        string currentHardwareId = null;
-
-        foreach (string line in ReadLinesShared(configPath))
-        {
-            if (!readingTrackers)
-            {
-                readingTrackers = line.Trim() == "trackers:" &&
-                    line.Length == line.Trim().Length;
-                continue;
-            }
-
-            if (line.Length > 0 && !char.IsWhiteSpace(line[0]))
-            {
-                break;
-            }
-
-            string trimmed = line.Trim();
-            if (trimmed.StartsWith("udp://", StringComparison.OrdinalIgnoreCase) &&
-                trimmed.EndsWith(":", StringComparison.Ordinal))
-            {
-                int sensorSuffix = trimmed.LastIndexOf("/0:", StringComparison.Ordinal);
-                currentHardwareId = sensorSuffix > 6
-                    ? trimmed.Substring(6, sensorSuffix - 6)
-                    : null;
-                continue;
-            }
-
-            if (currentHardwareId == null ||
-                !trimmed.StartsWith("designation:", StringComparison.OrdinalIgnoreCase))
-            {
-                continue;
-            }
-
-            string designation = trimmed.Substring("designation:".Length)
-                .Trim()
-                .Trim('"');
-            if (!string.IsNullOrWhiteSpace(designation) &&
-                !string.Equals(designation, "null", StringComparison.OrdinalIgnoreCase))
-            {
-                result[currentHardwareId] = designation;
-            }
-        }
-
-        return result;
-    }
-
-    private static IEnumerable<string> ReadLinesShared(string path)
-    {
-        using (FileStream stream = new FileStream(
-            path,
-            FileMode.Open,
-            FileAccess.Read,
-            FileShare.ReadWrite | FileShare.Delete))
-        using (StreamReader reader = new StreamReader(stream))
-        {
-            string line;
-            while ((line = reader.ReadLine()) != null)
-            {
-                yield return line;
-            }
-        }
-    }
-
-    private static Dictionary<string, string> ReadDesktopTrackerAddresses(
-        string logDirectory)
-    {
-        string[] logFiles = Directory.GetFiles(
-            logDirectory,
-            "slimevr-server*.log",
-            SearchOption.TopDirectoryOnly);
-        if (logFiles.Length == 0)
-        {
-            return new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-        }
-
-        string latestLog = logFiles[0];
-        DateTime latestWriteTime = File.GetLastWriteTimeUtc(latestLog);
-        for (int i = 1; i < logFiles.Length; i++)
-        {
-            DateTime writeTime = File.GetLastWriteTimeUtc(logFiles[i]);
-            if (writeTime > latestWriteTime)
-            {
-                latestLog = logFiles[i];
-                latestWriteTime = writeTime;
-            }
-        }
-
-        var result = new Dictionary<string, string>(
-            StringComparer.OrdinalIgnoreCase);
-        Regex connectedPattern = new Regex(
-            @"connected from address /(?<ip>(?:\d{1,3}\.){3}\d{1,3}):",
-            RegexOptions.Compiled);
-        Regex hardwarePattern = new Regex(
-            @"\bmac:\s*(?<hardware>(?:[0-9A-Fa-f]{2}:){5}[0-9A-Fa-f]{2})",
-            RegexOptions.Compiled);
-        string pendingAddress = null;
-
-        using (FileStream stream = new FileStream(
-            latestLog,
-            FileMode.Open,
-            FileAccess.Read,
-            FileShare.ReadWrite | FileShare.Delete))
-        using (StreamReader reader = new StreamReader(stream))
-        {
-            string line;
-            while ((line = reader.ReadLine()) != null)
-            {
-                Match connected = connectedPattern.Match(line);
-                if (connected.Success)
-                {
-                    pendingAddress = connected.Groups["ip"].Value;
-                    continue;
-                }
-
-                if (pendingAddress == null)
-                {
-                    continue;
-                }
-
-                Match hardware = hardwarePattern.Match(line.Trim());
-                if (hardware.Success)
-                {
-                    result[hardware.Groups["hardware"].Value] = pendingAddress;
-                    pendingAddress = null;
-                }
-            }
-        }
-
-        return result;
-    }
-#endif
 
     private void ParseAndApplyTrackerBindings(string responseJson, string sourceName)
     {
@@ -495,13 +437,13 @@ public sealed class CoachHapticFeedbackController : MonoBehaviour
         }
         catch (Exception exception)
         {
-            Debug.LogWarning($"[Haptics] Failed to parse SlimeVR tracker bindings: {exception.Message}", this);
+            Debug.LogWarning($"[Haptics] 无法解析 SlimeVR 自动绑定数据：{exception.Message}", this);
         }
 
         if (response == null || response.apiVersion != 1 || response.trackers == null)
         {
             ClearAutomaticallyDiscoveredEndpoints();
-            DiscoveryStatus = $"{sourceName} tracker binding response is invalid";
+            DiscoveryStatus = $"{sourceName}自动绑定数据格式不正确";
             return;
         }
 
@@ -530,8 +472,7 @@ public sealed class CoachHapticFeedbackController : MonoBehaviour
         {
             if (result == null)
             {
-                throw new InvalidOperationException(
-                    "Android tracker binding provider returned no result");
+                throw new InvalidOperationException("手机端未返回 Tracker 绑定数据");
             }
 
             return result.Call<string>("getString", "tracker_bindings_json");
@@ -578,28 +519,11 @@ public sealed class CoachHapticFeedbackController : MonoBehaviour
             automaticallyDiscoveredLocations.Add(binding.Key);
         }
 
-        DiscoveryStatus = $"Discovered {discovered.Count}/10 assigned trackers";
+        DiscoveryStatus = $"已自动识别 {discovered.Count}/10 个已分配设备";
         if (unassignedCount > 0)
         {
-            DiscoveryStatus += $"; {unassignedCount} trackers have no body assignment";
+            DiscoveryStatus += $"，另有 {unassignedCount} 个设备未分配部位";
         }
-
-        missingAddressWarnings.Clear();
-        LogDiscoveryStatusOnce();
-    }
-
-    private void LogDiscoveryStatusOnce()
-    {
-        if (string.Equals(
-            lastLoggedDiscoveryStatus,
-            DiscoveryStatus,
-            StringComparison.Ordinal))
-        {
-            return;
-        }
-
-        lastLoggedDiscoveryStatus = DiscoveryStatus;
-        Debug.Log($"[Haptics] {DiscoveryStatus}.", this);
     }
 
     private void ClearAutomaticallyDiscoveredEndpoints()
@@ -616,61 +540,38 @@ public sealed class CoachHapticFeedbackController : MonoBehaviour
         string bodyPosition,
         out TrackerWearLocation location)
     {
-        string normalized = (bodyPosition ?? string.Empty).Trim().ToLowerInvariant();
-        switch (normalized)
+        switch (bodyPosition)
         {
             case "body:upper_chest":
             case "body:chest":
-            case "upper_chest":
-            case "chest":
                 location = TrackerWearLocation.Chest;
                 return true;
             case "body:waist":
             case "body:hip":
-            case "waist":
-            case "hip":
                 location = TrackerWearLocation.Abdomen;
                 return true;
             case "body:left_upper_arm":
-            case "left_upper_arm":
-            case "leftupperarm":
                 location = TrackerWearLocation.LeftUpperArm;
                 return true;
             case "body:right_upper_arm":
-            case "right_upper_arm":
-            case "rightupperarm":
                 location = TrackerWearLocation.RightUpperArm;
                 return true;
             case "body:left_lower_arm":
-            case "left_lower_arm":
-            case "left_forearm":
-            case "leftforearm":
                 location = TrackerWearLocation.LeftForearm;
                 return true;
             case "body:right_lower_arm":
-            case "right_lower_arm":
-            case "right_forearm":
-            case "rightforearm":
                 location = TrackerWearLocation.RightForearm;
                 return true;
             case "body:left_upper_leg":
-            case "left_upper_leg":
-            case "leftthigh":
                 location = TrackerWearLocation.LeftThigh;
                 return true;
             case "body:right_upper_leg":
-            case "right_upper_leg":
-            case "rightthigh":
                 location = TrackerWearLocation.RightThigh;
                 return true;
             case "body:left_lower_leg":
-            case "left_lower_leg":
-            case "left_shin":
                 location = TrackerWearLocation.LeftLowerLeg;
                 return true;
             case "body:right_lower_leg":
-            case "right_lower_leg":
-            case "right_shin":
                 location = TrackerWearLocation.RightLowerLeg;
                 return true;
             default:
@@ -679,32 +580,115 @@ public sealed class CoachHapticFeedbackController : MonoBehaviour
         }
     }
 
-    private void TrySendPulse(TrackerWearLocation location)
+    private HashSet<TrackerWearLocation> BuildRequestedLocations(
+        ICollection<BodyPart> confirmedParts,
+        ICollection<TrackerWearLocation> debugLocations)
+    {
+        var requested = new HashSet<TrackerWearLocation>();
+        var overriddenParts = new HashSet<BodyPart>();
+        if (debugLocations != null)
+        {
+            foreach (TrackerWearLocation location in debugLocations)
+            {
+                BodyPart part = GetBodyPart(location);
+                if (part != BodyPart.None)
+                {
+                    overriddenParts.Add(part);
+                }
+            }
+        }
+
+        if (confirmedParts == null)
+        {
+            return requested;
+        }
+
+        foreach (BodyPart part in confirmedParts)
+        {
+            if (overriddenParts.Contains(part))
+            {
+                continue;
+            }
+
+            TrackerWearLocation[] mapped = GetMapping(part);
+            foreach (TrackerWearLocation location in mapped)
+            {
+                if (endpointAddresses.TryGetValue(location, out string address) &&
+                    !string.IsNullOrWhiteSpace(address))
+                {
+                    requested.Add(location);
+                }
+            }
+        }
+
+        return requested;
+    }
+
+    private static BodyPart GetBodyPart(TrackerWearLocation location)
+    {
+        switch (location)
+        {
+            case TrackerWearLocation.LeftUpperArm:
+            case TrackerWearLocation.LeftForearm:
+                return BodyPart.LeftArm;
+            case TrackerWearLocation.RightUpperArm:
+            case TrackerWearLocation.RightForearm:
+                return BodyPart.RightArm;
+            case TrackerWearLocation.LeftThigh:
+            case TrackerWearLocation.LeftLowerLeg:
+                return BodyPart.LeftLeg;
+            case TrackerWearLocation.RightThigh:
+            case TrackerWearLocation.RightLowerLeg:
+                return BodyPart.RightLeg;
+            case TrackerWearLocation.Chest:
+            case TrackerWearLocation.Abdomen:
+                return BodyPart.Torso;
+            default:
+                return BodyPart.None;
+        }
+    }
+
+    private static TrackerWearLocation[] GetMapping(BodyPart part)
+    {
+        switch (part)
+        {
+            case BodyPart.LeftArm:
+                return LeftArmMapping;
+            case BodyPart.RightArm:
+                return RightArmMapping;
+            case BodyPart.LeftLeg:
+                return LeftLegMapping;
+            case BodyPart.RightLeg:
+                return RightLegMapping;
+            case BodyPart.Torso:
+                return TorsoMapping;
+            default:
+                return Array.Empty<TrackerWearLocation>();
+        }
+    }
+
+    private void PulseIfDue(TrackerWearLocation location, bool enteringError)
     {
         if (!endpointAddresses.TryGetValue(location, out string address) ||
-            string.IsNullOrWhiteSpace(address))
-        {
-            if (missingAddressWarnings.Add(location))
-            {
-                Debug.LogWarning(
-                    $"[Haptics] No Tracker address is assigned for {location}. " +
-                    "Automatic discovery must return a connected tracker with a body position.",
-                    this);
-            }
-            return;
-        }
-
-        if (inFlightRequests.ContainsKey(location))
+            string.IsNullOrWhiteSpace(address) ||
+            inFlightRequests.ContainsKey(location))
         {
             return;
         }
 
+        float now = Time.unscaledTime;
+        bool hasPreviousPulse = lastPulseAt.TryGetValue(location, out float previousPulseAt);
+        if (!enteringError &&
+            hasPreviousPulse &&
+            now - previousPulseAt < repeatIntervalSeconds)
+        {
+            return;
+        }
+
+        lastPulseAt[location] = now;
         int durationMs = endpointDurations.TryGetValue(location, out int configuredDuration)
             ? configuredDuration
             : pulseDurationMs;
-        Debug.Log(
-            $"[Haptics] HIT -> {location} ({address}), {durationMs} ms.",
-            this);
         StartCoroutine(SendPulse(location, address, durationMs));
     }
 

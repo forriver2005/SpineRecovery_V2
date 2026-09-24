@@ -239,6 +239,7 @@ public class PracticeSessionController : MonoBehaviour
 
     private void LateUpdate()
     {
+        if (MobileCoachControls.IsPaused) return;
         PreserveAuthoredUserScale();
         UpdateUserTrackerFreshness(Time.unscaledDeltaTime);
         UpdateCompletionPostureGate(Time.unscaledDeltaTime);

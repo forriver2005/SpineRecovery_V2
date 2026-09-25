@@ -9,6 +9,15 @@ EditorBuildSettings:
     path: Assets/Scenes/DeadBugPractice.unity
     guid: ecead03f6d981dc4d898b11fbfc000ab
   - enabled: 1
+    path: Assets/Scenes/BirdDogPractice.unity
+    guid: 18cc5a1bc2834e3e9d998a3fc94ec82c
+  - enabled: 1
+    path: Assets/Scenes/maleDeadBugPractice.unity
+    guid: 59fb747a346951c499d43263eb9ba6a2
+  - enabled: 1
+    path: Assets/Scenes/maleBirdDogPractice.unity
+    guid: 8ef3d31162d94a0ba3a0f41ee91dce5f
+  - enabled: 1
     path: Assets/Scenes/SpineV2Minimal.unity
     guid: 337343efb3e6f5741bcaea6cc036886f
   - enabled: 1

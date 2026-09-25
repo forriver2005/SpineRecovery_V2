@@ -25,7 +25,13 @@ public sealed class FaceCameraBillboard : MonoBehaviour
             return;
         }
 
-        anchorLocalPosition = transform.localPosition;
+        RectTransform rectTransform = transform as RectTransform;
+        anchorLocalPosition = rectTransform != null
+            ? new Vector3(
+                rectTransform.anchoredPosition.x,
+                rectTransform.anchoredPosition.y,
+                rectTransform.localPosition.z)
+            : transform.localPosition;
         transform.SetParent(null, true);
     }
 
@@ -33,7 +39,16 @@ public sealed class FaceCameraBillboard : MonoBehaviour
     {
         if (detachFromRotatingParent && positionAnchor != null)
         {
-            transform.position = positionAnchor.TransformPoint(anchorLocalPosition);
+            // Keep the label above the coach in screen space even when the
+            // coach rotates into a lying pose. The old TransformPoint call
+            // rotated the vertical offset with the avatar and could move the
+            // label sideways or behind the camera.
+            float verticalOffset =
+                anchorLocalPosition.y * Mathf.Abs(positionAnchor.lossyScale.y);
+            Vector3 horizontalOffset =
+                positionAnchor.right * anchorLocalPosition.x;
+            transform.position = positionAnchor.position +
+                horizontalOffset + Vector3.up * verticalOffset;
         }
 
         if (targetCamera == null || !targetCamera.isActiveAndEnabled)

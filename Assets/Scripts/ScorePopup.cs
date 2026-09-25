@@ -41,6 +41,9 @@ public class ScorePopup : MonoBehaviour
         if (scoreText != null)
         {
             scoreText.fontSize = fontSize;
+            scoreText.enableWordWrapping = false;
+            scoreText.overflowMode = TextOverflowModes.Overflow;
+            scoreText.rectTransform.sizeDelta = new Vector2(640f, 110f);
         }
 
         // 找到背景Image并设置为透明
@@ -94,7 +97,7 @@ public class ScorePopup : MonoBehaviour
 
     public static string FormatLiveScoreText(float score)
     {
-        return $"实时分数: {FormalActionScoreMappingSettings.RoundForDisplay(score)}";
+        return $"实时分数：{FormalActionScoreMappingSettings.RoundForDisplay(score)}";
     }
 
     public static string FormatAverageScoreText(float score, string feedback)
@@ -102,8 +105,8 @@ public class ScorePopup : MonoBehaviour
         int displayed =
             FormalActionScoreMappingSettings.RoundForDisplay(score);
         return string.IsNullOrWhiteSpace(feedback)
-            ? $"平均分: {displayed}"
-            : $"平均分: {displayed}\n<size=45%><nobr>{feedback}</nobr></size>";
+            ? $"平均分：{displayed}"
+            : $"平均分：{displayed}\n<size=45%><nobr>{feedback}</nobr></size>";
     }
 
     public void HideImmediately()
@@ -178,8 +181,8 @@ public class ScorePopup : MonoBehaviour
         scoreText.text = label == "平均分"
             ? FormatAverageScoreText(score, feedback)
             : string.IsNullOrWhiteSpace(feedback)
-                ? $"{label}: {FormalActionScoreMappingSettings.RoundForDisplay(score)}"
-                : $"{label}: {FormalActionScoreMappingSettings.RoundForDisplay(score)}\n" +
+                ? $"{label}：{FormalActionScoreMappingSettings.RoundForDisplay(score)}"
+                : $"{label}：{FormalActionScoreMappingSettings.RoundForDisplay(score)}\n" +
                   $"<size=45%>{feedback}</size>";
 
         ShowCanvas();

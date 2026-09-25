@@ -7,8 +7,8 @@ using UnityEngine.UI;
 
 public class DeadBugStartMenuController : MonoBehaviour
 {
-    public const float PracticeControlTopY = 100f;
-    public const float PracticeControlVerticalSpacing = 100f;
+    public const float PracticeControlTopY = 250f;
+    public const float PracticeControlVerticalSpacing = 200f;
 
     private enum Difficulty
     {
@@ -275,10 +275,18 @@ public class DeadBugStartMenuController : MonoBehaviour
             child.gameObject.SetActive(true);
             if (child is RectTransform rectTransform)
             {
+                rectTransform.sizeDelta = new Vector2(380f, 140f);
                 rectTransform.anchoredPosition = new Vector2(
                     0f,
                     PracticeControlTopY -
                     columnIndex * PracticeControlVerticalSpacing);
+
+                TMP_Text buttonText =
+                    child.GetComponentInChildren<TMP_Text>(true);
+                if (buttonText != null)
+                {
+                    buttonText.fontSize = 48f;
+                }
             }
         }
     }

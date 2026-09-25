@@ -2,6 +2,7 @@ using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UI;
+using TMPro;
 
 [DefaultExecutionOrder(20000)]
 public class PracticeSessionController : MonoBehaviour
@@ -123,6 +124,10 @@ public class PracticeSessionController : MonoBehaviour
     private Transform authoredScaleUserRoot;
     private Vector3 authoredUserLocalScale;
     private bool hasAuthoredUserLocalScale;
+    private Canvas coachOverlayCanvas;
+    private RectTransform coachOverlayRect;
+    private TMP_Text coachOverlayText;
+    private bool coachOverlayVisibleRequested;
 
     public bool IsLyingOverheadPresentationReady =>
         ShouldUseLyingOverheadPresentation(
@@ -177,6 +182,7 @@ public class PracticeSessionController : MonoBehaviour
         ResolvePresentationController();
         ResolveVoicePromptManager();
         ResolveCoachLabel();
+        EnsureCoachOverlayLabel();
         ResolveUserTrackerReceiver();
         CaptureAuthoredUserScale();
         DisableTrackerRootScaleSynchronization();
@@ -243,6 +249,7 @@ public class PracticeSessionController : MonoBehaviour
         PreserveAuthoredUserScale();
         UpdateUserTrackerFreshness(Time.unscaledDeltaTime);
         UpdateCompletionPostureGate(Time.unscaledDeltaTime);
+        UpdateCoachOverlayLabel();
 
         if (!practiceRunning || !alignUserDirectionToCoachOnStart)
         {
@@ -462,6 +469,14 @@ public class PracticeSessionController : MonoBehaviour
         }
 
         RestoreIntroductionRendererStates();
+        // The coach name remains visible during formal training, as in the
+        // authored coach-mode scene. Introduction stages may hide it briefly.
+        ResolveCoachLabel();
+        if (coachLabel != null)
+        {
+            coachLabel.SetActive(true);
+        }
+        SetCoachOverlayVisible(true);
         trainingPlaybackStarted = true;
         Debug.Log(
             "PracticeSessionController: introduction complete; starting formal training.",
@@ -572,6 +587,137 @@ public class PracticeSessionController : MonoBehaviour
         {
             coachLabel.SetActive(visible && introductionCoachLabelWasActive);
         }
+
+        SetCoachOverlayVisible(visible && introductionCoachLabelWasActive);
+    }
+
+    private void EnsureCoachOverlayLabel()
+    {
+        if (coachOverlayText != null)
+        {
+            return;
+        }
+
+        GameObject canvasObject = new GameObject(
+            "CoachLabelOverlay",
+            typeof(Canvas),
+            typeof(CanvasScaler),
+            typeof(GraphicRaycaster));
+        coachOverlayCanvas = canvasObject.GetComponent<Canvas>();
+        coachOverlayCanvas.renderMode = RenderMode.ScreenSpaceOverlay;
+        coachOverlayCanvas.sortingOrder = 1000;
+
+        CanvasScaler scaler = canvasObject.GetComponent<CanvasScaler>();
+        scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
+        scaler.referenceResolution = new Vector2(1920f, 1080f);
+        scaler.matchWidthOrHeight = 0.5f;
+
+        GameObject textObject = new GameObject(
+            "CoachLabelText",
+            typeof(RectTransform),
+            typeof(CanvasRenderer),
+            typeof(TextMeshProUGUI));
+        textObject.transform.SetParent(canvasObject.transform, false);
+        coachOverlayRect = textObject.GetComponent<RectTransform>();
+        coachOverlayRect.sizeDelta = new Vector2(260f, 76f);
+        coachOverlayRect.pivot = new Vector2(0.5f, 0f);
+
+        coachOverlayText = textObject.GetComponent<TextMeshProUGUI>();
+        coachOverlayText.text = "Coach";
+        coachOverlayText.font = Resources.Load<TMP_FontAsset>(
+            "Fonts & Materials/LiberationSans SDF");
+        coachOverlayText.fontSize = 42f;
+        coachOverlayText.fontStyle = FontStyles.Normal;
+        coachOverlayText.alignment = TextAlignmentOptions.Center;
+        coachOverlayText.color = Color.white;
+        coachOverlayText.raycastTarget = false;
+        SetCoachOverlayVisible(false);
+
+        // The authored world-space label is kept for scene compatibility, but
+        // its mesh is hidden so the stable screen-space label is the only one.
+        if (coachLabel != null)
+        {
+            TMP_Text worldText = coachLabel.GetComponent<TMP_Text>();
+            if (worldText != null)
+            {
+                worldText.enabled = false;
+            }
+
+            MeshRenderer worldRenderer = coachLabel.GetComponent<MeshRenderer>();
+            if (worldRenderer != null)
+            {
+                worldRenderer.enabled = false;
+            }
+        }
+    }
+
+    private void SetCoachOverlayVisible(bool visible)
+    {
+        coachOverlayVisibleRequested = visible;
+        if (coachOverlayText != null)
+        {
+            coachOverlayText.gameObject.SetActive(visible);
+        }
+    }
+
+    private void UpdateCoachOverlayLabel()
+    {
+        if (coachOverlayText == null ||
+            !coachOverlayVisibleRequested ||
+            motionRecorder == null ||
+            motionRecorder.CoachAnimator == null ||
+            Camera.main == null)
+        {
+            return;
+        }
+
+        Renderer[] renderers = motionRecorder.CoachAnimator
+            .GetComponentsInChildren<Renderer>(true);
+        if (renderers.Length == 0)
+        {
+            return;
+        }
+
+        Bounds bounds = renderers[0].bounds;
+        for (int i = 1; i < renderers.Length; i++)
+        {
+            bounds.Encapsulate(renderers[i].bounds);
+        }
+
+        Vector3 worldTop = bounds.center + Vector3.up * bounds.extents.y;
+        Vector3 screenPoint = Camera.main.WorldToScreenPoint(worldTop);
+        if (screenPoint.z <= 0f)
+        {
+            return;
+        }
+
+        if (!coachOverlayText.gameObject.activeSelf)
+        {
+            coachOverlayText.gameObject.SetActive(true);
+        }
+
+        RectTransform canvasRect = coachOverlayCanvas.transform as RectTransform;
+        if (canvasRect != null &&
+            RectTransformUtility.ScreenPointToLocalPointInRectangle(
+                canvasRect,
+                screenPoint,
+                null,
+                out Vector2 localPoint))
+        {
+            Vector2 labelPosition = localPoint + Vector2.up * 18f;
+            float halfCanvasWidth = canvasRect.rect.width * 0.5f;
+            float halfCanvasHeight = canvasRect.rect.height * 0.5f;
+            float halfLabelWidth = coachOverlayRect.rect.width * 0.5f;
+            labelPosition.x = Mathf.Clamp(
+                labelPosition.x,
+                -halfCanvasWidth + halfLabelWidth + 12f,
+                halfCanvasWidth - halfLabelWidth - 12f);
+            labelPosition.y = Mathf.Clamp(
+                labelPosition.y,
+                -halfCanvasHeight + 12f,
+                halfCanvasHeight - coachOverlayRect.rect.height - 12f);
+            coachOverlayRect.anchoredPosition = labelPosition;
+        }
     }
 
     private void SetIntroductionAvatarVisible(
@@ -611,6 +757,8 @@ public class PracticeSessionController : MonoBehaviour
         {
             coachLabel.SetActive(introductionCoachLabelWasActive);
         }
+
+        SetCoachOverlayVisible(false);
 
         introductionCoachLabelStateCaptured = false;
         introductionCoachLabelWasActive = false;

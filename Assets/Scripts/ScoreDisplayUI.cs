@@ -13,7 +13,7 @@ public class ScoreDisplayUI : MonoBehaviour
     [SerializeField] private float fadeOutDuration = 0.5f; // 淡出时长
 
     [Header("样式")]
-    [SerializeField] private int fontSize = 80;
+    [SerializeField] private int fontSize = 48;
     [SerializeField] private Color scoreColor = new Color(1f, 0.85f, 0.2f); // 金色
     [SerializeField] private Font customFont; // 可选：自定义字体
 
@@ -56,23 +56,23 @@ public class ScoreDisplayUI : MonoBehaviour
         canvasGroup.alpha = 0f;
         canvasGroup.blocksRaycasts = false;
 
-        // 创建背景面板（半透明黑色）
+        // 创建透明承载面板
         GameObject panelGo = new GameObject("ScorePanel");
         panelGo.transform.SetParent(canvasGo.transform, false);
 
         RectTransform panelRt = panelGo.AddComponent<RectTransform>();
-        panelRt.anchorMin = new Vector2(0.5f, 0.5f);
-        panelRt.anchorMax = new Vector2(0.5f, 0.5f);
-        panelRt.pivot = new Vector2(0.5f, 0.5f);
-        panelRt.anchoredPosition = Vector2.zero;
-        panelRt.sizeDelta = new Vector2(500f, 200f);
+        panelRt.anchorMin = new Vector2(0f, 1f);
+        panelRt.anchorMax = new Vector2(0f, 1f);
+        panelRt.pivot = new Vector2(0f, 1f);
+        panelRt.anchoredPosition = new Vector2(40f, -40f);
+        panelRt.sizeDelta = new Vector2(320f, 150f);
 
         Image panelImage = panelGo.AddComponent<Image>();
-        panelImage.color = new Color(0f, 0f, 0f, 0.7f);
+        panelImage.color = Color.clear;
 
         // 添加圆角效果（通过 Outline 模拟）
         Outline outline = panelGo.AddComponent<Outline>();
-        outline.effectColor = new Color(1f, 1f, 1f, 0.3f);
+        outline.effectColor = Color.clear;
         outline.effectDistance = new Vector2(3f, 3f);
 
         // 创建分数文字
@@ -82,13 +82,13 @@ public class ScoreDisplayUI : MonoBehaviour
         RectTransform textRt = textGo.AddComponent<RectTransform>();
         textRt.anchorMin = Vector2.zero;
         textRt.anchorMax = Vector2.one;
-        textRt.offsetMin = Vector2.zero;
-        textRt.offsetMax = Vector2.zero;
+        textRt.offsetMin = new Vector2(16f, 8f);
+        textRt.offsetMax = new Vector2(-16f, -8f);
 
         scoreText = textGo.AddComponent<Text>();
-        scoreText.fontSize = fontSize;
+        scoreText.fontSize = Mathf.Min(fontSize, 48);
         scoreText.color = scoreColor;
-        scoreText.alignment = TextAnchor.MiddleCenter;
+        scoreText.alignment = TextAnchor.UpperLeft;
         scoreText.horizontalOverflow = HorizontalWrapMode.Overflow;
         scoreText.verticalOverflow = VerticalWrapMode.Overflow;
 

@@ -1,5 +1,32 @@
 # V2 stash 迁移盘点（2026-09-25）
 
+## 2026-09-26 整理后的实际 stash
+
+现在只剩 `stash@{0}`（`8a1943b6fd3bc8f8a55ac11c1dd02a8db9b6be31`，`deferred legacy and optional integration assets only`）。从旧五份快照去重的 378 个变更路径中，移除了工作区已经有的 169 个路径及其旧版本，留下目前不在工作区的 209 个路径（92 个非 `.meta`）。这是保存而非迁移待办；整理 stash 未改动训练文件或 index，本次只更新盘点文档。
+
+| 类别 | 路径数（非 meta） | 保留的内容和定位 |
+| --- | ---: | --- |
+| 旧场景 | 10（5） | `CoachModeEntry`、`CoachingChoose`、`DeadBug`、`maleDeadBug 1` 是旧入口/演示；`testPractice` 仅动作包联调按需评估。 |
+| 场景控制脚本 | 6（3） | `CoachModeEntryController`、`CoachingActionSelectionController`、旧 `GamingTrackerHapticsAdapter`；均非当前普通训练闭环所需。 |
+| 旧 UI 图片 | 44（22） | ImageSource 中的选择页、开始/结束页、评分等旧图片；当前七场景没有缺失这些图片的静态 GUID 依赖。 |
+| 旧 Knife UI 图片 | 7（3） | 三张旧按钮贴图及目录/meta；随旧选择页保存。 |
+| 语音 | 2（1） | `ReadyCountdown.mp3` 仅旧 `testPractice` 引用，四个现行教练场景使用已在工作区的 `ReadyCountdownShort.mp3`。 |
+| 一次性编辑器工具 | 6（3） | `CoachModeMobileMigration`、`CoachStage3Wiring`、`Stage5AndroidBuild`，不能直接重跑覆盖现有适配。 |
+| skel 编辑器脚本 | 9（4） | 四个 Editor 辅助脚本及目录/meta；回放所需运行时 skel 脚本已经在工作区。 |
+| EVMC4U 附件 | 86（34） | 教程、示例、测试、额外接收器/Editor、许可文本等；不整包恢复。 |
+| uOSC 附件 | 39（17） | Editor 和 Samples、package 描述；当前运行时代码已在工作区。 |
+
+原五份重叠快照已从 stash 列表移除，原 SHA 分别存为 `refs/codex/stash-archive/2026-09-26/{0..4}` 供误删恢复，不在日常 stash 列表中。当前普通手机推荐训练所需的七个场景不在新 stash；未来若需要 `testPractice` 联调，应连其游戏去向重新评估，旧 `testGaming` 场景既不在当前工作区，也不在这份 stash。
+
+> 本文下方的“迁移建议”和“当前缺失”是 2026-09-25 的历史快照，不是当前待办。现行手机→原 AR 可达场景及 V2 对照，以 [PHONE_AR_ROUTE_AUDIT.md](PHONE_AR_ROUTE_AUDIT.md) 为准；不可再按旧建议恢复 CoachingChoose、旧演示场景或整份 stash。
+
+## 2026-09-26 流程校正
+
+- 下文是恢复回放前的 stash 快照；PlayBack 场景、男女回放 prefab 和运行时 skel 依赖现已恢复，不能再按“当前缺失”清单直接操作。
+- 正常训练由 SpineFlowMobile 的 `trainingPlan.recommendedActions` 计算 `targetScene`，Intent 直接进入 V2 的死虫式/鸟狗式男女教练场景；训练端不经过 `CoachingChoose`。因此 `CoachingChoose`、选择控制器和旧选择页图片不是当前流程的待迁移功能，旧代码中的导航引用仅作为遗留入口盘点。
+- 当前手机端仅在动作包联调哨兵流程将 `targetScene` 设为 `testPractice`。该场景是按需的联调/未来扩展入口，不应当作现有普通推荐动作训练的阻塞项。其旧版 `ReadyCountdown.mp3` 引用可在未来迁移时评估是否改用现有 `ReadyCountdownShort.mp3`。
+- 后续医生处方若要包含多种动作，应先定义处方动作顺序、场景路由和完成结果契约；当前 V2 启动 payload 校验固定要求一条 coach 加一条 game 动作，不能直接声称已经支持多动作处方。
+
 ## 当前状态
 
 - 分支：Coaching；HEAD：b14bdc4（女性死虫式）。

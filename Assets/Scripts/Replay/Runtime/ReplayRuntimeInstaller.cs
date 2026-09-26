@@ -40,6 +40,9 @@ public static class ReplayRuntimeInstaller
         Animator coachAnimator = legacyPlayback != null
             ? legacyPlayback.CoachAnimator
             : null;
+        Camera camera = Camera.main ??
+            UnityEngine.Object.FindObjectOfType<Camera>(true);
+        ConfigureMobileCamera(camera, userAnimator, coachAnimator);
         if (legacyPlayback != null)
         {
             legacyPlayback.enabled = false;
@@ -83,12 +86,13 @@ public static class ReplayRuntimeInstaller
         ReplayPlacementController placement =
             rootObject.AddComponent<ReplayPlacementController>();
         ReplayUIController ui = InstallUi(menu, player);
+        ConfigureMobileCanvas(menu);
         ReplaySceneBootstrap bootstrap = rootObject.AddComponent<ReplaySceneBootstrap>();
 
         placement.Configure(
             replayRoot,
             player,
-            Camera.main);
+            camera);
         placement.ConfigureContent(
             userAnimator != null ? userAnimator.transform : null,
             coachAnimator != null ? coachAnimator.transform : null,
@@ -128,6 +132,46 @@ public static class ReplayRuntimeInstaller
         return new Vector3(midpoint.x, 0f, midpoint.z);
     }
 
+    private static void ConfigureMobileCamera(
+        Camera camera,
+        Animator userAnimator,
+        Animator coachAnimator)
+    {
+        if (camera == null)
+        {
+            return;
+        }
+
+        camera.transform.SetPositionAndRotation(
+            new Vector3(0f, 1.6f, 5f),
+            camera.transform.rotation);
+        camera.fieldOfView = 51.38676f;
+        camera.clearFlags = CameraClearFlags.Skybox;
+        camera.backgroundColor = Color.black;
+
+        Transform userRoot = userAnimator != null ? userAnimator.transform : null;
+        Transform coachRoot = coachAnimator != null ? coachAnimator.transform : null;
+        Vector3 target = userRoot != null
+            ? userRoot.position
+            : coachRoot != null
+                ? coachRoot.position
+                : camera.transform.position + camera.transform.forward * 2f;
+        if (coachRoot != null && userRoot != null)
+        {
+            target = (userRoot.position + coachRoot.position) * 0.5f;
+        }
+
+        target += Vector3.up * 0.8f;
+
+        Vector3 direction = target - camera.transform.position;
+        if (direction.sqrMagnitude > 0.0001f)
+        {
+            camera.transform.rotation = Quaternion.LookRotation(
+                direction.normalized,
+                Vector3.up);
+        }
+    }
+
     private static ReplayUIController InstallUi(GameObject menu, ReplayPlayer player)
     {
         GameObject host = menu != null ? menu : new GameObject("ReplayUI");
@@ -163,6 +207,100 @@ public static class ReplayRuntimeInstaller
             slider,
             string.IsNullOrWhiteSpace(ReplaySessionContext.SessionId));
         return ui;
+    }
+
+    private static void ConfigureMobileCanvas(GameObject menu)
+    {
+        if (menu == null)
+        {
+            return;
+        }
+
+        Canvas canvas = menu.GetComponent<Canvas>();
+        if (canvas == null)
+        {
+            return;
+        }
+
+        canvas.renderMode = RenderMode.ScreenSpaceOverlay;
+        canvas.worldCamera = null;
+
+        CanvasScaler scaler = menu.GetComponent<CanvasScaler>();
+        if (scaler != null)
+        {
+            scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
+            scaler.referenceResolution = new Vector2(1920f, 1080f);
+            scaler.screenMatchMode = CanvasScaler.ScreenMatchMode.MatchWidthOrHeight;
+            scaler.matchWidthOrHeight = 0.5f;
+        }
+
+        RectTransform root = menu.GetComponent<RectTransform>();
+        if (root != null)
+        {
+            root.anchorMin = Vector2.zero;
+            root.anchorMax = Vector2.one;
+            root.anchoredPosition = Vector2.zero;
+            root.sizeDelta = Vector2.zero;
+            root.localPosition = Vector3.zero;
+            root.localRotation = Quaternion.identity;
+            root.localScale = Vector3.one;
+        }
+
+        SetMobileRect(menu.transform, "Play", new Vector2(0f, 1f),
+            new Vector2(160f, -100f), new Vector2(190f, 70f));
+        SetMobileRect(menu.transform, "Pause", new Vector2(0f, 1f),
+            new Vector2(390f, -100f), new Vector2(190f, 70f));
+        SetMobileRect(menu.transform, "PlaybackProgressSlider", new Vector2(0f, 1f),
+            new Vector2(900f, -100f), new Vector2(800f, 30f));
+
+        SetMobileRect(menu.transform, "Practice", new Vector2(1f, 1f),
+            new Vector2(-140f, -240f), new Vector2(190f, 70f));
+        SetMobileRect(menu.transform, "Home", new Vector2(1f, 1f),
+            new Vector2(-140f, -350f), new Vector2(190f, 70f));
+        SetMobileRect(menu.transform, "Game", new Vector2(1f, 1f),
+            new Vector2(-140f, -460f), new Vector2(190f, 70f));
+    }
+
+    private static void SetMobileRect(
+        Transform root,
+        string objectName,
+        Vector2 anchor,
+        Vector2 position,
+        Vector2 size)
+    {
+        Transform target = FindChild(root, objectName);
+        RectTransform rect = target != null
+            ? target.GetComponent<RectTransform>()
+            : null;
+        if (rect == null)
+        {
+            return;
+        }
+
+        rect.anchorMin = anchor;
+        rect.anchorMax = anchor;
+        rect.anchoredPosition = position;
+        rect.sizeDelta = size;
+        rect.localRotation = Quaternion.identity;
+        rect.localScale = Vector3.one;
+    }
+
+    private static Transform FindChild(Transform root, string objectName)
+    {
+        if (root == null)
+        {
+            return null;
+        }
+
+        foreach (Transform child in root.GetComponentsInChildren<Transform>(true))
+        {
+            if (string.Equals(child.name, objectName, StringComparison.OrdinalIgnoreCase))
+            {
+                return child;
+            }
+        }
+
+        return null;
     }
 
     private static TMP_Text CreateLabel(

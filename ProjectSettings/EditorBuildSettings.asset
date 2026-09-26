@@ -29,4 +29,7 @@ EditorBuildSettings:
   - enabled: 1
     path: Assets/Scenes/DeadBugRhythmHapticsTest.unity
     guid: 4b8d9a0e7f6c5d4e3b2a190817161514
+  - enabled: 1
+    path: Assets/Scenes/PlayBack.unity
+    guid: 7b7c3d0689145e8438b95a475fbe8185
   m_configObjects: {}

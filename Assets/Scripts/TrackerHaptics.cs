@@ -96,6 +96,7 @@ public sealed class CoachHapticFeedbackController : MonoBehaviour
         new Dictionary<TrackerWearLocation, UnityWebRequest>();
     private readonly HashSet<TrackerWearLocation> activeLocations =
         new HashSet<TrackerWearLocation>();
+    private string lastLoggedDiscoveryStatus;
 
     private bool phaseWasEnabled;
     private Coroutine discoveryCoroutine;
@@ -399,7 +400,6 @@ public sealed class CoachHapticFeedbackController : MonoBehaviour
         }
 
         ParseAndApplyTrackerBindings(responseJson, "手机端内嵌 SlimeVR");
-        Debug.Log($"[Haptics] Provider 返回绑定数据，长度={responseJson?.Length ?? 0}", this);
         yield break;
 #else
         if (string.IsNullOrWhiteSpace(discoveryUrl))
@@ -523,6 +523,11 @@ public sealed class CoachHapticFeedbackController : MonoBehaviour
         if (unassignedCount > 0)
         {
             DiscoveryStatus += $"，另有 {unassignedCount} 个设备未分配部位";
+        }
+        if (DiscoveryStatus != lastLoggedDiscoveryStatus)
+        {
+            Debug.Log($"[Haptics] {DiscoveryStatus}", this);
+            lastLoggedDiscoveryStatus = DiscoveryStatus;
         }
     }
 

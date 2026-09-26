@@ -257,7 +257,7 @@ public class PoseScorer : MonoBehaviour
     [SerializeField] private AvatarMotionSource guidanceVmcReceiver;
     [Tooltip("Fail closed when the global VMC stream is unavailable or stale.")]
     [SerializeField] private bool enableVmcFreshnessGate = true;
-    [Tooltip("Maximum time without a packet frame or advancing VMC remote time.")]
+    [Tooltip("Maximum time without a VMC frame, Humanoid bone packet, or advancing remote time.")]
     [SerializeField, Min(0.01f)] private float vmcFreshnessTimeoutSeconds = 0.25f;
     [HideInInspector]
     [Tooltip("Legacy serialized value retained for scene migration. The new " +
@@ -2226,6 +2226,7 @@ public class PoseScorer : MonoBehaviour
         }
         else
         {
+            hasLatestTargetedGuidanceGeometry = false;
             if (guidanceDiagnosticEngine == null)
             {
                 guidanceDiagnosticEngine = new PoseHighlightDiagnosticEngine(
@@ -2772,7 +2773,10 @@ public class PoseScorer : MonoBehaviour
         bool isFresh = vmcFreshnessMonitor.Update(
             receiverAvailable,
             guidanceVmcReceiver.GetRemoteTime(),
-            guidanceVmcReceiver.LastPacketframeCounterInFrame,
+            // Android can update Humanoid bones without /VMC/Ext/T frames.
+            Mathf.Max(
+                guidanceVmcReceiver.LastPacketframeCounterInFrame,
+                guidanceVmcReceiver.LastBonePacketCounterInFrame),
             deltaTime);
         if (isFresh && !guidanceInputWasFresh)
         {

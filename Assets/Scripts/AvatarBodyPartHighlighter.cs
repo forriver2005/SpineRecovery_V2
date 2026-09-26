@@ -133,6 +133,11 @@ public sealed class AvatarBodyPartHighlighter : MonoBehaviour
         }
 
         EnsureMaterial();
+        if (runtimeMaterial == null)
+        {
+            ScheduleAutomaticBuildRetry();
+            return;
+        }
         InitializePartLists();
 
         SkinnedMeshRenderer[] sources =
@@ -673,6 +678,15 @@ public sealed class AvatarBodyPartHighlighter : MonoBehaviour
             if (shader == null)
             {
                 shader = Shader.Find("Unlit/Color");
+            }
+
+            if (shader == null)
+            {
+                Debug.LogError(
+                    "AvatarBodyPartHighlighter: highlight shader is unavailable; " +
+                    "body-part overlay is disabled, but coach scoring will continue.",
+                    this);
+                return;
             }
 
             runtimeMaterial = new Material(shader);

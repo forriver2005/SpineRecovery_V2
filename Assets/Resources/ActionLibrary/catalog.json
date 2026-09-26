@@ -1,0 +1,140 @@
+{
+  "items": [
+    {
+      "id": "clip_01",
+      "displayName": "棒使开合",
+      "motionPath": "ActionLibrary/Motions/clip_01",
+      "source": "1_棒使开合/3/1_v3.motion.json"
+    },
+    {
+      "id": "clip_02",
+      "displayName": "棒使开合对侧",
+      "motionPath": "ActionLibrary/Motions/clip_02",
+      "source": "1_棒使开合对侧/1/1_v1.motion.json"
+    },
+    {
+      "id": "clip_03",
+      "displayName": "侧抬腿",
+      "motionPath": "ActionLibrary/Motions/clip_03",
+      "source": "2_侧抬腿/1/2_v1.motion.json"
+    },
+    {
+      "id": "clip_04",
+      "displayName": "侧抬腿对侧",
+      "motionPath": "ActionLibrary/Motions/clip_04",
+      "source": "2_侧抬腿对侧/1/2_v1.motion.json"
+    },
+    {
+      "id": "clip_05",
+      "displayName": "内收侧抬腿",
+      "motionPath": "ActionLibrary/Motions/clip_05",
+      "source": "3_内收侧抬腿/1/3_v1.motion.json"
+    },
+    {
+      "id": "clip_06",
+      "displayName": "内收侧抬腿对侧",
+      "motionPath": "ActionLibrary/Motions/clip_06",
+      "source": "3_内收侧抬腿对侧/1/3_v1.motion.json"
+    },
+    {
+      "id": "clip_07",
+      "displayName": "质态退",
+      "motionPath": "ActionLibrary/Motions/clip_07",
+      "source": "4_质态退/1/4_v1.motion.json",
+      "viewAngle": 70
+    },
+    {
+      "id": "clip_08",
+      "displayName": "质态退对侧",
+      "motionPath": "ActionLibrary/Motions/clip_08",
+      "source": "4_质态退对侧/1/4_v1.motion.json",
+      "viewAngle": -70
+    },
+    {
+      "id": "clip_09",
+      "displayName": "臀桥",
+      "motionPath": "ActionLibrary/Motions/clip_09",
+      "source": "5_臀桥/1/5_v1.motion.json",
+      "viewAngle": 70
+    },
+    {
+      "id": "clip_10",
+      "displayName": "侧撑",
+      "motionPath": "ActionLibrary/Motions/clip_10",
+      "source": "6_侧撑/1/6_v1.motion.json"
+    },
+    {
+      "id": "clip_11",
+      "displayName": "侧撑简单",
+      "motionPath": "ActionLibrary/Motions/clip_11",
+      "source": "6_侧撑简单/1/6_v1.motion.json"
+    },
+    {
+      "id": "clip_12",
+      "displayName": "侧撑简单对侧",
+      "motionPath": "ActionLibrary/Motions/clip_12",
+      "source": "6_侧撑简单对侧/1/6_v1.motion.json"
+    },
+    {
+      "id": "clip_13",
+      "displayName": "侧撑进阶",
+      "motionPath": "ActionLibrary/Motions/clip_13",
+      "source": "6_侧撑进阶/1/6_v1.motion.json"
+    },
+    {
+      "id": "clip_14",
+      "displayName": "侧撑进阶对侧",
+      "motionPath": "ActionLibrary/Motions/clip_14",
+      "source": "6_侧撑进阶对侧/1/6_v1.motion.json"
+    },
+    {
+      "id": "clip_15",
+      "displayName": "牵伸",
+      "motionPath": "ActionLibrary/Motions/clip_15",
+      "source": "7_牵伸/1/7_v1.motion.json",
+      "viewAngle": 70
+    },
+    {
+      "id": "clip_16",
+      "displayName": "牵伸对侧",
+      "motionPath": "ActionLibrary/Motions/clip_16",
+      "source": "7_牵伸对侧/1/7_v1.motion.json",
+      "viewAngle": -70
+    },
+    {
+      "id": "clip_17",
+      "displayName": "臀部对侧",
+      "motionPath": "ActionLibrary/Motions/clip_17",
+      "source": "8_臀部对侧/2/8_v2.motion.json",
+      "viewAngle": -70
+    },
+    {
+      "id": "clip_18",
+      "displayName": "臀部拉伸",
+      "motionPath": "ActionLibrary/Motions/clip_18",
+      "source": "8_臀部拉伸/1/8_v1.motion.json",
+      "viewAngle": 70
+    },
+    {
+      "id": "clip_19",
+      "displayName": "坐姿膝关节屈屈",
+      "motionPath": "ActionLibrary/Motions/clip_19",
+      "source": "9_坐姿膝关节屈屈/1/9_v1.motion.json",
+      "viewAngle": 70
+    },
+    {
+      "id": "clip_21",
+      "displayName": "坐姿膝关节伸展",
+      "motionPath": "ActionLibrary/Motions/clip_21",
+      "source": "10_坐姿膝关节伸展/1/10_v1.motion.json",
+      "viewAngle": 70
+    },
+    {
+      "id": "clip_22",
+      "displayName": "深蹲双腿硬拉",
+      "motionPath": "ActionLibrary/Motions/clip_22",
+      "source": "11_深蹲双腿硬拉/1/11_v1.motion.json",
+      "viewAngle": 70
+    }
+  ]
+}

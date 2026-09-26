@@ -32,4 +32,7 @@ EditorBuildSettings:
   - enabled: 1
     path: Assets/Scenes/PlayBack.unity
     guid: 7b7c3d0689145e8438b95a475fbe8185
+  - enabled: 1
+    path: Assets/Scenes/CoachingChoose.unity
+    guid: 6f0be2c9f7d0278419c033759448b767
   m_configObjects: {}

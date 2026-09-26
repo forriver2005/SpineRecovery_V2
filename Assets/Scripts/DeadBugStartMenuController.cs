@@ -7,8 +7,14 @@ using UnityEngine.UI;
 
 public class DeadBugStartMenuController : MonoBehaviour
 {
-    public const float PracticeControlTopY = 250f;
-    public const float PracticeControlVerticalSpacing = 200f;
+    public const float PracticeControlTopY = 350f;
+    public const float PracticeControlVerticalSpacing = 175f;
+    private static bool showPracticeControlsOnNextLoad;
+
+    public static void ShowPracticeControlsOnNextLoad()
+    {
+        showPracticeControlsOnNextLoad = true;
+    }
 
     private enum Difficulty
     {
@@ -49,7 +55,7 @@ public class DeadBugStartMenuController : MonoBehaviour
     [SerializeField] private DeadBugGamingPoseScorer poseScorer;
     [SerializeField] private DeadBugGamingSideFeedback sideFeedback;
     [SerializeField] private GameObject actionMenu;
-    [Tooltip("The four-button Practice control panel. It is resolved by name in legacy scenes when not assigned.")]
+    [Tooltip("The Practice control panel. It is resolved by name in legacy scenes when not assigned.")]
     [SerializeField] private GameObject practiceActionMenu;
     [SerializeField] private DeadBugCountdownController countdownController;
     [SerializeField] private RhythmSongClock rhythmSongClock;
@@ -96,7 +102,11 @@ public class DeadBugStartMenuController : MonoBehaviour
         SpineFlowTrainingSession.PracticeStartConfirmationReset +=
             HandlePracticeStartConfirmationReset;
         SpineFlowTrainingSession.MobileSessionAccepted += RefreshTrainingVolumeText;
+        bool returningFromActionLibrary = IsPracticeCoachMode &&
+            showPracticeControlsOnNextLoad;
+        if (returningFromActionLibrary) showPracticeControlsOnNextLoad = false;
         InitializePresentation(
+            !returningFromActionLibrary &&
             SpineFlowTrainingSession.ShouldShowPracticeStartConfirmation);
 
         if (endMenuRoot != null)
@@ -246,6 +256,29 @@ public class DeadBugStartMenuController : MonoBehaviour
             return;
         }
 
+        if (practiceActionMenu.transform.Find("ActionLibrary") == null)
+        {
+            Transform start = practiceActionMenu.transform.Find("Start");
+            SceneSwitcher switcher = practiceActionMenu.GetComponent<SceneSwitcher>();
+            if (start != null && switcher != null)
+            {
+                GameObject libraryButton = Instantiate(start.gameObject, practiceActionMenu.transform);
+                libraryButton.name = "ActionLibrary";
+                Button button = libraryButton.GetComponent<Button>();
+                button.onClick = new Button.ButtonClickedEvent();
+                button.onClick.AddListener(switcher.LoadCoachingChooseScene);
+                Image image = libraryButton.GetComponent<Image>();
+                Sprite librarySprite = Resources.Load<Sprite>(
+                    "ActionLibrary/ActionLibraryButton");
+                if (image != null && librarySprite != null)
+                {
+                    image.sprite = librarySprite;
+                }
+                TMP_Text label = libraryButton.GetComponentInChildren<TMP_Text>(true);
+                if (label != null) label.text = "动作库";
+            }
+        }
+
         foreach (Transform child in practiceActionMenu.transform)
         {
             if (child.name == "Pause" || child.name == "Back")
@@ -268,6 +301,9 @@ public class DeadBugStartMenuController : MonoBehaviour
                     break;
                 case "Home":
                     columnIndex = 3;
+                    break;
+                case "ActionLibrary":
+                    columnIndex = 4;
                     break;
                 default:
                     continue;

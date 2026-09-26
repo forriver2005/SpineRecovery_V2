@@ -1,5 +1,15 @@
 # CODEX 项目记忆
 
+- 2026-09-27：用户截图指出新增第五个入口仍显示“播放”。原因：`ActionMenu/Start` 的可见按钮文字烘在 `Assets/ImageSource/PlayButton.png` 图片里，子节点 `Text (TMP)` 是 inactive，单改 TMP 文本无视觉效果。已新增 `Assets/Resources/ActionLibrary/ActionLibraryButton.png`（由原图编辑，仅把字改“动作库”），克隆入口时替换 Image.sprite；原四个按钮仍用原图。此类按钮改名需核对可见 sprite，不可只改 TMP。
+
+- 2026-09-27：动作库入口文字改“动作库”；预览在每条动作首帧根据 Humanoid 头/髋/肩/手/足骨骼确定胸前或身体侧面机位，避开脚朝屏幕，并自动留出全身画面。四个 Practice 场景 StartMenuCanvas/BackGroundPanel 右下 `Return` 箭头直接设 inactive（不要误关 ActionMenu 的 Home）。连接的 X4000 上手机 App 已保存的训练载荷为 female DeadBugPractice、教练 1×4、游戏 1×1；V2 场景序列化默认 2×4。V2 现于菜单显示和正式开练前重读 Android Intent，并在场景初始化/会话接收时立即同步教练组数；原有开始时同步仍保留。源码编译通过，尚未重建安装 APK 验证实机本次组数变化。
+
+- 2026-09-27：按用户要求，已将恢复 CoachingChoose 前工作区的回放、训练交互、姿态高亮/Tracker、迁移核对分别提交并精确重命名为 `9b19000`、`fa0d68f`、`fb9605e`、`6ac5193`；四次改名只重写提交信息与父链，文件树不变，旧 SHA 可由 reflog 找回。CoachingChoose 场景/控制器/按钮图片及本动作库改动仍留工作区，未纳入上述提交；`.codex/STASH_MIGRATION_AUDIT.md` 的旧待办只是历史快照，当前动作库恢复由用户明确要求。
+
+- 2026-09-27：动作库直接复用从 stash@{0} 恢复的 `CoachingChoose.unity`、旧控制器及两张缺失图片；场景加入 Build Settings。`CoachingActionLibrary` 运行时关闭旧凝视/三卡片选择，保留原预览模型与相机，用 `KeyframeCoachMotionBackend` 播放所选录制。动作库只显示 22 条可滚动动作、教练示范和返回；选中即自动循环。四个 Practice 场景共用的 ActionMenu 增加一个沿用原样式的“动作库”入口。C# 增量编译通过；尚未在 Unity/实机目测模型朝向与动作效果。
+
+- 2026-09-27：MetaSpine/05_演示视频/Recordings 有 22 个动作目录、25 套录制；每个目录选最高版本 motion，导出 22 个精简 JSON 到 `Assets/Resources/ActionLibrary/Motions`，原素材不改、不打包 FBX/Tracker/IMU。全部为 formatVersion=1、30 fps、单段、95 muscles，结构兼容现有动作后端。目录名暂直接作为显示名，`10_11` 等不明名称不自行改写；同动作多版本未给用户增加切换键。录制包约 20 MB，需关注设备内存。未实施的旧方案文档已清理。
+
 - 2026-09-26 实机根因：X4000 旧包中 `PoseScorer.Start()` 因原 AR 的 `BodyPartHighlightOverlay.shader` 漏迁、Android 后备 Shader 被裁剪而抛异常，导致 `OnSegmentHold` 从未订阅。已迁入 Shader/meta、纳入 Always Included Shaders，并使高亮缺 Shader 不阻断评分器。新 V2 和手机 APK 已保留数据覆盖安装，V2 冷启动 Unity 错误日志为空。详情见 `.codex/COACH_FLOW_RUNTIME_AUDIT.md`。
 
 - 2026-09-26：本次把训练验证推进到 Unity PlayMode 和 Android 模拟器：1×4 手机载荷进入 V2、开始页/播放采用 1×4、自然介绍后仿真准备姿势通过稳定与首段评分、骨骼包新鲜度、左臂高亮和测试 Tracker HTTP `/motor` 请求均通过。方向锁成功并不表示准备段已达标，原 AR 准备段还要求伸直双腿并持续 0.35 秒；此前把骨骼包新鲜度当成准备段卡住的确定原因不成立。`PoseScorer` 已恢复原 AR 在非目标提示时清旧几何标记。临时副本已构建九场景 ARMv7 手机 APK；原用户手机未连接，尚未安装。完整记录见 `.codex/COACH_FLOW_RUNTIME_AUDIT.md`。
@@ -83,3 +93,13 @@
 2026-09-26 更正：上一条把独立 SlimeVR 作为震动数据回退源是错误方向，该回退已从 SpineFlowMobile 撤销并重新安装 App。内嵌 SlimeVR 本来就是完整服务端+GUI，Provider 只读本进程 SlimeVrRuntimeManager；独立进程也可单独看到同一批 IMU。两者都监听本机 UDP 6969 / WebSocket 21110，同时运行会端口冲突；原内嵌 GUI 未等自身服务就绪就连 21110，可能误连独立进程。已加自身服务就绪门槛，未就绪时不加载 GUI。前述“10 个部位已接上”证据来自错误回退，不能当作内嵌震动已修复。
 2026-09-26：按游戏模式统一训练画面背景：四个教练场景和 PlayBack 相机均设 Skybox 清屏、黑色不透明背景（m_ClearFlags=1，RGBA=0/0/0/1）；回放 ReplayRuntimeInstaller 的运行时相机覆盖也同步改为该设置。游戏模式四场景本来已一致；回放进度条名为 Background 的 UI 子物体只是滑条轨道，不是全屏背景。
 2026-09-27：实机回归后补齐手机端效果：上轮黑底仅改源码、未更新手机 APK；本轮重构建并 adb install -r 覆盖安装 2026-09-27 ARM64 包。PlayBack 用户/教练分别调到左/右 x=-1/+1，教练从侧向改正面，固定相机退至 z=5 以完整容纳双模型；普通投屏无 AR 空间锚定，不能通过走动观察 360°。教练开始面板确认按 mobile sessionId 写入 PlayerPrefs，跨场景/进程只出现一次；四个游戏场景 StartMenu 的 Return 按键移至左上并接回当前训练对应 coach 场景；手机返回 Intent 显式指向 com.metaspine.mobile.MainActivity。红色高亮本轮未改：V2 与原 AR 的 PoseGuidanceRuntime 只有注释差异，PoseHighlightDiagnostics 逻辑相同；准备阶段对未期望抬起的手臂仍用 body-plane 35°/25° 门槛，语义准备位只检查手部朝头方向/腿伸直，因此同一规则也可能对正确手臂姿势给红色提示，需要结合实机姿态输入进一步定位。
+
+2026-09-27：动作库移除命名冲突的 10_11 导入项（clip_20）：原始 manifest/motion 的 actionId=10、displayName=11，但 10 和 11 正式录制分别是“坐姿膝关节伸展”“深蹲双腿硬拉”，三个文件帧数/时长及哈希不同。该条不能视作独立命名清晰的动作；仅删除 V2 导入资源和目录项，保留 MetaSpine 原始录制。
+
+2026-09-27：动作库按动作设置预览方向：臀桥、牵伸、臀部拉伸、坐姿膝关节屈伸、深蹲双腿硬拉使用约 70° 侧前方视角，对侧录制从相反侧取景；开合、侧抬腿及侧撑保留正面/原有俯卧侧面取景。相机仍依首帧骨骼自动对中和取距。
+
+2026-09-27：纠正动作库预览姿态：上一版相机以“髋到头”作为屏幕上方，错误地把臀桥等卧姿录制旋转成直立显示。现改为世界竖直方向固定画面上方，录制的站/坐/卧姿在屏幕中保持原样；质态退及其对侧录制首帧也是仰卧姿态，改用侧前方视角避免俯视。
+
+2026-09-27：动作库左上返回固定回到来源教练场景的五按键界面；编辑器直接从 CoachingChoose 启动时没有来源场景，回退到 DeadBugPractice 的五按键界面。返回时使用一次性展示标志跳过训练确认页，保留正常从手机首次进入时的确认逻辑；不再退出 Unity/应用。
+
+2026-09-27：将教练开始面板返回箭头、手机组数同步、动作库分别提交；复用独立 Unity 临时构建副本构建 10 场景 ARM64 IL2CPP/OpenGLES3 非 Development APK，输出 D:\Code\SpineV2Builds\2026-09-27\SpineRecovery-V2-action-library-arm64.apk。BuildResult=Succeeded，adb install -r 覆盖安装到 X4000（com.DefaultCompany.SpineV2）成功，保留应用数据；设备 lastUpdateTime=2026-09-27 05:34:21。此次仅核对构建和安装，动作库及训练流程仍需真人在手机画面中确认。

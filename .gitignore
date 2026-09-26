@@ -40,3 +40,6 @@ Thumbs.db
 *.aab
 *.unitypackage
 
+# Local AI project memory
+/.codex/CODEX.md
+

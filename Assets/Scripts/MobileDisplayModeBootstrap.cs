@@ -80,7 +80,9 @@ public sealed class MobileDisplayModeBootstrap : MonoBehaviour
             if (scaler == null) scaler = canvas.gameObject.AddComponent<CanvasScaler>();
             scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
             scaler.referenceResolution = new Vector2(1920f, 1080f);
-            scaler.screenMatchMode = CanvasScaler.ScreenMatchMode.MatchWidthOrHeight;
+            scaler.screenMatchMode = canvas.name == "ActionLibraryCanvas"
+                ? CanvasScaler.ScreenMatchMode.Expand
+                : CanvasScaler.ScreenMatchMode.MatchWidthOrHeight;
             scaler.matchWidthOrHeight = 0.5f;
         }
     }

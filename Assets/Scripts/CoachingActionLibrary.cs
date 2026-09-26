@@ -27,10 +27,10 @@ public sealed class CoachingActionLibrary : MonoBehaviour
     private const string SceneName = "CoachingChoose";
     private static string returnScene;
 
-    private readonly Color background = new Color(0.025f, 0.055f, 0.09f, 1f);
-    private readonly Color panelColor = new Color(0.055f, 0.12f, 0.17f, 1f);
-    private readonly Color cardColor = new Color(0.09f, 0.19f, 0.24f, 1f);
-    private readonly Color selectedColor = new Color(0.13f, 0.37f, 0.46f, 1f);
+    private readonly Color background = Color.black;
+    private readonly Color panelColor = Color.black;
+    private readonly Color cardColor = new Color(0.12f, 0.12f, 0.12f, 1f);
+    private readonly Color selectedColor = new Color(0.22f, 0.22f, 0.22f, 1f);
 
     private Entry[] entries;
     private Image[] cards;
@@ -97,7 +97,17 @@ public sealed class CoachingActionLibrary : MonoBehaviour
         coachAnimator = preview.GetComponentInChildren<Animator>(true);
         DisableOldSelector(menu);
         PreparePreview();
-        BuildInterface(menu.transform);
+        GameObject libraryCanvas = new GameObject(
+            "ActionLibraryCanvas",
+            typeof(RectTransform), typeof(Canvas), typeof(CanvasScaler), typeof(GraphicRaycaster));
+        Canvas canvas = libraryCanvas.GetComponent<Canvas>();
+        canvas.renderMode = RenderMode.ScreenSpaceOverlay;
+        canvas.sortingOrder = 100;
+        CanvasScaler scaler = libraryCanvas.GetComponent<CanvasScaler>();
+        scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
+        scaler.referenceResolution = new Vector2(1920f, 1080f);
+        scaler.screenMatchMode = CanvasScaler.ScreenMatchMode.Expand;
+        BuildInterface(libraryCanvas.transform);
 
         if (entries == null || entries.Length == 0)
         {
@@ -217,6 +227,9 @@ public sealed class CoachingActionLibrary : MonoBehaviour
     private void BuildInterface(Transform canvas)
     {
         RectTransform root = Rect(canvas, "ActionLibraryUI", 0, 0, 1920, 1080);
+        root.anchorMin = new Vector2(0.5f, 0.5f);
+        root.anchorMax = new Vector2(0.5f, 0.5f);
+        root.pivot = new Vector2(0.5f, 0.5f);
         Panel(root, "Background", 0, 0, 1920, 1080, background);
         Panel(root, "ListPanel", 48, 75, 560, 900, panelColor);
         Panel(root, "PreviewPanel", 640, 75, 1232, 900, panelColor);
@@ -229,11 +242,13 @@ public sealed class CoachingActionLibrary : MonoBehaviour
 
         if (previewTexture != null)
         {
-            RectTransform imageRect = Rect(root, "教练动作", 854, 175, 800, 700);
+            RectTransform imageRect = Rect(root, "教练动作", 750, 75, 1100, 962);
             RawImage image = imageRect.gameObject.AddComponent<RawImage>();
             image.texture = previewTexture;
             image.color = Color.white;
             image.raycastTarget = false;
+            selectedName.transform.SetAsLastSibling();
+            statusText.transform.SetAsLastSibling();
         }
         else
         {
@@ -403,7 +418,7 @@ public sealed class CoachingActionLibrary : MonoBehaviour
         }
 
         previewCamera.transform.SetPositionAndRotation(
-            target + viewDirection * (distance * 1.25f), rotation);
+            target + viewDirection * (distance * 1.08f), rotation);
     }
 
     private static void GoBack()

@@ -538,6 +538,14 @@ public sealed class SpineFlowTrainingSession : MonoBehaviour
         return new SpineFlowTrainingVolume(action.sets, action.reps);
     }
 
+    public static void RefreshMobileLaunchFromIntent()
+    {
+        if (instance != null)
+        {
+            instance.ReadStartPayloadFromAndroidIntent();
+        }
+    }
+
     public static int GetPlannedRepetitions(string mode, int fallback)
     {
         SpineFlowTrainingVolume volume = GetPlannedTrainingVolume(

@@ -177,6 +177,8 @@ public class PracticeSessionController : MonoBehaviour
         }
 
         ApplyDefaultDifficulty();
+        SpineFlowTrainingSession.MobileSessionAccepted += ApplyPlannedTrainingVolume;
+        ApplyPlannedTrainingVolume();
         DisableLegacyDifficultySelectionPanel();
 
         ResolvePresentationController();
@@ -205,6 +207,7 @@ public class PracticeSessionController : MonoBehaviour
 
     private void OnDestroy()
     {
+        SpineFlowTrainingSession.MobileSessionAccepted -= ApplyPlannedTrainingVolume;
         CancelPracticeIntroduction();
         RestoreUserRotationBeforeDirectionLock();
 
@@ -402,6 +405,8 @@ public class PracticeSessionController : MonoBehaviour
     /// </summary>
     private void StartPracticeDirectly()
     {
+        SpineFlowTrainingSession.RefreshMobileLaunchFromIntent();
+        if (this == null) return;
         if (practiceRunning)
         {
             return;
@@ -424,14 +429,7 @@ public class PracticeSessionController : MonoBehaviour
             "PracticeSessionController: starting coach-mode introduction.",
             this);
         ResetUserDirectionLock();
-        SpineFlowTrainingVolume trainingVolume =
-            SpineFlowTrainingSession.GetPlannedTrainingVolume(
-                "coach",
-                coachActionController.TotalSets,
-                coachActionController.RepetitionsPerSet);
-        coachActionController.SetTrainingVolume(
-            trainingVolume.sets,
-            trainingVolume.repetitionsPerSet);
+        ApplyPlannedTrainingVolume();
         Debug.Log(
             $"PracticeSessionController: using {(SpineFlowTrainingSession.HasMobileSession ? "mobile" : "scene")} " +
             $"coach volume {coachActionController.TotalSets} sets x " +
@@ -439,6 +437,21 @@ public class PracticeSessionController : MonoBehaviour
             this);
 
         BeginPracticeIntroduction();
+    }
+
+    private void ApplyPlannedTrainingVolume()
+    {
+        if (coachActionController == null || coachActionController.HasStarted)
+        {
+            return;
+        }
+
+        SpineFlowTrainingVolume volume =
+            SpineFlowTrainingSession.GetPlannedTrainingVolume(
+                "coach",
+                coachActionController.TotalSets,
+                coachActionController.RepetitionsPerSet);
+        coachActionController.SetTrainingVolume(volume.sets, volume.repetitionsPerSet);
     }
 
     private void BeginPracticeIntroduction()

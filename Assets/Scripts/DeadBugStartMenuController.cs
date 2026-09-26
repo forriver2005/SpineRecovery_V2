@@ -1160,6 +1160,8 @@ public class DeadBugStartMenuController : MonoBehaviour
 
     private void RefreshTrainingVolumeText()
     {
+        SpineFlowTrainingSession.RefreshMobileLaunchFromIntent();
+        if (this == null) return;
         ResolvePracticeCoachController();
         ResolveTimesText();
         if (timesText == null)

@@ -128,6 +128,8 @@ public class PracticeSessionController : MonoBehaviour
     private RectTransform coachOverlayRect;
     private TMP_Text coachOverlayText;
     private bool coachOverlayVisibleRequested;
+    private Renderer[] coachOverlayRenderers;
+    private Camera coachOverlayCamera;
 
     public bool IsLyingOverheadPresentationReady =>
         ShouldUseLyingOverheadPresentation(
@@ -683,15 +685,19 @@ public class PracticeSessionController : MonoBehaviour
         if (coachOverlayText == null ||
             !coachOverlayVisibleRequested ||
             motionRecorder == null ||
-            motionRecorder.CoachAnimator == null ||
-            Camera.main == null)
+            motionRecorder.CoachAnimator == null)
         {
             return;
         }
 
-        Renderer[] renderers = motionRecorder.CoachAnimator
-            .GetComponentsInChildren<Renderer>(true);
-        if (renderers.Length == 0)
+        if (coachOverlayCamera == null) coachOverlayCamera = Camera.main;
+        if (coachOverlayRenderers == null)
+        {
+            coachOverlayRenderers = motionRecorder.CoachAnimator
+                .GetComponentsInChildren<Renderer>(true);
+        }
+        Renderer[] renderers = coachOverlayRenderers;
+        if (coachOverlayCamera == null || renderers.Length == 0)
         {
             return;
         }
@@ -703,7 +709,7 @@ public class PracticeSessionController : MonoBehaviour
         }
 
         Vector3 worldTop = bounds.center + Vector3.up * bounds.extents.y;
-        Vector3 screenPoint = Camera.main.WorldToScreenPoint(worldTop);
+        Vector3 screenPoint = coachOverlayCamera.WorldToScreenPoint(worldTop);
         if (screenPoint.z <= 0f)
         {
             return;

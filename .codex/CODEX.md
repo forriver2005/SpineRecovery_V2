@@ -103,3 +103,7 @@
 2026-09-27：动作库左上返回固定回到来源教练场景的五按键界面；编辑器直接从 CoachingChoose 启动时没有来源场景，回退到 DeadBugPractice 的五按键界面。返回时使用一次性展示标志跳过训练确认页，保留正常从手机首次进入时的确认逻辑；不再退出 Unity/应用。
 
 2026-09-27：将教练开始面板返回箭头、手机组数同步、动作库分别提交；复用独立 Unity 临时构建副本构建 10 场景 ARM64 IL2CPP/OpenGLES3 非 Development APK，输出 D:\Code\SpineV2Builds\2026-09-27\SpineRecovery-V2-action-library-arm64.apk。BuildResult=Succeeded，adb install -r 覆盖安装到 X4000（com.DefaultCompany.SpineV2）成功，保留应用数据；设备 lastUpdateTime=2026-09-27 05:34:21。此次仅核对构建和安装，动作库及训练流程仍需真人在手机画面中确认。
+
+2026-09-27：V2 帧率检查：X4000 当前 60 Hz，应用未运行/设备锁屏时无法取得训练帧时间；Android 已设 vSync=0、targetFrameRate=60，默认 Medium 画质。发现四个教练场景共用的 Coach 标签 LateUpdate 每帧 GetComponentsInChildren<Renderer>(true) 分配数组并两次查询 Camera.main；改为按场景实例缓存渲染器和相机，保持逐帧标签跟随。此项是确定的 CPU/GC 开销消除，不代表已量化训练帧率增益。
+
+2026-09-27：针对上述缓存改动重建 10 场景 ARM64 IL2CPP APK（D:\Code\SpineV2Builds\2026-09-27\SpineRecovery-V2-fps-arm64.apk），BuildResult=Succeeded、0 errors；adb install -r 覆盖安装 X4000 成功，lastUpdateTime=05:40:59。设备锁屏且未进入正式训练，SurfaceFlinger/gfxinfo 无有效训练帧数据；不要把 60 Hz 上限当成已达到稳定 60 fps。

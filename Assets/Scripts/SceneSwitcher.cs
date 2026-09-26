@@ -31,6 +31,33 @@ public class SceneSwitcher : MonoBehaviour
             this);
     }
 
+    public void ReturnToCurrentCoachScene()
+    {
+        string coachScene = SpineFlowTrainingSession.CurrentCoachScene;
+        if (string.IsNullOrEmpty(coachScene))
+        {
+            string currentScene = SceneManager.GetActiveScene().name;
+            if (currentScene == "BirdDogMinimal")
+            {
+                coachScene = BirdDogPracticeScene;
+            }
+            else if (currentScene == "SpineV2Minimal" ||
+                     currentScene == "DeadBugRhythmHapticsTest")
+            {
+                coachScene = DeadBugPracticeScene;
+            }
+        }
+
+        if (string.IsNullOrEmpty(coachScene) ||
+            !Application.CanStreamedLevelBeLoaded(coachScene))
+        {
+            Debug.LogWarning("No matching coach scene is available for this game.", this);
+            return;
+        }
+
+        LoadSceneForCurrentMobileSession(coachScene);
+    }
+
     public void LoadGameScene()
     {
         LoadSceneForCurrentMobileSession(GameScene);

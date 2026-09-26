@@ -95,6 +95,7 @@ public class DeadBugStartMenuController : MonoBehaviour
         ResolveEndMenuRoot();
         SpineFlowTrainingSession.PracticeStartConfirmationReset +=
             HandlePracticeStartConfirmationReset;
+        SpineFlowTrainingSession.MobileSessionAccepted += RefreshTrainingVolumeText;
         InitializePresentation(
             SpineFlowTrainingSession.ShouldShowPracticeStartConfirmation);
 
@@ -299,6 +300,7 @@ public class DeadBugStartMenuController : MonoBehaviour
         RestoreSceneVisualsHiddenByMenu();
         SpineFlowTrainingSession.PracticeStartConfirmationReset -=
             HandlePracticeStartConfirmationReset;
+        SpineFlowTrainingSession.MobileSessionAccepted -= RefreshTrainingVolumeText;
 
         if (coachActionController != null)
         {
@@ -1178,10 +1180,9 @@ public class DeadBugStartMenuController : MonoBehaviour
                 fallbackSets,
                 fallbackRepetitions);
 
-        // A phone-authored session explicitly presents its planned set count.
-        // Standalone practice preserves the legacy "times" meaning and shows
-        // the configured repetitions per set (the scene fallback is 2 x 4).
-        timesText.text = SpineFlowTrainingSession.HasMobileSession
+        // The practice card is labeled "组数". Show sets for both phone and
+        // standalone practice; the game card keeps its repetition meaning.
+        timesText.text = IsPracticeCoachMode
             ? volume.sets.ToString()
             : volume.repetitionsPerSet.ToString();
     }

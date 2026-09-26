@@ -432,6 +432,11 @@ public class PracticeSessionController : MonoBehaviour
         coachActionController.SetTrainingVolume(
             trainingVolume.sets,
             trainingVolume.repetitionsPerSet);
+        Debug.Log(
+            $"PracticeSessionController: using {(SpineFlowTrainingSession.HasMobileSession ? "mobile" : "scene")} " +
+            $"coach volume {coachActionController.TotalSets} sets x " +
+            $"{coachActionController.RepetitionsPerSet} reps.",
+            this);
 
         BeginPracticeIntroduction();
     }

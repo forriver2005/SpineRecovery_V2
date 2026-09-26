@@ -34,6 +34,9 @@ public sealed class SpineFlowTrainingSession : MonoBehaviour
     private const string PayloadExtra = "spineflow_payload_json";
     private const string ProtocolVersionExtra = "spineflow_protocol_version";
     private const string MobilePackage = "com.metaspine.mobile";
+    private const string MobileActivity = "com.metaspine.mobile.MainActivity";
+    private const string PracticeStartAcknowledgedSessionKey =
+        "SpineFlow.PracticeStartAcknowledgedSession";
     private const string ResultAction = "com.metaspine.action.AR_SESSION_RESULT";
     private const string StartMessage = "START_SESSION";
     private const string ResultMessage = "SESSION_RESULT";
@@ -247,6 +250,7 @@ public sealed class SpineFlowTrainingSession : MonoBehaviour
 #endif
 
     public static event Action PracticeStartConfirmationReset;
+    public static event Action MobileSessionAccepted;
 
     public static bool HasMobileSession => instance != null && instance.HasValidStartPayload();
 
@@ -272,6 +276,10 @@ public sealed class SpineFlowTrainingSession : MonoBehaviour
             return action?.actionId;
         }
     }
+
+    public static string CurrentCoachScene => instance != null
+        ? ResolveCoachSceneFromAction(instance.FindPlannedAction("coach"))
+        : null;
 
     public static void CacheMotionPackage(CoachMotionPackage package)
     {
@@ -314,6 +322,13 @@ public sealed class SpineFlowTrainingSession : MonoBehaviour
         if (instance != null && HasPracticeStartConfirmationSession)
         {
             instance.practiceStartConfirmationAcknowledged = true;
+            if (instance.HasValidStartPayload())
+            {
+                PlayerPrefs.SetString(
+                    PracticeStartAcknowledgedSessionKey,
+                    instance.startPayload.sessionId);
+                PlayerPrefs.Save();
+            }
         }
     }
 
@@ -468,6 +483,10 @@ public sealed class SpineFlowTrainingSession : MonoBehaviour
 
         instance = this;
         DontDestroyOnLoad(gameObject);
+#if UNITY_ANDROID && !UNITY_EDITOR
+        QualitySettings.vSyncCount = 0;
+        Application.targetFrameRate = 60;
+#endif
         SceneManager.sceneLoaded += OnSceneLoaded;
         ReadStartPayloadFromAndroidIntent();
     }
@@ -783,7 +802,7 @@ public sealed class SpineFlowTrainingSession : MonoBehaviour
     {
         if (resultSent)
         {
-            return true;
+            return TryLaunchMobileApp();
         }
 
         if (!HasValidStartPayload())
@@ -801,7 +820,8 @@ public sealed class SpineFlowTrainingSession : MonoBehaviour
             using (AndroidJavaObject intent = new AndroidJavaObject("android.content.Intent"))
             {
                 intent.Call<AndroidJavaObject>("setAction", ResultAction);
-                intent.Call<AndroidJavaObject>("setPackage", MobilePackage);
+                intent.Call<AndroidJavaObject>(
+                    "setClassName", MobilePackage, MobileActivity);
                 intent.Call<AndroidJavaObject>("putExtra", ProtocolVersionExtra, ProtocolVersion);
                 intent.Call<AndroidJavaObject>("putExtra", PayloadExtra, resultJson);
                 intent.Call<AndroidJavaObject>("addFlags", 0x04000000 | 0x20000000);
@@ -835,7 +855,8 @@ public sealed class SpineFlowTrainingSession : MonoBehaviour
                 launchIntent.Call<AndroidJavaObject>(
                     "setAction",
                     "android.intent.action.MAIN");
-                launchIntent.Call<AndroidJavaObject>("setPackage", MobilePackage);
+                launchIntent.Call<AndroidJavaObject>(
+                    "setClassName", MobilePackage, MobileActivity);
                 launchIntent.Call<AndroidJavaObject>(
                     "addCategory",
                     "android.intent.category.LAUNCHER");
@@ -1204,10 +1225,13 @@ public sealed class SpineFlowTrainingSession : MonoBehaviour
 
         pendingLaunchScene = targetScene;
         PublishPendingMotionPackage();
+        PlannedAction coachAction = FindPlannedAction("coach");
         Debug.Log(
             $"[SpineFlow] Accepted mobile session {startPayload.sessionId}; " +
-            $"first scene is {targetScene}.",
+            $"first scene is {targetScene}; coach volume is " +
+            $"{coachAction.sets} sets x {coachAction.reps} reps.",
             this);
+        MobileSessionAccepted?.Invoke();
         TryLoadPendingLaunchScene(SceneManager.GetActiveScene().name);
     }
 
@@ -1257,7 +1281,12 @@ public sealed class SpineFlowTrainingSession : MonoBehaviour
         gameTiming = false;
         resultSent = false;
         pendingGameLevel = "standard";
-        practiceStartConfirmationAcknowledged = false;
+        practiceStartConfirmationAcknowledged =
+            HasValidStartPayload() &&
+            string.Equals(
+                PlayerPrefs.GetString(PracticeStartAcknowledgedSessionKey),
+                startPayload.sessionId,
+                StringComparison.Ordinal);
         cachedMotionPackage = null;
 #if UNITY_EDITOR
         editorPracticeConfirmationSessionActive = false;

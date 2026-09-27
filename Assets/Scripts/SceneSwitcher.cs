@@ -123,7 +123,10 @@ public class SceneSwitcher : MonoBehaviour
 
     public void LoadCoachingChooseScene()
     {
-        LoadSceneForCurrentMobileSession(CoachingChooseScene);
+        if (!CoachingActionLibrary.OpenFromPractice())
+        {
+            LoadSceneForCurrentMobileSession(CoachingChooseScene);
+        }
     }
 
     public void LoadGamingChooseScene()

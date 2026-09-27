@@ -26,6 +26,9 @@ public sealed class CoachingActionLibrary : MonoBehaviour
 
     private const string SceneName = "CoachingChoose";
     private static string returnScene;
+    private static Scene retainedPracticeScene;
+    private static GameObject[] retainedPracticeRoots;
+    private static bool[] retainedRootActiveStates;
 
     private readonly Color background = Color.black;
     private readonly Color panelColor = Color.black;
@@ -48,6 +51,9 @@ public sealed class CoachingActionLibrary : MonoBehaviour
     private static void Register()
     {
         returnScene = null;
+        retainedPracticeScene = default;
+        retainedPracticeRoots = null;
+        retainedRootActiveStates = null;
         SceneManager.activeSceneChanged -= RememberSourceScene;
         SceneManager.activeSceneChanged += RememberSourceScene;
         SceneManager.sceneLoaded -= Install;
@@ -74,8 +80,47 @@ public sealed class CoachingActionLibrary : MonoBehaviour
     {
         if (scene.name == SceneName && FindObjectOfType<CoachingActionLibrary>() == null)
         {
-            new GameObject(nameof(CoachingActionLibrary)).AddComponent<CoachingActionLibrary>();
+            GameObject host = new GameObject(nameof(CoachingActionLibrary));
+            SceneManager.MoveGameObjectToScene(host, scene);
+            host.AddComponent<CoachingActionLibrary>();
+
+            if (retainedPracticeScene.IsValid() && retainedPracticeScene.isLoaded)
+            {
+                retainedPracticeRoots = retainedPracticeScene.GetRootGameObjects();
+                retainedRootActiveStates = new bool[retainedPracticeRoots.Length];
+                SceneManager.SetActiveScene(scene);
+                for (int i = 0; i < retainedPracticeRoots.Length; i++)
+                {
+                    retainedRootActiveStates[i] = retainedPracticeRoots[i].activeSelf;
+                    retainedPracticeRoots[i].SetActive(false);
+                }
+            }
         }
+    }
+
+    public static bool OpenFromPractice()
+    {
+        Scene practiceScene = SceneManager.GetActiveScene();
+        if (!IsPracticeScene(practiceScene.name) ||
+            !Application.CanStreamedLevelBeLoaded(SceneName))
+        {
+            return false;
+        }
+
+        if (retainedPracticeScene.IsValid() && retainedPracticeScene.isLoaded)
+        {
+            return true;
+        }
+
+        retainedPracticeScene = practiceScene;
+        returnScene = practiceScene.name;
+        if (SceneManager.LoadSceneAsync(SceneName, LoadSceneMode.Additive) == null)
+        {
+            retainedPracticeScene = default;
+            return false;
+        }
+
+        return true;
     }
 
     private void Awake()
@@ -85,8 +130,8 @@ public sealed class CoachingActionLibrary : MonoBehaviour
             ? JsonUtility.FromJson<Catalog>(catalogAsset.text)?.items
             : null;
 
-        GameObject menu = GameObject.Find("ActionMenu");
-        GameObject preview = GameObject.Find("DeadBUgPreview");
+        GameObject menu = FindInLibraryScene("ActionMenu");
+        GameObject preview = FindInLibraryScene("DeadBUgPreview");
         if (menu == null || preview == null)
         {
             Debug.LogError("Action library could not find the CoachingChoose menu or coach preview.");
@@ -100,6 +145,7 @@ public sealed class CoachingActionLibrary : MonoBehaviour
         GameObject libraryCanvas = new GameObject(
             "ActionLibraryCanvas",
             typeof(RectTransform), typeof(Canvas), typeof(CanvasScaler), typeof(GraphicRaycaster));
+        SceneManager.MoveGameObjectToScene(libraryCanvas, SceneManager.GetSceneByName(SceneName));
         Canvas canvas = libraryCanvas.GetComponent<Canvas>();
         canvas.renderMode = RenderMode.ScreenSpaceOverlay;
         canvas.sortingOrder = 100;
@@ -168,6 +214,19 @@ public sealed class CoachingActionLibrary : MonoBehaviour
         return TMP_Settings.defaultFontAsset;
     }
 
+    private static GameObject FindInLibraryScene(string objectName)
+    {
+        Scene scene = SceneManager.GetSceneByName(SceneName);
+        foreach (GameObject root in scene.GetRootGameObjects())
+        {
+            foreach (Transform child in root.GetComponentsInChildren<Transform>(true))
+            {
+                if (child.name == objectName) return child.gameObject;
+            }
+        }
+        return null;
+    }
+
     private static void DisableOldSelector(GameObject menu)
     {
         CoachingActionSelectionController selector = menu.GetComponent<CoachingActionSelectionController>();
@@ -187,6 +246,7 @@ public sealed class CoachingActionLibrary : MonoBehaviour
     {
         foreach (Camera camera in FindObjectsOfType<Camera>(true))
         {
+            if (camera.gameObject.scene.name != SceneName) continue;
             if (camera.name == "DeadBugPreviewCamera")
             {
                 previewCamera = camera;
@@ -207,9 +267,9 @@ public sealed class CoachingActionLibrary : MonoBehaviour
             }
         }
 
-        GameObject birdDog = GameObject.Find("BirdDogPreview");
+        GameObject birdDog = FindInLibraryScene("BirdDogPreview");
         if (birdDog != null) birdDog.SetActive(false);
-        GameObject hipThrust = GameObject.Find("HipThrustPreview");
+        GameObject hipThrust = FindInLibraryScene("HipThrustPreview");
         if (hipThrust != null) hipThrust.SetActive(false);
 
         if (previewCamera != null)
@@ -423,6 +483,32 @@ public sealed class CoachingActionLibrary : MonoBehaviour
 
     private static void GoBack()
     {
+        if (retainedPracticeScene.IsValid() && retainedPracticeScene.isLoaded &&
+            retainedPracticeRoots != null)
+        {
+            Scene libraryScene = SceneManager.GetSceneByName(SceneName);
+            if (SceneManager.SetActiveScene(retainedPracticeScene))
+            {
+                foreach (GameObject root in libraryScene.GetRootGameObjects())
+                {
+                    root.SetActive(false);
+                }
+                for (int i = 0; i < retainedPracticeRoots.Length; i++)
+                {
+                    if (retainedPracticeRoots[i] != null)
+                    {
+                        retainedPracticeRoots[i].SetActive(retainedRootActiveStates[i]);
+                    }
+                }
+                retainedPracticeScene = default;
+                retainedPracticeRoots = null;
+                retainedRootActiveStates = null;
+                returnScene = null;
+                SceneManager.UnloadSceneAsync(libraryScene);
+                return;
+            }
+        }
+
         string destination = IsPracticeScene(returnScene)
             ? returnScene : SpineFlowTrainingSession.CurrentCoachScene;
         if (!IsPracticeScene(destination)) destination = "DeadBugPractice";

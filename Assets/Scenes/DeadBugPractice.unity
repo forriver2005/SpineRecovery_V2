@@ -15965,7 +15965,7 @@ MonoBehaviour:
       activeRegions: 0
       stabilizerRegions: 0
     applyFormalActionScoreMapping: 0
-  setCount: 2
+  setCount: 1
   repetitionsPerSet: 4
   repeatBoundarySegmentsPerSet: 0
   segmentTransitionBlendSeconds: 0.12

@@ -2585,6 +2585,10 @@ PrefabInstance:
       propertyPath: m_Name
       value: user
       objectReference: {fileID: 0}
+    - target: {fileID: -1728013695380148634, guid: 92fdc8607e571ee448d17397903ecb70, type: 3}
+      propertyPath: m_IsActive
+      value: 0
+      objectReference: {fileID: 0}
     - target: {fileID: -1102777188716332920, guid: 92fdc8607e571ee448d17397903ecb70, type: 3}
       propertyPath: m_DirtyAABB
       value: 0
@@ -5525,6 +5529,10 @@ PrefabInstance:
     - target: {fileID: 4740143680597435057, guid: 86b1e8192cb57cd47890882526664df1, type: 3}
       propertyPath: m_Name
       value: ExternalReceiver
+      objectReference: {fileID: 0}
+    - target: {fileID: 4740143680597435057, guid: 86b1e8192cb57cd47890882526664df1, type: 3}
+      propertyPath: m_IsActive
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 4740143680597435062, guid: 86b1e8192cb57cd47890882526664df1, type: 3}
       propertyPath: m_LocalPosition.x

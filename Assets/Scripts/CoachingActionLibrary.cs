@@ -493,18 +493,16 @@ public sealed class CoachingActionLibrary : MonoBehaviour
                 {
                     root.SetActive(false);
                 }
-                for (int i = 0; i < retainedPracticeRoots.Length; i++)
-                {
-                    if (retainedPracticeRoots[i] != null)
-                    {
-                        retainedPracticeRoots[i].SetActive(retainedRootActiveStates[i]);
-                    }
-                }
-                retainedPracticeScene = default;
-                retainedPracticeRoots = null;
-                retainedRootActiveStates = null;
                 returnScene = null;
-                SceneManager.UnloadSceneAsync(libraryScene);
+                AsyncOperation unload = SceneManager.UnloadSceneAsync(libraryScene);
+                if (unload != null)
+                {
+                    unload.completed += RestorePracticeAfterLibraryUnload;
+                }
+                else
+                {
+                    RestorePracticeAfterLibraryUnload(null);
+                }
                 return;
             }
         }
@@ -521,6 +519,26 @@ public sealed class CoachingActionLibrary : MonoBehaviour
         returnScene = null;
         DeadBugStartMenuController.ShowPracticeControlsOnNextLoad();
         SceneManager.LoadScene(destination);
+    }
+
+    private static void RestorePracticeAfterLibraryUnload(AsyncOperation operation)
+    {
+        if (retainedPracticeRoots == null)
+        {
+            return;
+        }
+
+        for (int i = 0; i < retainedPracticeRoots.Length; i++)
+        {
+            if (retainedPracticeRoots[i] != null)
+            {
+                retainedPracticeRoots[i].SetActive(retainedRootActiveStates[i]);
+            }
+        }
+
+        retainedPracticeScene = default;
+        retainedPracticeRoots = null;
+        retainedRootActiveStates = null;
     }
 
     private static RectTransform Rect(Transform parent, string name, float x, float y, float width, float height)

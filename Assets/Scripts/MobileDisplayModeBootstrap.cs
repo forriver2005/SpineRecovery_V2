@@ -65,7 +65,13 @@ public sealed class MobileDisplayModeBootstrap : MonoBehaviour
             CanvasScaler scaler = canvas.GetComponent<CanvasScaler>();
             if (scaler == null) scaler = canvas.gameObject.AddComponent<CanvasScaler>();
             scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
-            scaler.referenceResolution = new Vector2(1920f, 1080f);
+            // AppShell is a portrait-first mobile UI while the exercise scenes
+            // use landscape.  The old unconditional 1920x1080 reference made
+            // the portrait shell appear extremely small on phones.
+            bool portrait = Screen.height > Screen.width || Screen.orientation == ScreenOrientation.Portrait;
+            scaler.referenceResolution = portrait
+                ? new Vector2(1080f, 1920f)
+                : new Vector2(1920f, 1080f);
             scaler.screenMatchMode = CanvasScaler.ScreenMatchMode.MatchWidthOrHeight;
             scaler.matchWidthOrHeight = 0.5f;
         }

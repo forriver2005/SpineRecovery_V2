@@ -234,20 +234,24 @@ public class DeadBugStartMenuController : MonoBehaviour
 
     private void ConfigurePracticeActionMenu()
     {
-        if (!IsPracticeCoachMode)
-        {
-            return;
-        }
-
         ResolvePracticeActionMenu();
         if (practiceActionMenu == null)
         {
             return;
         }
 
+        // The legacy scene contains four real menu buttons and an unused
+        // PlayAction1Button. Normalize it into the five V2 actions instead of
+        // leaving the old duplicate "游戏" button visible.
+        NormalizeLegacyActionMenuButtons();
+        EnsurePlaybackActionMenuButton();
+        EnsurePracticeActionMenuButton();
+        EnsureStartActionMenuButton();
+
         foreach (Transform child in practiceActionMenu.transform)
         {
-            if (child.name == "Pause" || child.name == "Back")
+            if (child.name == "Pause" || child.name == "Back" || child.name == "ReturnIdle" ||
+                child.name == "PlayAction1Button")
             {
                 child.gameObject.SetActive(false);
                 continue;
@@ -265,8 +269,11 @@ public class DeadBugStartMenuController : MonoBehaviour
                 case "PlayBack":
                     columnIndex = 2;
                     break;
-                case "Home":
+                case "Practice":
                     columnIndex = 3;
+                    break;
+                case "Home":
+                    columnIndex = 4;
                     break;
                 default:
                     continue;
@@ -281,6 +288,152 @@ public class DeadBugStartMenuController : MonoBehaviour
                     columnIndex * PracticeControlVerticalSpacing);
             }
         }
+
+        SetActionMenuLabel("Start", "播放动作");
+        SetActionMenuLabel("Game", "游戏模式");
+        SetActionMenuLabel("PlayBack", "回放");
+        SetActionMenuLabel("Practice", "动作库");
+        SetActionMenuLabel("Home", "退出");
+
+        // Keep the V2 scene's five-option action menu usable even when the
+        // scene was authored with empty or stale inspector callbacks.
+        BindActionMenuButton("Start", BeginPlaybackAction);
+        BindActionMenuButton("Game", BeginGameMode);
+        BindActionMenuButton("PlayBack", LoadPlaybackScene);
+        BindActionMenuButton("Practice", LoadPracticeScene);
+        BindActionMenuButton("Home", ReturnToMobileApp);
+    }
+
+    private void EnsurePlaybackActionMenuButton()
+    {
+        if (practiceActionMenu == null || practiceActionMenu.transform.Find("PlayBack") != null)
+            return;
+
+        Transform template = practiceActionMenu.transform.Find("Game") ??
+            practiceActionMenu.transform.Find("Practice");
+        if (template == null) return;
+
+        GameObject playback = Instantiate(template.gameObject, practiceActionMenu.transform, false);
+        playback.name = "PlayBack";
+        playback.SetActive(true);
+        RectTransform rect = playback.GetComponent<RectTransform>();
+        if (rect != null) rect.anchoredPosition = new Vector2(0f, PracticeControlTopY - 2f * PracticeControlVerticalSpacing);
+    }
+
+    private void NormalizeLegacyActionMenuButtons()
+    {
+        if (practiceActionMenu == null) return;
+
+        // Keep only the two styled source buttons. All other legacy direct
+        // children (including PlayAction1Button and stale clones) are removed
+        // before creating the canonical five-button menu below.
+        List<GameObject> staleButtons = new List<GameObject>();
+        foreach (Transform child in practiceActionMenu.transform)
+        {
+            if (child.name != "Game" && child.name != "Home")
+                staleButtons.Add(child.gameObject);
+        }
+
+        foreach (GameObject stale in staleButtons)
+        {
+            // Immediate removal is intentional: the following creation pass
+            // must not mistake a queued-for-destruction legacy clone for a
+            // valid canonical button.
+            DestroyImmediate(stale);
+        }
+    }
+
+    private void EnsurePracticeActionMenuButton()
+    {
+        if (practiceActionMenu == null || practiceActionMenu.transform.Find("Practice") != null)
+            return;
+
+        Transform template = practiceActionMenu.transform.Find("Game") ??
+            practiceActionMenu.transform.Find("Start");
+        if (template == null) return;
+
+        GameObject practice = Instantiate(template.gameObject, practiceActionMenu.transform, false);
+        practice.name = "Practice";
+        practice.SetActive(true);
+    }
+
+    private void EnsureStartActionMenuButton()
+    {
+        if (practiceActionMenu == null || practiceActionMenu.transform.Find("Start") != null)
+            return;
+
+        Transform template = practiceActionMenu.transform.Find("Game");
+        if (template == null) return;
+
+        GameObject start = Instantiate(template.gameObject, practiceActionMenu.transform, false);
+        start.name = "Start";
+        start.SetActive(true);
+    }
+
+    private void SetActionMenuLabel(string childName, string caption)
+    {
+        Transform child = practiceActionMenu != null ? practiceActionMenu.transform.Find(childName) : null;
+        if (child == null) return;
+        Text legacy = child.GetComponentInChildren<Text>(true);
+        if (legacy != null)
+        {
+            legacy.text = caption;
+            legacy.gameObject.SetActive(true);
+        }
+        TMP_Text tmp = child.GetComponentInChildren<TMP_Text>(true);
+        if (tmp != null)
+        {
+            tmp.text = caption;
+            tmp.gameObject.SetActive(true);
+        }
+    }
+
+    private void BindActionMenuButton(string childName, UnityEngine.Events.UnityAction action)
+    {
+        Transform child = practiceActionMenu != null ? practiceActionMenu.transform.Find(childName) : null;
+        Button button = child != null ? child.GetComponent<Button>() : null;
+        if (button == null) return;
+        button.onClick.RemoveAllListeners();
+        button.onClick.AddListener(action);
+    }
+
+    private void BeginPlaybackAction()
+    {
+        if (practiceActionMenu != null) practiceActionMenu.SetActive(false);
+        SetPracticeActionMenuCanvasVisible(false);
+        if (gamingCanvasRoot != null) gamingCanvasRoot.SetActive(true);
+        RestoreModelsHiddenByMenu();
+        RestoreSceneVisualsHiddenByMenu();
+        RestoreOccludedWorldRoots();
+        if (countdownController != null)
+            countdownController.BeginCountdown(GetSelectedActionStateName());
+        else if (coachActionController != null)
+            coachActionController.PlayAction(GetSelectedActionStateName());
+    }
+
+    private void BeginGameMode()
+    {
+        if (rhythmSongClock != null) rhythmSongClock.StartMusicImmediately();
+        SceneSwitcher switcher = FindObjectOfType<SceneSwitcher>();
+        if (switcher != null) switcher.LoadGameScene();
+    }
+
+    private void LoadPlaybackScene()
+    {
+        SceneSwitcher switcher = FindObjectOfType<SceneSwitcher>();
+        if (switcher != null) switcher.LoadPlayBackScene();
+    }
+
+    private void LoadPracticeScene()
+    {
+        SceneSwitcher switcher = FindObjectOfType<SceneSwitcher>();
+        if (switcher != null) switcher.LoadDeadBugPracticeScene();
+    }
+
+    private void ReturnToMobileApp()
+    {
+        SceneSwitcher switcher = FindObjectOfType<SceneSwitcher>();
+        if (switcher != null) switcher.ReturnToMobileApp();
     }
 
     private void OnDestroy()
@@ -408,11 +561,6 @@ public class DeadBugStartMenuController : MonoBehaviour
             startButton.interactable = false;
         }
 
-        if (rhythmSongClock != null)
-        {
-            rhythmSongClock.StartMusicImmediately();
-        }
-
         if (endMenuRoot != null)
         {
             endMenuRoot.SetActive(false);
@@ -431,6 +579,12 @@ public class DeadBugStartMenuController : MonoBehaviour
             ShowPracticeSelectionControlsOnly();
             return;
         }
+
+        // In the normal V2 flow, Start confirms the preparation screen and
+        // reveals the five-option menu.  It must not jump straight into game
+        // mode; Game is selected explicitly by the user from that menu.
+        ShowPracticeSelectionControlsOnly();
+        return;
 
         RestoreModelsHiddenByMenu();
         RestoreSceneVisualsHiddenByMenu();
@@ -954,6 +1108,12 @@ public class DeadBugStartMenuController : MonoBehaviour
         foreach (Canvas actionCanvas in actionCanvases)
         {
             actionCanvas.enabled = visible;
+        }
+        GraphicRaycaster[] raycasters =
+            practiceActionMenu.GetComponentsInChildren<GraphicRaycaster>(true);
+        foreach (GraphicRaycaster raycaster in raycasters)
+        {
+            raycaster.enabled = visible;
         }
     }
 

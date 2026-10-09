@@ -1,5 +1,9 @@
+using System.Collections;
 using UnityEngine;
+using UnityEngine.EventSystems;
+using UnityEngine.InputSystem.UI;
 using UnityEngine.SceneManagement;
+using UnityEngine.UI;
 
 public class SceneSwitcher : MonoBehaviour
 {
@@ -17,9 +21,74 @@ public class SceneSwitcher : MonoBehaviour
     private const string PlayBackScene = "PlayBack";
     private const string CoachingChooseScene = "CoachingChoose";
     private const string GamingChooseScene = "GamingChoose";
+    private bool returnInProgress;
+    private static bool showPostTrainingSurveyOnAppShellReturn;
+
+    private IEnumerator Start()
+    {
+        // Wait until scene/menu scripts have finished their Awake/Start setup,
+        // then replace any stale legacy callback on the visible Home buttons.
+        yield return null;
+        int boundButtons = 0;
+        // The legacy menu controller can clear button listeners during its Awake.
+        // Rebind the visible Home/back buttons afterwards so the integrated Unity
+        // app always returns to AppShell instead of trying to launch another app.
+        Button[] buttons = FindObjectsOfType<Button>(true);
+        for (int i = 0; i < buttons.Length; i++)
+        {
+            Button button = buttons[i];
+            if (button == null || button.gameObject.scene != gameObject.scene ||
+                button.gameObject.name != "Home")
+            {
+                continue;
+            }
+
+            button.onClick = new Button.ButtonClickedEvent();
+            button.onClick.AddListener(ReturnToMobileApp);
+            button.interactable = true;
+            HomeArrowReturnHandler handler = button.GetComponent<HomeArrowReturnHandler>();
+            if (handler == null) handler = button.gameObject.AddComponent<HomeArrowReturnHandler>();
+            handler.Initialize(this);
+            boundButtons++;
+        }
+        Debug.Log($"[SpineFlow] Bound {boundButtons} Home/back button(s) to AppShell.", this);
+    }
 
     public void ReturnToMobileApp()
     {
+        if (returnInProgress) return;
+        returnInProgress = true;
+        Debug.Log("[SpineFlow] Home/back arrow clicked.", this);
+        SpineRecovery.App.AppBootstrap app = SpineRecovery.App.AppBootstrap.Instance;
+        if (Application.CanStreamedLevelBeLoaded("AppShell"))
+        {
+            SpineRecovery.App.AppRoute returnRoute =
+                app != null && app.State != null && app.State.Session != null
+                    ? SpineRecovery.App.AppRoute.Home
+                    : SpineRecovery.App.AppRoute.Login;
+            if (app != null && app.Router != null)
+            {
+                app.Router.Navigate(returnRoute);
+                SpineRecovery.App.AppShellUi shellUi = app.GetComponent<SpineRecovery.App.AppShellUi>();
+                if (shellUi != null)
+                {
+                    shellUi.ShowAppShell();
+                }
+            }
+
+            SpineRecovery.App.ScreenOrientationService.SetPortrait();
+            // SpineFlowMobile receives the AR result and lands on the
+            // post-training questionnaire before showing Home/History.
+            // Preserve that behavior for the in-process Unity preview.
+            showPostTrainingSurveyOnAppShellReturn = app != null &&
+                app.State != null && app.State.Session != null &&
+                app.Training != null && app.Training.CurrentPlan != null;
+            SceneManager.sceneLoaded += HandleAppShellLoaded;
+            SceneManager.LoadScene("AppShell", LoadSceneMode.Single);
+            EnsureAppShellEventSystem();
+            return;
+        }
+
         if (SpineFlowTrainingSession.TryReturnToMobile())
         {
             return;
@@ -31,9 +100,47 @@ public class SceneSwitcher : MonoBehaviour
             this);
     }
 
+    private static void HandleAppShellLoaded(Scene scene, LoadSceneMode mode)
+    {
+        if (!string.Equals(scene.name, "AppShell", System.StringComparison.OrdinalIgnoreCase)) return;
+        SceneManager.sceneLoaded -= HandleAppShellLoaded;
+        if (!showPostTrainingSurveyOnAppShellReturn) return;
+        showPostTrainingSurveyOnAppShellReturn = false;
+        SpineRecovery.App.AppBootstrap app = SpineRecovery.App.AppBootstrap.Instance;
+        SpineRecovery.App.AppShellUi shellUi = app != null ? app.GetComponent<SpineRecovery.App.AppShellUi>() : null;
+        if (shellUi != null) shellUi.ShowPostTrainingSurvey();
+    }
+
+    private static void EnsureAppShellEventSystem()
+    {
+        EventSystem current = EventSystem.current;
+        if (current != null && current.gameObject.scene.name == "AppShell")
+        {
+            return;
+        }
+
+        GameObject eventSystemObject = new GameObject("EventSystem");
+        eventSystemObject.AddComponent<EventSystem>();
+        InputSystemUIInputModule inputModule = eventSystemObject.AddComponent<InputSystemUIInputModule>();
+        inputModule.AssignDefaultActions();
+    }
+
     public void LoadGameScene()
     {
-        LoadSceneForCurrentMobileSession(GameScene);
+        if (Application.CanStreamedLevelBeLoaded(GameScene))
+        {
+            LoadSceneForCurrentMobileSession(GameScene);
+            return;
+        }
+
+        // The historical V2 repository references Gamescene, but that scene
+        // asset is not present in any available branch.  Keep the button
+        // functional on Android by falling back to the restored, data-driven
+        // Dead Bug practice scene until the original game scene is supplied.
+        Debug.LogWarning(
+            "[SpineFlow] Gamescene is unavailable in this build; " +
+            "falling back to DeadBugPractice.");
+        LoadDeadBugPracticeScene();
     }
 
     public void LoadActionScene()
@@ -162,5 +269,23 @@ public class SceneSwitcher : MonoBehaviour
                !string.IsNullOrWhiteSpace(replayTarget)
             ? replayTarget
             : fallback;
+    }
+}
+
+public sealed class HomeArrowReturnHandler : MonoBehaviour, IPointerClickHandler
+{
+    private SceneSwitcher owner;
+
+    public void Initialize(SceneSwitcher sceneSwitcher)
+    {
+        owner = sceneSwitcher;
+    }
+
+    public void OnPointerClick(PointerEventData eventData)
+    {
+        if (eventData != null && eventData.button == PointerEventData.InputButton.Left)
+        {
+            owner?.ReturnToMobileApp();
+        }
     }
 }

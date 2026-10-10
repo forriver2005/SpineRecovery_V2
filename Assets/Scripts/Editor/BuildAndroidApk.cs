@@ -1,6 +1,7 @@
 #if UNITY_EDITOR
 using System;
 using System.IO;
+using System.Linq;
 using UnityEditor;
 using UnityEditor.Android;
 using UnityEditor.Build.Reporting;
@@ -20,15 +21,16 @@ namespace SpineRecovery.Editor
             string directory = Path.GetDirectoryName(fullOutput);
             if (!string.IsNullOrEmpty(directory)) Directory.CreateDirectory(directory);
 
+            string[] scenes = EditorBuildSettings.scenes
+                .Where(scene => scene.enabled)
+                .Select(scene => scene.path)
+                .ToArray();
+            if (scenes.Length == 0)
+                throw new Exception("No enabled scenes are configured in EditorBuildSettings.");
+
             BuildPlayerOptions options = new BuildPlayerOptions
             {
-                scenes = new[]
-                {
-                    "Assets/Scenes/AppShell.unity",
-                    "Assets/Scenes/SpineV2Minimal.unity",
-                    "Assets/Scenes/BirdDogMinimal.unity",
-                    "Assets/Scenes/HipThrustMinimal.unity",
-                },
+                scenes = scenes,
                 locationPathName = fullOutput,
                 target = BuildTarget.Android,
                 options = BuildOptions.Development | BuildOptions.AllowDebugging,
@@ -63,15 +65,20 @@ namespace SpineRecovery.Editor
         {
             if (!File.Exists(file)) return;
             string text = File.ReadAllText(file);
-            if (text.Contains("resources {\n            excludes +=")) return;
+            if (text.Contains("META-INF/INDEX.LIST")) return;
             const string marker = "    packaging {\n";
-            if (!text.Contains(marker)) return;
+            const string legacyMarker = "    packagingOptions {\n";
             string block =
-                "    packaging {\n" +
+                "    packagingOptions {\n" +
                 "        resources {\n" +
                 "            excludes += ['META-INF/INDEX.LIST', 'META-INF/io.netty.versions.properties', 'META-INF/DEPENDENCIES', 'META-INF/LICENSE', 'META-INF/LICENSE.txt', 'META-INF/NOTICE', 'META-INF/NOTICE.txt']\n" +
                 "        }\n";
-            text = text.Replace(marker, block);
+            if (text.Contains(marker))
+                text = text.Replace(marker, "    packaging {\n        resources {\n            excludes += ['META-INF/INDEX.LIST', 'META-INF/io.netty.versions.properties', 'META-INF/DEPENDENCIES', 'META-INF/LICENSE', 'META-INF/LICENSE.txt', 'META-INF/NOTICE', 'META-INF/NOTICE.txt']\n        }\n");
+            else if (text.Contains(legacyMarker))
+                text = text.Replace(legacyMarker, block);
+            else
+                return;
             File.WriteAllText(file, text);
             Debug.Log("[BuildAndroidApk] Patched duplicate Java resource exclusions in " + file);
         }

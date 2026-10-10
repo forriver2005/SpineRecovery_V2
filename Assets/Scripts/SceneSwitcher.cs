@@ -1,5 +1,9 @@
+using System.Collections;
 using UnityEngine;
+using UnityEngine.EventSystems;
+using UnityEngine.InputSystem.UI;
 using UnityEngine.SceneManagement;
+using UnityEngine.UI;
 
 public class SceneSwitcher : MonoBehaviour
 {
@@ -17,18 +21,54 @@ public class SceneSwitcher : MonoBehaviour
     private const string PlayBackScene = "PlayBack";
     private const string CoachingChooseScene = "CoachingChoose";
     private const string GamingChooseScene = "GamingChoose";
+    private bool returnInProgress;
+
+    private IEnumerator Start()
+    {
+        // Wait until scene/menu scripts have finished their Awake/Start setup,
+        // then replace any stale legacy callback on the visible Home buttons.
+        yield return null;
+        int boundButtons = 0;
+        // The legacy menu controller can clear button listeners during its Awake.
+        // Rebind the visible Home/back buttons afterwards so the integrated Unity
+        // app always returns to AppShell instead of trying to launch another app.
+        Button[] buttons = FindObjectsOfType<Button>(true);
+        for (int i = 0; i < buttons.Length; i++)
+        {
+            Button button = buttons[i];
+            if (button == null || button.gameObject.scene != gameObject.scene ||
+                button.gameObject.name != "Home")
+            {
+                continue;
+            }
+
+            button.onClick = new Button.ButtonClickedEvent();
+            button.onClick.AddListener(ReturnToMobileApp);
+            button.interactable = true;
+            HomeArrowReturnHandler handler = button.GetComponent<HomeArrowReturnHandler>();
+            if (handler == null) handler = button.gameObject.AddComponent<HomeArrowReturnHandler>();
+            handler.Initialize(this);
+            boundButtons++;
+        }
+        Debug.Log($"[SpineFlow] Bound {boundButtons} Home/back button(s) to AppShell.", this);
+    }
 
     public void ReturnToMobileApp()
     {
-        if (SpineFlowTrainingSession.TryReturnToMobile())
+        if (returnInProgress) return;
+        returnInProgress = true;
+        Debug.Log("[SpineFlow] Home/back arrow clicked.", this);
+        SpineRecovery.App.AppBootstrap app = SpineRecovery.App.AppBootstrap.Instance;
+        if (app != null)
         {
+            string current = SceneManager.GetActiveScene().name;
+            if (current == "CoachingChoose" || current == "PlayBack")
+                SceneManager.LoadScene("AppShell", LoadSceneMode.Single);
+            else
+                app.Training.FinishAndReturn();
             return;
         }
-
-        Debug.LogWarning(
-            "[SpineFlow] Could not return to the mobile app. " +
-            "The Home scene is intentionally not used in this release.",
-            this);
+        SpineFlowTrainingSession.TryReturnToMobile();
     }
 
     public void ReturnToCurrentCoachScene()
@@ -60,7 +100,20 @@ public class SceneSwitcher : MonoBehaviour
 
     public void LoadGameScene()
     {
-        LoadSceneForCurrentMobileSession(GameScene);
+        if (Application.CanStreamedLevelBeLoaded(GameScene))
+        {
+            LoadSceneForCurrentMobileSession(GameScene);
+            return;
+        }
+
+        // The historical V2 repository references Gamescene, but that scene
+        // asset is not present in any available branch.  Keep the button
+        // functional on Android by falling back to the restored, data-driven
+        // Dead Bug practice scene until the original game scene is supplied.
+        Debug.LogWarning(
+            "[SpineFlow] Gamescene is unavailable in this build; " +
+            "falling back to DeadBugPractice.");
+        LoadDeadBugPracticeScene();
     }
 
     public void LoadActionScene()
@@ -180,6 +233,13 @@ public class SceneSwitcher : MonoBehaviour
 
     private static void LoadSceneForCurrentMobileSession(string sceneName)
     {
+        if (SceneManager.GetActiveScene().name == PlayBackScene &&
+            SpineRecovery.App.AppBootstrap.Instance != null &&
+            SpineRecovery.App.AppBootstrap.Instance.Training.CurrentPlan == null)
+        {
+            SceneManager.LoadScene("AppShell", LoadSceneMode.Single);
+            return;
+        }
         SceneManager.LoadScene(SpineFlowTrainingSession.ResolveSceneForMobileSession(sceneName));
     }
 
@@ -192,5 +252,23 @@ public class SceneSwitcher : MonoBehaviour
                !string.IsNullOrWhiteSpace(replayTarget)
             ? replayTarget
             : fallback;
+    }
+}
+
+public sealed class HomeArrowReturnHandler : MonoBehaviour, IPointerClickHandler
+{
+    private SceneSwitcher owner;
+
+    public void Initialize(SceneSwitcher sceneSwitcher)
+    {
+        owner = sceneSwitcher;
+    }
+
+    public void OnPointerClick(PointerEventData eventData)
+    {
+        if (eventData != null && eventData.button == PointerEventData.InputButton.Left)
+        {
+            owner?.ReturnToMobileApp();
+        }
     }
 }

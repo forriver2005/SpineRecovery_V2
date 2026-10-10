@@ -1,7 +1,10 @@
 fileFormatVersion: 2
 guid: fee6f3bedd096d343b5312a6b1ea1414
 TextureImporter:
-  internalIDToNameTable: []
+  internalIDToNameTable:
+  - first:
+      213: -1574285255352747365
+    second: BirdDog_0
   externalObjects: {}
   serializedVersion: 13
   mipmaps:
@@ -121,7 +124,28 @@ TextureImporter:
     forceMaximumCompressionQuality_BC6H_BC7: 0
   spriteSheet:
     serializedVersion: 2
-    sprites: []
+    sprites:
+    - serializedVersion: 2
+      name: BirdDog_0
+      rect:
+        serializedVersion: 2
+        x: 0
+        y: 0
+        width: 1620
+        height: 554
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: b9a7093b6e3072ae0800000000000000
+      internalID: -1574285255352747365
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
     outline: []
     physicsShape: []
     bones: []
@@ -132,7 +156,8 @@ TextureImporter:
     edges: []
     weights: []
     secondaryTextures: []
-    nameFileIdTable: {}
+    nameFileIdTable:
+      BirdDog_0: -1574285255352747365
   mipmapLimitGroupName: 
   pSDRemoveMatte: 0
   userData: 

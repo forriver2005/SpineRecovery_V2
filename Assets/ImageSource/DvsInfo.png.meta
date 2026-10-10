@@ -1,7 +1,10 @@
 fileFormatVersion: 2
 guid: 3bb1641c412421b439c5a9aa734baa93
 TextureImporter:
-  internalIDToNameTable: []
+  internalIDToNameTable:
+  - first:
+      213: -6048001669312348561
+    second: DvsInfo_0
   externalObjects: {}
   serializedVersion: 13
   mipmaps:
@@ -121,7 +124,28 @@ TextureImporter:
     forceMaximumCompressionQuality_BC6H_BC7: 0
   spriteSheet:
     serializedVersion: 2
-    sprites: []
+    sprites:
+    - serializedVersion: 2
+      name: DvsInfo_0
+      rect:
+        serializedVersion: 2
+        x: 0
+        y: 0
+        width: 1302
+        height: 68
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: f6efaa3868e211ca0800000000000000
+      internalID: -6048001669312348561
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
     outline: []
     physicsShape: []
     bones: []
@@ -132,7 +156,8 @@ TextureImporter:
     edges: []
     weights: []
     secondaryTextures: []
-    nameFileIdTable: {}
+    nameFileIdTable:
+      DvsInfo_0: -6048001669312348561
   mipmapLimitGroupName: 
   pSDRemoveMatte: 0
   userData: 

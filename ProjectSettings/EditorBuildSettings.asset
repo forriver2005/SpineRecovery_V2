@@ -6,17 +6,8 @@ EditorBuildSettings:
   serializedVersion: 2
   m_Scenes:
   - enabled: 1
-    path: Assets/Scenes/DeadBugPractice.unity
-    guid: ecead03f6d981dc4d898b11fbfc000ab
-  - enabled: 1
-    path: Assets/Scenes/BirdDogPractice.unity
-    guid: 18cc5a1bc2834e3e9d998a3fc94ec82c
-  - enabled: 1
-    path: Assets/Scenes/maleDeadBugPractice.unity
-    guid: 59fb747a346951c499d43263eb9ba6a2
-  - enabled: 1
-    path: Assets/Scenes/maleBirdDogPractice.unity
-    guid: 8ef3d31162d94a0ba3a0f41ee91dce5f
+    path: Assets/Scenes/AppShell.unity
+    guid: 3bee1a4b900b161409cbc819789661a3
   - enabled: 1
     path: Assets/Scenes/SpineV2Minimal.unity
     guid: 337343efb3e6f5741bcaea6cc036886f
@@ -27,12 +18,21 @@ EditorBuildSettings:
     path: Assets/Scenes/HipThrustMinimal.unity
     guid: 7c1c4f7e1b8d4a7c9a3e6f2d5b0c8e11
   - enabled: 1
-    path: Assets/Scenes/DeadBugRhythmHapticsTest.unity
-    guid: 4b8d9a0e7f6c5d4e3b2a190817161514
+    path: Assets/Scenes/BirdDogPractice.unity
+    guid: 18cc5a1bc2834e3e9d998a3fc94ec82c
+  - enabled: 1
+    path: Assets/Scenes/CoachingChoose.unity
+    guid: 6f0be2c9f7d0278419c033759448b767
+  - enabled: 1
+    path: Assets/Scenes/DeadBugPractice.unity
+    guid: ecead03f6d981dc4d898b11fbfc000ab
   - enabled: 1
     path: Assets/Scenes/PlayBack.unity
     guid: 7b7c3d0689145e8438b95a475fbe8185
   - enabled: 1
-    path: Assets/Scenes/CoachingChoose.unity
-    guid: 6f0be2c9f7d0278419c033759448b767
+    path: Assets/Scenes/maleBirdDogPractice.unity
+    guid: 8ef3d31162d94a0ba3a0f41ee91dce5f
+  - enabled: 1
+    path: Assets/Scenes/maleDeadBugPractice.unity
+    guid: 59fb747a346951c499d43263eb9ba6a2
   m_configObjects: {}

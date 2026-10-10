@@ -1,7 +1,10 @@
 fileFormatVersion: 2
 guid: 11931411cf9f5b549a53fbb1cc5a3573
 TextureImporter:
-  internalIDToNameTable: []
+  internalIDToNameTable:
+  - first:
+      213: -7718720603454127984
+    second: SliderBG_0
   externalObjects: {}
   serializedVersion: 13
   mipmaps:
@@ -121,7 +124,28 @@ TextureImporter:
     forceMaximumCompressionQuality_BC6H_BC7: 0
   spriteSheet:
     serializedVersion: 2
-    sprites: []
+    sprites:
+    - serializedVersion: 2
+      name: SliderBG_0
+      rect:
+        serializedVersion: 2
+        x: 0
+        y: 0
+        width: 1008
+        height: 28
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 090c0a6b18891e490800000000000000
+      internalID: -7718720603454127984
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
     outline: []
     physicsShape: []
     bones: []
@@ -132,7 +156,8 @@ TextureImporter:
     edges: []
     weights: []
     secondaryTextures: []
-    nameFileIdTable: {}
+    nameFileIdTable:
+      SliderBG_0: -7718720603454127984
   mipmapLimitGroupName: 
   pSDRemoveMatte: 0
   userData: 

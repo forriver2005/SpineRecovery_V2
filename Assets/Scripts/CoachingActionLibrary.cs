@@ -507,6 +507,12 @@ public sealed class CoachingActionLibrary : MonoBehaviour
             }
         }
 
+        if (SpineRecovery.App.AppBootstrap.Instance != null)
+        {
+            SceneManager.LoadScene("AppShell", LoadSceneMode.Single);
+            return;
+        }
+
         string destination = IsPracticeScene(returnScene)
             ? returnScene : SpineFlowTrainingSession.CurrentCoachScene;
         if (!IsPracticeScene(destination)) destination = "DeadBugPractice";

@@ -1,7 +1,10 @@
 fileFormatVersion: 2
 guid: 5224804767c7cdc45b0bb128c7e2799c
 TextureImporter:
-  internalIDToNameTable: []
+  internalIDToNameTable:
+  - first:
+      213: -7816762936476190851
+    second: Ribbon_0
   externalObjects: {}
   serializedVersion: 13
   mipmaps:
@@ -121,7 +124,28 @@ TextureImporter:
     forceMaximumCompressionQuality_BC6H_BC7: 0
   spriteSheet:
     serializedVersion: 2
-    sprites: []
+    sprites:
+    - serializedVersion: 2
+      name: Ribbon_0
+      rect:
+        serializedVersion: 2
+        x: 0
+        y: 0
+        width: 3322
+        height: 254
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: d77b5e53687458390800000000000000
+      internalID: -7816762936476190851
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
     outline: []
     physicsShape: []
     bones: []
@@ -132,7 +156,8 @@ TextureImporter:
     edges: []
     weights: []
     secondaryTextures: []
-    nameFileIdTable: {}
+    nameFileIdTable:
+      Ribbon_0: -7816762936476190851
   mipmapLimitGroupName: 
   pSDRemoveMatte: 0
   userData: 

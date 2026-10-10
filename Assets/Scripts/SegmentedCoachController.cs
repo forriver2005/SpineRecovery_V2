@@ -830,6 +830,13 @@ public class SegmentedCoachController : MonoBehaviour
         repetitionsPerSet = Mathf.Max(1, repetitions);
     }
 
+    public void SetCoreScoringDuration(float seconds)
+    {
+        if (hasStarted || segments == null) return;
+        for (int i = 1; i < segments.Count - 1; i += 2)
+            segments[i].scoringDuration = Mathf.Max(1f, seconds);
+    }
+
     public void SetTotalSequenceCycles(int cycleCount) =>
         SetTrainingVolume(cycleCount, RepetitionsPerSet);
 

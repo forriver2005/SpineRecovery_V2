@@ -47,7 +47,9 @@ public sealed class MobileDisplayModeBootstrap : MonoBehaviour
 
     private void ApplyOrientation()
     {
-        Screen.autorotateToPortrait = false;
+        orientation = SceneManager.GetActiveScene().name == "AppShell"
+            ? ScreenOrientation.Portrait : ScreenOrientation.LandscapeLeft;
+        Screen.autorotateToPortrait = orientation == ScreenOrientation.Portrait;
         Screen.autorotateToPortraitUpsideDown = false;
         Screen.autorotateToLandscapeLeft = orientation == ScreenOrientation.LandscapeLeft;
         Screen.autorotateToLandscapeRight = orientation == ScreenOrientation.LandscapeRight;
@@ -80,7 +82,10 @@ public sealed class MobileDisplayModeBootstrap : MonoBehaviour
             CanvasScaler scaler = canvas.GetComponent<CanvasScaler>();
             if (scaler == null) scaler = canvas.gameObject.AddComponent<CanvasScaler>();
             scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
-            scaler.referenceResolution = new Vector2(1920f, 1080f);
+            bool portrait = SceneManager.GetActiveScene().name == "AppShell";
+            scaler.referenceResolution = portrait
+                ? new Vector2(1080f, 1920f)
+                : new Vector2(1920f, 1080f);
             scaler.screenMatchMode = canvas.name == "ActionLibraryCanvas"
                 ? CanvasScaler.ScreenMatchMode.Expand
                 : CanvasScaler.ScreenMatchMode.MatchWidthOrHeight;

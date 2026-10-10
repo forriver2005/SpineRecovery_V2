@@ -1,0 +1,23 @@
+plugins {
+    id 'com.android.library'
+}
+
+android {
+    namespace 'com.metaspine.mobile.unified'
+    compileSdk 36
+    defaultConfig { minSdk 29 }
+    buildFeatures { buildConfig true }
+    buildTypes {
+        debug { buildConfigField 'String', 'SERVER_BASE_URL', '"https://api.metaspine.cn"' }
+        release { buildConfigField 'String', 'SERVER_BASE_URL', '"https://api.metaspine.cn"' }
+    }
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+}
+
+dependencies {
+    implementation 'androidx.core:core-ktx:1.13.1'
+    implementation 'org.jetbrains.kotlinx:kotlinx-coroutines-android:1.9.0'
+}

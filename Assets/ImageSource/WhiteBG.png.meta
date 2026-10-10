@@ -1,7 +1,10 @@
 fileFormatVersion: 2
 guid: 5592ae61b0113664bb2069354785b96a
 TextureImporter:
-  internalIDToNameTable: []
+  internalIDToNameTable:
+  - first:
+      213: -5895859946145465761
+    second: WhiteBG_0
   externalObjects: {}
   serializedVersion: 13
   mipmaps:
@@ -121,7 +124,28 @@ TextureImporter:
     forceMaximumCompressionQuality_BC6H_BC7: 0
   spriteSheet:
     serializedVersion: 2
-    sprites: []
+    sprites:
+    - serializedVersion: 2
+      name: WhiteBG_0
+      rect:
+        serializedVersion: 2
+        x: 0
+        y: 0
+        width: 4480
+        height: 2800
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: f5abb88dd92bd2ea0800000000000000
+      internalID: -5895859946145465761
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
     outline: []
     physicsShape: []
     bones: []
@@ -132,7 +156,8 @@ TextureImporter:
     edges: []
     weights: []
     secondaryTextures: []
-    nameFileIdTable: {}
+    nameFileIdTable:
+      WhiteBG_0: -5895859946145465761
   mipmapLimitGroupName: 
   pSDRemoveMatte: 0
   userData: 

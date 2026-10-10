@@ -178,7 +178,7 @@ namespace TMPro.Examples
 
                     // Updated modified vertex attributes
                     textInfo.meshInfo[i].mesh.vertices = textInfo.meshInfo[i].vertices;
-                    textInfo.meshInfo[i].mesh.uv = textInfo.meshInfo[i].uvs0;
+                    textInfo.meshInfo[i].mesh.SetUVs(0, textInfo.meshInfo[i].uvs0);
                     textInfo.meshInfo[i].mesh.colors32 = textInfo.meshInfo[i].colors32;
 
                     m_TextComponent.UpdateGeometry(textInfo.meshInfo[i].mesh, i);

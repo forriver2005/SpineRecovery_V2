@@ -454,6 +454,8 @@ public class PracticeSessionController : MonoBehaviour
                 coachActionController.TotalSets,
                 coachActionController.RepetitionsPerSet);
         coachActionController.SetTrainingVolume(volume.sets, volume.repetitionsPerSet);
+        if (SpineFlowTrainingSession.PlannedCoachHoldSeconds >= 0)
+            coachActionController.SetCoreScoringDuration(SpineFlowTrainingSession.PlannedCoachHoldSeconds);
     }
 
     private void BeginPracticeIntroduction()

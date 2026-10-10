@@ -36,6 +36,13 @@ namespace SpineRecovery.Editor
                 options = BuildOptions.Development | BuildOptions.AllowDebugging,
             };
 
+            if (string.Equals(Environment.GetEnvironmentVariable("SPINE_GRADLE_EXPORT"), "1", StringComparison.OrdinalIgnoreCase))
+            {
+                EditorUserBuildSettings.exportAsGoogleAndroidProject = true;
+                options.options = BuildOptions.Development;
+                Debug.Log("[BuildAndroidApk] Exporting Gradle project " + fullOutput);
+            }
+
             Debug.Log("[BuildAndroidApk] Building " + fullOutput);
             BuildReport report = BuildPipeline.BuildPlayer(options);
             if (report.summary.result != BuildResult.Succeeded)

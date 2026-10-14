@@ -180,14 +180,26 @@ namespace SpineRecovery.App
         private GameObject CreateLoginPanel(Transform parent)
         {
             GameObject panel = CreatePanel("LoginPanel", parent, new Color(0.973f, 0.980f, 1f));
-            CreateLabel(panel.transform, "Spine Recovery", new Vector2(0, 230), 30);
-            CreateLabel(panel.transform, "第一阶段应用框架 · 本地演示登录", new Vector2(0, 170), 16);
-            CreateLabel(panel.transform, "患者：new1–new10 / old1–old10（密码 123）；原管理员：admin / admin。每个患者账号进度独立保存。", new Vector2(0, 110), 14);
-            accountInput = CreateInput(panel.transform, "账号", new Vector2(0, 30), false);
-            passwordInput = CreateInput(panel.transform, "密码（演示：123）", new Vector2(0, -45), true);
-            CreateButton(panel.transform, "登录", new Vector2(0, -130), HandleLoginClicked);
-            CreateButton(panel.transform, "注册新账号", new Vector2(0, -200), () => bootstrap.Router.Navigate(AppRoute.Register));
-            loginMessage = CreateLabel(panel.transform, "", new Vector2(0, -265), 14);
+            CreateCoverImage(panel.transform, "AppUi/LoginCover");
+
+            // The supplied cover is the final mobile visual. Keep the actual
+            // Unity controls over it so login behavior and keyboard handling
+            // remain unchanged while the reference artwork stays pixel-close.
+            accountInput = CreateInput(panel.transform, "账号", new Vector2(0, 214), false);
+            passwordInput = CreateInput(panel.transform, "密码", new Vector2(0, 65), true);
+            accountInput.GetComponent<RectTransform>().sizeDelta = new Vector2(830, 115);
+            passwordInput.GetComponent<RectTransform>().sizeDelta = new Vector2(830, 115);
+            MakeOverlayInput(accountInput);
+            MakeOverlayInput(passwordInput);
+
+            Button loginButton = CreateButton(panel.transform, "登录", new Vector2(0, -162), HandleLoginClicked, 830, 112);
+            Button registerButton = CreateButton(panel.transform, "注册新账号", new Vector2(145, -385),
+                () => bootstrap.Router.Navigate(AppRoute.Register), 300, 70);
+            MakeOverlayButton(loginButton);
+            MakeOverlayButton(registerButton);
+
+            loginMessage = CreateLabel(panel.transform, "", new Vector2(0, -610), 14);
+            loginMessage.rectTransform.sizeDelta = new Vector2(860, 70);
             return panel;
         }
 
@@ -1398,6 +1410,57 @@ namespace SpineRecovery.App
             scaler.matchWidthOrHeight = 0.5f;
             canvasObject.AddComponent<GraphicRaycaster>();
             return canvas;
+        }
+
+        private static void CreateCoverImage(Transform parent, string resourcePath)
+        {
+            Texture2D texture = Resources.Load<Texture2D>(resourcePath);
+            if (texture == null) return;
+
+            GameObject imageObject = new GameObject("CoverArtwork", typeof(RectTransform), typeof(Image));
+            imageObject.transform.SetParent(parent, false);
+            RectTransform rect = imageObject.GetComponent<RectTransform>();
+            rect.anchorMin = Vector2.zero;
+            rect.anchorMax = Vector2.one;
+            rect.offsetMin = Vector2.zero;
+            rect.offsetMax = Vector2.zero;
+            Image image = imageObject.GetComponent<Image>();
+            image.sprite = Sprite.Create(texture, new Rect(0, 0, texture.width, texture.height),
+                new Vector2(0.5f, 0.5f), 100f);
+            image.type = Image.Type.Simple;
+            image.preserveAspect = false;
+            image.raycastTarget = false;
+        }
+
+        private static void MakeOverlayInput(InputField input)
+        {
+            if (input == null) return;
+            Image image = input.GetComponent<Image>();
+            if (image != null) image.color = new Color(1f, 1f, 1f, 0f);
+            Outline outline = input.GetComponent<Outline>();
+            if (outline != null) outline.effectColor = new Color(1f, 1f, 1f, 0f);
+            if (input.textComponent != null)
+            {
+                input.textComponent.color = new Color(0.25f, 0.30f, 0.38f, 1f);
+                input.textComponent.fontSize = 29;
+            }
+            if (input.placeholder is Text placeholder)
+                placeholder.color = new Color(1f, 1f, 1f, 0f);
+        }
+
+        private static void MakeOverlayButton(Button button)
+        {
+            if (button == null) return;
+            Image image = button.GetComponent<Image>();
+            if (image != null) image.color = new Color(1f, 1f, 1f, 0f);
+            Text label = button.GetComponentInChildren<Text>();
+            if (label != null) label.color = new Color(1f, 1f, 1f, 0f);
+            ColorBlock colors = button.colors;
+            colors.normalColor = new Color(1f, 1f, 1f, 0f);
+            colors.highlightedColor = new Color(1f, 1f, 1f, 0f);
+            colors.pressedColor = new Color(1f, 1f, 1f, 0f);
+            colors.selectedColor = new Color(1f, 1f, 1f, 0f);
+            button.colors = colors;
         }
 
         private void EnsureEventSystem()

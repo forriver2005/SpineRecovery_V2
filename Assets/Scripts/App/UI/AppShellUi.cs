@@ -180,7 +180,17 @@ namespace SpineRecovery.App
         private GameObject CreateLoginPanel(Transform parent)
         {
             GameObject panel = CreatePanel("LoginPanel", parent, new Color(0.973f, 0.980f, 1f));
-            CreateCoverImage(panel.transform, "AppUi/LoginCover");
+            // Compose the cover from the supplied SVG components. Each layer
+            // remains an independent UI Image so it can be tuned without
+            // replacing the whole screen artwork.
+            CreateSvgImage(panel.transform, "AppUi/Components/Vector-3", Vector2.zero, new Vector2(1080, 1920));
+            CreateSvgImage(panel.transform, "AppUi/Components/Group 65", new Vector2(0, 650), new Vector2(322, 330));
+            CreateSvgImage(panel.transform, "AppUi/Components/Group", new Vector2(0, 108), new Vector2(970, 981));
+            CreateSvgImage(panel.transform, "AppUi/Components/Vector-6", new Vector2(0, -700), new Vector2(274, 31));
+            CreateSvgImage(panel.transform, "AppUi/Components/Vector-4", new Vector2(-115, -385), new Vector2(238, 42));
+            CreateSvgImage(panel.transform, "AppUi/Components/Vector-5", new Vector2(140, -385), new Vector2(166, 42));
+            CreateSvgImage(panel.transform, "AppUi/Components/Group-3", new Vector2(-94, -825), new Vector2(144, 144));
+            CreateSvgImage(panel.transform, "AppUi/Components/Group-4", new Vector2(94, -825), new Vector2(144, 144));
 
             // The supplied cover is the final mobile visual. Keep the actual
             // Unity controls over it so login behavior and keyboard handling
@@ -1412,21 +1422,18 @@ namespace SpineRecovery.App
             return canvas;
         }
 
-        private static void CreateCoverImage(Transform parent, string resourcePath)
+        private static void CreateSvgImage(Transform parent, string resourcePath, Vector2 position, Vector2 size)
         {
-            Texture2D texture = Resources.Load<Texture2D>(resourcePath);
-            if (texture == null) return;
+            Sprite sprite = Resources.Load<Sprite>(resourcePath);
+            if (sprite == null) return;
 
-            GameObject imageObject = new GameObject("CoverArtwork", typeof(RectTransform), typeof(Image));
+            GameObject imageObject = new GameObject("Svg:" + resourcePath, typeof(RectTransform), typeof(Image));
             imageObject.transform.SetParent(parent, false);
             RectTransform rect = imageObject.GetComponent<RectTransform>();
-            rect.anchorMin = Vector2.zero;
-            rect.anchorMax = Vector2.one;
-            rect.offsetMin = Vector2.zero;
-            rect.offsetMax = Vector2.zero;
+            rect.sizeDelta = size;
+            rect.anchoredPosition = position;
             Image image = imageObject.GetComponent<Image>();
-            image.sprite = Sprite.Create(texture, new Rect(0, 0, texture.width, texture.height),
-                new Vector2(0.5f, 0.5f), 100f);
+            image.sprite = sprite;
             image.type = Image.Type.Simple;
             image.preserveAspect = false;
             image.raycastTarget = false;

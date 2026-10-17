@@ -241,8 +241,14 @@ public class PoseScorer : MonoBehaviour
     [SerializeField] private AvatarBodyPartHighlighter modelBodyPartHighlighter;
     [Tooltip("Shared tracker motor controller. It only consumes confirmed guidance parts.")]
     [SerializeField] private CoachHapticFeedbackController hapticFeedback;
-    private readonly HashSet<TrackerWearLocation> hapticLocationOverrides =
-        new HashSet<TrackerWearLocation>();
+    private readonly List<TrackerWearLocation> hapticLocationOverrides =
+        new List<TrackerWearLocation>(2);
+    private readonly List<BodyPart> hapticCandidateParts =
+        new List<BodyPart>(5);
+    private readonly List<BodyPart> selectedHapticParts =
+        new List<BodyPart>(2);
+    private readonly List<HapticTrackerCandidate> hapticTrackerCandidates =
+        new List<HapticTrackerCandidate>(10);
     private TargetedExercisePoseGeometry latestTargetedGuidanceGeometry;
     private bool hasLatestTargetedGuidanceGeometry;
     [SerializeField] private bool enableModelSurfaceHighlight = true;
@@ -413,6 +419,20 @@ public class PoseScorer : MonoBehaviour
     private readonly Dictionary<HumanBodyBones, Quaternion> userCalibrationRotations =
         new Dictionary<HumanBodyBones, Quaternion>();
     private bool hasSessionStartCalibration;
+
+    private struct HapticTrackerCandidate
+    {
+        public readonly TrackerWearLocation location;
+        public readonly float severity;
+
+        public HapticTrackerCandidate(
+            TrackerWearLocation location,
+            float severity)
+        {
+            this.location = location;
+            this.severity = severity;
+        }
+    }
 
     private enum State
     {
@@ -1912,10 +1932,9 @@ public class PoseScorer : MonoBehaviour
             currentState == State.WaitingStable ||
             currentState == State.PreparingScore;
         bool guidanceInputFresh = guidanceInputIsFresh;
-        hapticFeedback.Tick(
+        hapticFeedback.TickSelectedLocations(
             guidancePhaseEnabled,
             guidanceInputFresh,
-            confirmedGuidanceParts,
             hapticLocationOverrides,
             MobileCoachControls.IsPaused);
     }
@@ -1923,35 +1942,158 @@ public class PoseScorer : MonoBehaviour
     private void BuildHapticLocationOverrides()
     {
         hapticLocationOverrides.Clear();
+        hapticCandidateParts.Clear();
+        hapticTrackerCandidates.Clear();
         foreach (BodyPart part in confirmedGuidanceParts)
+        {
+            hapticCandidateParts.Add(part);
+        }
+
+        SelectHapticGuidanceParts();
+        foreach (BodyPart part in selectedHapticParts)
         {
             if (part == BodyPart.Torso)
             {
-                hapticLocationOverrides.Add(TrackerWearLocation.Chest);
-                hapticLocationOverrides.Add(TrackerWearLocation.Abdomen);
+                AddHapticTrackerCandidate(
+                    TrackerWearLocation.Abdomen,
+                    GetGuidancePartSeverity(part));
                 continue;
             }
 
-            if (!UsesTargetedExerciseGuidance ||
-                !hasLatestTargetedGuidanceGeometry ||
-                !TryGetTargetedLimbHapticLocations(
+            if (UsesTargetedExerciseGuidance &&
+                hasLatestTargetedGuidanceGeometry &&
+                TryGetTargetedLimbHapticLocations(
                     part,
                     out TrackerWearLocation proximal,
                     out TrackerWearLocation distal,
                     out bool useProximal,
-                    out bool useDistal))
+                    out bool useDistal,
+                    out float proximalSeverity,
+                    out float distalSeverity))
             {
+                if (useProximal &&
+                    (!useDistal || proximalSeverity >= distalSeverity))
+                {
+                    AddHapticTrackerCandidate(proximal, proximalSeverity);
+                }
+                else if (useDistal)
+                {
+                    AddHapticTrackerCandidate(distal, distalSeverity);
+                }
+
                 continue;
             }
 
-            if (useProximal)
+            AddHapticTrackerCandidate(
+                GetDefaultHapticLocation(part),
+                GetGuidancePartSeverity(part));
+        }
+
+        for (int index = 1; index < hapticTrackerCandidates.Count; index++)
+        {
+            HapticTrackerCandidate candidate = hapticTrackerCandidates[index];
+            int insertAt = index;
+            while (insertAt > 0)
             {
-                hapticLocationOverrides.Add(proximal);
+                HapticTrackerCandidate previous =
+                    hapticTrackerCandidates[insertAt - 1];
+                bool comesBefore = candidate.severity > previous.severity ||
+                    (Mathf.Approximately(candidate.severity, previous.severity) &&
+                     (int)candidate.location < (int)previous.location);
+                if (!comesBefore)
+                {
+                    break;
+                }
+
+                hapticTrackerCandidates[insertAt] = previous;
+                insertAt--;
             }
-            if (useDistal)
+            hapticTrackerCandidates[insertAt] = candidate;
+        }
+
+        for (int index = 0;
+             index < hapticTrackerCandidates.Count &&
+             hapticLocationOverrides.Count < 2;
+             index++)
+        {
+            hapticLocationOverrides.Add(hapticTrackerCandidates[index].location);
+        }
+    }
+
+    private void AddHapticTrackerCandidate(
+        TrackerWearLocation location,
+        float severity)
+    {
+        hapticTrackerCandidates.Add(new HapticTrackerCandidate(location, severity));
+    }
+
+    private void SelectHapticGuidanceParts()
+    {
+        selectedHapticParts.Clear();
+        if (UsesTargetedExerciseGuidance)
+        {
+            bool hasLeftArmRightLegPair =
+                hapticCandidateParts.Contains(BodyPart.LeftArm) &&
+                hapticCandidateParts.Contains(BodyPart.RightLeg);
+            bool hasRightArmLeftLegPair =
+                hapticCandidateParts.Contains(BodyPart.RightArm) &&
+                hapticCandidateParts.Contains(BodyPart.LeftLeg);
+
+            if (hasLeftArmRightLegPair || hasRightArmLeftLegPair)
             {
-                hapticLocationOverrides.Add(distal);
+                bool chooseLeftArmRightLeg = hasLeftArmRightLegPair &&
+                    (!hasRightArmLeftLegPair ||
+                     GetGuidancePartSeverity(BodyPart.LeftArm) +
+                     GetGuidancePartSeverity(BodyPart.RightLeg) >=
+                     GetGuidancePartSeverity(BodyPart.RightArm) +
+                     GetGuidancePartSeverity(BodyPart.LeftLeg));
+                AddHapticPair(
+                    chooseLeftArmRightLeg ? BodyPart.LeftArm : BodyPart.RightArm,
+                    chooseLeftArmRightLeg ? BodyPart.RightLeg : BodyPart.LeftLeg);
+                return;
             }
+        }
+
+        selectedHapticParts.AddRange(hapticCandidateParts);
+    }
+
+    private void AddHapticPair(BodyPart first, BodyPart second)
+    {
+        if (GetGuidancePartSeverity(first) >= GetGuidancePartSeverity(second))
+        {
+            selectedHapticParts.Add(first);
+            selectedHapticParts.Add(second);
+        }
+        else
+        {
+            selectedHapticParts.Add(second);
+            selectedHapticParts.Add(first);
+        }
+    }
+
+    private float GetGuidancePartSeverity(BodyPart part)
+    {
+        return CurrentGuidancePartSeverities.TryGetValue(part, out float severity)
+            ? severity
+            : 0f;
+    }
+
+    private static TrackerWearLocation GetDefaultHapticLocation(BodyPart part)
+    {
+        switch (part)
+        {
+            case BodyPart.LeftArm:
+                return TrackerWearLocation.LeftUpperArm;
+            case BodyPart.RightArm:
+                return TrackerWearLocation.RightUpperArm;
+            case BodyPart.LeftLeg:
+                return TrackerWearLocation.LeftThigh;
+            case BodyPart.RightLeg:
+                return TrackerWearLocation.RightThigh;
+            case BodyPart.Torso:
+                return TrackerWearLocation.Abdomen;
+            default:
+                return default;
         }
     }
 
@@ -1960,12 +2102,16 @@ public class PoseScorer : MonoBehaviour
         out TrackerWearLocation proximal,
         out TrackerWearLocation distal,
         out bool useProximal,
-        out bool useDistal)
+        out bool useDistal,
+        out float proximalSeverity,
+        out float distalSeverity)
     {
         proximal = default;
         distal = default;
         useProximal = false;
         useDistal = false;
+        proximalSeverity = 0f;
+        distalSeverity = 0f;
 
         if (!TryGetTargetedLimbEvidence(
                 part,
@@ -1980,20 +2126,22 @@ public class PoseScorer : MonoBehaviour
             return false;
         }
 
-        // A Bird Dog support failure may be caused by contact/endpoint drop,
-        // not one anatomical segment. Keep the existing full-limb cue there.
+        // A Bird Dog support failure may not identify one anatomical segment;
+        // the group selector resolves the tied locations under its two-motor cap.
         if (guidanceExercise == PoseGuidanceExercise.BirdDog && !expectedActive)
         {
             useProximal = true;
             useDistal = true;
+            proximalSeverity = GetGuidancePartSeverity(part);
+            distalSeverity = proximalSeverity;
             return true;
         }
 
-        float proximalSeverity = CalculateProximalHapticSeverity(
+        proximalSeverity = CalculateProximalHapticSeverity(
             direction,
             directionTracked,
             expectedActive);
-        float distalSeverity = guidanceExercise == PoseGuidanceExercise.BirdDog &&
+        distalSeverity = guidanceExercise == PoseGuidanceExercise.BirdDog &&
             expectedActive && bendTracked
             ? NormalizeAboveThreshold(
                 bendDegrees,

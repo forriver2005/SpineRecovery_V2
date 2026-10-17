@@ -66,7 +66,7 @@ public sealed class CoachHapticFeedbackController : MonoBehaviour
     [Header("演示设置")]
     [SerializeField] private bool enabledForDemo = true;
     [SerializeField, Min(1)] private int pulseDurationMs = 100;
-    [SerializeField, Min(0.1f)] private float repeatIntervalSeconds = 2f;
+    [SerializeField, Min(0.1f)] private float repeatIntervalSeconds = 4f;
     [SerializeField, Min(1)] private int requestTimeoutSeconds = 1;
     [SerializeField] private TrackerMotorEndpoint[] endpoints =
     {
@@ -90,8 +90,6 @@ public sealed class CoachHapticFeedbackController : MonoBehaviour
         new HashSet<TrackerWearLocation>();
     private readonly Dictionary<TrackerWearLocation, int> endpointDurations =
         new Dictionary<TrackerWearLocation, int>();
-    private readonly Dictionary<TrackerWearLocation, float> lastPulseAt =
-        new Dictionary<TrackerWearLocation, float>();
     private readonly Dictionary<TrackerWearLocation, UnityWebRequest> inFlightRequests =
         new Dictionary<TrackerWearLocation, UnityWebRequest>();
     private readonly HashSet<TrackerWearLocation> activeLocations =
@@ -99,6 +97,8 @@ public sealed class CoachHapticFeedbackController : MonoBehaviour
     private string lastLoggedDiscoveryStatus;
 
     private bool phaseWasEnabled;
+    private bool hasGuidanceGroupPulse;
+    private float lastGuidanceGroupPulseAt;
     private Coroutine discoveryCoroutine;
 
     public string DiscoveryStatus { get; private set; } = "等待连接修改版 SlimeVR";
@@ -238,7 +238,17 @@ public sealed class CoachHapticFeedbackController : MonoBehaviour
             RebuildEndpointMap();
         }
 
-        PulseIfDue(location, true);
+        if (!endpointAddresses.TryGetValue(location, out string address) ||
+            string.IsNullOrWhiteSpace(address) ||
+            inFlightRequests.ContainsKey(location))
+        {
+            return;
+        }
+
+        int durationMs = endpointDurations.TryGetValue(location, out int configuredDuration)
+            ? configuredDuration
+            : pulseDurationMs;
+        StartCoroutine(SendPulse(location, address, durationMs));
     }
 
     /// <summary>
@@ -270,11 +280,62 @@ public sealed class CoachHapticFeedbackController : MonoBehaviour
         ICollection<TrackerWearLocation> debugLocations,
         bool coachIsPaused)
     {
-        bool canPulse = isActiveAndEnabled && !applicationPaused && enabledForDemo &&
-            guidancePhaseEnabled &&
-            guidanceInputIsFresh &&
-            !coachIsPaused;
+        if (!BeginGuidanceTick(
+                guidancePhaseEnabled,
+                guidanceInputIsFresh,
+                coachIsPaused))
+        {
+            return;
+        }
 
+        HashSet<TrackerWearLocation> requestedLocations =
+             BuildRequestedLocations(confirmedParts, debugLocations);
+        AddConfiguredDebugLocations(requestedLocations, debugLocations);
+        TickRequestedLocations(requestedLocations);
+    }
+
+    public void TickSelectedLocations(
+        bool guidancePhaseEnabled,
+        bool guidanceInputIsFresh,
+        ICollection<TrackerWearLocation> selectedLocations,
+        bool coachIsPaused)
+    {
+        if (!BeginGuidanceTick(
+                guidancePhaseEnabled,
+                guidanceInputIsFresh,
+                coachIsPaused))
+        {
+            return;
+        }
+
+        var requestedLocations = new HashSet<TrackerWearLocation>();
+        if (selectedLocations != null)
+        {
+            foreach (TrackerWearLocation location in selectedLocations)
+            {
+                if (requestedLocations.Count == 2)
+                {
+                    break;
+                }
+
+                if (endpointAddresses.TryGetValue(location, out string address) &&
+                    !string.IsNullOrWhiteSpace(address))
+                {
+                    requestedLocations.Add(location);
+                }
+            }
+        }
+
+        TickRequestedLocations(requestedLocations);
+    }
+
+    private bool BeginGuidanceTick(
+        bool guidancePhaseEnabled,
+        bool guidanceInputIsFresh,
+        bool coachIsPaused)
+    {
+        bool canPulse = isActiveAndEnabled && !applicationPaused && enabledForDemo &&
+            guidancePhaseEnabled && guidanceInputIsFresh && !coachIsPaused;
         if (!canPulse)
         {
             if (phaseWasEnabled || activeLocations.Count > 0)
@@ -283,24 +344,20 @@ public sealed class CoachHapticFeedbackController : MonoBehaviour
             }
 
             phaseWasEnabled = false;
-            return;
+            return false;
         }
 
         phaseWasEnabled = true;
-        HashSet<TrackerWearLocation> requestedLocations =
-             BuildRequestedLocations(confirmedParts, debugLocations);
-        AddConfiguredDebugLocations(requestedLocations, debugLocations);
+        return true;
+    }
+
+    private void TickRequestedLocations(
+        HashSet<TrackerWearLocation> requestedLocations)
+    {
 
         foreach (TrackerWearLocation location in requestedLocations)
         {
-            if (activeLocations.Add(location))
-            {
-                PulseIfDue(location, true);
-            }
-            else
-            {
-                PulseIfDue(location, false);
-            }
+            activeLocations.Add(location);
         }
 
         foreach (TrackerWearLocation location in activeLocations)
@@ -313,6 +370,52 @@ public sealed class CoachHapticFeedbackController : MonoBehaviour
             }
         }
         activeLocations.RemoveWhere(location => !requestedLocations.Contains(location));
+
+        if (requestedLocations.Count == 0)
+        {
+            hasGuidanceGroupPulse = false;
+            return;
+        }
+
+        float now = Time.unscaledTime;
+        if (hasGuidanceGroupPulse &&
+            now - lastGuidanceGroupPulseAt < repeatIntervalSeconds)
+        {
+            return;
+        }
+
+        if (SendGuidancePulseGroup(requestedLocations))
+        {
+            lastGuidanceGroupPulseAt = now;
+            hasGuidanceGroupPulse = true;
+        }
+    }
+
+    private bool SendGuidancePulseGroup(
+        HashSet<TrackerWearLocation> requestedLocations)
+    {
+        var pulseLocations = new List<TrackerWearLocation>(2);
+        foreach (TrackerWearLocation location in requestedLocations)
+        {
+            if (inFlightRequests.ContainsKey(location))
+            {
+                return false;
+            }
+
+            if (endpointAddresses.TryGetValue(location, out string address) &&
+                !string.IsNullOrWhiteSpace(address))
+            {
+                pulseLocations.Add(location);
+            }
+        }
+
+        foreach (TrackerWearLocation location in pulseLocations)
+        {
+            string address = endpointAddresses[location];
+            StartCoroutine(SendPulse(location, address, pulseDurationMs));
+        }
+
+        return pulseLocations.Count > 0;
     }
 
     private void AddConfiguredDebugLocations(
@@ -343,7 +446,7 @@ public sealed class CoachHapticFeedbackController : MonoBehaviour
 
         inFlightRequests.Clear();
         activeLocations.Clear();
-        lastPulseAt.Clear();
+        hasGuidanceGroupPulse = false;
         phaseWasEnabled = false;
     }
 
@@ -670,31 +773,6 @@ public sealed class CoachHapticFeedbackController : MonoBehaviour
             default:
                 return Array.Empty<TrackerWearLocation>();
         }
-    }
-
-    private void PulseIfDue(TrackerWearLocation location, bool enteringError)
-    {
-        if (!endpointAddresses.TryGetValue(location, out string address) ||
-            string.IsNullOrWhiteSpace(address) ||
-            inFlightRequests.ContainsKey(location))
-        {
-            return;
-        }
-
-        float now = Time.unscaledTime;
-        bool hasPreviousPulse = lastPulseAt.TryGetValue(location, out float previousPulseAt);
-        if (!enteringError &&
-            hasPreviousPulse &&
-            now - previousPulseAt < repeatIntervalSeconds)
-        {
-            return;
-        }
-
-        lastPulseAt[location] = now;
-        int durationMs = endpointDurations.TryGetValue(location, out int configuredDuration)
-            ? configuredDuration
-            : pulseDurationMs;
-        StartCoroutine(SendPulse(location, address, durationMs));
     }
 
     private IEnumerator SendPulse(TrackerWearLocation location, string address, int durationMs)

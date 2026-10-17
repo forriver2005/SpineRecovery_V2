@@ -104,6 +104,10 @@ namespace EVMC4U
         [SerializeField, Label("表情なめらか係数(0.500～0.999)")]
         public float BlendShapeFilter = 0.7f; //BlendShapeフィルタ係数
 
+        [Header("模型关节活动范围限制")]
+        [SerializeField]
+        public AvatarJointLimitFilter JointLimitFilter = null;
+
 #if EVMC4U_JA
         [Header("VRMファイル自動読み込み")]
 #else
@@ -155,6 +159,10 @@ namespace EVMC4U
         // Presentation code uses it to distinguish a real body tracker stream
         // from an otherwise connected VMC sender.
         public int LastBonePacketCounterInFrame = 0;
+        public bool HasHardPoseConstraint =>
+            JointLimitFilter != null && JointLimitFilter.HasHardInvalidPose;
+        public bool HasActivePoseConstraint =>
+            JointLimitFilter != null && JointLimitFilter.AnyConstraintActive;
         [SerializeField, Label("廃棄されたパケット数")]
         public int DropPackets = 0; //廃棄されたパケット(not パケットフレーム)
 
@@ -415,6 +423,15 @@ namespace EVMC4U
         {
             synchronizationContext = SynchronizationContext.Current;
 
+            if (JointLimitFilter == null)
+            {
+                JointLimitFilter = GetComponent<AvatarJointLimitFilter>();
+                if (JointLimitFilter == null)
+                {
+                    JointLimitFilter = gameObject.AddComponent<AvatarJointLimitFilter>();
+                }
+            }
+
             //nullチェック
             if (NextReceivers == null)
             {
@@ -663,7 +680,16 @@ namespace EVMC4U
                 Debug.Log("[ExternalReceiver] [Temporary Fix] Forcefully change the Update timing of ExternalReceiver to LateUpdate.");
             }
 
+            if (JointLimitFilter != null && Model != null)
+            {
+                Animator filterAnimator = Model.GetComponent<Animator>() ??
+                    Model.GetComponentInChildren<Animator>();
+                JointLimitFilter.Configure(filterAnimator);
+                JointLimitFilter.BeginFrame();
+            }
+
             BoneSynchronizeByTable();
+            JointLimitFilter?.CompleteFrame();
 
         }
 
@@ -1366,6 +1392,11 @@ namespace EVMC4U
         private void BoneSynchronizeSingle(Transform t, ref HumanBodyBones bone, ref Vector3 pos, ref Quaternion rot, bool posFilter, bool rotFilter)
         {
             BoneFilter = Mathf.Clamp(BoneFilter, 0f, 1f);
+
+            if (JointLimitFilter != null)
+            {
+                rot = JointLimitFilter.Filter(bone, rot);
+            }
 
             //ボーン位置同期が有効か
             if (BonePositionSynchronize)

@@ -1178,6 +1178,12 @@ public class PoseScorer : MonoBehaviour
 
     private void UpdateScoring()
     {
+        if (HasHardPoseConstraint())
+        {
+            UpdateStatusText("检测到姿态数据异常，请重新校准...");
+            return;
+        }
+
         // The original scorer evaluates every rendered frame. Audio beats are
         // presentation only and must not define the statistical sample cadence.
         float score = CaptureScoringSample(Time.deltaTime);
@@ -2917,7 +2923,8 @@ public class PoseScorer : MonoBehaviour
 
         hasLoggedMissingGuidanceReceiver = false;
         bool receiverAvailable = guidanceVmcReceiver.isActiveAndEnabled &&
-            guidanceVmcReceiver.GetAvailable() > 0;
+            guidanceVmcReceiver.GetAvailable() > 0 &&
+            !HasHardPoseConstraint();
         bool isFresh = vmcFreshnessMonitor.Update(
             receiverAvailable,
             guidanceVmcReceiver.GetRemoteTime(),
@@ -2934,6 +2941,18 @@ public class PoseScorer : MonoBehaviour
 
         guidanceInputWasFresh = isFresh;
         return isFresh;
+    }
+
+    private bool HasHardPoseConstraint()
+    {
+        if (guidanceVmcReceiver == null)
+        {
+            return false;
+        }
+
+        EVMC4U.ExternalReceiver receiver =
+            guidanceVmcReceiver.GetComponent<EVMC4U.ExternalReceiver>();
+        return receiver != null && receiver.HasHardPoseConstraint;
     }
 
     private void ResolveGuidanceVmcReceiver()

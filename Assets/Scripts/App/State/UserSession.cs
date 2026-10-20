@@ -61,6 +61,7 @@ namespace SpineRecovery.App
         public bool admissionReviewRequired;
         public PainHistoryRecord[] painHistory = Array.Empty<PainHistoryRecord>();
         public TrainingHistoryRecord[] trainingHistory = Array.Empty<TrainingHistoryRecord>();
+        public MonthlyQuestionnaireRecord[] monthlyHistory = Array.Empty<MonthlyQuestionnaireRecord>();
         public string routineQuestionnaireCompletedAt;
         public int routineQuestionnairePainLevel;
         public string routineQuestionnaireSymptomChange;

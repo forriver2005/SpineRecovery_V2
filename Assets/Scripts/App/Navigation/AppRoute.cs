@@ -19,5 +19,9 @@ namespace SpineRecovery.App
         History,
         RoutineQuestionnaire,
         Admin,
+        PreTrainingBlocked,
+        PostTrainingStop,
+        MonthlyJoa,
+        MonthlySfmpq,
     }
 }

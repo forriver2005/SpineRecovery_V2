@@ -18,8 +18,6 @@ namespace SpineRecovery.App
         private Text adminMessage;
         private Text historyMessage;
         private Text activationMessage;
-        private Text routineMessage;
-        private Text routinePainLabel;
         private Text arTrainingMessage;
         private Text trainingMenuMessage;
         private EventSystem appEventSystem;
@@ -44,7 +42,6 @@ namespace SpineRecovery.App
         private Button[] extensionResponseButtons;
         private Button[] flexionPhaseButtons;
         private Button[] extensionPhaseButtons;
-        private Button[] routineSymptomButtons;
         private readonly Dictionary<AppRoute, Text> flowMessages = new Dictionary<AppRoute, Text>();
         private int selectedPain = 3;
         private int flexionAdmissionPain;
@@ -74,8 +71,6 @@ namespace SpineRecovery.App
         private int postActionNumber = 1;
         private int postActionCount = 1;
         private MonthlyQuestionnaireScreens monthlyScreens;
-        private int routinePain;
-        private string routineSymptom = "";
 
         private void Start()
         {
@@ -125,7 +120,6 @@ namespace SpineRecovery.App
             GameObject monthlySfmpqPanel = monthlyScreens.BuildSfMpq(appCanvas.transform,
                 () => bootstrap.Router.Navigate(AppRoute.MonthlyJoa),
                 FinishMonthlyQuestionnaire);
-            GameObject routinePanel = CreateRoutineQuestionnairePanel(appCanvas.transform);
 
             bootstrap.Router.Initialize(bootstrap.State);
             bootstrap.Router.RegisterPanel(AppRoute.Login, loginPanel);
@@ -148,7 +142,6 @@ namespace SpineRecovery.App
             bootstrap.Router.RegisterPanel(AppRoute.PostTrainingStop, postTrainingStopPanel);
             bootstrap.Router.RegisterPanel(AppRoute.MonthlyJoa, monthlyJoaPanel);
             bootstrap.Router.RegisterPanel(AppRoute.MonthlySfmpq, monthlySfmpqPanel);
-            bootstrap.Router.RegisterPanel(AppRoute.RoutineQuestionnaire, routinePanel);
         }
 
         public void ShowAppShell()
@@ -186,18 +179,9 @@ namespace SpineRecovery.App
             string recommendation = recommended == null || recommended.Length == 0
                 ? "当前暂无匹配的推荐动作"
                 : "推荐动作：" + string.Join("、", recommended.Select(action => action.displayName));
-            string routineReminder = RoutineQuestionnaireDue(session)
-                ? "\n提示：例行问卷待完成"
-                : "";
-            homeMessage.text = identity + "\n" + tagText + "\n" + recommendation + routineReminder;
+            homeMessage.text = identity + "\n" + tagText + "\n" + recommendation;
         }
 
-        private static bool RoutineQuestionnaireDue(UserSession session)
-        {
-            if (session == null || string.IsNullOrWhiteSpace(session.routineQuestionnaireCompletedAt)) return true;
-            if (!System.DateTimeOffset.TryParse(session.routineQuestionnaireCompletedAt, out System.DateTimeOffset completedAt)) return true;
-            return System.DateTimeOffset.UtcNow - completedAt >= System.TimeSpan.FromHours(24);
-        }
 
         private GameObject CreateLoginPanel(Transform parent)
         {
@@ -269,26 +253,6 @@ namespace SpineRecovery.App
             return panel;
         }
 
-        private GameObject CreateRoutineQuestionnairePanel(Transform parent)
-        {
-            GameObject panel = CreatePanel("RoutineQuestionnairePanel", parent, new Color(0.973f, 0.980f, 1f));
-            CreateLabel(panel.transform, "例行问卷", new Vector2(0, 220), 30);
-            CreateLabel(panel.transform, "记录本次训练前的疼痛和症状变化。", new Vector2(0, 165), 16);
-            routinePainLabel = CreateLabel(panel.transform, "当前疼痛评分：0 / 10", new Vector2(0, 100), 20);
-            CreateButton(panel.transform, "疼痛 −", new Vector2(-145, 35), () => ChangeRoutinePain(-1), 250);
-            CreateButton(panel.transform, "疼痛 +", new Vector2(145, 35), () => ChangeRoutinePain(1), 250);
-            routineSymptomButtons = new[]
-            {
-                CreateButton(panel.transform, "好转 / 不变", new Vector2(0, -50), () => SelectRoutineSymptom("stable")),
-                CreateButton(panel.transform, "稍微加重", new Vector2(0, -120), () => SelectRoutineSymptom("slightly_worse")),
-                CreateButton(panel.transform, "明显加重", new Vector2(0, -190), () => SelectRoutineSymptom("worse")),
-            };
-            routineMessage = CreateLabel(panel.transform, "请选择症状变化。", new Vector2(0, -265), 14);
-            CreateButton(panel.transform, "保存例行问卷", new Vector2(0, -335), SaveRoutineQuestionnaire);
-            CreateButton(panel.transform, "返回训练首页", new Vector2(0, -405), () => bootstrap.Router.Navigate(AppRoute.Home));
-            return panel;
-        }
-
         private GameObject CreateHomePanel(Transform parent)
         {
             GameObject panel = CreatePanel("HomePanel", parent, new Color(0.973f, 0.980f, 1f));
@@ -297,10 +261,9 @@ namespace SpineRecovery.App
             CreateButton(panel.transform, "追踪器连接与校准", new Vector2(0, 75), () => bootstrap.Router.Navigate(AppRoute.TrackingCalibration));
             CreateButton(panel.transform, "进入 AR 训练", new Vector2(0, 0), () => bootstrap.Router.Navigate(AppRoute.Training));
             CreateButton(panel.transform, "激活档案", new Vector2(0, -75), () => bootstrap.Router.Navigate(AppRoute.Activation));
-            CreateButton(panel.transform, "例行问卷（训练前记录）", new Vector2(0, -150), ShowRoutineQuestionnaire);
-            CreateButton(panel.transform, "训练历史", new Vector2(0, -225), ShowHistory);
-            CreateButton(panel.transform, "月度问卷", new Vector2(0, -300), ShowMonthlyQuestionnaire);
-            CreateButton(panel.transform, "退出登录", new Vector2(0, -375), () => bootstrap.State.ClearSession());
+            CreateButton(panel.transform, "训练历史", new Vector2(0, -150), ShowHistory);
+            CreateButton(panel.transform, "月度问卷", new Vector2(0, -225), ShowMonthlyQuestionnaire);
+            CreateButton(panel.transform, "退出登录", new Vector2(0, -300), () => bootstrap.State.ClearSession());
             return panel;
         }
 
@@ -642,58 +605,6 @@ namespace SpineRecovery.App
         {
             // Skipping activation also enters the training home directly so
             // the removed first-login questionnaire chain stays unreachable.
-            bootstrap.Router.Navigate(AppRoute.Home);
-        }
-
-        private void ShowRoutineQuestionnaire()
-        {
-            UserSession session = bootstrap.State.Session;
-            routinePain = session == null ? 0 : session.routineQuestionnairePainLevel;
-            routineSymptom = session == null ? "" : session.routineQuestionnaireSymptomChange;
-            if (routinePainLabel != null) routinePainLabel.text = "当前疼痛评分：" + routinePain + " / 10";
-            RefreshRoutineSymptomSelection();
-            bootstrap.Router.Navigate(AppRoute.RoutineQuestionnaire);
-        }
-
-        private void ChangeRoutinePain(int delta)
-        {
-            routinePain = Mathf.Clamp(routinePain + delta, 0, 10);
-            if (routinePainLabel != null) routinePainLabel.text = "当前疼痛评分：" + routinePain + " / 10";
-        }
-
-        private void SelectRoutineSymptom(string value)
-        {
-            routineSymptom = value;
-            RefreshRoutineSymptomSelection();
-        }
-
-        private void RefreshRoutineSymptomSelection()
-        {
-            int selected = routineSymptom == "stable" ? 0 : routineSymptom == "slightly_worse" ? 1 : routineSymptom == "worse" ? 2 : -1;
-            RefreshChoiceColors(routineSymptomButtons, selected, new Color(0.08f, 0.28f, 0.70f));
-        }
-
-        private void SaveRoutineQuestionnaire()
-        {
-            UserSession session = bootstrap.State.Session;
-            if (session == null || string.IsNullOrEmpty(routineSymptom))
-            {
-                if (routineMessage != null) routineMessage.text = "请选择症状变化后再保存。";
-                return;
-            }
-            session.routineQuestionnairePainLevel = routinePain;
-            session.routineQuestionnaireSymptomChange = routineSymptom;
-            session.routineQuestionnaireCompletedAt = System.DateTimeOffset.UtcNow.ToString("O");
-            session.routineQuestionnaireAnswers = "pain=" + routinePain + ";symptom=" + routineSymptom;
-            bootstrap.Users.AppendPainRecord(session, new PainHistoryRecord
-            {
-                id = "routine:" + System.DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(),
-                recordedAt = session.routineQuestionnaireCompletedAt,
-                painLevel = routinePain,
-                source = "DailyQuestionnaire",
-                painParts = session.painParts ?? System.Array.Empty<string>(),
-            });
-            if (routineMessage != null) routineMessage.text = "例行问卷已保存。";
             bootstrap.Router.Navigate(AppRoute.Home);
         }
 

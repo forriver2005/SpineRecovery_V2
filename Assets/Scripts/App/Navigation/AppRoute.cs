@@ -17,7 +17,6 @@ namespace SpineRecovery.App
         Training,
         PostTrainingSurvey,
         History,
-        RoutineQuestionnaire,
         Admin,
         PreTrainingBlocked,
         PostTrainingStop,

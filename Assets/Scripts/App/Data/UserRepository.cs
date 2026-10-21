@@ -19,6 +19,7 @@ namespace SpineRecovery.App
         UserSession Load(string accountId);
         void AppendPainRecord(UserSession session, PainHistoryRecord record);
         void AppendTrainingRecord(UserSession session, TrainingHistoryRecord record);
+        void AppendMonthlyRecord(UserSession session, MonthlyQuestionnaireRecord record);
     }
 
     public sealed class JsonUserRepository : IUserRepository
@@ -170,6 +171,17 @@ namespace SpineRecovery.App
             System.Array.Copy(records, updated, records.Length);
             updated[records.Length] = record;
             session.trainingHistory = updated;
+            Save(session);
+        }
+
+        public void AppendMonthlyRecord(UserSession session, MonthlyQuestionnaireRecord record)
+        {
+            if (session == null || record == null) return;
+            var records = session.monthlyHistory ?? System.Array.Empty<MonthlyQuestionnaireRecord>();
+            var updated = new MonthlyQuestionnaireRecord[records.Length + 1];
+            System.Array.Copy(records, updated, records.Length);
+            updated[records.Length] = record;
+            session.monthlyHistory = updated;
             Save(session);
         }
 

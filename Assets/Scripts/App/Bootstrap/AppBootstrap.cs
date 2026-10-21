@@ -10,6 +10,7 @@ namespace SpineRecovery.App
         public AppRouter Router { get; private set; }
         public IUserRepository Users { get; private set; }
         public IAdminConfigRepository AdminConfigs { get; private set; }
+        public IMonthlyAssignmentRepository MonthlyAssignments { get; private set; }
         public TrainingSessionService Training { get; private set; }
 
         private void Awake()
@@ -36,6 +37,7 @@ namespace SpineRecovery.App
                 Users = users;
             }
             AdminConfigs = new JsonAdminConfigRepository();
+            MonthlyAssignments = new JsonMonthlyAssignmentRepository();
             Router = GetComponent<AppRouter>() ?? gameObject.AddComponent<AppRouter>();
             Training = GetComponent<TrainingSessionService>() ?? gameObject.AddComponent<TrainingSessionService>();
         }

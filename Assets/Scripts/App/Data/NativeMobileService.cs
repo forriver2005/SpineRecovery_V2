@@ -154,5 +154,14 @@ namespace SpineRecovery.App
             session.trainingHistory = rows.ToArray();
             Save(session);
         }
+
+        public void AppendMonthlyRecord(UserSession session, MonthlyQuestionnaireRecord record)
+        {
+            var rows = new List<MonthlyQuestionnaireRecord>(session.monthlyHistory ?? Array.Empty<MonthlyQuestionnaireRecord>());
+            int index = rows.FindIndex(row => row.id == record.id);
+            if (index >= 0) rows[index] = record; else rows.Add(record);
+            session.monthlyHistory = rows.ToArray();
+            Save(session);
+        }
     }
 }

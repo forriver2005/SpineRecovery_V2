@@ -51,6 +51,8 @@ namespace SpineRecovery.App
         public bool preTrainingCheckPassed;
         public string preTrainingRecordedAt;
         public string preTrainingEventId;
+        /// <summary>ISO timestamp of the last time the user confirmed tracker calibration; empty if never.</summary>
+        public string trackingCalibratedAt;
         public int flexionPainLevel;
         public int extensionPainLevel;
         public string flexionResponse;
@@ -63,6 +65,7 @@ namespace SpineRecovery.App
         public bool admissionReviewRequired;
         public PainHistoryRecord[] painHistory = Array.Empty<PainHistoryRecord>();
         public TrainingHistoryRecord[] trainingHistory = Array.Empty<TrainingHistoryRecord>();
+        public MonthlyQuestionnaireRecord[] monthlyHistory = Array.Empty<MonthlyQuestionnaireRecord>();
         public string routineQuestionnaireCompletedAt;
         public int routineQuestionnairePainLevel;
         public string routineQuestionnaireSymptomChange;

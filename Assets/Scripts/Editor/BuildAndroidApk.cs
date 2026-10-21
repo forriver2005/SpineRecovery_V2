@@ -15,7 +15,9 @@ namespace SpineRecovery.Editor
         {
             string output = Environment.GetEnvironmentVariable("SPINE_APK_OUTPUT");
             if (string.IsNullOrWhiteSpace(output))
-                output = Path.Combine("Builds", "SpineRecovery_SlimeVR_LogExport.apk");
+                output = Path.Combine(
+                    Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory),
+                    "SpineRecovery_SlimeVR_LogExport.apk");
 
             string fullOutput = Path.GetFullPath(output);
             string directory = Path.GetDirectoryName(fullOutput);

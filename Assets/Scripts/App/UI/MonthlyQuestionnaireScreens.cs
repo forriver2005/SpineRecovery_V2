@@ -65,6 +65,7 @@ namespace SpineRecovery.App
         private RectTransform joaContent;
         private RectTransform sfmpqContent;
         private Text joaMessage;
+        private Text joaNextCaption;
         private UnityAction onJoaNext;
 
         // ---- page 1: JOA self assessment -------------------------------------
@@ -119,7 +120,8 @@ namespace SpineRecovery.App
             RectTransform footer = QuestionnaireUi.Footer(root, FooterHeight);
             joaMessage = QuestionnaireUi.Label(footer, "", 12.5f, QuestionnaireUi.DangerText, TextAnchor.MiddleCenter,
                 FontStyle.Normal, 20f, 4f, 350f, 16f);
-            QuestionnaireUi.PillButton(footer, "下一题", 20f, 24f, 350f, 52f, true, HandleJoaNext);
+            Button nextButton = QuestionnaireUi.PillButton(footer, "下一题", 20f, 24f, 350f, 52f, true, HandleJoaNext);
+            joaNextCaption = nextButton.GetComponentInChildren<Text>();
             QuestionnaireUi.Header(root, "腰椎康复系统", onBack);
             return panel;
         }
@@ -160,6 +162,12 @@ namespace SpineRecovery.App
             RefreshRatings(sensoryButtons, sensory);
             RefreshRatings(affectiveButtons, affective);
             ClearJoaMessage();
+        }
+
+        /// <summary>Labels the page-1 footer button, e.g. 「下一题」 when page 2 follows, 「完成」 otherwise.</summary>
+        public void SetJoaNextCaption(string caption)
+        {
+            if (joaNextCaption != null) joaNextCaption.text = caption;
         }
 
         /// <summary>Snapshot of the current answers; the caller fills in id and timestamp.</summary>

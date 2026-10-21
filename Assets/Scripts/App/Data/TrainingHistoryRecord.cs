@@ -33,6 +33,10 @@ namespace SpineRecovery.App
     {
         public string id;
         public string completedAt;
+        /// <summary>Assignment this submission answers; empty for legacy local entries.</summary>
+        public string assignmentId;
+        /// <summary>Bit mask of the assigned pages (1 = JOA page 1, 2 = SF-MPQ page 2).</summary>
+        public int modules;
         /// <summary>Lower back pain: 0 不疼 … 3 经常或一直很疼.</summary>
         public int backPain;
         /// <summary>Leg pain / numbness: 0 没有 … 3 经常或一直很严重.</summary>

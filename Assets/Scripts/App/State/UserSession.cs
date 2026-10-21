@@ -49,6 +49,8 @@ namespace SpineRecovery.App
         public bool intakeReviewRequired;
         public bool admissionCompleted;
         public bool preTrainingCheckPassed;
+        /// <summary>ISO timestamp of the last time the user confirmed tracker calibration; empty if never.</summary>
+        public string trackingCalibratedAt;
         public int flexionPainLevel;
         public int extensionPainLevel;
         public string flexionResponse;

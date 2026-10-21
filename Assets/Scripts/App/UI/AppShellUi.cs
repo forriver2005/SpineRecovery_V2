@@ -71,6 +71,9 @@ namespace SpineRecovery.App
         private int postActionNumber = 1;
         private int postActionCount = 1;
         private MonthlyQuestionnaireScreens monthlyScreens;
+        private HomeScreen homeScreen;
+        /// <summary>Pages of the monthly assignment currently being filled (1, 2 or 3).</summary>
+        private int activeMonthlyModules = MonthlyQuestionnaireAssignment.ModuleJoa;
 
         private void Start()
         {
@@ -116,9 +119,9 @@ namespace SpineRecovery.App
             monthlyScreens = new MonthlyQuestionnaireScreens();
             GameObject monthlyJoaPanel = monthlyScreens.BuildJoa(appCanvas.transform,
                 () => bootstrap.Router.Navigate(AppRoute.Home),
-                () => bootstrap.Router.Navigate(AppRoute.MonthlySfmpq));
+                HandleMonthlyJoaNext);
             GameObject monthlySfmpqPanel = monthlyScreens.BuildSfMpq(appCanvas.transform,
-                () => bootstrap.Router.Navigate(AppRoute.MonthlyJoa),
+                HandleMonthlySfmpqBack,
                 FinishMonthlyQuestionnaire);
 
             bootstrap.Router.Initialize(bootstrap.State);
@@ -160,26 +163,7 @@ namespace SpineRecovery.App
 
         private void RefreshHomeSummary()
         {
-            if (bootstrap == null || bootstrap.State == null || bootstrap.State.Session == null || homeMessage == null)
-                return;
-
-            UserSession session = bootstrap.State.Session;
-            string identity = "当前用户：" + session.accountId + (session.IsReturningUser ? "（回访用户）" : "（新用户）");
-            if (session.IsAdministrator)
-            {
-                homeMessage.text = identity;
-                return;
-            }
-
-            AdminTrainingConfiguration config = bootstrap.AdminConfigs?.CurrentPublished();
-            AdminActionDefinition[] recommended = config?.RecommendedActions(session.userTags);
-            string tagText = session.userTags == null || session.userTags.Length == 0
-                ? "暂无用户标签"
-                : "用户标签：" + string.Join("、", session.userTags);
-            string recommendation = recommended == null || recommended.Length == 0
-                ? "当前暂无匹配的推荐动作"
-                : "推荐动作：" + string.Join("、", recommended.Select(action => action.displayName));
-            homeMessage.text = identity + "\n" + tagText + "\n" + recommendation;
+            if (homeScreen != null) homeScreen.Refresh();
         }
 
 
@@ -255,16 +239,44 @@ namespace SpineRecovery.App
 
         private GameObject CreateHomePanel(Transform parent)
         {
-            GameObject panel = CreatePanel("HomePanel", parent, new Color(0.973f, 0.980f, 1f));
-            CreateLabel(panel.transform, "训练首页", new Vector2(0, 170), 30);
-            homeMessage = CreateLabel(panel.transform, "", new Vector2(0, 120), 16);
-            CreateButton(panel.transform, "追踪器连接与校准", new Vector2(0, 75), () => bootstrap.Router.Navigate(AppRoute.TrackingCalibration));
-            CreateButton(panel.transform, "进入 AR 训练", new Vector2(0, 0), () => bootstrap.Router.Navigate(AppRoute.Training));
-            CreateButton(panel.transform, "激活档案", new Vector2(0, -75), () => bootstrap.Router.Navigate(AppRoute.Activation));
-            CreateButton(panel.transform, "训练历史", new Vector2(0, -150), ShowHistory);
-            CreateButton(panel.transform, "月度问卷", new Vector2(0, -225), ShowMonthlyQuestionnaire);
-            CreateButton(panel.transform, "退出登录", new Vector2(0, -300), () => bootstrap.State.ClearSession());
+            homeScreen = new HomeScreen();
+            GameObject panel = homeScreen.Build(parent, BuildHomeState, new HomeScreen.Actions
+            {
+                EnterTraining = () => bootstrap.Router.Navigate(AppRoute.Training),
+                OpenTracker = () => bootstrap.Router.Navigate(AppRoute.TrackingCalibration),
+                OpenActivation = () => bootstrap.Router.Navigate(AppRoute.Activation),
+                OpenHistory = ShowHistory,
+                OpenMonthly = ShowMonthlyQuestionnaire,
+                Logout = () => bootstrap.State.ClearSession(),
+            });
+            // Status lines (launch errors, save confirmations) still go through homeMessage.
+            homeMessage = homeScreen.Message;
             return panel;
+        }
+
+        private HomeScreen.State BuildHomeState()
+        {
+            UserSession session = bootstrap != null && bootstrap.State != null ? bootstrap.State.Session : null;
+            if (session == null) return new HomeScreen.State { Name = "" };
+
+            MonthlyQuestionnaireAssignment assignment = bootstrap.MonthlyAssignments != null
+                ? bootstrap.MonthlyAssignments.GetActive(session.accountId)
+                : null;
+            HomeScreen.MonthlyEntryStatus monthlyStatus = HomeScreen.MonthlyEntryStatus.Disabled;
+            if (assignment != null)
+            {
+                monthlyStatus = assignment.opened
+                    ? HomeScreen.MonthlyEntryStatus.Open
+                    : HomeScreen.MonthlyEntryStatus.New;
+            }
+
+            return new HomeScreen.State
+            {
+                Name = session.accountId,
+                Activated = session.profile != null && session.profile.activationBound,
+                Calibrated = !string.IsNullOrEmpty(session.trackingCalibratedAt),
+                MonthlyStatus = monthlyStatus,
+            };
         }
 
         private GameObject CreateArTrainingPanel(Transform parent)
@@ -517,16 +529,63 @@ namespace SpineRecovery.App
 
         private void ShowMonthlyQuestionnaire()
         {
-            if (bootstrap.State.Session == null)
+            UserSession user = bootstrap.State.Session;
+            if (user == null)
             {
                 bootstrap.Router.Navigate(AppRoute.Login);
                 return;
             }
+
+            MonthlyQuestionnaireAssignment assignment = bootstrap.MonthlyAssignments.GetActive(user.accountId);
+            if (assignment == null)
+            {
+                return;
+            }
+            if (!assignment.opened)
+            {
+                assignment.opened = true;
+                bootstrap.MonthlyAssignments.Save(user.accountId, assignment);
+            }
+
+            activeMonthlyModules = assignment.modules;
+            monthlyScreens.SetJoaNextCaption(assignment.Includes(MonthlyQuestionnaireAssignment.ModuleSfMpq)
+                ? "下一题"
+                : "完成");
             monthlyScreens.Begin();
-            bootstrap.Router.Navigate(AppRoute.MonthlyJoa);
+            if (assignment.Includes(MonthlyQuestionnaireAssignment.ModuleJoa))
+            {
+                bootstrap.Router.Navigate(AppRoute.MonthlyJoa);
+            }
+            else
+            {
+                bootstrap.Router.Navigate(AppRoute.MonthlySfmpq);
+            }
         }
 
-        // No time limit yet: every submission is stored as a new record.
+        private void HandleMonthlyJoaNext()
+        {
+            if ((activeMonthlyModules & MonthlyQuestionnaireAssignment.ModuleSfMpq) != 0)
+            {
+                bootstrap.Router.Navigate(AppRoute.MonthlySfmpq);
+            }
+            else
+            {
+                FinishMonthlyQuestionnaire();
+            }
+        }
+
+        private void HandleMonthlySfmpqBack()
+        {
+            if ((activeMonthlyModules & MonthlyQuestionnaireAssignment.ModuleJoa) != 0)
+            {
+                bootstrap.Router.Navigate(AppRoute.MonthlyJoa);
+            }
+            else
+            {
+                bootstrap.Router.Navigate(AppRoute.Home);
+            }
+        }
+
         private void FinishMonthlyQuestionnaire()
         {
             UserSession user = bootstrap.State.Session;
@@ -539,6 +598,16 @@ namespace SpineRecovery.App
             MonthlyQuestionnaireRecord record = monthlyScreens.CollectRecord();
             record.id = "monthly:" + System.DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
             record.completedAt = System.DateTimeOffset.UtcNow.ToString("O");
+            record.modules = activeMonthlyModules;
+
+            MonthlyQuestionnaireAssignment assignment = bootstrap.MonthlyAssignments.GetActive(user.accountId);
+            if (assignment != null)
+            {
+                record.assignmentId = assignment.assignmentId;
+                assignment.status = MonthlyQuestionnaireAssignment.StatusCompleted;
+                assignment.completedAt = record.completedAt;
+                bootstrap.MonthlyAssignments.Save(user.accountId, assignment);
+            }
             bootstrap.Users.AppendMonthlyRecord(user, record);
             homeMessage.text = "月度问卷已保存到本地。";
             bootstrap.Router.Navigate(AppRoute.Home);
@@ -733,6 +802,12 @@ namespace SpineRecovery.App
 
         private void ConfirmTrackingCalibration()
         {
+            UserSession session = bootstrap.State.Session;
+            if (session != null)
+            {
+                session.trackingCalibratedAt = System.DateTimeOffset.UtcNow.ToString("O");
+                bootstrap.Users.Save(session);
+            }
             if (trackingMessage != null)
                 trackingMessage.text = "已由用户确认完成校准。请在真机验证追踪器在线状态后再开始训练。";
             bootstrap.Router.Navigate(AppRoute.Home);

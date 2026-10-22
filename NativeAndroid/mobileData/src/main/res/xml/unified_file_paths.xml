@@ -1,4 +1,6 @@
 <paths xmlns:android="http://schemas.android.com/apk/res/android">
     <cache-path name="motion_packages" path="motion_packages/" />
     <cache-path name="updates" path="updates/" />
+    <!-- P4.5：处方冻结的固定资源（已核对长度与 SHA-256）交给 AR 读取。 -->
+    <files-path name="prescription_assets" path="prescription_assets/" />
 </paths>

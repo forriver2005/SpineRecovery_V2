@@ -1,27 +1,101 @@
 package com.metaspine.mobile.data
 
+import kotlinx.coroutines.CancellationException
 import org.json.JSONObject
+import java.io.File
 
 /**
- * M7.1 §8.3：下行协调器 —— 执行「拉取 → 校验 → 保存 → 尝试回执」，并回答本次是否可用于启动训练。
+ * 已核对并交接给本机执行层的固定资源引用。
  *
- * 关键规则（设计 §4.5）：
- * - 只有**本次在线刷新成功且 state=ready** 才返回 [DirectiveRefreshResult.Ready]；
- * - 失败/非 ready 时缓存只用于展示，训练一律失败关闭；
- * - 401/403 不回退缓存；
- * - 回执只在快照成功落盘后提交，失败不影响本次处方，下一次拉到同一 active order 时重试。
+ * `localFile` 只用于本机读取，**不会**上传 T01；服务器侧只认条目、版本与摘要。
+ */
+data class HandedOffAsset(
+    val item: AdmissionPrescriptionItemV2,
+    val file: File,
+    val byteCount: Long
+)
+
+/**
+ * 完整处方交接：订单、清单、全部条目/剂量/资源身份，以及本地已验证文件引用。
+ *
+ * [blockingReasons] 非空表示“已保存但资源或能力不完整”，此时不得宣称 ready。
+ */
+data class TrainingPrescriptionHandoff(
+    val scope: BindingScope,
+    val order: DownloadedOrder,
+    val manifestSha256: String,
+    val assets: List<HandedOffAsset>,
+    val blockingReasons: List<String>
+) {
+    val complete: Boolean get() = blockingReasons.isEmpty() && assets.size == order.items.size
+
+    /**
+     * 交给 AR 的完整处方事实。逐项写出与 manifest 相同的字段，
+     * AR 只需按 [localFile] 读取已核对字节，不需要、也不允许自行拼路径或改名。
+     */
+    fun toJson(): JSONObject = JSONObject()
+        .put("orderId", order.orderId)
+        .put("reason", order.reason)
+        .put("createdBy", order.createdBy)
+        .put("createdAt", order.createdAt)
+        .put("prescriptionContractVersion", order.prescription.prescriptionContractVersion)
+        .put("resourceManifestSha256", manifestSha256)
+        .put("localScope", JSONObject()
+            .put("origin", scope.origin)
+            .put("serviceId", scope.serviceId)
+            .put("hospitalKey", scope.hospitalKey))
+        .put("items", org.json.JSONArray(order.items.map { item ->
+            val handoff = assets.firstOrNull { it.item.itemId == item.itemId }
+            val asset = item.asset
+            JSONObject()
+                .put("itemId", item.itemId)
+                .put("position", item.position)
+                .put("actionId", item.actionId)
+                .put("actionName", item.actionName)
+                .put("sets", item.sets)
+                .put("reps", item.reps)
+                .put("holdSeconds", item.holdSeconds)
+                .put("actionVersionId", asset.actionVersionId)
+                .put("variantKey", asset.variantKey)
+                .put("formatVersion", asset.formatVersion)
+                .put("runtimeContractVersion", asset.runtimeContractVersion)
+                .put("doseProfile", asset.doseProfile)
+                .put("supportedModes", org.json.JSONArray(asset.supportedModes))
+                .put("sha256", asset.sha256)
+                .put("fileSize", asset.fileSize)
+                .put("localFileName", handoff?.file?.name.orEmpty())
+        }))
+}
+
+/**
+ * P4：下行协调器 —— 「拉取 → 校验 → 保存 → 下载资源 → 两阶段回执 → 交接」。
+ *
+ * 关键规则：
+ * - 只有**本次在线刷新成功且 state=ready、全部资源已验证、`assets_ready` 已被接受**
+ *   才返回 [DirectiveRefreshResult.Ready]；
+ * - `directive_saved` 只在快照与回执任务持久化成功后提交；
+ * - `assets_ready` 只在全部固定文件核对通过、且消费者确认能力后提交；
+ * - 缺能力或资源失败时保持 saved，并列出具体缺口；
+ * - 停训仍走简式回执；回执失败不回退成“训练可用”。
  */
 class TrainingDirectiveCoordinator(
     private val storage: DirectiveSnapshotStorage,
+    private val receipts: PrescriptionReceiptStorage? = null,
+    private val assets: PrescriptionAssetStorage? = null,
+    private val handoffGate: (TrainingPrescriptionHandoff) -> List<String> = { emptyList() },
     private val fetchDirective: suspend (String) -> Result<JSONObject> = PatientDirectiveClient::fetch,
     private val sendStopReceipt: suspend (String, Long) -> Result<PatientDirectiveClient.ReceiptInfo> =
         PatientDirectiveClient::postStopReceipt,
+    private val sendPrescriptionReceipt:
+        suspend (String, Long, String, String) -> Result<PatientDirectiveClient.ReceiptInfo> =
+        PatientDirectiveClient::postPrescriptionReceipt,
     private val nowMillis: () -> Long = System::currentTimeMillis
 ) {
 
     suspend fun refresh(
         accountId: String,
-        credential: PatientServerCredential?
+        credential: PatientServerCredential?,
+        scope: BindingScope? = null
     ): DirectiveRefreshResult {
         val effective = credential
             ?: return DirectiveRefreshResult.NotActivated("尚未完成激活码绑定，请联系医生")
@@ -48,33 +122,152 @@ class TrainingDirectiveCoordinator(
 
         // 200 的每种状态都整体覆盖旧快照：撤销/停止必须立刻让旧处方失效。
         storage.write(accountId, snapshot)
-        // 回执失败不阻塞训练：已在本地保存的处方仍然安全，下次拉取会重试。
-        submitReceiptIfNeeded(effective, snapshot)
 
-        return when {
-            // 解析器已拒绝非 2 版本；这里再挡一次，避免将来放宽解析时把旧快照当可训练。
-            snapshot.state == TrainingDirectiveState.Ready &&
-                snapshot.directiveVersion == PatientDirectiveClient.DIRECTIVE_VERSION ->
-                DirectiveRefreshResult.Ready(snapshot)
-            else -> DirectiveRefreshResult.NotTrainable(snapshot, DirectiveMessages.forState(snapshot))
+        if (snapshot.state == TrainingDirectiveState.Stopped) {
+            submitStopReceiptIfNeeded(effective, snapshot)
+            return DirectiveRefreshResult.NotTrainable(snapshot, DirectiveMessages.forState(snapshot))
         }
+
+        val order = snapshot.prescription
+        if (snapshot.state != TrainingDirectiveState.Ready || order == null || scope == null) {
+            return DirectiveRefreshResult.NotTrainable(snapshot, DirectiveMessages.forState(snapshot))
+        }
+
+        return deliverPrescription(effective, snapshot, order, scope)
     }
 
-    /**
-     * P4.1 只保留停训简式回执；处方回执必须走两阶段（`directive_saved` / `assets_ready`），
-     * 由 P4.5 的持久化队列提交——这里若发简式 `{orderId}` 会被服务器 400
-     * `STOP_RECEIPT_ORDER_TYPE_MISMATCH`，且无法表达保存与资源就绪的区别。
-     */
-    private suspend fun submitReceiptIfNeeded(
+    private suspend fun submitStopReceiptIfNeeded(
         credential: PatientServerCredential,
         snapshot: TrainingDirectiveSnapshot
     ) {
         val stopOrder = snapshot.stopOrder ?: return
-        // Server 已经记录过该版本（receivedAt 非空）时无需重复提交。
         if (!stopOrder.receivedAt.isNullOrBlank()) return
-        // 停训回执是尽力而为：失败不能把已确认的状态误判为不可用。
         runCatching { sendStopReceipt(credential.patientToken, stopOrder.orderId) }
     }
+
+    /**
+     * 两阶段回执与交接。任何一步失败都保持可展示快照，但绝不返回 Ready。
+     */
+    private suspend fun deliverPrescription(
+        credential: PatientServerCredential,
+        snapshot: TrainingDirectiveSnapshot,
+        order: DownloadedOrder,
+        scope: BindingScope
+    ): DirectiveRefreshResult {
+        val manifest = order.resourceManifestSha256
+        if (manifest != order.prescription.computeManifestSha256()) {
+            // 本地重算不符：不提交任何回执，也不把处方交接出去。
+            return DirectiveRefreshResult.NotTrainable(snapshot, "处方清单校验失败，请联系医生")
+        }
+
+        // ── 阶段 1：处方与清单已落盘后提交 directive_saved ──────────────────────
+        var task = receipts?.read(scope, order.orderId)
+            ?.takeIf { it.resourceManifestSha256 == manifest }
+            ?: PrescriptionReceiptTask(
+                orderId = order.orderId,
+                resourceManifestSha256 = manifest,
+                phase = ReceiptPhase.NotSubmitted,
+                savedReceivedAt = null,
+                assetsReadyReceivedAt = null,
+                failedAssetItemIds = emptyList(),
+                blockingReasons = emptyList()
+            )
+        if (task.phase == ReceiptPhase.NotSubmitted) {
+            val saved = sendPrescriptionReceipt(
+                credential.patientToken, order.orderId, PatientDirectiveClient.PHASE_SAVED, manifest
+            )
+            val info = saved.getOrElse { error ->
+                // 保存阶段的失败必须保留任务，下一次刷新原样重试同一订单与摘要。
+                return DirectiveRefreshResult.NotTrainable(
+                    snapshot, receiptFailureMessage(error, "处方保存回执失败"))
+            }
+            task = task.copy(phase = ReceiptPhase.Saved, savedReceivedAt = info.receivedAt)
+            receipts?.write(scope, task)
+        }
+
+        // ── 阶段 2：下载并核对全部固定文件 ──────────────────────────────────────
+        val handedOff = mutableListOf<HandedOffAsset>()
+        val failures = mutableListOf<Long>()
+        for (item in order.items) {
+            val asset = item.asset
+            val cached = assets?.existing(order.orderId, item.itemId, asset.sha256)
+            if (cached != null) {
+                handedOff.add(HandedOffAsset(item, cached, asset.fileSize))
+                continue
+            }
+            val downloaded = try {
+                assets?.download(credential.patientToken, order, item)
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (error: ApiHttpException) {
+                // 凭据被拒是全局问题：继续下载其余条目没有意义，也不能把处方当成可用。
+                if (error.httpStatus == 401 || error.httpStatus == 403) {
+                    receipts?.write(scope, task.copy(
+                        failedAssetItemIds = (failures + item.itemId).distinct(),
+                        blockingReasons = listOf("患者凭据已失效，请重新激活")))
+                    return DirectiveRefreshResult.CredentialRejected(
+                        "患者凭据已失效，请联系医生或管理员")
+                }
+                null
+            } catch (error: PrescriptionAssetException) {
+                null
+            }
+            if (downloaded == null) {
+                failures.add(item.itemId)
+            } else {
+                handedOff.add(HandedOffAsset(item, downloaded, asset.fileSize))
+            }
+        }
+        val blocking = buildList {
+            if (failures.isNotEmpty()) add("有资源未通过校验，已保持保存状态")
+            addAll(handoffGate(TrainingPrescriptionHandoff(
+                scope = scope,
+                order = order,
+                manifestSha256 = manifest,
+                assets = handedOff,
+                blockingReasons = emptyList()
+            )))
+        }
+        if (blocking.isNotEmpty()) {
+            receipts?.write(scope, task.copy(
+                failedAssetItemIds = failures, blockingReasons = blocking))
+            return DirectiveRefreshResult.NotTrainable(
+                snapshot, blocking.firstOrNull() ?: "资源尚未就绪，请稍后重试")
+        }
+
+        // ── 阶段 3：全部条件满足才提交 assets_ready ─────────────────────────────
+        if (task.phase != ReceiptPhase.AssetsReady) {
+            val ready = sendPrescriptionReceipt(
+                credential.patientToken, order.orderId,
+                PatientDirectiveClient.PHASE_ASSETS_READY, manifest
+            )
+            val info = ready.getOrElse { error ->
+                // 服务器可能已记录、只是响应丢失：保持 saved，下一次原样重放。
+                return DirectiveRefreshResult.NotTrainable(
+                    snapshot, receiptFailureMessage(error, "资源就绪回执失败"))
+            }
+            task = task.copy(
+                phase = ReceiptPhase.AssetsReady,
+                assetsReadyReceivedAt = info.assetsReadyAt ?: info.receivedAt,
+                failedAssetItemIds = emptyList(),
+                blockingReasons = emptyList()
+            )
+            receipts?.write(scope, task)
+        }
+
+        return DirectiveRefreshResult.Ready(
+            snapshot,
+            TrainingPrescriptionHandoff(scope, order, manifest, handedOff, emptyList())
+        )
+    }
+
+    private fun receiptFailureMessage(error: Throwable, fallback: String): String =
+        when {
+            error is ApiHttpException && error.httpStatus == 401 ->
+                "患者凭据已失效，请联系医生或管理员"
+            error is DirectiveProtocolException && error.message != null -> error.message!!
+            else -> fallback
+        }
 
     private fun failureResult(
         accountId: String,
@@ -99,12 +292,30 @@ class TrainingDirectiveCoordinator(
     }
 }
 
+/** 回执任务存储端口：单元测试用内存实现，Android 用 [PrescriptionReceiptStore]。 */
+interface PrescriptionReceiptStorage {
+    fun read(scope: BindingScope, orderId: Long): PrescriptionReceiptTask?
+    fun write(scope: BindingScope, task: PrescriptionReceiptTask)
+}
+
+/** 固定资源端口：返回已发布的本地文件；失败必须抛出而不是返回半文件。 */
+interface PrescriptionAssetStorage {
+    fun existing(orderId: Long, itemId: Long, sha256: String): File?
+    suspend fun download(patientToken: String, order: DownloadedOrder, item: AdmissionPrescriptionItemV2): File?
+}
+
 /** 本次刷新对“能否开始训练”的结论。 */
 sealed interface DirectiveRefreshResult {
-    /** 本次在线刷新成功且 state=ready；仍需通过手机本地训练前安全检查。 */
-    data class Ready(val snapshot: TrainingDirectiveSnapshot) : DirectiveRefreshResult
+    /**
+     * 本次在线刷新成功、资源已验证且 `assets_ready` 已被接受；
+     * 仍需通过手机本地训练前安全检查。
+     */
+    data class Ready(
+        val snapshot: TrainingDirectiveSnapshot,
+        val handoff: TrainingPrescriptionHandoff? = null
+    ) : DirectiveRefreshResult
 
-    /** 刷新成功但医生当前不允许训练（已停止 / 等待新处方 / 处方不兼容）。 */
+    /** 刷新成功但医生当前不允许训练，或资源/能力尚未就绪。 */
     data class NotTrainable(
         val snapshot: TrainingDirectiveSnapshot,
         val message: String

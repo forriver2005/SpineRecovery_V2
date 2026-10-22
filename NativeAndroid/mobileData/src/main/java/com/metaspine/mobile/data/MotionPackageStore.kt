@@ -10,16 +10,6 @@ import java.nio.file.StandardCopyOption
 
 private const val MOTION_PACKAGE_FILE_SUFFIX = ".motion.json"
 
-internal fun selectLatestCachedMotionPackage(candidates: Array<out File>): File? =
-    candidates
-        .asSequence()
-        .filter {
-            it.isFile &&
-                it.length() > 0L &&
-                it.name.endsWith(MOTION_PACKAGE_FILE_SUFFIX)
-        }
-        .maxWithOrNull(compareBy<File>({ it.lastModified() }, { it.name }))
-
 /**
  * 动作数据包（CoachMotionPackage JSON）的本地仓库。
  *
@@ -85,13 +75,6 @@ object MotionPackageStore {
             ?.map { it.name.removeSuffix(FILE_SUFFIX) }
             ?.sorted()
             ?: emptyList()
-
-    /** 返回最近写入的有效缓存动作；修改时间相同时按文件名稳定选择。 */
-    fun latestCachedActionId(context: Context): String? {
-        val candidates = cacheDir(context).listFiles().orEmpty()
-        val selected = selectLatestCachedMotionPackage(candidates)
-        return selected?.name?.removeSuffix(FILE_SUFFIX)
-    }
 
     /** 删除某个动作的缓存。 */
     fun remove(context: Context, actionId: String): Boolean =

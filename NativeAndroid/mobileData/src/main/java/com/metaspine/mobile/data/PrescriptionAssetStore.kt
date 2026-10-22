@@ -57,7 +57,7 @@ data class PrescriptionAssetRecord(
 class PrescriptionAssetStore(
     private val root: File,
     private val scope: BindingScope
-) {
+) : PrescriptionAssetStorage {
     private val indexFile = File(root, "index.json")
 
     /** 下载目标路径：不含来源与 PAT，只用于本地定位。 */
@@ -141,6 +141,34 @@ class PrescriptionAssetStore(
                 it.hospitalKey == scope.hospitalKey
         }
 
+    /**
+     * 已有且仍与清单摘要一致的文件；摘要不一致视为无缓存，强制重新下载。
+     * 这里不返回“上一次的版本”——处方冻结的是具体字节，不是动作名。
+     */
+    override fun existing(orderId: Long, itemId: Long, sha256: String): File? {
+        val record = recordFor(orderId, itemId)?.takeIf { it.sha256 == sha256 } ?: return null
+        return verifiedFile(record)
+    }
+
+    override suspend fun download(
+        patientToken: String,
+        order: DownloadedOrder,
+        item: AdmissionPrescriptionItemV2
+    ): File? {
+        val asset = item.asset
+        return PrescriptionAssetClient.download(
+            patientToken = patientToken,
+            downloadPath = asset.downloadPath,
+            expectedSha256 = asset.sha256,
+            expectedFileSize = asset.fileSize,
+            origin = { scope.origin },
+            publish = { temp ->
+                publish(order.orderId, item.itemId, asset.actionVersionId, asset.variantKey,
+                    asset.sha256, temp)
+            }
+        ).file
+    }
+
     fun readIndex(): List<PrescriptionAssetRecord> = runCatching {
         if (!indexFile.isFile) return emptyList<PrescriptionAssetRecord>()
         val array = JSONObject(indexFile.readText(Charsets.UTF_8)).getJSONArray("records")
@@ -177,8 +205,20 @@ class PrescriptionAssetStore(
     }
 
     companion object {
+        /** FileProvider 的 `<files-path name="prescription_assets" path="prescription_assets/" />`。 */
+        internal const val PROVIDER_AUTHORITY_SUFFIX = ".motionprovider"
+
         fun forContext(context: Context, scope: BindingScope): PrescriptionAssetStore =
             PrescriptionAssetStore(File(context.filesDir, LOCATION), scope)
+
+        /** 只允许把本缓存根目录内的文件交给 AR；越界路径直接失败，不签发 URI。 */
+        fun contentUriFor(context: Context, file: File): android.net.Uri? = runCatching {
+            val root = File(context.filesDir, LOCATION).canonicalFile
+            val canonical = file.canonicalFile
+            require(canonical.path.startsWith(root.path + File.separator)) { "资源不在处方缓存目录内" }
+            androidx.core.content.FileProvider.getUriForFile(
+                context, context.packageName + PROVIDER_AUTHORITY_SUFFIX, canonical)
+        }.getOrNull()
 
         private const val LOCATION = "prescription_assets"
     }

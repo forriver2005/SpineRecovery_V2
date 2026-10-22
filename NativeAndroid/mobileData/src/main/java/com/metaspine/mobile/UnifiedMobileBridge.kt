@@ -8,6 +8,7 @@ import com.metaspine.mobile.data.*
 import kotlinx.coroutines.*
 import org.json.JSONArray
 import org.json.JSONObject
+import java.io.File
 import java.time.OffsetDateTime
 import java.util.UUID
 import java.util.concurrent.atomic.AtomicInteger
@@ -228,6 +229,8 @@ object UnifiedMobileBridge {
                     priorScope.hospitalKey != newScope.hospitalKey ||
                     priorScope.patientId != newScope.patientId)
                 if (bindingChanged) sync.forgetAccount(account) else sync.invalidateInflight(account)
+                // P4.2：旧绑定的处方回执任务不得被新 PAT 重放。代际已变，这里只做物理清理。
+                priorScope?.let { PrescriptionReceiptStore(context).clearScope(it) }
                 check(PatientCredentials.saveActivatedCredential(context, account,
                     PatientServerCredential(redeemed.patientId, pending.proposedToken), redeemed.prescription,
                     redeemed.identity, redeemed.prescriptionV2))
@@ -242,7 +245,21 @@ object UnifiedMobileBridge {
                     "请重新完成本次训练前检查"
                 }
                 val credential = requireNotNull(PatientCredentials.credential(context, account)) { "请先激活医生档案" }
-                val refreshed = TrainingDirectiveCoordinator(TrainingDirectiveStore(context)).refresh(account, credential)
+                // 处方文件只按当前绑定作用域存取；作用域与 PAT 患者不一致时不得交接。
+                val bindingScope = requireNotNull(BindingScopeStore.load(context, account)) {
+                    "医院绑定信息缺失，请重新激活医生档案"
+                }
+                require(bindingScope.patientId == credential.patientId &&
+                    bindingScope.origin == SpineFlowServerConfig.BASE_URL) {
+                    "医院绑定已变更，请重新激活医生档案"
+                }
+                val assetStore = PrescriptionAssetStore.forContext(context, bindingScope)
+                val refreshed = TrainingDirectiveCoordinator(
+                    storage = TrainingDirectiveStore(context),
+                    receipts = PrescriptionReceiptStore(context),
+                    assets = assetStore,
+                    handoffGate = { handoff -> TrainingStartPayload.capabilityGaps(handoff.order) }
+                ).refresh(account, credential, bindingScope)
                 require(refreshed is DirectiveRefreshResult.Ready) {
                     when (refreshed) {
                         is DirectiveRefreshResult.NotTrainable -> refreshed.message
@@ -252,11 +269,14 @@ object UnifiedMobileBridge {
                         else -> "无法获取本次医生处方"
                     }
                 }
-                val order = requireNotNull(refreshed.snapshot.trainableOrder())
+                val handoff = requireNotNull(refreshed.handoff) { "处方资源尚未完成校验，请重新下拉处方" }
                 val payload = TrainingStartPayload.forPrescription(user,
                     if (user.isReturningUser) DemoFlowType.ReturningUser else DemoFlowType.FirstAdmission,
-                    credential.patientId, order)
+                    credential.patientId, handoff) { file ->
+                    PrescriptionAssetStore.contentUriFor(context, file)?.toString()
+                }
                 val source = JSONObject(payload.toJson())
+                val order = handoff.order
                 val action = requireNotNull(order.singleItem)
                 val coachScene = when (action.actionId) {
                     "bird_dog" -> if (user.profile?.gender == UserGender.Male) "maleBirdDogPractice" else "BirdDogPractice"

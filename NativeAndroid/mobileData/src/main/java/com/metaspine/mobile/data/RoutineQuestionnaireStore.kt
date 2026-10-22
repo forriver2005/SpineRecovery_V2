@@ -7,15 +7,20 @@ import android.database.sqlite.SQLiteOpenHelper
 
 /** Independent schema: never migrates or writes the pre-training questionnaires database. */
 class RoutineQuestionnaireStore(context: Context, name: String = "routine_questionnaires.db") :
-    SQLiteOpenHelper(context.applicationContext, name, null, 1), RoutineQuestionnaireStorage {
+    SQLiteOpenHelper(context.applicationContext, name, null, 2), RoutineQuestionnaireStorage {
     override fun onCreate(db: SQLiteDatabase) {
         db.execSQL("CREATE TABLE bindings (account_id TEXT PRIMARY KEY, patient_id TEXT NOT NULL, fingerprint TEXT NOT NULL, rejected INTEGER NOT NULL DEFAULT 0)")
         db.execSQL("CREATE TABLE tasks (account_id TEXT NOT NULL, patient_id TEXT NOT NULL, task_id INTEGER NOT NULL, payload TEXT NOT NULL, PRIMARY KEY(account_id, patient_id, task_id))")
+        db.execSQL(QUARANTINE_DDL)
     }
-    override fun onUpgrade(db: SQLiteDatabase, oldVersion: Int, newVersion: Int) = error("不支持的问卷缓存升级")
+    override fun onUpgrade(db: SQLiteDatabase, oldVersion: Int, newVersion: Int) {
+        // 仅新增隔离表（附加式，不改既有表结构/主键）：旧安装升级后即支持切源留存。
+        if (oldVersion < 2) db.execSQL(QUARANTINE_DDL) else error("不支持的问卷缓存升级")
+    }
     @Synchronized fun clearAccount(accountId: String) {
         transaction { db ->
             db.delete("tasks", "account_id = ?", arrayOf(accountId))
+            db.delete("quarantine_tasks", "account_id = ?", arrayOf(accountId))
             db.delete("bindings", "account_id = ?", arrayOf(accountId))
         }
     }
@@ -28,6 +33,24 @@ class RoutineQuestionnaireStore(context: Context, name: String = "routine_questi
     @Synchronized override fun bind(scope: RoutineScope) {
         transaction { db ->
             if (!matches(scope)) {
+                // P2.7 / §4：切源不再静默删除未确认答卷——先按旧指纹隔离留存，供恢复与诊断。
+                val oldFingerprint = db.rawQuery(
+                    "SELECT fingerprint FROM bindings WHERE account_id=?", arrayOf(scope.accountId)
+                ).use { if (it.moveToFirst()) it.getString(0) else null }
+                if (oldFingerprint != null) {
+                    db.rawQuery(
+                        "SELECT patient_id,task_id,payload FROM tasks WHERE account_id=?",
+                        arrayOf(scope.accountId)
+                    ).use { cursor ->
+                        while (cursor.moveToNext()) {
+                            db.insertWithOnConflict("quarantine_tasks", null, ContentValues().apply {
+                                put("account_id", scope.accountId); put("patient_id", cursor.getString(0))
+                                put("fingerprint", oldFingerprint); put("task_id", cursor.getLong(1))
+                                put("payload", cursor.getString(2)); put("quarantined_at", System.currentTimeMillis())
+                            }, SQLiteDatabase.CONFLICT_REPLACE)
+                        }
+                    }
+                }
                 db.delete("tasks", "account_id = ?", arrayOf(scope.accountId))
                 db.insertOrThrow("bindings", null, ContentValues().apply {
                     // The old binding is replaced only inside the same transaction as the purge.
@@ -73,4 +96,11 @@ class RoutineQuestionnaireStore(context: Context, name: String = "routine_questi
     }
     private fun args(scope: RoutineScope) = arrayOf(scope.accountId, scope.patientId, scope.fingerprint)
     private fun aad(scope: RoutineScope, id: Long) = "routine:${scope.accountId}:${scope.patientId}:$id:${scope.fingerprint}"
+
+    private companion object {
+        const val QUARANTINE_DDL =
+            "CREATE TABLE IF NOT EXISTS quarantine_tasks (account_id TEXT NOT NULL, patient_id TEXT NOT NULL, " +
+                "fingerprint TEXT NOT NULL, task_id INTEGER NOT NULL, payload TEXT NOT NULL, " +
+                "quarantined_at INTEGER NOT NULL, PRIMARY KEY(account_id, patient_id, fingerprint, task_id))"
+    }
 }

@@ -19,6 +19,8 @@ import org.json.JSONObject
 class ServerSyncCoordinator(
     private val context: Context,
     private val scope: CoroutineScope,
+    // P2.4：启动/前台重算时按账号加载「可同步」用户状态（已过滤 LEGACY_IMPORT / 种子数据）。
+    private val loadSyncableUser: (String) -> DemoUserData? = { null },
 ) {
     private val store = PendingSyncStore(context)
     private var flushJob: Job? = null
@@ -43,6 +45,22 @@ class ServerSyncCoordinator(
         store.clearAccount(accountId)
     }
 
+    /**
+     * P2.7：重新激活/换绑后作废旧绑定的在途回包与防抖任务，但**保留**队列与游标
+     * （同一医院重放激活时合法未确认的 V2 任务不能丢）。冲刷在发请求前后比对
+     * [accountGenerations]，代际变化即丢弃旧回包，不修改新绑定的凭据/游标/缓存。
+     */
+    fun invalidateInflight(accountId: String) {
+        accountGenerations[accountId] = (accountGenerations[accountId] ?: 0) + 1
+        debounceJobs.remove(accountId)?.cancel()
+    }
+
+    /** P2.4：用户状态落盘后由桥接层同步调用，先于 5 秒防抖入队打持久 dirty 标记。 */
+    fun markDirty(accountId: String) {
+        if (accountId in forgottenAccountIds) return
+        store.markDirty(accountId)
+    }
+
     /** SF-01：凭据被拒时回调（每个账号只在暂停切换时触发一次），UI 据此提示用户。 */
     var onCredentialsRejected: ((accountId: String) -> Unit)? = null
 
@@ -61,15 +79,20 @@ class ServerSyncCoordinator(
         networkCallback = callback
         // 网络恢复回调（ACCESS_NETWORK_STATE 权限 Manifest 已有）
         connectivityManager?.registerDefaultNetworkCallback(callback)
+        // P2.4：冷启动即重算 dirty 账号的待发 diff——覆盖「保存后防抖窗口内被强杀」的场景，
+        // 不能只依赖已有队列 flush（此时队列可能为空）。
+        scope.launch { recomputePending(); flush() }
     }
 
     /**
      * 用户状态变更入口（Step 5 由 MainActivity.saveUser 调用）。
      * 防抖 5s：saveUser 调用频繁，只对最终状态做一次 diff。
+     * dirty 标记由桥接层在落盘后同步打上，防抖窗口内被杀仍可重启重算。
      */
     fun onUserChanged(user: DemoUserData) {
         if (user.accountId in forgottenAccountIds) return
         val accountId = user.accountId
+        store.markDirty(accountId)
         debounceJobs[accountId]?.cancel()
         debounceJobs[accountId] = scope.launch {
             delay(5_000)
@@ -79,7 +102,7 @@ class ServerSyncCoordinator(
 
     /** App 回到前台（Step 5 接 activityResumed = true）。 */
     fun onForeground() {
-        scope.launch { flush() }
+        scope.launch { recomputePending(); flush() }
     }
 
     /** 评审 #6：注销网络回调，由 MainActivity.onDestroy 调用。 */
@@ -124,6 +147,7 @@ class ServerSyncCoordinator(
                         profileHash = diff.newProfileHash,
                         lifecycle = diff.lifecycle,
                         imuCalibrationState = diff.imuCalibrationState,
+                        feedbackEventIds = diff.newFeedbackEventIds,
                     ),
                 ),
             )
@@ -171,7 +195,37 @@ class ServerSyncCoordinator(
                 "入队 sync=${diff.syncBody != null} upload=${totalUploading}条(${plan.chunks.size}批) rejected=${diff.rejectedSessionIds.size}条 oversized=${plan.oversizedSessionIds.size}条"
             )
         }
+        // P2.4：diff 已持久入队后清除 dirty 标记；队列损坏时保留标记以便诊断，不静默丢弃。
+        if (!store.isQueueCorrupted(accountId)) store.clearDirty(accountId)
         scope.launch { flush() }
+    }
+
+    /**
+     * P2.4：启动/前台重算所有 dirty 账号的待发 diff。
+     * 幂等——buildPendingDiff 以游标快照为基准，upload 再去重已入队/已隔离的 sessionId，
+     * sync 用 replaceKind；因此重复重算不会产生重复任务。损坏队列跳过并保留标记待人工诊断。
+     */
+    private fun recomputePending() {
+        val dirty = store.dirtyAccountIds()
+        if (dirty.isEmpty()) return
+        for (accountId in dirty) {
+            if (accountId in forgottenAccountIds) {
+                store.clearDirty(accountId)
+                continue
+            }
+            if (store.isQueueCorrupted(accountId)) {
+                android.util.Log.e(TAG, "账号 $accountId 队列密文损坏，跳过自动重算，保留待人工诊断")
+                continue
+            }
+            val user = loadSyncableUser(accountId)
+            if (user == null) {
+                // 账号已删除/无法加载——无待发可言，清标记避免每次启动空转。
+                store.clearDirty(accountId)
+                continue
+            }
+            android.util.Log.i(TAG, "启动重算待发 diff: $accountId")
+            enqueueUserDiff(user)
+        }
     }
 
     // ---------- 冲刷 ----------
@@ -209,9 +263,13 @@ class ServerSyncCoordinator(
                 }
                 if (generation != (accountGenerations[accountId] ?: 0)) continue
                 if (result.isSuccess) {
-                    store.remove(accountId, id)
-                    applyCursor(accountId, item.optJSONObject("cursor"))
-                    android.util.Log.i(TAG, "冲刷成功 kind=${item.optString("kind")}")
+                    // P2.5：移除队列元素与推进游标在同一次 commit() 内原子完成，
+                    // 消除「已移除但游标未推进」的重发窗口。
+                    if (store.commitAck(accountId, id, item.optJSONObject("cursor"))) {
+                        android.util.Log.i(TAG, "冲刷成功 kind=${item.optString("kind")}")
+                    } else {
+                        android.util.Log.w(TAG, "ACK 提交时队列元素已不存在 kind=${item.optString("kind")}")
+                    }
                     continue
                 }
                 // SF-01：401/403 = 凭据被拒（缺失/撤销/归属不符）→ 暂停冲刷并提示，不无限重试
@@ -274,28 +332,7 @@ class ServerSyncCoordinator(
         scope.launch { flush() }
     }
 
-    /** 成功后把队列元素携带的游标信息合并写回快照。 */
-    private fun applyCursor(accountId: String, cursorJson: JSONObject?) {
-        val cursor = QueueCursor.fromJson(cursorJson)
-        if (cursor.sessionIds.isEmpty() && cursor.painIds.isEmpty() &&
-            cursor.qHashes.isEmpty() && cursor.profileHash == null &&
-            cursor.lifecycle == null && cursor.imuCalibrationState == null
-        ) {
-            return
-        }
-        val snapshot = store.snapshot(accountId)
-        val updated = snapshot
-            .afterUpload(cursor.sessionIds)
-            .afterSync(
-                cursor.painIds,
-                cursor.qHashes,
-                cursor.profileHash,
-                cursor.lifecycle,
-                cursor.imuCalibrationState,
-            )
-        store.saveSnapshot(accountId, updated)
-    }
-
+    /** 退避封顶：15/30/60/120/300 秒。 */
     private fun backoffSeconds(attempts: Int): Long =
         listOf(15L, 30L, 60L, 120L, 300L).getOrElse(attempts - 1) { 300L }
 }
@@ -340,6 +377,7 @@ internal data class PendingDiff(
     val newProfileHash: String?,                    // 本次同步携带的档案内容键
     val lifecycle: String?,                         // 评审 P1-1：本次同步携带的生命周期（仅变化时非空）
     val imuCalibrationState: String?,               // 评审 P1-1：本次同步携带的 IMU 状态（仅变化时非空）
+    val newFeedbackEventIds: Set<String> = emptySet(), // P3.5：本次同步携带的训练后反馈事件键
 )
 
 /**
@@ -372,17 +410,26 @@ internal fun buildPendingDiff(
         .map { it.id }
         .toSet()
 
-    // 评审 #5：多条积压训练必须全部携带反馈——此前只取第一条，upload 游标推进后
-    // 其余训练的 post_training 问卷永久缺失。改为数组，每条反馈一个事件（eventId 用 sessionId，重试稳定）
-    val feedbacks = uploadRecords.mapNotNull { record ->
+    // P3.5：反馈是**独立于训练上传**的事件——从全量历史派生，按已确认反馈游标过滤，
+    // 因此「训练已上传确认后才补填的晚反馈」仍会出站，不再依赖 uploadRecords（会随
+    // session 游标推进而消失）。eventId=post:<sessionId> 稳定，重试/重启不重新随机；
+    // 显式携带 sessionId（服务器按事件独立入库，不宣称自动建训练外键）。
+    val feedbackCandidates = user.history
+        .distinctBy { it.sessionId }
+        .filter { "post:${it.sessionId}" !in snapshot.syncedFeedbackEventIds }
+    val feedbacks = feedbackCandidates.mapNotNull { record ->
         record.feedback?.let { feedback ->
             JSONObject()
                 .put("feeling", feedback.feeling)
                 .put("difficulty", feedback.difficulty)
                 .put("recordedAt", record.completedAt)
+                .put("sessionId", record.sessionId)
                 .put("eventId", "post:${record.sessionId}")
         }
     }
+    val newFeedbackEventIds = feedbackCandidates
+        .mapNotNull { record -> record.feedback?.let { "post:${record.sessionId}" } }
+        .toSet()
     if (feedbacks.isNotEmpty()) {
         if (syncBody == null) {
             syncBody = JSONObject()
@@ -404,6 +451,7 @@ internal fun buildPendingDiff(
         newProfileHash = newProfileHash,
         lifecycle = delta.lifecycle,
         imuCalibrationState = delta.imuCalibrationState,
+        newFeedbackEventIds = newFeedbackEventIds,
     )
 }
 
@@ -411,13 +459,14 @@ internal fun buildPendingDiff(
 internal fun PatientSyncClient.SyncSnapshot.afterUpload(sessionIds: Collection<String>) =
     copy(syncedSessionIds = syncedSessionIds + sessionIds)
 
-/** 患者同步成功后推进疼痛/问卷/档案/状态游标。 */
+/** 患者同步成功后推进疼痛/问卷/档案/状态/反馈游标。 */
 internal fun PatientSyncClient.SyncSnapshot.afterSync(
     painIds: Collection<String>,
     questionnaireHashes: Map<String, String>,
     profileHash: String?,
     lifecycle: String?,
     imuCalibrationState: String?,
+    feedbackEventIds: Collection<String> = emptySet(),
 ) = copy(
     syncedPainIds = syncedPainIds + painIds,
     // 评审 #3：参数与属性同名遮蔽，必须合并 this.questionnaireHashes 与本次增量，
@@ -426,4 +475,6 @@ internal fun PatientSyncClient.SyncSnapshot.afterSync(
     profileHash = profileHash ?: this.profileHash,
     lifecycle = lifecycle ?: this.lifecycle,
     imuCalibrationState = imuCalibrationState ?: this.imuCalibrationState,
+    // P3.5：反馈事件游标独立累积，晚反馈确认后不再重复出站。
+    syncedFeedbackEventIds = syncedFeedbackEventIds + feedbackEventIds,
 )

@@ -120,17 +120,15 @@ object TrainingSyncClient {
         return JSONObject().put("sessions", sessions)
     }
 
-    /** 单条记录的请求体 JSON（resultJson 原样 + feedback 附加 + SF-08 pre 关联），供 buildUploadBody/拆批共用。 */
+    /**
+     * 单条记录的请求体 JSON（resultJson 原样 + SF-08 pre 关联），供 buildUploadBody/拆批共用。
+     *
+     * P3.5：训练后反馈不再拼接进 T01 上传体——反馈作为独立 S01 事件（post:<sessionId>）
+     * 出站并有独立游标，避免「训练上传后补填的晚反馈」随 session 游标推进而永久丢失，
+     * 也避免同一反馈在 T01 与 S01 两条通道重复。
+     */
     internal fun sessionJsonOf(record: TrainingHistoryRecord): JSONObject {
         val session = JSONObject(record.resultJson)
-        record.feedback?.let { feedback ->
-            session.put(
-                "feedback",
-                JSONObject()
-                    .put("feeling", feedback.feeling)
-                    .put("difficulty", feedback.difficulty)
-            )
-        }
         // SF-08：随训练上传显式声明 pre 问卷事件（pre:<recordedAt>，与 sync 通道同一身份）。
         // 服务器校验该问卷存在且属于该患者并写入 pre_training_event_id；空串 = 不声明。
         record.preTrainingEventId.takeIf(String::isNotBlank)?.let {

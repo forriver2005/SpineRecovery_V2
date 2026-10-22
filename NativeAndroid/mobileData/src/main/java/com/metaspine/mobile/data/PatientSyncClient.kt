@@ -15,7 +15,10 @@ object PatientSyncClient {
         val profileHash: String? = null,
         // 评审 P1-1：上次成功同步时发出的 lifecycle / IMU 状态（null = 未同步过 → 视为变化）
         val lifecycle: String? = null,
-        val imuCalibrationState: String? = null
+        val imuCalibrationState: String? = null,
+        // P3.5：已确认出站的训练后反馈事件（"post:<sessionId>"）。独立于 syncedSessionIds，
+        // 使「训练已上传确认后才补填的晚反馈」仍能作为独立 S01 事件再次出站。
+        val syncedFeedbackEventIds: Set<String> = emptySet()
     )
 
     /** 一次同步要携带的增量 **/

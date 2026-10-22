@@ -29,7 +29,10 @@ object UnifiedMobileBridge {
         context = host.applicationContext
         users = DemoUserStore(context)
         SpineFlowServerConfig.baseUrlOverride = PatientCredentials.serverUrlOverride(context)
-        sync = ServerSyncCoordinator(context, scope)
+        sync = ServerSyncCoordinator(context, scope) { accountId ->
+            // P2.4 启动重算：按账号加载可同步状态（过滤 LEGACY_IMPORT / imported / 种子数据）。
+            runCatching { syncable(users.loadUser(accountId)) }.getOrNull()
+        }
         loginGuard = AccountLoginGuard(context, users, sync::forgetAccount)
         loginGuard.recoverPendingDeletions()
         routineStore = RoutineQuestionnaireStore(context)
@@ -101,6 +104,8 @@ object UnifiedMobileBridge {
             history = records, painHistory = painRecords
         )
         users.saveUser(saved)
+        // P2.4：落盘后同步打 dirty 标记，早于 5 秒防抖入队——防抖窗口内被强杀仍能重启重算。
+        sync.markDirty(id)
         main.post { sync.onUserChanged(syncable(saved)) }
     }
 
@@ -191,6 +196,10 @@ object UnifiedMobileBridge {
             "activate" -> {
                 val code = PatientActivationClient.normalizeInput(body.getString("code"))
                 require(PatientActivationClient.isComplete(code)) { "请输入有效的11位建档手机号" }
+                val origin = SpineFlowServerConfig.BASE_URL
+                val serviceIdentity = ServiceIdentityClient.requireHospital(
+                    ServiceIdentityClient.fetch().getOrThrow())
+                val priorScope = BindingScopeStore.load(context, account)
                 val pending = PatientCredentials.activationPending(context, account)
                     ?: PendingActivationBinding(PatientActivationClient.newRequestId(), code,
                         PatientActivationClient.newProposedToken(), PatientCredentials.installationId(context), account)
@@ -199,8 +208,30 @@ object UnifiedMobileBridge {
                 val redeemed = PatientActivationClient.redeem(PatientActivationClient.buildRedeemBody(
                     pending.requestId, pending.activationCode, pending.proposedToken, pending.installationId, account
                 )).getOrThrow()
+                // P2.7：网络回包在途期间若发生登出/切换（identityGeneration 变化），
+                // 不得把旧请求的凭据落到当前身份上。
+                require(identityGeneration.get() == generation) { "激活请求已取消，请重试" }
+                val nextGeneration = BindingScopeStore.nextGeneration(context, account)
+                val newScope = BindingScope(
+                    origin = origin,
+                    serviceId = serviceIdentity.serviceId,
+                    hospitalKey = serviceIdentity.hospitalKey,
+                    hospitalName = serviceIdentity.hospitalName,
+                    patientId = redeemed.patientId,
+                    accountId = account,
+                    credentialGeneration = nextGeneration
+                )
+                // P2.7：换绑（Origin/医院/患者变化）时旧队列属于旧绑定，绝不能用新 PAT
+                // 发往新医院——作废旧队列与在途回包；同院重放仅作废在途回包，保留合法未确认任务。
+                val bindingChanged = priorScope != null && (priorScope.origin != newScope.origin ||
+                    priorScope.serviceId != newScope.serviceId ||
+                    priorScope.hospitalKey != newScope.hospitalKey ||
+                    priorScope.patientId != newScope.patientId)
+                if (bindingChanged) sync.forgetAccount(account) else sync.invalidateInflight(account)
                 check(PatientCredentials.saveActivatedCredential(context, account,
-                    PatientServerCredential(redeemed.patientId, pending.proposedToken), redeemed.prescription, redeemed.identity))
+                    PatientServerCredential(redeemed.patientId, pending.proposedToken), redeemed.prescription,
+                    redeemed.identity, redeemed.prescriptionV2))
+                check(BindingScopeStore.save(context, newScope)) { "医院绑定作用域未能保存" }
                 sync.resumeAfterCredentialsUpdate(syncable(users.loadUser(account)))
                 return JSONObject(load(account))
             }
@@ -242,9 +273,13 @@ object UnifiedMobileBridge {
             }
             "routineRefresh", "routineAnswer", "routineSubmit" -> {
                 val credential = requireNotNull(PatientCredentials.credential(context, account)) { "请先激活医生档案" }
-                val bound = RoutineScope.of(account, credential, SpineFlowServerConfig.BASE_URL)
+                val origin = SpineFlowServerConfig.BASE_URL
+                val bound = RoutineScope.of(account, credential, origin)
+                // P2.7：在途回包只有「凭据、活动账号、Origin 均未变」才可写回，
+                // 切源后旧问卷回包不得修改新绑定的答卷/缓存。
                 val current = { PatientCredentials.credential(context, account) == credential &&
-                    users.activeAccountId() == account }
+                    users.activeAccountId() == account &&
+                    SpineFlowServerConfig.BASE_URL == origin }
                 var message = ""
                 if (command == "routineRefresh") message = routine.refresh(bound, credential, current).message
                 if (command == "routineAnswer") {
@@ -338,8 +373,10 @@ object UnifiedMobileBridge {
         else -> UserGender.Unspecified
     }
     private fun syncable(user: DemoUserData): DemoUserData = user.copy(
+        // P3.5：结果上传不再被「反馈未填」阻塞——真实训练（planJson 非空）完成（endReason 非空）
+        // 即可上传；反馈作为独立 S01 事件在填好后自行出站。仍排除 LEGACY_IMPORT。
         history = user.history.filter { it.endReason != "LEGACY_IMPORT" &&
-            (it.planJson.isBlank() || (it.endReason.isNotBlank() && !it.feedbackPending)) },
+            (it.planJson.isBlank() || it.endReason.isNotBlank()) },
         painHistory = user.painHistory.filterNot { it.id.startsWith("imported:") }
     )
     private fun objects(array: JSONArray?): List<JSONObject> =

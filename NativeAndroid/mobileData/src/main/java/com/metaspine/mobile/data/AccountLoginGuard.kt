@@ -29,10 +29,12 @@ class AccountLoginGuard(
                 AccountActivationState.Damaged -> AccountLoginResult.Blocked("账号绑定信息不完整，请联系工作人员处理")
                 is AccountActivationState.Activated -> {
                     val origin = SpineFlowServerConfig.BASE_URL
+                    val scopeAtRequest = BindingScopeStore.load(context, id)
                     val status = checkServer(state.credential, id, PatientCredentials.installationId(context))
                     // A late response cannot authorize deletion/login after another binding replaces this one.
                     if (PatientCredentials.credential(context, id) != state.credential ||
-                        SpineFlowServerConfig.BASE_URL != origin) {
+                        SpineFlowServerConfig.BASE_URL != origin ||
+                        BindingScopeStore.load(context, id) != scopeAtRequest) {
                         return AccountLoginResult.Blocked("账号绑定已变化，请重新登录")
                     }
                     when (status) {

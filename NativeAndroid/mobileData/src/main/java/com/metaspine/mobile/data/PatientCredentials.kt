@@ -61,6 +61,7 @@ object PatientCredentials {
     private const val KEY_TOKEN_PREFIX = "patient_token_"
     private const val KEY_PATIENT_ID_PREFIX = "patient_id_"
     private const val KEY_PRESCRIPTION_PREFIX = "admission_prescription_"
+    private const val KEY_PRESCRIPTION_V2_PREFIX = "admission_prescription_v2_"
     private const val KEY_ACTIVATION_PENDING_PREFIX = "activation_pending_"
     private const val KEY_IDENTITY_PREFIX = "activation_identity_"
     private const val KEY_INSTALLATION_ID = "installation_id"
@@ -89,8 +90,10 @@ object PatientCredentials {
     fun clearAccount(context: Context, accountId: String) {
         val editor = prefs(context).edit()
         listOf(KEY_TOKEN_PREFIX, KEY_PATIENT_ID_PREFIX, KEY_PRESCRIPTION_PREFIX,
-            KEY_ACTIVATION_PENDING_PREFIX, KEY_IDENTITY_PREFIX).forEach { editor.remove(it + accountKey(accountId)) }
+            KEY_PRESCRIPTION_V2_PREFIX, KEY_ACTIVATION_PENDING_PREFIX, KEY_IDENTITY_PREFIX)
+            .forEach { editor.remove(it + accountKey(accountId)) }
         check(editor.commit()) { "患者绑定信息未能清理" }
+        BindingScopeStore.clear(context, accountId)
     }
 
     fun installationId(context: Context): String {
@@ -152,10 +155,11 @@ object PatientCredentials {
         accountId: String,
         credential: PatientServerCredential,
         prescription: AdmissionPrescriptionItem,
-        identity: BoundPatientIdentity
+        identity: BoundPatientIdentity,
+        prescriptionV2: AdmissionPrescriptionV2? = null
     ): Boolean {
         val key = accountKey(accountId)
-        return prefs(context).edit()
+        val editor = prefs(context).edit()
             .putString(KEY_PATIENT_ID_PREFIX + key,
                 SecureLocalData.seal(KEY_PATIENT_ID_PREFIX + key, credential.patientId))
             .putString(KEY_TOKEN_PREFIX + key,
@@ -165,8 +169,17 @@ object PatientCredentials {
             .putString(KEY_IDENTITY_PREFIX + key,
                 SecureLocalData.seal(KEY_IDENTITY_PREFIX + key, identity.toJson().toString()))
             .remove(KEY_ACTIVATION_PENDING_PREFIX + key)
-            .commit()
+        if (prescriptionV2 != null) {
+            editor.putString(KEY_PRESCRIPTION_V2_PREFIX + key,
+                SecureLocalData.seal(KEY_PRESCRIPTION_V2_PREFIX + key, prescriptionV2.toJson().toString()))
+        }
+        return editor.commit()
     }
+
+    fun prescriptionV2(context: Context, accountId: String): AdmissionPrescriptionV2? =
+        SecureLocalData.read(prefs(context), KEY_PRESCRIPTION_V2_PREFIX + accountKey(accountId))?.let { raw ->
+            runCatching { AdmissionPrescriptionV2.fromJson(JSONObject(raw)) }.getOrNull()
+        }
 
     fun boundIdentity(context: Context, accountId: String): BoundPatientIdentity? =
         SecureLocalData.read(prefs(context), KEY_IDENTITY_PREFIX + accountKey(accountId))?.let { raw ->
@@ -266,4 +279,68 @@ object PatientCredentials {
         .put("displayName", displayName)
         .put("idCardMasked", idCardMasked)
         .put("doctorUsername", doctorUsername)
+
+    private fun AdmissionPrescriptionV2.toJson(): JSONObject = JSONObject()
+        .put("orderId", orderId)
+        .put("prescriptionContractVersion", prescriptionContractVersion)
+        .put("resourceManifestSha256", resourceManifestSha256)
+        .put("items", org.json.JSONArray(items.map { it.toJson() }))
+
+    private fun AdmissionPrescriptionItemV2.toJson(): JSONObject = JSONObject()
+        .put("itemId", itemId)
+        .put("position", position)
+        .put("actionId", actionId)
+        .put("actionName", actionName)
+        .put("sets", sets)
+        .put("reps", reps)
+        .put("holdSeconds", holdSeconds)
+        .put("asset", asset.toJson())
+
+    private fun AdmissionPrescriptionAsset.toJson(): JSONObject = JSONObject()
+        .put("actionVersionId", actionVersionId)
+        .put("variantKey", variantKey)
+        .put("formatVersion", formatVersion)
+        .put("runtimeContractVersion", runtimeContractVersion)
+        .put("doseProfile", doseProfile)
+        .put("supportedModes", org.json.JSONArray(supportedModes))
+        .put("fileSize", fileSize)
+        .put("sha256", sha256)
+        .put("downloadPath", downloadPath)
+
+    private companion object V2Json {
+        fun AdmissionPrescriptionV2.fromJson(json: JSONObject): AdmissionPrescriptionV2 {
+            val items = json.getJSONArray("items")
+            return AdmissionPrescriptionV2(
+                orderId = json.getLong("orderId"),
+                prescriptionContractVersion = json.getInt("prescriptionContractVersion"),
+                resourceManifestSha256 = json.getString("resourceManifestSha256"),
+                items = (0 until items.length()).map { AdmissionPrescriptionItemV2.fromJson(items.getJSONObject(it)) }
+            )
+        }
+
+        private fun AdmissionPrescriptionItemV2.fromJson(json: JSONObject): AdmissionPrescriptionItemV2 {
+            val asset = json.getJSONObject("asset")
+            val modes = asset.getJSONArray("supportedModes")
+            return AdmissionPrescriptionItemV2(
+                itemId = json.getLong("itemId"),
+                position = json.getInt("position"),
+                actionId = json.getString("actionId"),
+                actionName = json.getString("actionName"),
+                sets = json.getInt("sets"),
+                reps = json.getInt("reps"),
+                holdSeconds = json.getInt("holdSeconds"),
+                asset = AdmissionPrescriptionAsset(
+                    actionVersionId = asset.getLong("actionVersionId"),
+                    variantKey = asset.getString("variantKey"),
+                    formatVersion = asset.getInt("formatVersion"),
+                    runtimeContractVersion = asset.getInt("runtimeContractVersion"),
+                    doseProfile = asset.getString("doseProfile"),
+                    supportedModes = (0 until modes.length()).map { modes.getString(it) },
+                    fileSize = asset.getLong("fileSize"),
+                    sha256 = asset.getString("sha256"),
+                    downloadPath = asset.getString("downloadPath")
+                )
+            )
+        }
+    }
 }

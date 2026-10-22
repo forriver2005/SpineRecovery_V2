@@ -15,17 +15,87 @@ class PendingSyncStore(context: Context) {
     private val prefs = context.getSharedPreferences("spine_sync", Context.MODE_PRIVATE)
 
     private fun write(key: String, value: String) {
-        check(prefs.edit().putString(key, SecureLocalData.seal(key, value)).commit()) {
-            "同步队列未能安全落盘"
-        }
+        val editor = prefs.edit().putString(key, SecureLocalData.seal(key, value))
+        // 一次成功的有效写入即消解此前的损坏标记（P2.4：损坏必须可诊断，但可被新写入恢复）。
+        if (key.startsWith(QUEUE_PREFIX)) editor.putBoolean(CORRUPT_PREFIX + key.removePrefix(QUEUE_PREFIX), false)
+        check(editor.commit()) { "同步队列未能安全落盘" }
     }
 
-    private fun queueKey(accountId: String) = "sync.queue.$accountId"
+    private fun queueKey(accountId: String) = QUEUE_PREFIX + accountId
     private fun snapshotKey(accountId: String) = "sync.snapshot.$accountId"
+    private fun dirtyKey(accountId: String) = "sync.dirty.$accountId"
 
     fun clearAccount(accountId: String) {
         check(prefs.edit().remove(queueKey(accountId)).remove(snapshotKey(accountId))
-            .remove("sync.quarantine.$accountId").commit()) { "同步缓存未能清理" }
+            .remove("sync.quarantine.$accountId").remove(dirtyKey(accountId))
+            .remove(CORRUPT_PREFIX + accountId).commit()) { "同步缓存未能清理" }
+    }
+
+    // ---------- P2.4：持久 dirty 标记 + 损坏可诊断 ----------
+
+    /**
+     * 用户状态落盘后立即同步打标记（在 5 秒防抖入队之前）。
+     * 防回归：若进程在防抖窗口内被强杀，diff 从未入队、队列为空；重启后靠该标记
+     * 重算待发，恢复「保存后 0 秒 / 2 秒强杀仍能补发」的语义。
+     */
+    fun markDirty(accountId: String) {
+        check(prefs.edit().putBoolean(dirtyKey(accountId), true).commit()) { "待发标记未能落盘" }
+    }
+
+    fun clearDirty(accountId: String) {
+        prefs.edit().putBoolean(dirtyKey(accountId), false).commit()
+    }
+
+    fun dirtyAccountIds(): Set<String> = buildSet {
+        for (key in prefs.all.keys) {
+            if (key.startsWith("sync.dirty.") && prefs.getBoolean(key, false)) {
+                add(key.removePrefix("sync.dirty."))
+            }
+        }
+    }
+
+    /** 队列密文存在但无法解析——必须人工诊断，绝不当作「没有待发」静默丢弃。 */
+    fun isQueueCorrupted(accountId: String): Boolean =
+        prefs.getBoolean(CORRUPT_PREFIX + accountId, false)
+
+    // ---------- P2.5：ACK 原子提交 ----------
+
+    /**
+     * 成功后在单次 commit() 内同时「移除队列元素」并「推进游标快照」。
+     * 防回归：旧实现先 remove 再 applyCursor 是两次独立写入，中间被杀会出现
+     * 「已移除但游标未推进」（重启重算重发）或反向窗口。这里合并为一次落盘。
+     * @return 队列中确实存在该元素并完成提交返回 true；元素已不存在返回 false（不推进游标）。
+     */
+    fun commitAck(accountId: String, id: String, cursorJson: JSONObject?): Boolean {
+        val key = queueKey(accountId)
+        val queue = readArray(key)
+        val next = JSONArray()
+        var found = false
+        for (index in 0 until queue.length()) {
+            val element = queue.optJSONObject(index) ?: continue
+            if (element.optString("id") == id) found = true else next.put(element)
+        }
+        if (!found) return false
+        val cursor = QueueCursor.fromJson(cursorJson)
+        val editor = prefs.edit()
+            .putString(key, SecureLocalData.seal(key, next.toString()))
+            .putBoolean(CORRUPT_PREFIX + accountId, false)
+        if (cursor.sessionIds.isNotEmpty() || cursor.painIds.isNotEmpty() ||
+            cursor.qHashes.isNotEmpty() || cursor.profileHash != null ||
+            cursor.lifecycle != null || cursor.imuCalibrationState != null ||
+            cursor.feedbackEventIds.isNotEmpty()
+        ) {
+            val updated = snapshot(accountId)
+                .afterUpload(cursor.sessionIds)
+                .afterSync(
+                    cursor.painIds, cursor.qHashes, cursor.profileHash,
+                    cursor.lifecycle, cursor.imuCalibrationState, cursor.feedbackEventIds,
+                )
+            val sKey = snapshotKey(accountId)
+            editor.putString(sKey, SecureLocalData.seal(sKey, updated.toJson().toString()))
+        }
+        check(editor.commit()) { "ACK 未能原子落盘" }
+        return true
     }
 
     /** 队列元素：{id, kind: "upload"|"sync", payload, attempts, enqueuedAt, cursor} */
@@ -123,17 +193,30 @@ class PendingSyncStore(context: Context) {
     fun snapshot(accountId: String): PatientSyncClient.SyncSnapshot {
         val raw = SecureLocalData.read(prefs, snapshotKey(accountId))
             ?: return PatientSyncClient.SyncSnapshot()
-        return runCatching { raw.toSyncSnapshot() }.getOrElse { PatientSyncClient.SyncSnapshot() }
+        return runCatching { raw.toSyncSnapshot() }.getOrElse {
+            // 快照损坏不等于「什么都没同步过」：记录日志供诊断，返回空快照会让重算
+            // 按未同步处理（服务器对不可变事件幂等去重），但绝不静默无声。
+            android.util.Log.e(TAG, "游标快照损坏，无法解析: ${snapshotKey(accountId)}（按空快照重算，服务器幂等去重）")
+            PatientSyncClient.SyncSnapshot()
+        }
     }
 
     fun saveSnapshot(accountId: String, snapshot: PatientSyncClient.SyncSnapshot) {
         write(snapshotKey(accountId), snapshot.toJson().toString())
     }
 
-    private fun readArray(key: String): JSONArray =
-        SecureLocalData.read(prefs, key)
-            ?.let { runCatching { JSONArray(it) }.getOrNull() }
-            ?: JSONArray()
+    private fun readArray(key: String): JSONArray {
+        val raw = SecureLocalData.read(prefs, key) ?: return JSONArray()
+        return runCatching { JSONArray(raw) }.getOrElse {
+            // 防回归：密文存在但解析失败 = 数据损坏。必须留下可诊断标记，
+            // 且 dirty 标记不清除，避免把「解析失败」误记成「没有待发」。
+            android.util.Log.e(TAG, "本地同步队列损坏，无法解析: $key（保留损坏标记，待人工诊断）")
+            if (key.startsWith(QUEUE_PREFIX)) {
+                prefs.edit().putBoolean(CORRUPT_PREFIX + key.removePrefix(QUEUE_PREFIX), true).commit()
+            }
+            JSONArray()
+        }
+    }
 
     /** 413 或协议拒绝时保留原始队列元素供人工诊断，绝不推进上传游标。 */
     fun quarantine(accountId: String, id: String, reason: String) {
@@ -171,6 +254,12 @@ class PendingSyncStore(context: Context) {
         if (replaced) write(key, next.toString())
         return replaced
     }
+
+    private companion object {
+        const val TAG = "PendingSyncStore"
+        const val QUEUE_PREFIX = "sync.queue."
+        const val CORRUPT_PREFIX = "sync.corrupt."
+    }
 }
 
 // ---- 快照 <-> JSON ----
@@ -182,6 +271,7 @@ internal fun PatientSyncClient.SyncSnapshot.toJson(): JSONObject = JSONObject()
     .put("profileHash", profileHash ?: JSONObject.NULL)
     .put("lifecycle", lifecycle ?: JSONObject.NULL)
     .put("imuCalibrationState", imuCalibrationState ?: JSONObject.NULL)
+    .put("feedbackEventIds", JSONArray(syncedFeedbackEventIds.sorted()))
 
 internal fun String.toSyncSnapshot(): PatientSyncClient.SyncSnapshot {
     val json = JSONObject(this)
@@ -192,6 +282,8 @@ internal fun String.toSyncSnapshot(): PatientSyncClient.SyncSnapshot {
         profileHash = json.opt("profileHash")?.takeIf { it !== JSONObject.NULL } as? String,
         lifecycle = json.opt("lifecycle")?.takeIf { it !== JSONObject.NULL } as? String,
         imuCalibrationState = json.opt("imuCalibrationState")?.takeIf { it !== JSONObject.NULL } as? String,
+        // 旧快照无此键 → 空集合 → 反馈按未确认重发一次，服务器按 eventId 幂等去重。
+        syncedFeedbackEventIds = json.optJSONArray("feedbackEventIds").toStringSet(),
     )
 }
 
@@ -218,6 +310,7 @@ internal data class QueueCursor(
     val profileHash: String? = null,
     val lifecycle: String? = null,
     val imuCalibrationState: String? = null,
+    val feedbackEventIds: Set<String> = emptySet(),
 ) {
     fun toJson(): JSONObject = JSONObject()
         .put("sessionIds", JSONArray(sessionIds.sorted()))
@@ -226,6 +319,7 @@ internal data class QueueCursor(
         .put("profileHash", profileHash ?: JSONObject.NULL)
         .put("lifecycle", lifecycle ?: JSONObject.NULL)
         .put("imuCalibrationState", imuCalibrationState ?: JSONObject.NULL)
+        .put("feedbackEventIds", JSONArray(feedbackEventIds.sorted()))
 
     companion object {
         fun fromJson(json: JSONObject?): QueueCursor {
@@ -238,6 +332,7 @@ internal data class QueueCursor(
                 lifecycle = json.opt("lifecycle")?.takeIf { it !== JSONObject.NULL } as? String,
                 imuCalibrationState = json.opt("imuCalibrationState")
                     ?.takeIf { it !== JSONObject.NULL } as? String,
+                feedbackEventIds = json.optJSONArray("feedbackEventIds").toStringSet(),
             )
         }
     }

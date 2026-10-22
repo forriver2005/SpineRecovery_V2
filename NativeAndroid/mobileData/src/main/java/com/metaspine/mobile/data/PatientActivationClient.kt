@@ -23,7 +23,39 @@ data class BoundPatientIdentity(
 data class ActivationRedeemResult(
     val patientId: String,
     val identity: BoundPatientIdentity,
-    val prescription: AdmissionPrescriptionItem
+    val prescription: AdmissionPrescriptionItem,
+    val prescriptionV2: AdmissionPrescriptionV2
+)
+
+/** V2 首方/处方的冻结资源身份（合同 §8.2），下载与结果回传都必须保持这些身份。 */
+data class AdmissionPrescriptionAsset(
+    val actionVersionId: Long,
+    val variantKey: String,
+    val formatVersion: Int,
+    val runtimeContractVersion: Int,
+    val doseProfile: String,
+    val supportedModes: List<String>,
+    val fileSize: Long,
+    val sha256: String,
+    val downloadPath: String
+)
+
+data class AdmissionPrescriptionItemV2(
+    val itemId: Long,
+    val position: Int,
+    val actionId: String,
+    val actionName: String,
+    val sets: Int,
+    val reps: Int,
+    val holdSeconds: Int,
+    val asset: AdmissionPrescriptionAsset
+)
+
+data class AdmissionPrescriptionV2(
+    val orderId: Long,
+    val prescriptionContractVersion: Int,
+    val resourceManifestSha256: String,
+    val items: List<AdmissionPrescriptionItemV2>
 )
 
 /**
@@ -92,9 +124,8 @@ object PatientActivationClient {
 
     internal fun parseRedeem(data: JSONObject): ActivationRedeemResult {
         val identity = data.getJSONObject("identity")
-        val items = data.getJSONObject("prescription").getJSONArray("items")
-        require(items.length() == 1) { "激活凭据首张处方动作数量异常" }
-        val item = items.getJSONObject(0)
+        val prescriptionV2 = parsePrescriptionV2(data.getJSONObject("prescription"))
+        val first = prescriptionV2.items.first()
         val doctorUsername = data.optJSONObject("doctor")?.optString("username").orEmpty()
         return ActivationRedeemResult(
             patientId = data.getString("patientId"),
@@ -104,12 +135,50 @@ object PatientActivationClient {
                 doctorUsername = doctorUsername
             ),
             prescription = AdmissionPrescriptionItem(
+                actionId = first.actionId,
+                actionName = first.actionName,
+                sets = first.sets,
+                reps = first.reps,
+                holdSeconds = first.holdSeconds
+            ),
+            prescriptionV2 = prescriptionV2
+        )
+    }
+
+    /** 完整 V2 首方：1–10 项有序、每项带冻结资源身份；不再限制单项。 */
+    internal fun parsePrescriptionV2(json: JSONObject): AdmissionPrescriptionV2 {
+        val items = json.getJSONArray("items")
+        require(items.length() in 1..10) { "激活凭据首张处方动作数量异常: ${items.length()}" }
+        val list = (0 until items.length()).map { i ->
+            val item = items.getJSONObject(i)
+            val asset = item.getJSONObject("asset")
+            val modes = asset.getJSONArray("supportedModes")
+            AdmissionPrescriptionItemV2(
+                itemId = item.getLong("itemId"),
+                position = item.getInt("position"),
                 actionId = item.getString("actionId"),
                 actionName = item.getString("actionName"),
                 sets = item.getInt("sets"),
                 reps = item.getInt("reps"),
-                holdSeconds = item.getInt("holdSeconds")
+                holdSeconds = item.getInt("holdSeconds"),
+                asset = AdmissionPrescriptionAsset(
+                    actionVersionId = asset.getLong("actionVersionId"),
+                    variantKey = asset.getString("variantKey"),
+                    formatVersion = asset.getInt("formatVersion"),
+                    runtimeContractVersion = asset.getInt("runtimeContractVersion"),
+                    doseProfile = asset.getString("doseProfile"),
+                    supportedModes = (0 until modes.length()).map { modes.getString(it) },
+                    fileSize = asset.getLong("fileSize"),
+                    sha256 = asset.getString("sha256"),
+                    downloadPath = asset.getString("downloadPath")
+                )
             )
+        }
+        return AdmissionPrescriptionV2(
+            orderId = json.getLong("orderId"),
+            prescriptionContractVersion = json.getInt("prescriptionContractVersion"),
+            resourceManifestSha256 = json.getString("resourceManifestSha256"),
+            items = list
         )
     }
 

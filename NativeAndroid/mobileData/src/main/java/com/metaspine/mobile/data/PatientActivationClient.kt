@@ -27,37 +27,6 @@ data class ActivationRedeemResult(
     val prescriptionV2: AdmissionPrescriptionV2
 )
 
-/** V2 首方/处方的冻结资源身份（合同 §8.2），下载与结果回传都必须保持这些身份。 */
-data class AdmissionPrescriptionAsset(
-    val actionVersionId: Long,
-    val variantKey: String,
-    val formatVersion: Int,
-    val runtimeContractVersion: Int,
-    val doseProfile: String,
-    val supportedModes: List<String>,
-    val fileSize: Long,
-    val sha256: String,
-    val downloadPath: String
-)
-
-data class AdmissionPrescriptionItemV2(
-    val itemId: Long,
-    val position: Int,
-    val actionId: String,
-    val actionName: String,
-    val sets: Int,
-    val reps: Int,
-    val holdSeconds: Int,
-    val asset: AdmissionPrescriptionAsset
-)
-
-data class AdmissionPrescriptionV2(
-    val orderId: Long,
-    val prescriptionContractVersion: Int,
-    val resourceManifestSha256: String,
-    val items: List<AdmissionPrescriptionItemV2>
-)
-
 /**
  * 阶段 C：患者端激活协议（预览 + 核销）。
  *
@@ -145,42 +114,12 @@ object PatientActivationClient {
         )
     }
 
-    /** 完整 V2 首方：1–10 项有序、每项带冻结资源身份；不再限制单项。 */
-    internal fun parsePrescriptionV2(json: JSONObject): AdmissionPrescriptionV2 {
-        val items = json.getJSONArray("items")
-        require(items.length() in 1..10) { "激活凭据首张处方动作数量异常: ${items.length()}" }
-        val list = (0 until items.length()).map { i ->
-            val item = items.getJSONObject(i)
-            val asset = item.getJSONObject("asset")
-            val modes = asset.getJSONArray("supportedModes")
-            AdmissionPrescriptionItemV2(
-                itemId = item.getLong("itemId"),
-                position = item.getInt("position"),
-                actionId = item.getString("actionId"),
-                actionName = item.getString("actionName"),
-                sets = item.getInt("sets"),
-                reps = item.getInt("reps"),
-                holdSeconds = item.getInt("holdSeconds"),
-                asset = AdmissionPrescriptionAsset(
-                    actionVersionId = asset.getLong("actionVersionId"),
-                    variantKey = asset.getString("variantKey"),
-                    formatVersion = asset.getInt("formatVersion"),
-                    runtimeContractVersion = asset.getInt("runtimeContractVersion"),
-                    doseProfile = asset.getString("doseProfile"),
-                    supportedModes = (0 until modes.length()).map { modes.getString(it) },
-                    fileSize = asset.getLong("fileSize"),
-                    sha256 = asset.getString("sha256"),
-                    downloadPath = asset.getString("downloadPath")
-                )
-            )
-        }
-        return AdmissionPrescriptionV2(
-            orderId = json.getLong("orderId"),
-            prescriptionContractVersion = json.getInt("prescriptionContractVersion"),
-            resourceManifestSha256 = json.getString("resourceManifestSha256"),
-            items = list
-        )
-    }
+    /**
+     * 完整 V2 首方：1–10 项有序、每项带冻结资源身份；不再限制单项。
+     * 与 D01 共用 [AdmissionPrescriptionV2]；A02 的条目 ID 字段名是 `id`，D01 是 `itemId`。
+     */
+    internal fun parsePrescriptionV2(json: JSONObject): AdmissionPrescriptionV2 =
+        AdmissionPrescriptionV2.fromJson(json, itemIdKey = "id")
 
     /**
      * 失败文案（设计 §8.8）。

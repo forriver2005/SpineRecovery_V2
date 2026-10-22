@@ -15,9 +15,18 @@ android {
         sourceCompatibility JavaVersion.VERSION_17
         targetCompatibility JavaVersion.VERSION_17
     }
+    testOptions {
+        unitTests.returnDefaultValues = true
+    }
 }
 
 dependencies {
     implementation 'androidx.core:core-ktx:1.13.1'
     implementation 'org.jetbrains.kotlinx:kotlinx-coroutines-android:1.9.0'
+
+    // 协议/队列单元测试（P0.5）。org.json 在 Android 单元测试中只有空实现，
+    // 必须用真实实现覆盖，才能验证序列化与规范摘要。
+    testImplementation 'junit:junit:4.13.2'
+    testImplementation 'org.json:json:20240303'
+    testImplementation 'org.jetbrains.kotlinx:kotlinx-coroutines-test:1.9.0'
 }

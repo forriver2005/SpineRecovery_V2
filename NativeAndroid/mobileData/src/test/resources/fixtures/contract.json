@@ -1,0 +1,1784 @@
+{
+  "fixtureOnly": true,
+  "patientId": "bridge_fixture_patient",
+  "source": "server contracts; synthetic IDs require HTTP fixture replacement",
+  "health": {
+    "userId": "bridge_fixture_patient",
+    "accountId": "bridge_fixture_account",
+    "lifecycle": "AdmissionPending",
+    "imuCalibrationState": "NotCalibrated",
+    "profile": {
+      "eventId": "profile:bridge-fixture",
+      "gender": "female",
+      "ageYears": 35,
+      "heightCm": 165,
+      "weightKg": 60,
+      "recordedAt": "2026-10-21T00:00:00.000Z"
+    },
+    "painPoints": [
+      {
+        "eventId": "pain:bridge-fixture:0",
+        "bodyPart": "left_waist",
+        "bodyPartLabel": "左腰",
+        "view": "front",
+        "painLevel": 3,
+        "recordedAt": "2026-10-21T00:00:00.000Z"
+      }
+    ],
+    "admissionSurvey": {
+      "eventId": "admission:bridge-fixture",
+      "painLevel": 3,
+      "requiresClinicalReview": false
+    },
+    "admissionIntake": {
+      "eventId": "intake:bridge-fixture",
+      "situation": "history",
+      "symptom": "pain",
+      "goals": []
+    },
+    "preTrainingQuestionnaire": {
+      "eventId": "pre:bridge-fixture",
+      "prePainLevel": 3,
+      "symptomChange": "stable",
+      "painLocationChanged": false,
+      "allowedToTrain": true,
+      "recordedAt": "2026-10-21T00:00:00.000Z"
+    },
+    "postTrainingFeedbacks": [
+      {
+        "eventId": "post:bridge_1",
+        "sessionId": "bridge_1",
+        "feeling": "良好",
+        "difficulty": "合适",
+        "recordedAt": "2026-10-21T00:10:00.000Z"
+      }
+    ]
+  },
+  "questionnaire": {
+    "taskId": 701,
+    "schema": {
+      "schemaVersion": 1,
+      "title": "桥接测试问卷",
+      "questions": [
+        {
+          "id": "pain",
+          "type": "scale",
+          "prompt": "疼痛程度",
+          "required": true,
+          "min": 0,
+          "max": 10,
+          "step": 1
+        }
+      ]
+    },
+    "receipt": {
+      "requestId": "40000000-0000-4000-8000-000000000701"
+    },
+    "submission": {
+      "requestId": "40000000-0000-4000-8000-000000000702",
+      "templateVersion": 1,
+      "answers": {
+        "pain": 3
+      }
+    }
+  },
+  "cases": [
+    {
+      "name": "1-items",
+      "directive": {
+        "directiveVersion": 2,
+        "serverTime": "2026-10-21T00:00:00.000Z",
+        "trainingState": "ready",
+        "message": "已获取最新康复处方",
+        "activeStopOrder": null,
+        "activePrescription": {
+          "orderId": 5001,
+          "prescriptionContractVersion": 2,
+          "reason": "隔离合同样例",
+          "createdAt": "2026-10-21T00:00:00.000Z",
+          "createdBy": "fixture_doctor",
+          "receivedAt": null,
+          "assetsReadyAt": null,
+          "resourceManifestSha256": "13bf1c8d4b67c455c02382dba82f8fee621c7ce78182ec9cf1234f9c2040d7b2",
+          "items": [
+            {
+              "itemId": 1001,
+              "position": 0,
+              "actionId": "7",
+              "actionName": "肩部伸展",
+              "sets": 2,
+              "reps": 6,
+              "holdSeconds": 5,
+              "asset": {
+                "actionVersionId": 317,
+                "variantKey": "single",
+                "formatVersion": 1,
+                "runtimeContractVersion": 1,
+                "doseProfile": "sequence-coach-game-v1",
+                "supportedModes": [
+                  "coach",
+                  "game"
+                ],
+                "fileSize": 8398,
+                "sha256": "da194aa91ce29fc79ef345cebd7cab7c6b5305bb2130325256ba188e6329d4a4",
+                "downloadPath": "/api/patient/training-directive/orders/5001/items/1001/asset"
+              }
+            }
+          ]
+        }
+      },
+      "manifestCanonicalUtf8": "[2,5001,[[1001,0,\"7\",317,\"single\",1,1,\"sequence-coach-game-v1\",[\"coach\",\"game\"],8398,\"da194aa91ce29fc79ef345cebd7cab7c6b5305bb2130325256ba188e6329d4a4\",2,6,5]]]",
+      "savedReceipt": {
+        "orderId": 5001,
+        "directiveVersion": 2,
+        "phase": "directive_saved",
+        "resourceManifestSha256": "13bf1c8d4b67c455c02382dba82f8fee621c7ce78182ec9cf1234f9c2040d7b2"
+      },
+      "readyReceipt": {
+        "orderId": 5001,
+        "directiveVersion": 2,
+        "phase": "assets_ready",
+        "resourceManifestSha256": "13bf1c8d4b67c455c02382dba82f8fee621c7ce78182ec9cf1234f9c2040d7b2"
+      },
+      "results": [
+        {
+          "request": {
+            "protocolVersion": 2,
+            "sessionId": "bridge_1",
+            "requestToken": "bridge_req_1",
+            "createdAt": "2026-10-21T00:01:00.000Z",
+            "completed": false,
+            "status": "INTERRUPTED",
+            "durationSeconds": 0,
+            "prescriptionOrderId": 5001,
+            "resourceManifestSha256": "13bf1c8d4b67c455c02382dba82f8fee621c7ce78182ec9cf1234f9c2040d7b2",
+            "resultRevision": 1,
+            "source": "mobile_no_details",
+            "preTrainingEventId": "pre:bridge-fixture",
+            "itemResults": [
+              {
+                "itemId": 1001,
+                "position": 0,
+                "actionId": "7",
+                "actionVersionId": 317,
+                "variantKey": "single",
+                "sha256": "da194aa91ce29fc79ef345cebd7cab7c6b5305bb2130325256ba188e6329d4a4",
+                "status": "NOT_STARTED",
+                "modeResults": [
+                  {
+                    "mode": "coach",
+                    "status": "NOT_STARTED",
+                    "completedReps": 0,
+                    "durationSeconds": 0,
+                    "score": null,
+                    "source": "not_started"
+                  },
+                  {
+                    "mode": "game",
+                    "status": "NOT_STARTED",
+                    "completedReps": 0,
+                    "durationSeconds": 0,
+                    "score": null,
+                    "source": "not_started"
+                  }
+                ]
+              }
+            ]
+          },
+          "canonicalUtf8": "{\"completed\":false,\"createdAt\":\"2026-10-21T00:01:00.000Z\",\"durationSeconds\":0,\"itemResults\":[{\"actionId\":\"7\",\"actionVersionId\":317,\"itemId\":1001,\"modeResults\":[{\"completedReps\":0,\"durationSeconds\":0,\"mode\":\"coach\",\"score\":null,\"source\":\"not_started\",\"status\":\"NOT_STARTED\"},{\"completedReps\":0,\"durationSeconds\":0,\"mode\":\"game\",\"score\":null,\"source\":\"not_started\",\"status\":\"NOT_STARTED\"}],\"position\":0,\"sha256\":\"da194aa91ce29fc79ef345cebd7cab7c6b5305bb2130325256ba188e6329d4a4\",\"status\":\"NOT_STARTED\",\"variantKey\":\"single\"}],\"preTrainingEventId\":\"pre:bridge-fixture\",\"prescriptionOrderId\":5001,\"protocolVersion\":2,\"requestToken\":\"bridge_req_1\",\"resourceManifestSha256\":\"13bf1c8d4b67c455c02382dba82f8fee621c7ce78182ec9cf1234f9c2040d7b2\",\"resultRevision\":1,\"sessionId\":\"bridge_1\",\"source\":\"mobile_no_details\",\"status\":\"INTERRUPTED\",\"userId\":\"bridge_fixture_patient\"}",
+          "utf8Hex": "7b22636f6d706c65746564223a66616c73652c22637265617465644174223a22323032362d31302d32315430303a30313a30302e3030305a222c226475726174696f6e5365636f6e6473223a302c226974656d526573756c7473223a5b7b22616374696f6e4964223a2237222c22616374696f6e56657273696f6e4964223a3331372c226974656d4964223a313030312c226d6f6465526573756c7473223a5b7b22636f6d706c6574656452657073223a302c226475726174696f6e5365636f6e6473223a302c226d6f6465223a22636f616368222c2273636f7265223a6e756c6c2c22736f75726365223a226e6f745f73746172746564222c22737461747573223a224e4f545f53544152544544227d2c7b22636f6d706c6574656452657073223a302c226475726174696f6e5365636f6e6473223a302c226d6f6465223a2267616d65222c2273636f7265223a6e756c6c2c22736f75726365223a226e6f745f73746172746564222c22737461747573223a224e4f545f53544152544544227d5d2c22706f736974696f6e223a302c22736861323536223a2264613139346161393163653239666337396566333435636562643763616237633662353330356262323133303332353235366261313838653633323964346134222c22737461747573223a224e4f545f53544152544544222c2276617269616e744b6579223a2273696e676c65227d5d2c22707265547261696e696e674576656e744964223a227072653a6272696467652d66697874757265222c22707265736372697074696f6e4f726465724964223a353030312c2270726f746f636f6c56657273696f6e223a322c2272657175657374546f6b656e223a226272696467655f7265715f31222c227265736f757263654d616e6966657374536861323536223a2231336266316338643462363763343535633032333832646261383266386665653632316337636537383138326563396366313233346639633230343064376232222c22726573756c745265766973696f6e223a312c2273657373696f6e4964223a226272696467655f31222c22736f75726365223a226d6f62696c655f6e6f5f64657461696c73222c22737461747573223a22494e544552525550544544222c22757365724964223a226272696467655f666978747572655f70617469656e74227d",
+          "sha256": "c5c96903365399891897a658c4fd6fa153a212c93aaf9600c16f06da92f8c12d",
+          "receipt": {
+            "sessionId": "bridge_1",
+            "resultRevision": 1,
+            "resultContentSha256": "c5c96903365399891897a658c4fd6fa153a212c93aaf9600c16f06da92f8c12d"
+          }
+        },
+        {
+          "request": {
+            "protocolVersion": 2,
+            "sessionId": "bridge_1",
+            "requestToken": "bridge_req_1",
+            "createdAt": "2026-10-21T00:01:00.000Z",
+            "completed": false,
+            "status": "INTERRUPTED",
+            "durationSeconds": 15,
+            "prescriptionOrderId": 5001,
+            "resourceManifestSha256": "13bf1c8d4b67c455c02382dba82f8fee621c7ce78182ec9cf1234f9c2040d7b2",
+            "resultRevision": 2,
+            "source": "ar_measured",
+            "preTrainingEventId": "pre:bridge-fixture",
+            "itemResults": [
+              {
+                "itemId": 1001,
+                "position": 0,
+                "actionId": "7",
+                "actionVersionId": 317,
+                "variantKey": "single",
+                "sha256": "da194aa91ce29fc79ef345cebd7cab7c6b5305bb2130325256ba188e6329d4a4",
+                "status": "INTERRUPTED",
+                "modeResults": [
+                  {
+                    "mode": "coach",
+                    "status": "COMPLETED",
+                    "completedReps": 2,
+                    "durationSeconds": 15,
+                    "score": 80,
+                    "source": "ar_measured"
+                  },
+                  {
+                    "mode": "game",
+                    "status": "NOT_STARTED",
+                    "completedReps": 0,
+                    "durationSeconds": 0,
+                    "score": null,
+                    "source": "not_started"
+                  }
+                ]
+              }
+            ]
+          },
+          "canonicalUtf8": "{\"completed\":false,\"createdAt\":\"2026-10-21T00:01:00.000Z\",\"durationSeconds\":15,\"itemResults\":[{\"actionId\":\"7\",\"actionVersionId\":317,\"itemId\":1001,\"modeResults\":[{\"completedReps\":2,\"durationSeconds\":15,\"mode\":\"coach\",\"score\":80,\"source\":\"ar_measured\",\"status\":\"COMPLETED\"},{\"completedReps\":0,\"durationSeconds\":0,\"mode\":\"game\",\"score\":null,\"source\":\"not_started\",\"status\":\"NOT_STARTED\"}],\"position\":0,\"sha256\":\"da194aa91ce29fc79ef345cebd7cab7c6b5305bb2130325256ba188e6329d4a4\",\"status\":\"INTERRUPTED\",\"variantKey\":\"single\"}],\"preTrainingEventId\":\"pre:bridge-fixture\",\"prescriptionOrderId\":5001,\"protocolVersion\":2,\"requestToken\":\"bridge_req_1\",\"resourceManifestSha256\":\"13bf1c8d4b67c455c02382dba82f8fee621c7ce78182ec9cf1234f9c2040d7b2\",\"resultRevision\":2,\"sessionId\":\"bridge_1\",\"source\":\"ar_measured\",\"status\":\"INTERRUPTED\",\"userId\":\"bridge_fixture_patient\"}",
+          "utf8Hex": "7b22636f6d706c65746564223a66616c73652c22637265617465644174223a22323032362d31302d32315430303a30313a30302e3030305a222c226475726174696f6e5365636f6e6473223a31352c226974656d526573756c7473223a5b7b22616374696f6e4964223a2237222c22616374696f6e56657273696f6e4964223a3331372c226974656d4964223a313030312c226d6f6465526573756c7473223a5b7b22636f6d706c6574656452657073223a322c226475726174696f6e5365636f6e6473223a31352c226d6f6465223a22636f616368222c2273636f7265223a38302c22736f75726365223a2261725f6d65617375726564222c22737461747573223a22434f4d504c45544544227d2c7b22636f6d706c6574656452657073223a302c226475726174696f6e5365636f6e6473223a302c226d6f6465223a2267616d65222c2273636f7265223a6e756c6c2c22736f75726365223a226e6f745f73746172746564222c22737461747573223a224e4f545f53544152544544227d5d2c22706f736974696f6e223a302c22736861323536223a2264613139346161393163653239666337396566333435636562643763616237633662353330356262323133303332353235366261313838653633323964346134222c22737461747573223a22494e544552525550544544222c2276617269616e744b6579223a2273696e676c65227d5d2c22707265547261696e696e674576656e744964223a227072653a6272696467652d66697874757265222c22707265736372697074696f6e4f726465724964223a353030312c2270726f746f636f6c56657273696f6e223a322c2272657175657374546f6b656e223a226272696467655f7265715f31222c227265736f757263654d616e6966657374536861323536223a2231336266316338643462363763343535633032333832646261383266386665653632316337636537383138326563396366313233346639633230343064376232222c22726573756c745265766973696f6e223a322c2273657373696f6e4964223a226272696467655f31222c22736f75726365223a2261725f6d65617375726564222c22737461747573223a22494e544552525550544544222c22757365724964223a226272696467655f666978747572655f70617469656e74227d",
+          "sha256": "1e3dad17ddda443e2514cd8d2eb2965fb734ab2cd25f97d2dcc9b1b86a964a69",
+          "receipt": {
+            "sessionId": "bridge_1",
+            "resultRevision": 2,
+            "resultContentSha256": "1e3dad17ddda443e2514cd8d2eb2965fb734ab2cd25f97d2dcc9b1b86a964a69"
+          }
+        },
+        {
+          "request": {
+            "protocolVersion": 2,
+            "sessionId": "bridge_1",
+            "requestToken": "bridge_req_1",
+            "createdAt": "2026-10-21T00:01:00.000Z",
+            "completed": true,
+            "status": "COMPLETED",
+            "durationSeconds": 30,
+            "prescriptionOrderId": 5001,
+            "resourceManifestSha256": "13bf1c8d4b67c455c02382dba82f8fee621c7ce78182ec9cf1234f9c2040d7b2",
+            "resultRevision": 3,
+            "source": "ar_measured",
+            "preTrainingEventId": "pre:bridge-fixture",
+            "itemResults": [
+              {
+                "itemId": 1001,
+                "position": 0,
+                "actionId": "7",
+                "actionVersionId": 317,
+                "variantKey": "single",
+                "sha256": "da194aa91ce29fc79ef345cebd7cab7c6b5305bb2130325256ba188e6329d4a4",
+                "status": "COMPLETED",
+                "modeResults": [
+                  {
+                    "mode": "coach",
+                    "status": "COMPLETED",
+                    "completedReps": 2,
+                    "durationSeconds": 15,
+                    "score": 80,
+                    "source": "ar_measured"
+                  },
+                  {
+                    "mode": "game",
+                    "status": "COMPLETED",
+                    "completedReps": 2,
+                    "durationSeconds": 15,
+                    "score": 80,
+                    "source": "ar_measured"
+                  }
+                ]
+              }
+            ]
+          },
+          "canonicalUtf8": "{\"completed\":true,\"createdAt\":\"2026-10-21T00:01:00.000Z\",\"durationSeconds\":30,\"itemResults\":[{\"actionId\":\"7\",\"actionVersionId\":317,\"itemId\":1001,\"modeResults\":[{\"completedReps\":2,\"durationSeconds\":15,\"mode\":\"coach\",\"score\":80,\"source\":\"ar_measured\",\"status\":\"COMPLETED\"},{\"completedReps\":2,\"durationSeconds\":15,\"mode\":\"game\",\"score\":80,\"source\":\"ar_measured\",\"status\":\"COMPLETED\"}],\"position\":0,\"sha256\":\"da194aa91ce29fc79ef345cebd7cab7c6b5305bb2130325256ba188e6329d4a4\",\"status\":\"COMPLETED\",\"variantKey\":\"single\"}],\"preTrainingEventId\":\"pre:bridge-fixture\",\"prescriptionOrderId\":5001,\"protocolVersion\":2,\"requestToken\":\"bridge_req_1\",\"resourceManifestSha256\":\"13bf1c8d4b67c455c02382dba82f8fee621c7ce78182ec9cf1234f9c2040d7b2\",\"resultRevision\":3,\"sessionId\":\"bridge_1\",\"source\":\"ar_measured\",\"status\":\"COMPLETED\",\"userId\":\"bridge_fixture_patient\"}",
+          "utf8Hex": "7b22636f6d706c65746564223a747275652c22637265617465644174223a22323032362d31302d32315430303a30313a30302e3030305a222c226475726174696f6e5365636f6e6473223a33302c226974656d526573756c7473223a5b7b22616374696f6e4964223a2237222c22616374696f6e56657273696f6e4964223a3331372c226974656d4964223a313030312c226d6f6465526573756c7473223a5b7b22636f6d706c6574656452657073223a322c226475726174696f6e5365636f6e6473223a31352c226d6f6465223a22636f616368222c2273636f7265223a38302c22736f75726365223a2261725f6d65617375726564222c22737461747573223a22434f4d504c45544544227d2c7b22636f6d706c6574656452657073223a322c226475726174696f6e5365636f6e6473223a31352c226d6f6465223a2267616d65222c2273636f7265223a38302c22736f75726365223a2261725f6d65617375726564222c22737461747573223a22434f4d504c45544544227d5d2c22706f736974696f6e223a302c22736861323536223a2264613139346161393163653239666337396566333435636562643763616237633662353330356262323133303332353235366261313838653633323964346134222c22737461747573223a22434f4d504c45544544222c2276617269616e744b6579223a2273696e676c65227d5d2c22707265547261696e696e674576656e744964223a227072653a6272696467652d66697874757265222c22707265736372697074696f6e4f726465724964223a353030312c2270726f746f636f6c56657273696f6e223a322c2272657175657374546f6b656e223a226272696467655f7265715f31222c227265736f757263654d616e6966657374536861323536223a2231336266316338643462363763343535633032333832646261383266386665653632316337636537383138326563396366313233346639633230343064376232222c22726573756c745265766973696f6e223a332c2273657373696f6e4964223a226272696467655f31222c22736f75726365223a2261725f6d65617375726564222c22737461747573223a22434f4d504c45544544222c22757365724964223a226272696467655f666978747572655f70617469656e74227d",
+          "sha256": "b941447dbf5c3be863c975f7abf074acfe0a9e2b0672ad87d954276e209a69e4",
+          "receipt": {
+            "sessionId": "bridge_1",
+            "resultRevision": 3,
+            "resultContentSha256": "b941447dbf5c3be863c975f7abf074acfe0a9e2b0672ad87d954276e209a69e4"
+          }
+        }
+      ]
+    },
+    {
+      "name": "2-items",
+      "directive": {
+        "directiveVersion": 2,
+        "serverTime": "2026-10-21T00:00:00.000Z",
+        "trainingState": "ready",
+        "message": "已获取最新康复处方",
+        "activeStopOrder": null,
+        "activePrescription": {
+          "orderId": 5002,
+          "prescriptionContractVersion": 2,
+          "reason": "隔离合同样例",
+          "createdAt": "2026-10-21T00:00:00.000Z",
+          "createdBy": "fixture_doctor",
+          "receivedAt": null,
+          "assetsReadyAt": null,
+          "resourceManifestSha256": "3b13c7bf763e2ff0241e9d9068d0c7dd44177d342c8e5bb4e887f16bcb02662d",
+          "items": [
+            {
+              "itemId": 1001,
+              "position": 0,
+              "actionId": "7",
+              "actionName": "肩部伸展",
+              "sets": 2,
+              "reps": 6,
+              "holdSeconds": 5,
+              "asset": {
+                "actionVersionId": 317,
+                "variantKey": "single",
+                "formatVersion": 1,
+                "runtimeContractVersion": 1,
+                "doseProfile": "sequence-coach-game-v1",
+                "supportedModes": [
+                  "coach",
+                  "game"
+                ],
+                "fileSize": 8398,
+                "sha256": "da194aa91ce29fc79ef345cebd7cab7c6b5305bb2130325256ba188e6329d4a4",
+                "downloadPath": "/api/patient/training-directive/orders/5002/items/1001/asset"
+              }
+            },
+            {
+              "itemId": 1002,
+              "position": 1,
+              "actionId": "8",
+              "actionName": "躯干旋转",
+              "sets": 2,
+              "reps": 6,
+              "holdSeconds": 5,
+              "asset": {
+                "actionVersionId": 318,
+                "variantKey": "single",
+                "formatVersion": 1,
+                "runtimeContractVersion": 1,
+                "doseProfile": "sequence-coach-game-v1",
+                "supportedModes": [
+                  "coach",
+                  "game"
+                ],
+                "fileSize": 8398,
+                "sha256": "74ecca013728125db69cedc6a1521a497a968cb54b382af81967e79890195e2e",
+                "downloadPath": "/api/patient/training-directive/orders/5002/items/1002/asset"
+              }
+            }
+          ]
+        }
+      },
+      "manifestCanonicalUtf8": "[2,5002,[[1001,0,\"7\",317,\"single\",1,1,\"sequence-coach-game-v1\",[\"coach\",\"game\"],8398,\"da194aa91ce29fc79ef345cebd7cab7c6b5305bb2130325256ba188e6329d4a4\",2,6,5],[1002,1,\"8\",318,\"single\",1,1,\"sequence-coach-game-v1\",[\"coach\",\"game\"],8398,\"74ecca013728125db69cedc6a1521a497a968cb54b382af81967e79890195e2e\",2,6,5]]]",
+      "savedReceipt": {
+        "orderId": 5002,
+        "directiveVersion": 2,
+        "phase": "directive_saved",
+        "resourceManifestSha256": "3b13c7bf763e2ff0241e9d9068d0c7dd44177d342c8e5bb4e887f16bcb02662d"
+      },
+      "readyReceipt": {
+        "orderId": 5002,
+        "directiveVersion": 2,
+        "phase": "assets_ready",
+        "resourceManifestSha256": "3b13c7bf763e2ff0241e9d9068d0c7dd44177d342c8e5bb4e887f16bcb02662d"
+      },
+      "results": [
+        {
+          "request": {
+            "protocolVersion": 2,
+            "sessionId": "bridge_2",
+            "requestToken": "bridge_req_2",
+            "createdAt": "2026-10-21T00:01:00.000Z",
+            "completed": false,
+            "status": "INTERRUPTED",
+            "durationSeconds": 0,
+            "prescriptionOrderId": 5002,
+            "resourceManifestSha256": "3b13c7bf763e2ff0241e9d9068d0c7dd44177d342c8e5bb4e887f16bcb02662d",
+            "resultRevision": 1,
+            "source": "mobile_no_details",
+            "preTrainingEventId": "pre:bridge-fixture",
+            "itemResults": [
+              {
+                "itemId": 1001,
+                "position": 0,
+                "actionId": "7",
+                "actionVersionId": 317,
+                "variantKey": "single",
+                "sha256": "da194aa91ce29fc79ef345cebd7cab7c6b5305bb2130325256ba188e6329d4a4",
+                "status": "NOT_STARTED",
+                "modeResults": [
+                  {
+                    "mode": "coach",
+                    "status": "NOT_STARTED",
+                    "completedReps": 0,
+                    "durationSeconds": 0,
+                    "score": null,
+                    "source": "not_started"
+                  },
+                  {
+                    "mode": "game",
+                    "status": "NOT_STARTED",
+                    "completedReps": 0,
+                    "durationSeconds": 0,
+                    "score": null,
+                    "source": "not_started"
+                  }
+                ]
+              },
+              {
+                "itemId": 1002,
+                "position": 1,
+                "actionId": "8",
+                "actionVersionId": 318,
+                "variantKey": "single",
+                "sha256": "74ecca013728125db69cedc6a1521a497a968cb54b382af81967e79890195e2e",
+                "status": "NOT_STARTED",
+                "modeResults": [
+                  {
+                    "mode": "coach",
+                    "status": "NOT_STARTED",
+                    "completedReps": 0,
+                    "durationSeconds": 0,
+                    "score": null,
+                    "source": "not_started"
+                  },
+                  {
+                    "mode": "game",
+                    "status": "NOT_STARTED",
+                    "completedReps": 0,
+                    "durationSeconds": 0,
+                    "score": null,
+                    "source": "not_started"
+                  }
+                ]
+              }
+            ]
+          },
+          "canonicalUtf8": "{\"completed\":false,\"createdAt\":\"2026-10-21T00:01:00.000Z\",\"durationSeconds\":0,\"itemResults\":[{\"actionId\":\"7\",\"actionVersionId\":317,\"itemId\":1001,\"modeResults\":[{\"completedReps\":0,\"durationSeconds\":0,\"mode\":\"coach\",\"score\":null,\"source\":\"not_started\",\"status\":\"NOT_STARTED\"},{\"completedReps\":0,\"durationSeconds\":0,\"mode\":\"game\",\"score\":null,\"source\":\"not_started\",\"status\":\"NOT_STARTED\"}],\"position\":0,\"sha256\":\"da194aa91ce29fc79ef345cebd7cab7c6b5305bb2130325256ba188e6329d4a4\",\"status\":\"NOT_STARTED\",\"variantKey\":\"single\"},{\"actionId\":\"8\",\"actionVersionId\":318,\"itemId\":1002,\"modeResults\":[{\"completedReps\":0,\"durationSeconds\":0,\"mode\":\"coach\",\"score\":null,\"source\":\"not_started\",\"status\":\"NOT_STARTED\"},{\"completedReps\":0,\"durationSeconds\":0,\"mode\":\"game\",\"score\":null,\"source\":\"not_started\",\"status\":\"NOT_STARTED\"}],\"position\":1,\"sha256\":\"74ecca013728125db69cedc6a1521a497a968cb54b382af81967e79890195e2e\",\"status\":\"NOT_STARTED\",\"variantKey\":\"single\"}],\"preTrainingEventId\":\"pre:bridge-fixture\",\"prescriptionOrderId\":5002,\"protocolVersion\":2,\"requestToken\":\"bridge_req_2\",\"resourceManifestSha256\":\"3b13c7bf763e2ff0241e9d9068d0c7dd44177d342c8e5bb4e887f16bcb02662d\",\"resultRevision\":1,\"sessionId\":\"bridge_2\",\"source\":\"mobile_no_details\",\"status\":\"INTERRUPTED\",\"userId\":\"bridge_fixture_patient\"}",
+          "utf8Hex": "7b22636f6d706c65746564223a66616c73652c22637265617465644174223a22323032362d31302d32315430303a30313a30302e3030305a222c226475726174696f6e5365636f6e6473223a302c226974656d526573756c7473223a5b7b22616374696f6e4964223a2237222c22616374696f6e56657273696f6e4964223a3331372c226974656d4964223a313030312c226d6f6465526573756c7473223a5b7b22636f6d706c6574656452657073223a302c226475726174696f6e5365636f6e6473223a302c226d6f6465223a22636f616368222c2273636f7265223a6e756c6c2c22736f75726365223a226e6f745f73746172746564222c22737461747573223a224e4f545f53544152544544227d2c7b22636f6d706c6574656452657073223a302c226475726174696f6e5365636f6e6473223a302c226d6f6465223a2267616d65222c2273636f7265223a6e756c6c2c22736f75726365223a226e6f745f73746172746564222c22737461747573223a224e4f545f53544152544544227d5d2c22706f736974696f6e223a302c22736861323536223a2264613139346161393163653239666337396566333435636562643763616237633662353330356262323133303332353235366261313838653633323964346134222c22737461747573223a224e4f545f53544152544544222c2276617269616e744b6579223a2273696e676c65227d2c7b22616374696f6e4964223a2238222c22616374696f6e56657273696f6e4964223a3331382c226974656d4964223a313030322c226d6f6465526573756c7473223a5b7b22636f6d706c6574656452657073223a302c226475726174696f6e5365636f6e6473223a302c226d6f6465223a22636f616368222c2273636f7265223a6e756c6c2c22736f75726365223a226e6f745f73746172746564222c22737461747573223a224e4f545f53544152544544227d2c7b22636f6d706c6574656452657073223a302c226475726174696f6e5365636f6e6473223a302c226d6f6465223a2267616d65222c2273636f7265223a6e756c6c2c22736f75726365223a226e6f745f73746172746564222c22737461747573223a224e4f545f53544152544544227d5d2c22706f736974696f6e223a312c22736861323536223a2237346563636130313337323831323564623639636564633661313532316134393761393638636235346233383261663831393637653739383930313935653265222c22737461747573223a224e4f545f53544152544544222c2276617269616e744b6579223a2273696e676c65227d5d2c22707265547261696e696e674576656e744964223a227072653a6272696467652d66697874757265222c22707265736372697074696f6e4f726465724964223a353030322c2270726f746f636f6c56657273696f6e223a322c2272657175657374546f6b656e223a226272696467655f7265715f32222c227265736f757263654d616e6966657374536861323536223a2233623133633762663736336532666630323431653964393036386430633764643434313737643334326338653562623465383837663136626362303236363264222c22726573756c745265766973696f6e223a312c2273657373696f6e4964223a226272696467655f32222c22736f75726365223a226d6f62696c655f6e6f5f64657461696c73222c22737461747573223a22494e544552525550544544222c22757365724964223a226272696467655f666978747572655f70617469656e74227d",
+          "sha256": "46e1c0f0e9c67ae142f3aa16272173264dcae1af125f30f7df0ec46a5a2f3945",
+          "receipt": {
+            "sessionId": "bridge_2",
+            "resultRevision": 1,
+            "resultContentSha256": "46e1c0f0e9c67ae142f3aa16272173264dcae1af125f30f7df0ec46a5a2f3945"
+          }
+        },
+        {
+          "request": {
+            "protocolVersion": 2,
+            "sessionId": "bridge_2",
+            "requestToken": "bridge_req_2",
+            "createdAt": "2026-10-21T00:01:00.000Z",
+            "completed": false,
+            "status": "INTERRUPTED",
+            "durationSeconds": 15,
+            "prescriptionOrderId": 5002,
+            "resourceManifestSha256": "3b13c7bf763e2ff0241e9d9068d0c7dd44177d342c8e5bb4e887f16bcb02662d",
+            "resultRevision": 2,
+            "source": "ar_measured",
+            "preTrainingEventId": "pre:bridge-fixture",
+            "itemResults": [
+              {
+                "itemId": 1001,
+                "position": 0,
+                "actionId": "7",
+                "actionVersionId": 317,
+                "variantKey": "single",
+                "sha256": "da194aa91ce29fc79ef345cebd7cab7c6b5305bb2130325256ba188e6329d4a4",
+                "status": "INTERRUPTED",
+                "modeResults": [
+                  {
+                    "mode": "coach",
+                    "status": "COMPLETED",
+                    "completedReps": 2,
+                    "durationSeconds": 15,
+                    "score": 80,
+                    "source": "ar_measured"
+                  },
+                  {
+                    "mode": "game",
+                    "status": "NOT_STARTED",
+                    "completedReps": 0,
+                    "durationSeconds": 0,
+                    "score": null,
+                    "source": "not_started"
+                  }
+                ]
+              },
+              {
+                "itemId": 1002,
+                "position": 1,
+                "actionId": "8",
+                "actionVersionId": 318,
+                "variantKey": "single",
+                "sha256": "74ecca013728125db69cedc6a1521a497a968cb54b382af81967e79890195e2e",
+                "status": "NOT_STARTED",
+                "modeResults": [
+                  {
+                    "mode": "coach",
+                    "status": "NOT_STARTED",
+                    "completedReps": 0,
+                    "durationSeconds": 0,
+                    "score": null,
+                    "source": "not_started"
+                  },
+                  {
+                    "mode": "game",
+                    "status": "NOT_STARTED",
+                    "completedReps": 0,
+                    "durationSeconds": 0,
+                    "score": null,
+                    "source": "not_started"
+                  }
+                ]
+              }
+            ]
+          },
+          "canonicalUtf8": "{\"completed\":false,\"createdAt\":\"2026-10-21T00:01:00.000Z\",\"durationSeconds\":15,\"itemResults\":[{\"actionId\":\"7\",\"actionVersionId\":317,\"itemId\":1001,\"modeResults\":[{\"completedReps\":2,\"durationSeconds\":15,\"mode\":\"coach\",\"score\":80,\"source\":\"ar_measured\",\"status\":\"COMPLETED\"},{\"completedReps\":0,\"durationSeconds\":0,\"mode\":\"game\",\"score\":null,\"source\":\"not_started\",\"status\":\"NOT_STARTED\"}],\"position\":0,\"sha256\":\"da194aa91ce29fc79ef345cebd7cab7c6b5305bb2130325256ba188e6329d4a4\",\"status\":\"INTERRUPTED\",\"variantKey\":\"single\"},{\"actionId\":\"8\",\"actionVersionId\":318,\"itemId\":1002,\"modeResults\":[{\"completedReps\":0,\"durationSeconds\":0,\"mode\":\"coach\",\"score\":null,\"source\":\"not_started\",\"status\":\"NOT_STARTED\"},{\"completedReps\":0,\"durationSeconds\":0,\"mode\":\"game\",\"score\":null,\"source\":\"not_started\",\"status\":\"NOT_STARTED\"}],\"position\":1,\"sha256\":\"74ecca013728125db69cedc6a1521a497a968cb54b382af81967e79890195e2e\",\"status\":\"NOT_STARTED\",\"variantKey\":\"single\"}],\"preTrainingEventId\":\"pre:bridge-fixture\",\"prescriptionOrderId\":5002,\"protocolVersion\":2,\"requestToken\":\"bridge_req_2\",\"resourceManifestSha256\":\"3b13c7bf763e2ff0241e9d9068d0c7dd44177d342c8e5bb4e887f16bcb02662d\",\"resultRevision\":2,\"sessionId\":\"bridge_2\",\"source\":\"ar_measured\",\"status\":\"INTERRUPTED\",\"userId\":\"bridge_fixture_patient\"}",
+          "utf8Hex": "7b22636f6d706c65746564223a66616c73652c22637265617465644174223a22323032362d31302d32315430303a30313a30302e3030305a222c226475726174696f6e5365636f6e6473223a31352c226974656d526573756c7473223a5b7b22616374696f6e4964223a2237222c22616374696f6e56657273696f6e4964223a3331372c226974656d4964223a313030312c226d6f6465526573756c7473223a5b7b22636f6d706c6574656452657073223a322c226475726174696f6e5365636f6e6473223a31352c226d6f6465223a22636f616368222c2273636f7265223a38302c22736f75726365223a2261725f6d65617375726564222c22737461747573223a22434f4d504c45544544227d2c7b22636f6d706c6574656452657073223a302c226475726174696f6e5365636f6e6473223a302c226d6f6465223a2267616d65222c2273636f7265223a6e756c6c2c22736f75726365223a226e6f745f73746172746564222c22737461747573223a224e4f545f53544152544544227d5d2c22706f736974696f6e223a302c22736861323536223a2264613139346161393163653239666337396566333435636562643763616237633662353330356262323133303332353235366261313838653633323964346134222c22737461747573223a22494e544552525550544544222c2276617269616e744b6579223a2273696e676c65227d2c7b22616374696f6e4964223a2238222c22616374696f6e56657273696f6e4964223a3331382c226974656d4964223a313030322c226d6f6465526573756c7473223a5b7b22636f6d706c6574656452657073223a302c226475726174696f6e5365636f6e6473223a302c226d6f6465223a22636f616368222c2273636f7265223a6e756c6c2c22736f75726365223a226e6f745f73746172746564222c22737461747573223a224e4f545f53544152544544227d2c7b22636f6d706c6574656452657073223a302c226475726174696f6e5365636f6e6473223a302c226d6f6465223a2267616d65222c2273636f7265223a6e756c6c2c22736f75726365223a226e6f745f73746172746564222c22737461747573223a224e4f545f53544152544544227d5d2c22706f736974696f6e223a312c22736861323536223a2237346563636130313337323831323564623639636564633661313532316134393761393638636235346233383261663831393637653739383930313935653265222c22737461747573223a224e4f545f53544152544544222c2276617269616e744b6579223a2273696e676c65227d5d2c22707265547261696e696e674576656e744964223a227072653a6272696467652d66697874757265222c22707265736372697074696f6e4f726465724964223a353030322c2270726f746f636f6c56657273696f6e223a322c2272657175657374546f6b656e223a226272696467655f7265715f32222c227265736f757263654d616e6966657374536861323536223a2233623133633762663736336532666630323431653964393036386430633764643434313737643334326338653562623465383837663136626362303236363264222c22726573756c745265766973696f6e223a322c2273657373696f6e4964223a226272696467655f32222c22736f75726365223a2261725f6d65617375726564222c22737461747573223a22494e544552525550544544222c22757365724964223a226272696467655f666978747572655f70617469656e74227d",
+          "sha256": "b0d08e5ad175e28cc39f509c55bf5cdea05d7956c93425fb0b3cb6459d49677a",
+          "receipt": {
+            "sessionId": "bridge_2",
+            "resultRevision": 2,
+            "resultContentSha256": "b0d08e5ad175e28cc39f509c55bf5cdea05d7956c93425fb0b3cb6459d49677a"
+          }
+        },
+        {
+          "request": {
+            "protocolVersion": 2,
+            "sessionId": "bridge_2",
+            "requestToken": "bridge_req_2",
+            "createdAt": "2026-10-21T00:01:00.000Z",
+            "completed": true,
+            "status": "COMPLETED",
+            "durationSeconds": 60,
+            "prescriptionOrderId": 5002,
+            "resourceManifestSha256": "3b13c7bf763e2ff0241e9d9068d0c7dd44177d342c8e5bb4e887f16bcb02662d",
+            "resultRevision": 3,
+            "source": "ar_measured",
+            "preTrainingEventId": "pre:bridge-fixture",
+            "itemResults": [
+              {
+                "itemId": 1001,
+                "position": 0,
+                "actionId": "7",
+                "actionVersionId": 317,
+                "variantKey": "single",
+                "sha256": "da194aa91ce29fc79ef345cebd7cab7c6b5305bb2130325256ba188e6329d4a4",
+                "status": "COMPLETED",
+                "modeResults": [
+                  {
+                    "mode": "coach",
+                    "status": "COMPLETED",
+                    "completedReps": 2,
+                    "durationSeconds": 15,
+                    "score": 80,
+                    "source": "ar_measured"
+                  },
+                  {
+                    "mode": "game",
+                    "status": "COMPLETED",
+                    "completedReps": 2,
+                    "durationSeconds": 15,
+                    "score": 80,
+                    "source": "ar_measured"
+                  }
+                ]
+              },
+              {
+                "itemId": 1002,
+                "position": 1,
+                "actionId": "8",
+                "actionVersionId": 318,
+                "variantKey": "single",
+                "sha256": "74ecca013728125db69cedc6a1521a497a968cb54b382af81967e79890195e2e",
+                "status": "COMPLETED",
+                "modeResults": [
+                  {
+                    "mode": "coach",
+                    "status": "COMPLETED",
+                    "completedReps": 2,
+                    "durationSeconds": 15,
+                    "score": 80,
+                    "source": "ar_measured"
+                  },
+                  {
+                    "mode": "game",
+                    "status": "COMPLETED",
+                    "completedReps": 2,
+                    "durationSeconds": 15,
+                    "score": 80,
+                    "source": "ar_measured"
+                  }
+                ]
+              }
+            ]
+          },
+          "canonicalUtf8": "{\"completed\":true,\"createdAt\":\"2026-10-21T00:01:00.000Z\",\"durationSeconds\":60,\"itemResults\":[{\"actionId\":\"7\",\"actionVersionId\":317,\"itemId\":1001,\"modeResults\":[{\"completedReps\":2,\"durationSeconds\":15,\"mode\":\"coach\",\"score\":80,\"source\":\"ar_measured\",\"status\":\"COMPLETED\"},{\"completedReps\":2,\"durationSeconds\":15,\"mode\":\"game\",\"score\":80,\"source\":\"ar_measured\",\"status\":\"COMPLETED\"}],\"position\":0,\"sha256\":\"da194aa91ce29fc79ef345cebd7cab7c6b5305bb2130325256ba188e6329d4a4\",\"status\":\"COMPLETED\",\"variantKey\":\"single\"},{\"actionId\":\"8\",\"actionVersionId\":318,\"itemId\":1002,\"modeResults\":[{\"completedReps\":2,\"durationSeconds\":15,\"mode\":\"coach\",\"score\":80,\"source\":\"ar_measured\",\"status\":\"COMPLETED\"},{\"completedReps\":2,\"durationSeconds\":15,\"mode\":\"game\",\"score\":80,\"source\":\"ar_measured\",\"status\":\"COMPLETED\"}],\"position\":1,\"sha256\":\"74ecca013728125db69cedc6a1521a497a968cb54b382af81967e79890195e2e\",\"status\":\"COMPLETED\",\"variantKey\":\"single\"}],\"preTrainingEventId\":\"pre:bridge-fixture\",\"prescriptionOrderId\":5002,\"protocolVersion\":2,\"requestToken\":\"bridge_req_2\",\"resourceManifestSha256\":\"3b13c7bf763e2ff0241e9d9068d0c7dd44177d342c8e5bb4e887f16bcb02662d\",\"resultRevision\":3,\"sessionId\":\"bridge_2\",\"source\":\"ar_measured\",\"status\":\"COMPLETED\",\"userId\":\"bridge_fixture_patient\"}",
+          "utf8Hex": "7b22636f6d706c65746564223a747275652c22637265617465644174223a22323032362d31302d32315430303a30313a30302e3030305a222c226475726174696f6e5365636f6e6473223a36302c226974656d526573756c7473223a5b7b22616374696f6e4964223a2237222c22616374696f6e56657273696f6e4964223a3331372c226974656d4964223a313030312c226d6f6465526573756c7473223a5b7b22636f6d706c6574656452657073223a322c226475726174696f6e5365636f6e6473223a31352c226d6f6465223a22636f616368222c2273636f7265223a38302c22736f75726365223a2261725f6d65617375726564222c22737461747573223a22434f4d504c45544544227d2c7b22636f6d706c6574656452657073223a322c226475726174696f6e5365636f6e6473223a31352c226d6f6465223a2267616d65222c2273636f7265223a38302c22736f75726365223a2261725f6d65617375726564222c22737461747573223a22434f4d504c45544544227d5d2c22706f736974696f6e223a302c22736861323536223a2264613139346161393163653239666337396566333435636562643763616237633662353330356262323133303332353235366261313838653633323964346134222c22737461747573223a22434f4d504c45544544222c2276617269616e744b6579223a2273696e676c65227d2c7b22616374696f6e4964223a2238222c22616374696f6e56657273696f6e4964223a3331382c226974656d4964223a313030322c226d6f6465526573756c7473223a5b7b22636f6d706c6574656452657073223a322c226475726174696f6e5365636f6e6473223a31352c226d6f6465223a22636f616368222c2273636f7265223a38302c22736f75726365223a2261725f6d65617375726564222c22737461747573223a22434f4d504c45544544227d2c7b22636f6d706c6574656452657073223a322c226475726174696f6e5365636f6e6473223a31352c226d6f6465223a2267616d65222c2273636f7265223a38302c22736f75726365223a2261725f6d65617375726564222c22737461747573223a22434f4d504c45544544227d5d2c22706f736974696f6e223a312c22736861323536223a2237346563636130313337323831323564623639636564633661313532316134393761393638636235346233383261663831393637653739383930313935653265222c22737461747573223a22434f4d504c45544544222c2276617269616e744b6579223a2273696e676c65227d5d2c22707265547261696e696e674576656e744964223a227072653a6272696467652d66697874757265222c22707265736372697074696f6e4f726465724964223a353030322c2270726f746f636f6c56657273696f6e223a322c2272657175657374546f6b656e223a226272696467655f7265715f32222c227265736f757263654d616e6966657374536861323536223a2233623133633762663736336532666630323431653964393036386430633764643434313737643334326338653562623465383837663136626362303236363264222c22726573756c745265766973696f6e223a332c2273657373696f6e4964223a226272696467655f32222c22736f75726365223a2261725f6d65617375726564222c22737461747573223a22434f4d504c45544544222c22757365724964223a226272696467655f666978747572655f70617469656e74227d",
+          "sha256": "26988c43fa50b3262193304e041e73eb5331f8052dbb18bc270418a6a9a4f9fb",
+          "receipt": {
+            "sessionId": "bridge_2",
+            "resultRevision": 3,
+            "resultContentSha256": "26988c43fa50b3262193304e041e73eb5331f8052dbb18bc270418a6a9a4f9fb"
+          }
+        }
+      ]
+    },
+    {
+      "name": "10-items",
+      "directive": {
+        "directiveVersion": 2,
+        "serverTime": "2026-10-21T00:00:00.000Z",
+        "trainingState": "ready",
+        "message": "已获取最新康复处方",
+        "activeStopOrder": null,
+        "activePrescription": {
+          "orderId": 5010,
+          "prescriptionContractVersion": 2,
+          "reason": "隔离合同样例",
+          "createdAt": "2026-10-21T00:00:00.000Z",
+          "createdBy": "fixture_doctor",
+          "receivedAt": null,
+          "assetsReadyAt": null,
+          "resourceManifestSha256": "57be8f661e115cb089c79b21368ac3cc3c28d2540ce2481c3b78b6710cbcef6a",
+          "items": [
+            {
+              "itemId": 1001,
+              "position": 0,
+              "actionId": "7",
+              "actionName": "肩部伸展",
+              "sets": 2,
+              "reps": 6,
+              "holdSeconds": 5,
+              "asset": {
+                "actionVersionId": 317,
+                "variantKey": "single",
+                "formatVersion": 1,
+                "runtimeContractVersion": 1,
+                "doseProfile": "sequence-coach-game-v1",
+                "supportedModes": [
+                  "coach",
+                  "game"
+                ],
+                "fileSize": 8398,
+                "sha256": "da194aa91ce29fc79ef345cebd7cab7c6b5305bb2130325256ba188e6329d4a4",
+                "downloadPath": "/api/patient/training-directive/orders/5010/items/1001/asset"
+              }
+            },
+            {
+              "itemId": 1002,
+              "position": 1,
+              "actionId": "8",
+              "actionName": "躯干旋转",
+              "sets": 2,
+              "reps": 6,
+              "holdSeconds": 5,
+              "asset": {
+                "actionVersionId": 318,
+                "variantKey": "single",
+                "formatVersion": 1,
+                "runtimeContractVersion": 1,
+                "doseProfile": "sequence-coach-game-v1",
+                "supportedModes": [
+                  "coach",
+                  "game"
+                ],
+                "fileSize": 8398,
+                "sha256": "74ecca013728125db69cedc6a1521a497a968cb54b382af81967e79890195e2e",
+                "downloadPath": "/api/patient/training-directive/orders/5010/items/1002/asset"
+              }
+            },
+            {
+              "itemId": 1003,
+              "position": 2,
+              "actionId": "9",
+              "actionName": "抬腿练习",
+              "sets": 2,
+              "reps": 6,
+              "holdSeconds": 5,
+              "asset": {
+                "actionVersionId": 319,
+                "variantKey": "single",
+                "formatVersion": 1,
+                "runtimeContractVersion": 1,
+                "doseProfile": "sequence-coach-game-v1",
+                "supportedModes": [
+                  "coach",
+                  "game"
+                ],
+                "fileSize": 8398,
+                "sha256": "8179dd05b9743697c86fc3af3c2afd18b90a9b6fa50c9bc1fd9fd432f37e046b",
+                "downloadPath": "/api/patient/training-directive/orders/5010/items/1003/asset"
+              }
+            },
+            {
+              "itemId": 1004,
+              "position": 3,
+              "actionId": "10",
+              "actionName": "训练动作 4",
+              "sets": 2,
+              "reps": 6,
+              "holdSeconds": 5,
+              "asset": {
+                "actionVersionId": 320,
+                "variantKey": "single",
+                "formatVersion": 1,
+                "runtimeContractVersion": 1,
+                "doseProfile": "sequence-coach-game-v1",
+                "supportedModes": [
+                  "coach",
+                  "game"
+                ],
+                "fileSize": 8401,
+                "sha256": "a7795fc2caaee3a716b085f8f9c00177da35dcb8b5582eb2a6a1e634897089e5",
+                "downloadPath": "/api/patient/training-directive/orders/5010/items/1004/asset"
+              }
+            },
+            {
+              "itemId": 1005,
+              "position": 4,
+              "actionId": "11",
+              "actionName": "训练动作 5",
+              "sets": 2,
+              "reps": 6,
+              "holdSeconds": 5,
+              "asset": {
+                "actionVersionId": 321,
+                "variantKey": "single",
+                "formatVersion": 1,
+                "runtimeContractVersion": 1,
+                "doseProfile": "sequence-coach-game-v1",
+                "supportedModes": [
+                  "coach",
+                  "game"
+                ],
+                "fileSize": 8401,
+                "sha256": "070efbb574de1700a02ee624f9f7fe748a6b5dc75f0dc99e2d5e4fa5559a28df",
+                "downloadPath": "/api/patient/training-directive/orders/5010/items/1005/asset"
+              }
+            },
+            {
+              "itemId": 1006,
+              "position": 5,
+              "actionId": "12",
+              "actionName": "训练动作 6",
+              "sets": 2,
+              "reps": 6,
+              "holdSeconds": 5,
+              "asset": {
+                "actionVersionId": 322,
+                "variantKey": "single",
+                "formatVersion": 1,
+                "runtimeContractVersion": 1,
+                "doseProfile": "sequence-coach-game-v1",
+                "supportedModes": [
+                  "coach",
+                  "game"
+                ],
+                "fileSize": 8401,
+                "sha256": "450c24d430dbea8008d079fc850b3c33c072423cae9438c755aa095d445b6080",
+                "downloadPath": "/api/patient/training-directive/orders/5010/items/1006/asset"
+              }
+            },
+            {
+              "itemId": 1007,
+              "position": 6,
+              "actionId": "13",
+              "actionName": "训练动作 7",
+              "sets": 2,
+              "reps": 6,
+              "holdSeconds": 5,
+              "asset": {
+                "actionVersionId": 323,
+                "variantKey": "single",
+                "formatVersion": 1,
+                "runtimeContractVersion": 1,
+                "doseProfile": "sequence-coach-game-v1",
+                "supportedModes": [
+                  "coach",
+                  "game"
+                ],
+                "fileSize": 8401,
+                "sha256": "93fdc2c3aac2f840cccd101763082abccad5a8dcdd7f151ebdd6bb44ec3f6540",
+                "downloadPath": "/api/patient/training-directive/orders/5010/items/1007/asset"
+              }
+            },
+            {
+              "itemId": 1008,
+              "position": 7,
+              "actionId": "14",
+              "actionName": "训练动作 8",
+              "sets": 2,
+              "reps": 6,
+              "holdSeconds": 5,
+              "asset": {
+                "actionVersionId": 324,
+                "variantKey": "single",
+                "formatVersion": 1,
+                "runtimeContractVersion": 1,
+                "doseProfile": "sequence-coach-game-v1",
+                "supportedModes": [
+                  "coach",
+                  "game"
+                ],
+                "fileSize": 8401,
+                "sha256": "cbd9f8497981c796f5e1a1dbc9c0d61292d739172fd5f8e689617a59002f1560",
+                "downloadPath": "/api/patient/training-directive/orders/5010/items/1008/asset"
+              }
+            },
+            {
+              "itemId": 1009,
+              "position": 8,
+              "actionId": "15",
+              "actionName": "训练动作 9",
+              "sets": 2,
+              "reps": 6,
+              "holdSeconds": 5,
+              "asset": {
+                "actionVersionId": 325,
+                "variantKey": "single",
+                "formatVersion": 1,
+                "runtimeContractVersion": 1,
+                "doseProfile": "sequence-coach-game-v1",
+                "supportedModes": [
+                  "coach",
+                  "game"
+                ],
+                "fileSize": 8401,
+                "sha256": "1ea5bd80c70a9ef8d8b76248043cfa0d14dfd9fddf2c702a1cf665e7be84bb56",
+                "downloadPath": "/api/patient/training-directive/orders/5010/items/1009/asset"
+              }
+            },
+            {
+              "itemId": 1010,
+              "position": 9,
+              "actionId": "16",
+              "actionName": "训练动作 10",
+              "sets": 2,
+              "reps": 6,
+              "holdSeconds": 5,
+              "asset": {
+                "actionVersionId": 326,
+                "variantKey": "single",
+                "formatVersion": 1,
+                "runtimeContractVersion": 1,
+                "doseProfile": "sequence-coach-game-v1",
+                "supportedModes": [
+                  "coach",
+                  "game"
+                ],
+                "fileSize": 8402,
+                "sha256": "6932f794140f2954ba71781d220a3f0b771acd83f42295e696ab47b7cb1c1586",
+                "downloadPath": "/api/patient/training-directive/orders/5010/items/1010/asset"
+              }
+            }
+          ]
+        }
+      },
+      "manifestCanonicalUtf8": "[2,5010,[[1001,0,\"7\",317,\"single\",1,1,\"sequence-coach-game-v1\",[\"coach\",\"game\"],8398,\"da194aa91ce29fc79ef345cebd7cab7c6b5305bb2130325256ba188e6329d4a4\",2,6,5],[1002,1,\"8\",318,\"single\",1,1,\"sequence-coach-game-v1\",[\"coach\",\"game\"],8398,\"74ecca013728125db69cedc6a1521a497a968cb54b382af81967e79890195e2e\",2,6,5],[1003,2,\"9\",319,\"single\",1,1,\"sequence-coach-game-v1\",[\"coach\",\"game\"],8398,\"8179dd05b9743697c86fc3af3c2afd18b90a9b6fa50c9bc1fd9fd432f37e046b\",2,6,5],[1004,3,\"10\",320,\"single\",1,1,\"sequence-coach-game-v1\",[\"coach\",\"game\"],8401,\"a7795fc2caaee3a716b085f8f9c00177da35dcb8b5582eb2a6a1e634897089e5\",2,6,5],[1005,4,\"11\",321,\"single\",1,1,\"sequence-coach-game-v1\",[\"coach\",\"game\"],8401,\"070efbb574de1700a02ee624f9f7fe748a6b5dc75f0dc99e2d5e4fa5559a28df\",2,6,5],[1006,5,\"12\",322,\"single\",1,1,\"sequence-coach-game-v1\",[\"coach\",\"game\"],8401,\"450c24d430dbea8008d079fc850b3c33c072423cae9438c755aa095d445b6080\",2,6,5],[1007,6,\"13\",323,\"single\",1,1,\"sequence-coach-game-v1\",[\"coach\",\"game\"],8401,\"93fdc2c3aac2f840cccd101763082abccad5a8dcdd7f151ebdd6bb44ec3f6540\",2,6,5],[1008,7,\"14\",324,\"single\",1,1,\"sequence-coach-game-v1\",[\"coach\",\"game\"],8401,\"cbd9f8497981c796f5e1a1dbc9c0d61292d739172fd5f8e689617a59002f1560\",2,6,5],[1009,8,\"15\",325,\"single\",1,1,\"sequence-coach-game-v1\",[\"coach\",\"game\"],8401,\"1ea5bd80c70a9ef8d8b76248043cfa0d14dfd9fddf2c702a1cf665e7be84bb56\",2,6,5],[1010,9,\"16\",326,\"single\",1,1,\"sequence-coach-game-v1\",[\"coach\",\"game\"],8402,\"6932f794140f2954ba71781d220a3f0b771acd83f42295e696ab47b7cb1c1586\",2,6,5]]]",
+      "savedReceipt": {
+        "orderId": 5010,
+        "directiveVersion": 2,
+        "phase": "directive_saved",
+        "resourceManifestSha256": "57be8f661e115cb089c79b21368ac3cc3c28d2540ce2481c3b78b6710cbcef6a"
+      },
+      "readyReceipt": {
+        "orderId": 5010,
+        "directiveVersion": 2,
+        "phase": "assets_ready",
+        "resourceManifestSha256": "57be8f661e115cb089c79b21368ac3cc3c28d2540ce2481c3b78b6710cbcef6a"
+      },
+      "results": [
+        {
+          "request": {
+            "protocolVersion": 2,
+            "sessionId": "bridge_10",
+            "requestToken": "bridge_req_10",
+            "createdAt": "2026-10-21T00:01:00.000Z",
+            "completed": false,
+            "status": "INTERRUPTED",
+            "durationSeconds": 0,
+            "prescriptionOrderId": 5010,
+            "resourceManifestSha256": "57be8f661e115cb089c79b21368ac3cc3c28d2540ce2481c3b78b6710cbcef6a",
+            "resultRevision": 1,
+            "source": "mobile_no_details",
+            "preTrainingEventId": "pre:bridge-fixture",
+            "itemResults": [
+              {
+                "itemId": 1001,
+                "position": 0,
+                "actionId": "7",
+                "actionVersionId": 317,
+                "variantKey": "single",
+                "sha256": "da194aa91ce29fc79ef345cebd7cab7c6b5305bb2130325256ba188e6329d4a4",
+                "status": "NOT_STARTED",
+                "modeResults": [
+                  {
+                    "mode": "coach",
+                    "status": "NOT_STARTED",
+                    "completedReps": 0,
+                    "durationSeconds": 0,
+                    "score": null,
+                    "source": "not_started"
+                  },
+                  {
+                    "mode": "game",
+                    "status": "NOT_STARTED",
+                    "completedReps": 0,
+                    "durationSeconds": 0,
+                    "score": null,
+                    "source": "not_started"
+                  }
+                ]
+              },
+              {
+                "itemId": 1002,
+                "position": 1,
+                "actionId": "8",
+                "actionVersionId": 318,
+                "variantKey": "single",
+                "sha256": "74ecca013728125db69cedc6a1521a497a968cb54b382af81967e79890195e2e",
+                "status": "NOT_STARTED",
+                "modeResults": [
+                  {
+                    "mode": "coach",
+                    "status": "NOT_STARTED",
+                    "completedReps": 0,
+                    "durationSeconds": 0,
+                    "score": null,
+                    "source": "not_started"
+                  },
+                  {
+                    "mode": "game",
+                    "status": "NOT_STARTED",
+                    "completedReps": 0,
+                    "durationSeconds": 0,
+                    "score": null,
+                    "source": "not_started"
+                  }
+                ]
+              },
+              {
+                "itemId": 1003,
+                "position": 2,
+                "actionId": "9",
+                "actionVersionId": 319,
+                "variantKey": "single",
+                "sha256": "8179dd05b9743697c86fc3af3c2afd18b90a9b6fa50c9bc1fd9fd432f37e046b",
+                "status": "NOT_STARTED",
+                "modeResults": [
+                  {
+                    "mode": "coach",
+                    "status": "NOT_STARTED",
+                    "completedReps": 0,
+                    "durationSeconds": 0,
+                    "score": null,
+                    "source": "not_started"
+                  },
+                  {
+                    "mode": "game",
+                    "status": "NOT_STARTED",
+                    "completedReps": 0,
+                    "durationSeconds": 0,
+                    "score": null,
+                    "source": "not_started"
+                  }
+                ]
+              },
+              {
+                "itemId": 1004,
+                "position": 3,
+                "actionId": "10",
+                "actionVersionId": 320,
+                "variantKey": "single",
+                "sha256": "a7795fc2caaee3a716b085f8f9c00177da35dcb8b5582eb2a6a1e634897089e5",
+                "status": "NOT_STARTED",
+                "modeResults": [
+                  {
+                    "mode": "coach",
+                    "status": "NOT_STARTED",
+                    "completedReps": 0,
+                    "durationSeconds": 0,
+                    "score": null,
+                    "source": "not_started"
+                  },
+                  {
+                    "mode": "game",
+                    "status": "NOT_STARTED",
+                    "completedReps": 0,
+                    "durationSeconds": 0,
+                    "score": null,
+                    "source": "not_started"
+                  }
+                ]
+              },
+              {
+                "itemId": 1005,
+                "position": 4,
+                "actionId": "11",
+                "actionVersionId": 321,
+                "variantKey": "single",
+                "sha256": "070efbb574de1700a02ee624f9f7fe748a6b5dc75f0dc99e2d5e4fa5559a28df",
+                "status": "NOT_STARTED",
+                "modeResults": [
+                  {
+                    "mode": "coach",
+                    "status": "NOT_STARTED",
+                    "completedReps": 0,
+                    "durationSeconds": 0,
+                    "score": null,
+                    "source": "not_started"
+                  },
+                  {
+                    "mode": "game",
+                    "status": "NOT_STARTED",
+                    "completedReps": 0,
+                    "durationSeconds": 0,
+                    "score": null,
+                    "source": "not_started"
+                  }
+                ]
+              },
+              {
+                "itemId": 1006,
+                "position": 5,
+                "actionId": "12",
+                "actionVersionId": 322,
+                "variantKey": "single",
+                "sha256": "450c24d430dbea8008d079fc850b3c33c072423cae9438c755aa095d445b6080",
+                "status": "NOT_STARTED",
+                "modeResults": [
+                  {
+                    "mode": "coach",
+                    "status": "NOT_STARTED",
+                    "completedReps": 0,
+                    "durationSeconds": 0,
+                    "score": null,
+                    "source": "not_started"
+                  },
+                  {
+                    "mode": "game",
+                    "status": "NOT_STARTED",
+                    "completedReps": 0,
+                    "durationSeconds": 0,
+                    "score": null,
+                    "source": "not_started"
+                  }
+                ]
+              },
+              {
+                "itemId": 1007,
+                "position": 6,
+                "actionId": "13",
+                "actionVersionId": 323,
+                "variantKey": "single",
+                "sha256": "93fdc2c3aac2f840cccd101763082abccad5a8dcdd7f151ebdd6bb44ec3f6540",
+                "status": "NOT_STARTED",
+                "modeResults": [
+                  {
+                    "mode": "coach",
+                    "status": "NOT_STARTED",
+                    "completedReps": 0,
+                    "durationSeconds": 0,
+                    "score": null,
+                    "source": "not_started"
+                  },
+                  {
+                    "mode": "game",
+                    "status": "NOT_STARTED",
+                    "completedReps": 0,
+                    "durationSeconds": 0,
+                    "score": null,
+                    "source": "not_started"
+                  }
+                ]
+              },
+              {
+                "itemId": 1008,
+                "position": 7,
+                "actionId": "14",
+                "actionVersionId": 324,
+                "variantKey": "single",
+                "sha256": "cbd9f8497981c796f5e1a1dbc9c0d61292d739172fd5f8e689617a59002f1560",
+                "status": "NOT_STARTED",
+                "modeResults": [
+                  {
+                    "mode": "coach",
+                    "status": "NOT_STARTED",
+                    "completedReps": 0,
+                    "durationSeconds": 0,
+                    "score": null,
+                    "source": "not_started"
+                  },
+                  {
+                    "mode": "game",
+                    "status": "NOT_STARTED",
+                    "completedReps": 0,
+                    "durationSeconds": 0,
+                    "score": null,
+                    "source": "not_started"
+                  }
+                ]
+              },
+              {
+                "itemId": 1009,
+                "position": 8,
+                "actionId": "15",
+                "actionVersionId": 325,
+                "variantKey": "single",
+                "sha256": "1ea5bd80c70a9ef8d8b76248043cfa0d14dfd9fddf2c702a1cf665e7be84bb56",
+                "status": "NOT_STARTED",
+                "modeResults": [
+                  {
+                    "mode": "coach",
+                    "status": "NOT_STARTED",
+                    "completedReps": 0,
+                    "durationSeconds": 0,
+                    "score": null,
+                    "source": "not_started"
+                  },
+                  {
+                    "mode": "game",
+                    "status": "NOT_STARTED",
+                    "completedReps": 0,
+                    "durationSeconds": 0,
+                    "score": null,
+                    "source": "not_started"
+                  }
+                ]
+              },
+              {
+                "itemId": 1010,
+                "position": 9,
+                "actionId": "16",
+                "actionVersionId": 326,
+                "variantKey": "single",
+                "sha256": "6932f794140f2954ba71781d220a3f0b771acd83f42295e696ab47b7cb1c1586",
+                "status": "NOT_STARTED",
+                "modeResults": [
+                  {
+                    "mode": "coach",
+                    "status": "NOT_STARTED",
+                    "completedReps": 0,
+                    "durationSeconds": 0,
+                    "score": null,
+                    "source": "not_started"
+                  },
+                  {
+                    "mode": "game",
+                    "status": "NOT_STARTED",
+                    "completedReps": 0,
+                    "durationSeconds": 0,
+                    "score": null,
+                    "source": "not_started"
+                  }
+                ]
+              }
+            ]
+          },
+          "canonicalUtf8": "{\"completed\":false,\"createdAt\":\"2026-10-21T00:01:00.000Z\",\"durationSeconds\":0,\"itemResults\":[{\"actionId\":\"7\",\"actionVersionId\":317,\"itemId\":1001,\"modeResults\":[{\"completedReps\":0,\"durationSeconds\":0,\"mode\":\"coach\",\"score\":null,\"source\":\"not_started\",\"status\":\"NOT_STARTED\"},{\"completedReps\":0,\"durationSeconds\":0,\"mode\":\"game\",\"score\":null,\"source\":\"not_started\",\"status\":\"NOT_STARTED\"}],\"position\":0,\"sha256\":\"da194aa91ce29fc79ef345cebd7cab7c6b5305bb2130325256ba188e6329d4a4\",\"status\":\"NOT_STARTED\",\"variantKey\":\"single\"},{\"actionId\":\"8\",\"actionVersionId\":318,\"itemId\":1002,\"modeResults\":[{\"completedReps\":0,\"durationSeconds\":0,\"mode\":\"coach\",\"score\":null,\"source\":\"not_started\",\"status\":\"NOT_STARTED\"},{\"completedReps\":0,\"durationSeconds\":0,\"mode\":\"game\",\"score\":null,\"source\":\"not_started\",\"status\":\"NOT_STARTED\"}],\"position\":1,\"sha256\":\"74ecca013728125db69cedc6a1521a497a968cb54b382af81967e79890195e2e\",\"status\":\"NOT_STARTED\",\"variantKey\":\"single\"},{\"actionId\":\"9\",\"actionVersionId\":319,\"itemId\":1003,\"modeResults\":[{\"completedReps\":0,\"durationSeconds\":0,\"mode\":\"coach\",\"score\":null,\"source\":\"not_started\",\"status\":\"NOT_STARTED\"},{\"completedReps\":0,\"durationSeconds\":0,\"mode\":\"game\",\"score\":null,\"source\":\"not_started\",\"status\":\"NOT_STARTED\"}],\"position\":2,\"sha256\":\"8179dd05b9743697c86fc3af3c2afd18b90a9b6fa50c9bc1fd9fd432f37e046b\",\"status\":\"NOT_STARTED\",\"variantKey\":\"single\"},{\"actionId\":\"10\",\"actionVersionId\":320,\"itemId\":1004,\"modeResults\":[{\"completedReps\":0,\"durationSeconds\":0,\"mode\":\"coach\",\"score\":null,\"source\":\"not_started\",\"status\":\"NOT_STARTED\"},{\"completedReps\":0,\"durationSeconds\":0,\"mode\":\"game\",\"score\":null,\"source\":\"not_started\",\"status\":\"NOT_STARTED\"}],\"position\":3,\"sha256\":\"a7795fc2caaee3a716b085f8f9c00177da35dcb8b5582eb2a6a1e634897089e5\",\"status\":\"NOT_STARTED\",\"variantKey\":\"single\"},{\"actionId\":\"11\",\"actionVersionId\":321,\"itemId\":1005,\"modeResults\":[{\"completedReps\":0,\"durationSeconds\":0,\"mode\":\"coach\",\"score\":null,\"source\":\"not_started\",\"status\":\"NOT_STARTED\"},{\"completedReps\":0,\"durationSeconds\":0,\"mode\":\"game\",\"score\":null,\"source\":\"not_started\",\"status\":\"NOT_STARTED\"}],\"position\":4,\"sha256\":\"070efbb574de1700a02ee624f9f7fe748a6b5dc75f0dc99e2d5e4fa5559a28df\",\"status\":\"NOT_STARTED\",\"variantKey\":\"single\"},{\"actionId\":\"12\",\"actionVersionId\":322,\"itemId\":1006,\"modeResults\":[{\"completedReps\":0,\"durationSeconds\":0,\"mode\":\"coach\",\"score\":null,\"source\":\"not_started\",\"status\":\"NOT_STARTED\"},{\"completedReps\":0,\"durationSeconds\":0,\"mode\":\"game\",\"score\":null,\"source\":\"not_started\",\"status\":\"NOT_STARTED\"}],\"position\":5,\"sha256\":\"450c24d430dbea8008d079fc850b3c33c072423cae9438c755aa095d445b6080\",\"status\":\"NOT_STARTED\",\"variantKey\":\"single\"},{\"actionId\":\"13\",\"actionVersionId\":323,\"itemId\":1007,\"modeResults\":[{\"completedReps\":0,\"durationSeconds\":0,\"mode\":\"coach\",\"score\":null,\"source\":\"not_started\",\"status\":\"NOT_STARTED\"},{\"completedReps\":0,\"durationSeconds\":0,\"mode\":\"game\",\"score\":null,\"source\":\"not_started\",\"status\":\"NOT_STARTED\"}],\"position\":6,\"sha256\":\"93fdc2c3aac2f840cccd101763082abccad5a8dcdd7f151ebdd6bb44ec3f6540\",\"status\":\"NOT_STARTED\",\"variantKey\":\"single\"},{\"actionId\":\"14\",\"actionVersionId\":324,\"itemId\":1008,\"modeResults\":[{\"completedReps\":0,\"durationSeconds\":0,\"mode\":\"coach\",\"score\":null,\"source\":\"not_started\",\"status\":\"NOT_STARTED\"},{\"completedReps\":0,\"durationSeconds\":0,\"mode\":\"game\",\"score\":null,\"source\":\"not_started\",\"status\":\"NOT_STARTED\"}],\"position\":7,\"sha256\":\"cbd9f8497981c796f5e1a1dbc9c0d61292d739172fd5f8e689617a59002f1560\",\"status\":\"NOT_STARTED\",\"variantKey\":\"single\"},{\"actionId\":\"15\",\"actionVersionId\":325,\"itemId\":1009,\"modeResults\":[{\"completedReps\":0,\"durationSeconds\":0,\"mode\":\"coach\",\"score\":null,\"source\":\"not_started\",\"status\":\"NOT_STARTED\"},{\"completedReps\":0,\"durationSeconds\":0,\"mode\":\"game\",\"score\":null,\"source\":\"not_started\",\"status\":\"NOT_STARTED\"}],\"position\":8,\"sha256\":\"1ea5bd80c70a9ef8d8b76248043cfa0d14dfd9fddf2c702a1cf665e7be84bb56\",\"status\":\"NOT_STARTED\",\"variantKey\":\"single\"},{\"actionId\":\"16\",\"actionVersionId\":326,\"itemId\":1010,\"modeResults\":[{\"completedReps\":0,\"durationSeconds\":0,\"mode\":\"coach\",\"score\":null,\"source\":\"not_started\",\"status\":\"NOT_STARTED\"},{\"completedReps\":0,\"durationSeconds\":0,\"mode\":\"game\",\"score\":null,\"source\":\"not_started\",\"status\":\"NOT_STARTED\"}],\"position\":9,\"sha256\":\"6932f794140f2954ba71781d220a3f0b771acd83f42295e696ab47b7cb1c1586\",\"status\":\"NOT_STARTED\",\"variantKey\":\"single\"}],\"preTrainingEventId\":\"pre:bridge-fixture\",\"prescriptionOrderId\":5010,\"protocolVersion\":2,\"requestToken\":\"bridge_req_10\",\"resourceManifestSha256\":\"57be8f661e115cb089c79b21368ac3cc3c28d2540ce2481c3b78b6710cbcef6a\",\"resultRevision\":1,\"sessionId\":\"bridge_10\",\"source\":\"mobile_no_details\",\"status\":\"INTERRUPTED\",\"userId\":\"bridge_fixture_patient\"}",
+          "utf8Hex": "7b22636f6d706c65746564223a66616c73652c22637265617465644174223a22323032362d31302d32315430303a30313a30302e3030305a222c226475726174696f6e5365636f6e6473223a302c226974656d526573756c7473223a5b7b22616374696f6e4964223a2237222c22616374696f6e56657273696f6e4964223a3331372c226974656d4964223a313030312c226d6f6465526573756c7473223a5b7b22636f6d706c6574656452657073223a302c226475726174696f6e5365636f6e6473223a302c226d6f6465223a22636f616368222c2273636f7265223a6e756c6c2c22736f75726365223a226e6f745f73746172746564222c22737461747573223a224e4f545f53544152544544227d2c7b22636f6d706c6574656452657073223a302c226475726174696f6e5365636f6e6473223a302c226d6f6465223a2267616d65222c2273636f7265223a6e756c6c2c22736f75726365223a226e6f745f73746172746564222c22737461747573223a224e4f545f53544152544544227d5d2c22706f736974696f6e223a302c22736861323536223a2264613139346161393163653239666337396566333435636562643763616237633662353330356262323133303332353235366261313838653633323964346134222c22737461747573223a224e4f545f53544152544544222c2276617269616e744b6579223a2273696e676c65227d2c7b22616374696f6e4964223a2238222c22616374696f6e56657273696f6e4964223a3331382c226974656d4964223a313030322c226d6f6465526573756c7473223a5b7b22636f6d706c6574656452657073223a302c226475726174696f6e5365636f6e6473223a302c226d6f6465223a22636f616368222c2273636f7265223a6e756c6c2c22736f75726365223a226e6f745f73746172746564222c22737461747573223a224e4f545f53544152544544227d2c7b22636f6d706c6574656452657073223a302c226475726174696f6e5365636f6e6473223a302c226d6f6465223a2267616d65222c2273636f7265223a6e756c6c2c22736f75726365223a226e6f745f73746172746564222c22737461747573223a224e4f545f53544152544544227d5d2c22706f736974696f6e223a312c22736861323536223a2237346563636130313337323831323564623639636564633661313532316134393761393638636235346233383261663831393637653739383930313935653265222c22737461747573223a224e4f545f53544152544544222c2276617269616e744b6579223a2273696e676c65227d2c7b22616374696f6e4964223a2239222c22616374696f6e56657273696f6e4964223a3331392c226974656d4964223a313030332c226d6f6465526573756c7473223a5b7b22636f6d706c6574656452657073223a302c226475726174696f6e5365636f6e6473223a302c226d6f6465223a22636f616368222c2273636f7265223a6e756c6c2c22736f75726365223a226e6f745f73746172746564222c22737461747573223a224e4f545f53544152544544227d2c7b22636f6d706c6574656452657073223a302c226475726174696f6e5365636f6e6473223a302c226d6f6465223a2267616d65222c2273636f7265223a6e756c6c2c22736f75726365223a226e6f745f73746172746564222c22737461747573223a224e4f545f53544152544544227d5d2c22706f736974696f6e223a322c22736861323536223a2238313739646430356239373433363937633836666333616633633261666431386239306139623666613530633962633166643966643433326633376530343662222c22737461747573223a224e4f545f53544152544544222c2276617269616e744b6579223a2273696e676c65227d2c7b22616374696f6e4964223a223130222c22616374696f6e56657273696f6e4964223a3332302c226974656d4964223a313030342c226d6f6465526573756c7473223a5b7b22636f6d706c6574656452657073223a302c226475726174696f6e5365636f6e6473223a302c226d6f6465223a22636f616368222c2273636f7265223a6e756c6c2c22736f75726365223a226e6f745f73746172746564222c22737461747573223a224e4f545f53544152544544227d2c7b22636f6d706c6574656452657073223a302c226475726174696f6e5365636f6e6473223a302c226d6f6465223a2267616d65222c2273636f7265223a6e756c6c2c22736f75726365223a226e6f745f73746172746564222c22737461747573223a224e4f545f53544152544544227d5d2c22706f736974696f6e223a332c22736861323536223a2261373739356663326361616565336137313662303835663866396330303137376461333564636238623535383265623261366131653633343839373038396535222c22737461747573223a224e4f545f53544152544544222c2276617269616e744b6579223a2273696e676c65227d2c7b22616374696f6e4964223a223131222c22616374696f6e56657273696f6e4964223a3332312c226974656d4964223a313030352c226d6f6465526573756c7473223a5b7b22636f6d706c6574656452657073223a302c226475726174696f6e5365636f6e6473223a302c226d6f6465223a22636f616368222c2273636f7265223a6e756c6c2c22736f75726365223a226e6f745f73746172746564222c22737461747573223a224e4f545f53544152544544227d2c7b22636f6d706c6574656452657073223a302c226475726174696f6e5365636f6e6473223a302c226d6f6465223a2267616d65222c2273636f7265223a6e756c6c2c22736f75726365223a226e6f745f73746172746564222c22737461747573223a224e4f545f53544152544544227d5d2c22706f736974696f6e223a342c22736861323536223a2230373065666262353734646531373030613032656536323466396637666537343861366235646337356630646339396532643565346661353535396132386466222c22737461747573223a224e4f545f53544152544544222c2276617269616e744b6579223a2273696e676c65227d2c7b22616374696f6e4964223a223132222c22616374696f6e56657273696f6e4964223a3332322c226974656d4964223a313030362c226d6f6465526573756c7473223a5b7b22636f6d706c6574656452657073223a302c226475726174696f6e5365636f6e6473223a302c226d6f6465223a22636f616368222c2273636f7265223a6e756c6c2c22736f75726365223a226e6f745f73746172746564222c22737461747573223a224e4f545f53544152544544227d2c7b22636f6d706c6574656452657073223a302c226475726174696f6e5365636f6e6473223a302c226d6f6465223a2267616d65222c2273636f7265223a6e756c6c2c22736f75726365223a226e6f745f73746172746564222c22737461747573223a224e4f545f53544152544544227d5d2c22706f736974696f6e223a352c22736861323536223a2234353063323464343330646265613830303864303739666338353062336333336330373234323363616539343338633735356161303935643434356236303830222c22737461747573223a224e4f545f53544152544544222c2276617269616e744b6579223a2273696e676c65227d2c7b22616374696f6e4964223a223133222c22616374696f6e56657273696f6e4964223a3332332c226974656d4964223a313030372c226d6f6465526573756c7473223a5b7b22636f6d706c6574656452657073223a302c226475726174696f6e5365636f6e6473223a302c226d6f6465223a22636f616368222c2273636f7265223a6e756c6c2c22736f75726365223a226e6f745f73746172746564222c22737461747573223a224e4f545f53544152544544227d2c7b22636f6d706c6574656452657073223a302c226475726174696f6e5365636f6e6473223a302c226d6f6465223a2267616d65222c2273636f7265223a6e756c6c2c22736f75726365223a226e6f745f73746172746564222c22737461747573223a224e4f545f53544152544544227d5d2c22706f736974696f6e223a362c22736861323536223a2239336664633263336161633266383430636363643130313736333038326162636361643561386463646437663135316562646436626234346563336636353430222c22737461747573223a224e4f545f53544152544544222c2276617269616e744b6579223a2273696e676c65227d2c7b22616374696f6e4964223a223134222c22616374696f6e56657273696f6e4964223a3332342c226974656d4964223a313030382c226d6f6465526573756c7473223a5b7b22636f6d706c6574656452657073223a302c226475726174696f6e5365636f6e6473223a302c226d6f6465223a22636f616368222c2273636f7265223a6e756c6c2c22736f75726365223a226e6f745f73746172746564222c22737461747573223a224e4f545f53544152544544227d2c7b22636f6d706c6574656452657073223a302c226475726174696f6e5365636f6e6473223a302c226d6f6465223a2267616d65222c2273636f7265223a6e756c6c2c22736f75726365223a226e6f745f73746172746564222c22737461747573223a224e4f545f53544152544544227d5d2c22706f736974696f6e223a372c22736861323536223a2263626439663834393739383163373936663565316131646263396330643631323932643733393137326664356638653638393631376135393030326631353630222c22737461747573223a224e4f545f53544152544544222c2276617269616e744b6579223a2273696e676c65227d2c7b22616374696f6e4964223a223135222c22616374696f6e56657273696f6e4964223a3332352c226974656d4964223a313030392c226d6f6465526573756c7473223a5b7b22636f6d706c6574656452657073223a302c226475726174696f6e5365636f6e6473223a302c226d6f6465223a22636f616368222c2273636f7265223a6e756c6c2c22736f75726365223a226e6f745f73746172746564222c22737461747573223a224e4f545f53544152544544227d2c7b22636f6d706c6574656452657073223a302c226475726174696f6e5365636f6e6473223a302c226d6f6465223a2267616d65222c2273636f7265223a6e756c6c2c22736f75726365223a226e6f745f73746172746564222c22737461747573223a224e4f545f53544152544544227d5d2c22706f736974696f6e223a382c22736861323536223a2231656135626438306337306139656638643862373632343830343363666130643134646664396664646632633730326131636636363565376265383462623536222c22737461747573223a224e4f545f53544152544544222c2276617269616e744b6579223a2273696e676c65227d2c7b22616374696f6e4964223a223136222c22616374696f6e56657273696f6e4964223a3332362c226974656d4964223a313031302c226d6f6465526573756c7473223a5b7b22636f6d706c6574656452657073223a302c226475726174696f6e5365636f6e6473223a302c226d6f6465223a22636f616368222c2273636f7265223a6e756c6c2c22736f75726365223a226e6f745f73746172746564222c22737461747573223a224e4f545f53544152544544227d2c7b22636f6d706c6574656452657073223a302c226475726174696f6e5365636f6e6473223a302c226d6f6465223a2267616d65222c2273636f7265223a6e756c6c2c22736f75726365223a226e6f745f73746172746564222c22737461747573223a224e4f545f53544152544544227d5d2c22706f736974696f6e223a392c22736861323536223a2236393332663739343134306632393534626137313738316432323061336630623737316163643833663432323935653639366162343762376362316331353836222c22737461747573223a224e4f545f53544152544544222c2276617269616e744b6579223a2273696e676c65227d5d2c22707265547261696e696e674576656e744964223a227072653a6272696467652d66697874757265222c22707265736372697074696f6e4f726465724964223a353031302c2270726f746f636f6c56657273696f6e223a322c2272657175657374546f6b656e223a226272696467655f7265715f3130222c227265736f757263654d616e6966657374536861323536223a2235376265386636363165313135636230383963373962323133363861633363633363323864323534306365323438316333623738623637313063626365663661222c22726573756c745265766973696f6e223a312c2273657373696f6e4964223a226272696467655f3130222c22736f75726365223a226d6f62696c655f6e6f5f64657461696c73222c22737461747573223a22494e544552525550544544222c22757365724964223a226272696467655f666978747572655f70617469656e74227d",
+          "sha256": "8e45077549ebe95b77c7d8f2ca72dd88dfddc7bb00a517d315006e224c6fdf98",
+          "receipt": {
+            "sessionId": "bridge_10",
+            "resultRevision": 1,
+            "resultContentSha256": "8e45077549ebe95b77c7d8f2ca72dd88dfddc7bb00a517d315006e224c6fdf98"
+          }
+        },
+        {
+          "request": {
+            "protocolVersion": 2,
+            "sessionId": "bridge_10",
+            "requestToken": "bridge_req_10",
+            "createdAt": "2026-10-21T00:01:00.000Z",
+            "completed": false,
+            "status": "INTERRUPTED",
+            "durationSeconds": 15,
+            "prescriptionOrderId": 5010,
+            "resourceManifestSha256": "57be8f661e115cb089c79b21368ac3cc3c28d2540ce2481c3b78b6710cbcef6a",
+            "resultRevision": 2,
+            "source": "ar_measured",
+            "preTrainingEventId": "pre:bridge-fixture",
+            "itemResults": [
+              {
+                "itemId": 1001,
+                "position": 0,
+                "actionId": "7",
+                "actionVersionId": 317,
+                "variantKey": "single",
+                "sha256": "da194aa91ce29fc79ef345cebd7cab7c6b5305bb2130325256ba188e6329d4a4",
+                "status": "INTERRUPTED",
+                "modeResults": [
+                  {
+                    "mode": "coach",
+                    "status": "COMPLETED",
+                    "completedReps": 2,
+                    "durationSeconds": 15,
+                    "score": 80,
+                    "source": "ar_measured"
+                  },
+                  {
+                    "mode": "game",
+                    "status": "NOT_STARTED",
+                    "completedReps": 0,
+                    "durationSeconds": 0,
+                    "score": null,
+                    "source": "not_started"
+                  }
+                ]
+              },
+              {
+                "itemId": 1002,
+                "position": 1,
+                "actionId": "8",
+                "actionVersionId": 318,
+                "variantKey": "single",
+                "sha256": "74ecca013728125db69cedc6a1521a497a968cb54b382af81967e79890195e2e",
+                "status": "NOT_STARTED",
+                "modeResults": [
+                  {
+                    "mode": "coach",
+                    "status": "NOT_STARTED",
+                    "completedReps": 0,
+                    "durationSeconds": 0,
+                    "score": null,
+                    "source": "not_started"
+                  },
+                  {
+                    "mode": "game",
+                    "status": "NOT_STARTED",
+                    "completedReps": 0,
+                    "durationSeconds": 0,
+                    "score": null,
+                    "source": "not_started"
+                  }
+                ]
+              },
+              {
+                "itemId": 1003,
+                "position": 2,
+                "actionId": "9",
+                "actionVersionId": 319,
+                "variantKey": "single",
+                "sha256": "8179dd05b9743697c86fc3af3c2afd18b90a9b6fa50c9bc1fd9fd432f37e046b",
+                "status": "NOT_STARTED",
+                "modeResults": [
+                  {
+                    "mode": "coach",
+                    "status": "NOT_STARTED",
+                    "completedReps": 0,
+                    "durationSeconds": 0,
+                    "score": null,
+                    "source": "not_started"
+                  },
+                  {
+                    "mode": "game",
+                    "status": "NOT_STARTED",
+                    "completedReps": 0,
+                    "durationSeconds": 0,
+                    "score": null,
+                    "source": "not_started"
+                  }
+                ]
+              },
+              {
+                "itemId": 1004,
+                "position": 3,
+                "actionId": "10",
+                "actionVersionId": 320,
+                "variantKey": "single",
+                "sha256": "a7795fc2caaee3a716b085f8f9c00177da35dcb8b5582eb2a6a1e634897089e5",
+                "status": "NOT_STARTED",
+                "modeResults": [
+                  {
+                    "mode": "coach",
+                    "status": "NOT_STARTED",
+                    "completedReps": 0,
+                    "durationSeconds": 0,
+                    "score": null,
+                    "source": "not_started"
+                  },
+                  {
+                    "mode": "game",
+                    "status": "NOT_STARTED",
+                    "completedReps": 0,
+                    "durationSeconds": 0,
+                    "score": null,
+                    "source": "not_started"
+                  }
+                ]
+              },
+              {
+                "itemId": 1005,
+                "position": 4,
+                "actionId": "11",
+                "actionVersionId": 321,
+                "variantKey": "single",
+                "sha256": "070efbb574de1700a02ee624f9f7fe748a6b5dc75f0dc99e2d5e4fa5559a28df",
+                "status": "NOT_STARTED",
+                "modeResults": [
+                  {
+                    "mode": "coach",
+                    "status": "NOT_STARTED",
+                    "completedReps": 0,
+                    "durationSeconds": 0,
+                    "score": null,
+                    "source": "not_started"
+                  },
+                  {
+                    "mode": "game",
+                    "status": "NOT_STARTED",
+                    "completedReps": 0,
+                    "durationSeconds": 0,
+                    "score": null,
+                    "source": "not_started"
+                  }
+                ]
+              },
+              {
+                "itemId": 1006,
+                "position": 5,
+                "actionId": "12",
+                "actionVersionId": 322,
+                "variantKey": "single",
+                "sha256": "450c24d430dbea8008d079fc850b3c33c072423cae9438c755aa095d445b6080",
+                "status": "NOT_STARTED",
+                "modeResults": [
+                  {
+                    "mode": "coach",
+                    "status": "NOT_STARTED",
+                    "completedReps": 0,
+                    "durationSeconds": 0,
+                    "score": null,
+                    "source": "not_started"
+                  },
+                  {
+                    "mode": "game",
+                    "status": "NOT_STARTED",
+                    "completedReps": 0,
+                    "durationSeconds": 0,
+                    "score": null,
+                    "source": "not_started"
+                  }
+                ]
+              },
+              {
+                "itemId": 1007,
+                "position": 6,
+                "actionId": "13",
+                "actionVersionId": 323,
+                "variantKey": "single",
+                "sha256": "93fdc2c3aac2f840cccd101763082abccad5a8dcdd7f151ebdd6bb44ec3f6540",
+                "status": "NOT_STARTED",
+                "modeResults": [
+                  {
+                    "mode": "coach",
+                    "status": "NOT_STARTED",
+                    "completedReps": 0,
+                    "durationSeconds": 0,
+                    "score": null,
+                    "source": "not_started"
+                  },
+                  {
+                    "mode": "game",
+                    "status": "NOT_STARTED",
+                    "completedReps": 0,
+                    "durationSeconds": 0,
+                    "score": null,
+                    "source": "not_started"
+                  }
+                ]
+              },
+              {
+                "itemId": 1008,
+                "position": 7,
+                "actionId": "14",
+                "actionVersionId": 324,
+                "variantKey": "single",
+                "sha256": "cbd9f8497981c796f5e1a1dbc9c0d61292d739172fd5f8e689617a59002f1560",
+                "status": "NOT_STARTED",
+                "modeResults": [
+                  {
+                    "mode": "coach",
+                    "status": "NOT_STARTED",
+                    "completedReps": 0,
+                    "durationSeconds": 0,
+                    "score": null,
+                    "source": "not_started"
+                  },
+                  {
+                    "mode": "game",
+                    "status": "NOT_STARTED",
+                    "completedReps": 0,
+                    "durationSeconds": 0,
+                    "score": null,
+                    "source": "not_started"
+                  }
+                ]
+              },
+              {
+                "itemId": 1009,
+                "position": 8,
+                "actionId": "15",
+                "actionVersionId": 325,
+                "variantKey": "single",
+                "sha256": "1ea5bd80c70a9ef8d8b76248043cfa0d14dfd9fddf2c702a1cf665e7be84bb56",
+                "status": "NOT_STARTED",
+                "modeResults": [
+                  {
+                    "mode": "coach",
+                    "status": "NOT_STARTED",
+                    "completedReps": 0,
+                    "durationSeconds": 0,
+                    "score": null,
+                    "source": "not_started"
+                  },
+                  {
+                    "mode": "game",
+                    "status": "NOT_STARTED",
+                    "completedReps": 0,
+                    "durationSeconds": 0,
+                    "score": null,
+                    "source": "not_started"
+                  }
+                ]
+              },
+              {
+                "itemId": 1010,
+                "position": 9,
+                "actionId": "16",
+                "actionVersionId": 326,
+                "variantKey": "single",
+                "sha256": "6932f794140f2954ba71781d220a3f0b771acd83f42295e696ab47b7cb1c1586",
+                "status": "NOT_STARTED",
+                "modeResults": [
+                  {
+                    "mode": "coach",
+                    "status": "NOT_STARTED",
+                    "completedReps": 0,
+                    "durationSeconds": 0,
+                    "score": null,
+                    "source": "not_started"
+                  },
+                  {
+                    "mode": "game",
+                    "status": "NOT_STARTED",
+                    "completedReps": 0,
+                    "durationSeconds": 0,
+                    "score": null,
+                    "source": "not_started"
+                  }
+                ]
+              }
+            ]
+          },
+          "canonicalUtf8": "{\"completed\":false,\"createdAt\":\"2026-10-21T00:01:00.000Z\",\"durationSeconds\":15,\"itemResults\":[{\"actionId\":\"7\",\"actionVersionId\":317,\"itemId\":1001,\"modeResults\":[{\"completedReps\":2,\"durationSeconds\":15,\"mode\":\"coach\",\"score\":80,\"source\":\"ar_measured\",\"status\":\"COMPLETED\"},{\"completedReps\":0,\"durationSeconds\":0,\"mode\":\"game\",\"score\":null,\"source\":\"not_started\",\"status\":\"NOT_STARTED\"}],\"position\":0,\"sha256\":\"da194aa91ce29fc79ef345cebd7cab7c6b5305bb2130325256ba188e6329d4a4\",\"status\":\"INTERRUPTED\",\"variantKey\":\"single\"},{\"actionId\":\"8\",\"actionVersionId\":318,\"itemId\":1002,\"modeResults\":[{\"completedReps\":0,\"durationSeconds\":0,\"mode\":\"coach\",\"score\":null,\"source\":\"not_started\",\"status\":\"NOT_STARTED\"},{\"completedReps\":0,\"durationSeconds\":0,\"mode\":\"game\",\"score\":null,\"source\":\"not_started\",\"status\":\"NOT_STARTED\"}],\"position\":1,\"sha256\":\"74ecca013728125db69cedc6a1521a497a968cb54b382af81967e79890195e2e\",\"status\":\"NOT_STARTED\",\"variantKey\":\"single\"},{\"actionId\":\"9\",\"actionVersionId\":319,\"itemId\":1003,\"modeResults\":[{\"completedReps\":0,\"durationSeconds\":0,\"mode\":\"coach\",\"score\":null,\"source\":\"not_started\",\"status\":\"NOT_STARTED\"},{\"completedReps\":0,\"durationSeconds\":0,\"mode\":\"game\",\"score\":null,\"source\":\"not_started\",\"status\":\"NOT_STARTED\"}],\"position\":2,\"sha256\":\"8179dd05b9743697c86fc3af3c2afd18b90a9b6fa50c9bc1fd9fd432f37e046b\",\"status\":\"NOT_STARTED\",\"variantKey\":\"single\"},{\"actionId\":\"10\",\"actionVersionId\":320,\"itemId\":1004,\"modeResults\":[{\"completedReps\":0,\"durationSeconds\":0,\"mode\":\"coach\",\"score\":null,\"source\":\"not_started\",\"status\":\"NOT_STARTED\"},{\"completedReps\":0,\"durationSeconds\":0,\"mode\":\"game\",\"score\":null,\"source\":\"not_started\",\"status\":\"NOT_STARTED\"}],\"position\":3,\"sha256\":\"a7795fc2caaee3a716b085f8f9c00177da35dcb8b5582eb2a6a1e634897089e5\",\"status\":\"NOT_STARTED\",\"variantKey\":\"single\"},{\"actionId\":\"11\",\"actionVersionId\":321,\"itemId\":1005,\"modeResults\":[{\"completedReps\":0,\"durationSeconds\":0,\"mode\":\"coach\",\"score\":null,\"source\":\"not_started\",\"status\":\"NOT_STARTED\"},{\"completedReps\":0,\"durationSeconds\":0,\"mode\":\"game\",\"score\":null,\"source\":\"not_started\",\"status\":\"NOT_STARTED\"}],\"position\":4,\"sha256\":\"070efbb574de1700a02ee624f9f7fe748a6b5dc75f0dc99e2d5e4fa5559a28df\",\"status\":\"NOT_STARTED\",\"variantKey\":\"single\"},{\"actionId\":\"12\",\"actionVersionId\":322,\"itemId\":1006,\"modeResults\":[{\"completedReps\":0,\"durationSeconds\":0,\"mode\":\"coach\",\"score\":null,\"source\":\"not_started\",\"status\":\"NOT_STARTED\"},{\"completedReps\":0,\"durationSeconds\":0,\"mode\":\"game\",\"score\":null,\"source\":\"not_started\",\"status\":\"NOT_STARTED\"}],\"position\":5,\"sha256\":\"450c24d430dbea8008d079fc850b3c33c072423cae9438c755aa095d445b6080\",\"status\":\"NOT_STARTED\",\"variantKey\":\"single\"},{\"actionId\":\"13\",\"actionVersionId\":323,\"itemId\":1007,\"modeResults\":[{\"completedReps\":0,\"durationSeconds\":0,\"mode\":\"coach\",\"score\":null,\"source\":\"not_started\",\"status\":\"NOT_STARTED\"},{\"completedReps\":0,\"durationSeconds\":0,\"mode\":\"game\",\"score\":null,\"source\":\"not_started\",\"status\":\"NOT_STARTED\"}],\"position\":6,\"sha256\":\"93fdc2c3aac2f840cccd101763082abccad5a8dcdd7f151ebdd6bb44ec3f6540\",\"status\":\"NOT_STARTED\",\"variantKey\":\"single\"},{\"actionId\":\"14\",\"actionVersionId\":324,\"itemId\":1008,\"modeResults\":[{\"completedReps\":0,\"durationSeconds\":0,\"mode\":\"coach\",\"score\":null,\"source\":\"not_started\",\"status\":\"NOT_STARTED\"},{\"completedReps\":0,\"durationSeconds\":0,\"mode\":\"game\",\"score\":null,\"source\":\"not_started\",\"status\":\"NOT_STARTED\"}],\"position\":7,\"sha256\":\"cbd9f8497981c796f5e1a1dbc9c0d61292d739172fd5f8e689617a59002f1560\",\"status\":\"NOT_STARTED\",\"variantKey\":\"single\"},{\"actionId\":\"15\",\"actionVersionId\":325,\"itemId\":1009,\"modeResults\":[{\"completedReps\":0,\"durationSeconds\":0,\"mode\":\"coach\",\"score\":null,\"source\":\"not_started\",\"status\":\"NOT_STARTED\"},{\"completedReps\":0,\"durationSeconds\":0,\"mode\":\"game\",\"score\":null,\"source\":\"not_started\",\"status\":\"NOT_STARTED\"}],\"position\":8,\"sha256\":\"1ea5bd80c70a9ef8d8b76248043cfa0d14dfd9fddf2c702a1cf665e7be84bb56\",\"status\":\"NOT_STARTED\",\"variantKey\":\"single\"},{\"actionId\":\"16\",\"actionVersionId\":326,\"itemId\":1010,\"modeResults\":[{\"completedReps\":0,\"durationSeconds\":0,\"mode\":\"coach\",\"score\":null,\"source\":\"not_started\",\"status\":\"NOT_STARTED\"},{\"completedReps\":0,\"durationSeconds\":0,\"mode\":\"game\",\"score\":null,\"source\":\"not_started\",\"status\":\"NOT_STARTED\"}],\"position\":9,\"sha256\":\"6932f794140f2954ba71781d220a3f0b771acd83f42295e696ab47b7cb1c1586\",\"status\":\"NOT_STARTED\",\"variantKey\":\"single\"}],\"preTrainingEventId\":\"pre:bridge-fixture\",\"prescriptionOrderId\":5010,\"protocolVersion\":2,\"requestToken\":\"bridge_req_10\",\"resourceManifestSha256\":\"57be8f661e115cb089c79b21368ac3cc3c28d2540ce2481c3b78b6710cbcef6a\",\"resultRevision\":2,\"sessionId\":\"bridge_10\",\"source\":\"ar_measured\",\"status\":\"INTERRUPTED\",\"userId\":\"bridge_fixture_patient\"}",
+          "utf8Hex": "7b22636f6d706c65746564223a66616c73652c22637265617465644174223a22323032362d31302d32315430303a30313a30302e3030305a222c226475726174696f6e5365636f6e6473223a31352c226974656d526573756c7473223a5b7b22616374696f6e4964223a2237222c22616374696f6e56657273696f6e4964223a3331372c226974656d4964223a313030312c226d6f6465526573756c7473223a5b7b22636f6d706c6574656452657073223a322c226475726174696f6e5365636f6e6473223a31352c226d6f6465223a22636f616368222c2273636f7265223a38302c22736f75726365223a2261725f6d65617375726564222c22737461747573223a22434f4d504c45544544227d2c7b22636f6d706c6574656452657073223a302c226475726174696f6e5365636f6e6473223a302c226d6f6465223a2267616d65222c2273636f7265223a6e756c6c2c22736f75726365223a226e6f745f73746172746564222c22737461747573223a224e4f545f53544152544544227d5d2c22706f736974696f6e223a302c22736861323536223a2264613139346161393163653239666337396566333435636562643763616237633662353330356262323133303332353235366261313838653633323964346134222c22737461747573223a22494e544552525550544544222c2276617269616e744b6579223a2273696e676c65227d2c7b22616374696f6e4964223a2238222c22616374696f6e56657273696f6e4964223a3331382c226974656d4964223a313030322c226d6f6465526573756c7473223a5b7b22636f6d706c6574656452657073223a302c226475726174696f6e5365636f6e6473223a302c226d6f6465223a22636f616368222c2273636f7265223a6e756c6c2c22736f75726365223a226e6f745f73746172746564222c22737461747573223a224e4f545f53544152544544227d2c7b22636f6d706c6574656452657073223a302c226475726174696f6e5365636f6e6473223a302c226d6f6465223a2267616d65222c2273636f7265223a6e756c6c2c22736f75726365223a226e6f745f73746172746564222c22737461747573223a224e4f545f53544152544544227d5d2c22706f736974696f6e223a312c22736861323536223a2237346563636130313337323831323564623639636564633661313532316134393761393638636235346233383261663831393637653739383930313935653265222c22737461747573223a224e4f545f53544152544544222c2276617269616e744b6579223a2273696e676c65227d2c7b22616374696f6e4964223a2239222c22616374696f6e56657273696f6e4964223a3331392c226974656d4964223a313030332c226d6f6465526573756c7473223a5b7b22636f6d706c6574656452657073223a302c226475726174696f6e5365636f6e6473223a302c226d6f6465223a22636f616368222c2273636f7265223a6e756c6c2c22736f75726365223a226e6f745f73746172746564222c22737461747573223a224e4f545f53544152544544227d2c7b22636f6d706c6574656452657073223a302c226475726174696f6e5365636f6e6473223a302c226d6f6465223a2267616d65222c2273636f7265223a6e756c6c2c22736f75726365223a226e6f745f73746172746564222c22737461747573223a224e4f545f53544152544544227d5d2c22706f736974696f6e223a322c22736861323536223a2238313739646430356239373433363937633836666333616633633261666431386239306139623666613530633962633166643966643433326633376530343662222c22737461747573223a224e4f545f53544152544544222c2276617269616e744b6579223a2273696e676c65227d2c7b22616374696f6e4964223a223130222c22616374696f6e56657273696f6e4964223a3332302c226974656d4964223a313030342c226d6f6465526573756c7473223a5b7b22636f6d706c6574656452657073223a302c226475726174696f6e5365636f6e6473223a302c226d6f6465223a22636f616368222c2273636f7265223a6e756c6c2c22736f75726365223a226e6f745f73746172746564222c22737461747573223a224e4f545f53544152544544227d2c7b22636f6d706c6574656452657073223a302c226475726174696f6e5365636f6e6473223a302c226d6f6465223a2267616d65222c2273636f7265223a6e756c6c2c22736f75726365223a226e6f745f73746172746564222c22737461747573223a224e4f545f53544152544544227d5d2c22706f736974696f6e223a332c22736861323536223a2261373739356663326361616565336137313662303835663866396330303137376461333564636238623535383265623261366131653633343839373038396535222c22737461747573223a224e4f545f53544152544544222c2276617269616e744b6579223a2273696e676c65227d2c7b22616374696f6e4964223a223131222c22616374696f6e56657273696f6e4964223a3332312c226974656d4964223a313030352c226d6f6465526573756c7473223a5b7b22636f6d706c6574656452657073223a302c226475726174696f6e5365636f6e6473223a302c226d6f6465223a22636f616368222c2273636f7265223a6e756c6c2c22736f75726365223a226e6f745f73746172746564222c22737461747573223a224e4f545f53544152544544227d2c7b22636f6d706c6574656452657073223a302c226475726174696f6e5365636f6e6473223a302c226d6f6465223a2267616d65222c2273636f7265223a6e756c6c2c22736f75726365223a226e6f745f73746172746564222c22737461747573223a224e4f545f53544152544544227d5d2c22706f736974696f6e223a342c22736861323536223a2230373065666262353734646531373030613032656536323466396637666537343861366235646337356630646339396532643565346661353535396132386466222c22737461747573223a224e4f545f53544152544544222c2276617269616e744b6579223a2273696e676c65227d2c7b22616374696f6e4964223a223132222c22616374696f6e56657273696f6e4964223a3332322c226974656d4964223a313030362c226d6f6465526573756c7473223a5b7b22636f6d706c6574656452657073223a302c226475726174696f6e5365636f6e6473223a302c226d6f6465223a22636f616368222c2273636f7265223a6e756c6c2c22736f75726365223a226e6f745f73746172746564222c22737461747573223a224e4f545f53544152544544227d2c7b22636f6d706c6574656452657073223a302c226475726174696f6e5365636f6e6473223a302c226d6f6465223a2267616d65222c2273636f7265223a6e756c6c2c22736f75726365223a226e6f745f73746172746564222c22737461747573223a224e4f545f53544152544544227d5d2c22706f736974696f6e223a352c22736861323536223a2234353063323464343330646265613830303864303739666338353062336333336330373234323363616539343338633735356161303935643434356236303830222c22737461747573223a224e4f545f53544152544544222c2276617269616e744b6579223a2273696e676c65227d2c7b22616374696f6e4964223a223133222c22616374696f6e56657273696f6e4964223a3332332c226974656d4964223a313030372c226d6f6465526573756c7473223a5b7b22636f6d706c6574656452657073223a302c226475726174696f6e5365636f6e6473223a302c226d6f6465223a22636f616368222c2273636f7265223a6e756c6c2c22736f75726365223a226e6f745f73746172746564222c22737461747573223a224e4f545f53544152544544227d2c7b22636f6d706c6574656452657073223a302c226475726174696f6e5365636f6e6473223a302c226d6f6465223a2267616d65222c2273636f7265223a6e756c6c2c22736f75726365223a226e6f745f73746172746564222c22737461747573223a224e4f545f53544152544544227d5d2c22706f736974696f6e223a362c22736861323536223a2239336664633263336161633266383430636363643130313736333038326162636361643561386463646437663135316562646436626234346563336636353430222c22737461747573223a224e4f545f53544152544544222c2276617269616e744b6579223a2273696e676c65227d2c7b22616374696f6e4964223a223134222c22616374696f6e56657273696f6e4964223a3332342c226974656d4964223a313030382c226d6f6465526573756c7473223a5b7b22636f6d706c6574656452657073223a302c226475726174696f6e5365636f6e6473223a302c226d6f6465223a22636f616368222c2273636f7265223a6e756c6c2c22736f75726365223a226e6f745f73746172746564222c22737461747573223a224e4f545f53544152544544227d2c7b22636f6d706c6574656452657073223a302c226475726174696f6e5365636f6e6473223a302c226d6f6465223a2267616d65222c2273636f7265223a6e756c6c2c22736f75726365223a226e6f745f73746172746564222c22737461747573223a224e4f545f53544152544544227d5d2c22706f736974696f6e223a372c22736861323536223a2263626439663834393739383163373936663565316131646263396330643631323932643733393137326664356638653638393631376135393030326631353630222c22737461747573223a224e4f545f53544152544544222c2276617269616e744b6579223a2273696e676c65227d2c7b22616374696f6e4964223a223135222c22616374696f6e56657273696f6e4964223a3332352c226974656d4964223a313030392c226d6f6465526573756c7473223a5b7b22636f6d706c6574656452657073223a302c226475726174696f6e5365636f6e6473223a302c226d6f6465223a22636f616368222c2273636f7265223a6e756c6c2c22736f75726365223a226e6f745f73746172746564222c22737461747573223a224e4f545f53544152544544227d2c7b22636f6d706c6574656452657073223a302c226475726174696f6e5365636f6e6473223a302c226d6f6465223a2267616d65222c2273636f7265223a6e756c6c2c22736f75726365223a226e6f745f73746172746564222c22737461747573223a224e4f545f53544152544544227d5d2c22706f736974696f6e223a382c22736861323536223a2231656135626438306337306139656638643862373632343830343363666130643134646664396664646632633730326131636636363565376265383462623536222c22737461747573223a224e4f545f53544152544544222c2276617269616e744b6579223a2273696e676c65227d2c7b22616374696f6e4964223a223136222c22616374696f6e56657273696f6e4964223a3332362c226974656d4964223a313031302c226d6f6465526573756c7473223a5b7b22636f6d706c6574656452657073223a302c226475726174696f6e5365636f6e6473223a302c226d6f6465223a22636f616368222c2273636f7265223a6e756c6c2c22736f75726365223a226e6f745f73746172746564222c22737461747573223a224e4f545f53544152544544227d2c7b22636f6d706c6574656452657073223a302c226475726174696f6e5365636f6e6473223a302c226d6f6465223a2267616d65222c2273636f7265223a6e756c6c2c22736f75726365223a226e6f745f73746172746564222c22737461747573223a224e4f545f53544152544544227d5d2c22706f736974696f6e223a392c22736861323536223a2236393332663739343134306632393534626137313738316432323061336630623737316163643833663432323935653639366162343762376362316331353836222c22737461747573223a224e4f545f53544152544544222c2276617269616e744b6579223a2273696e676c65227d5d2c22707265547261696e696e674576656e744964223a227072653a6272696467652d66697874757265222c22707265736372697074696f6e4f726465724964223a353031302c2270726f746f636f6c56657273696f6e223a322c2272657175657374546f6b656e223a226272696467655f7265715f3130222c227265736f757263654d616e6966657374536861323536223a2235376265386636363165313135636230383963373962323133363861633363633363323864323534306365323438316333623738623637313063626365663661222c22726573756c745265766973696f6e223a322c2273657373696f6e4964223a226272696467655f3130222c22736f75726365223a2261725f6d65617375726564222c22737461747573223a22494e544552525550544544222c22757365724964223a226272696467655f666978747572655f70617469656e74227d",
+          "sha256": "2857449086ec174047a3a38292df174a72750047ab7b50d017c1e93029977b8e",
+          "receipt": {
+            "sessionId": "bridge_10",
+            "resultRevision": 2,
+            "resultContentSha256": "2857449086ec174047a3a38292df174a72750047ab7b50d017c1e93029977b8e"
+          }
+        },
+        {
+          "request": {
+            "protocolVersion": 2,
+            "sessionId": "bridge_10",
+            "requestToken": "bridge_req_10",
+            "createdAt": "2026-10-21T00:01:00.000Z",
+            "completed": true,
+            "status": "COMPLETED",
+            "durationSeconds": 300,
+            "prescriptionOrderId": 5010,
+            "resourceManifestSha256": "57be8f661e115cb089c79b21368ac3cc3c28d2540ce2481c3b78b6710cbcef6a",
+            "resultRevision": 3,
+            "source": "ar_measured",
+            "preTrainingEventId": "pre:bridge-fixture",
+            "itemResults": [
+              {
+                "itemId": 1001,
+                "position": 0,
+                "actionId": "7",
+                "actionVersionId": 317,
+                "variantKey": "single",
+                "sha256": "da194aa91ce29fc79ef345cebd7cab7c6b5305bb2130325256ba188e6329d4a4",
+                "status": "COMPLETED",
+                "modeResults": [
+                  {
+                    "mode": "coach",
+                    "status": "COMPLETED",
+                    "completedReps": 2,
+                    "durationSeconds": 15,
+                    "score": 80,
+                    "source": "ar_measured"
+                  },
+                  {
+                    "mode": "game",
+                    "status": "COMPLETED",
+                    "completedReps": 2,
+                    "durationSeconds": 15,
+                    "score": 80,
+                    "source": "ar_measured"
+                  }
+                ]
+              },
+              {
+                "itemId": 1002,
+                "position": 1,
+                "actionId": "8",
+                "actionVersionId": 318,
+                "variantKey": "single",
+                "sha256": "74ecca013728125db69cedc6a1521a497a968cb54b382af81967e79890195e2e",
+                "status": "COMPLETED",
+                "modeResults": [
+                  {
+                    "mode": "coach",
+                    "status": "COMPLETED",
+                    "completedReps": 2,
+                    "durationSeconds": 15,
+                    "score": 80,
+                    "source": "ar_measured"
+                  },
+                  {
+                    "mode": "game",
+                    "status": "COMPLETED",
+                    "completedReps": 2,
+                    "durationSeconds": 15,
+                    "score": 80,
+                    "source": "ar_measured"
+                  }
+                ]
+              },
+              {
+                "itemId": 1003,
+                "position": 2,
+                "actionId": "9",
+                "actionVersionId": 319,
+                "variantKey": "single",
+                "sha256": "8179dd05b9743697c86fc3af3c2afd18b90a9b6fa50c9bc1fd9fd432f37e046b",
+                "status": "COMPLETED",
+                "modeResults": [
+                  {
+                    "mode": "coach",
+                    "status": "COMPLETED",
+                    "completedReps": 2,
+                    "durationSeconds": 15,
+                    "score": 80,
+                    "source": "ar_measured"
+                  },
+                  {
+                    "mode": "game",
+                    "status": "COMPLETED",
+                    "completedReps": 2,
+                    "durationSeconds": 15,
+                    "score": 80,
+                    "source": "ar_measured"
+                  }
+                ]
+              },
+              {
+                "itemId": 1004,
+                "position": 3,
+                "actionId": "10",
+                "actionVersionId": 320,
+                "variantKey": "single",
+                "sha256": "a7795fc2caaee3a716b085f8f9c00177da35dcb8b5582eb2a6a1e634897089e5",
+                "status": "COMPLETED",
+                "modeResults": [
+                  {
+                    "mode": "coach",
+                    "status": "COMPLETED",
+                    "completedReps": 2,
+                    "durationSeconds": 15,
+                    "score": 80,
+                    "source": "ar_measured"
+                  },
+                  {
+                    "mode": "game",
+                    "status": "COMPLETED",
+                    "completedReps": 2,
+                    "durationSeconds": 15,
+                    "score": 80,
+                    "source": "ar_measured"
+                  }
+                ]
+              },
+              {
+                "itemId": 1005,
+                "position": 4,
+                "actionId": "11",
+                "actionVersionId": 321,
+                "variantKey": "single",
+                "sha256": "070efbb574de1700a02ee624f9f7fe748a6b5dc75f0dc99e2d5e4fa5559a28df",
+                "status": "COMPLETED",
+                "modeResults": [
+                  {
+                    "mode": "coach",
+                    "status": "COMPLETED",
+                    "completedReps": 2,
+                    "durationSeconds": 15,
+                    "score": 80,
+                    "source": "ar_measured"
+                  },
+                  {
+                    "mode": "game",
+                    "status": "COMPLETED",
+                    "completedReps": 2,
+                    "durationSeconds": 15,
+                    "score": 80,
+                    "source": "ar_measured"
+                  }
+                ]
+              },
+              {
+                "itemId": 1006,
+                "position": 5,
+                "actionId": "12",
+                "actionVersionId": 322,
+                "variantKey": "single",
+                "sha256": "450c24d430dbea8008d079fc850b3c33c072423cae9438c755aa095d445b6080",
+                "status": "COMPLETED",
+                "modeResults": [
+                  {
+                    "mode": "coach",
+                    "status": "COMPLETED",
+                    "completedReps": 2,
+                    "durationSeconds": 15,
+                    "score": 80,
+                    "source": "ar_measured"
+                  },
+                  {
+                    "mode": "game",
+                    "status": "COMPLETED",
+                    "completedReps": 2,
+                    "durationSeconds": 15,
+                    "score": 80,
+                    "source": "ar_measured"
+                  }
+                ]
+              },
+              {
+                "itemId": 1007,
+                "position": 6,
+                "actionId": "13",
+                "actionVersionId": 323,
+                "variantKey": "single",
+                "sha256": "93fdc2c3aac2f840cccd101763082abccad5a8dcdd7f151ebdd6bb44ec3f6540",
+                "status": "COMPLETED",
+                "modeResults": [
+                  {
+                    "mode": "coach",
+                    "status": "COMPLETED",
+                    "completedReps": 2,
+                    "durationSeconds": 15,
+                    "score": 80,
+                    "source": "ar_measured"
+                  },
+                  {
+                    "mode": "game",
+                    "status": "COMPLETED",
+                    "completedReps": 2,
+                    "durationSeconds": 15,
+                    "score": 80,
+                    "source": "ar_measured"
+                  }
+                ]
+              },
+              {
+                "itemId": 1008,
+                "position": 7,
+                "actionId": "14",
+                "actionVersionId": 324,
+                "variantKey": "single",
+                "sha256": "cbd9f8497981c796f5e1a1dbc9c0d61292d739172fd5f8e689617a59002f1560",
+                "status": "COMPLETED",
+                "modeResults": [
+                  {
+                    "mode": "coach",
+                    "status": "COMPLETED",
+                    "completedReps": 2,
+                    "durationSeconds": 15,
+                    "score": 80,
+                    "source": "ar_measured"
+                  },
+                  {
+                    "mode": "game",
+                    "status": "COMPLETED",
+                    "completedReps": 2,
+                    "durationSeconds": 15,
+                    "score": 80,
+                    "source": "ar_measured"
+                  }
+                ]
+              },
+              {
+                "itemId": 1009,
+                "position": 8,
+                "actionId": "15",
+                "actionVersionId": 325,
+                "variantKey": "single",
+                "sha256": "1ea5bd80c70a9ef8d8b76248043cfa0d14dfd9fddf2c702a1cf665e7be84bb56",
+                "status": "COMPLETED",
+                "modeResults": [
+                  {
+                    "mode": "coach",
+                    "status": "COMPLETED",
+                    "completedReps": 2,
+                    "durationSeconds": 15,
+                    "score": 80,
+                    "source": "ar_measured"
+                  },
+                  {
+                    "mode": "game",
+                    "status": "COMPLETED",
+                    "completedReps": 2,
+                    "durationSeconds": 15,
+                    "score": 80,
+                    "source": "ar_measured"
+                  }
+                ]
+              },
+              {
+                "itemId": 1010,
+                "position": 9,
+                "actionId": "16",
+                "actionVersionId": 326,
+                "variantKey": "single",
+                "sha256": "6932f794140f2954ba71781d220a3f0b771acd83f42295e696ab47b7cb1c1586",
+                "status": "COMPLETED",
+                "modeResults": [
+                  {
+                    "mode": "coach",
+                    "status": "COMPLETED",
+                    "completedReps": 2,
+                    "durationSeconds": 15,
+                    "score": 80,
+                    "source": "ar_measured"
+                  },
+                  {
+                    "mode": "game",
+                    "status": "COMPLETED",
+                    "completedReps": 2,
+                    "durationSeconds": 15,
+                    "score": 80,
+                    "source": "ar_measured"
+                  }
+                ]
+              }
+            ]
+          },
+          "canonicalUtf8": "{\"completed\":true,\"createdAt\":\"2026-10-21T00:01:00.000Z\",\"durationSeconds\":300,\"itemResults\":[{\"actionId\":\"7\",\"actionVersionId\":317,\"itemId\":1001,\"modeResults\":[{\"completedReps\":2,\"durationSeconds\":15,\"mode\":\"coach\",\"score\":80,\"source\":\"ar_measured\",\"status\":\"COMPLETED\"},{\"completedReps\":2,\"durationSeconds\":15,\"mode\":\"game\",\"score\":80,\"source\":\"ar_measured\",\"status\":\"COMPLETED\"}],\"position\":0,\"sha256\":\"da194aa91ce29fc79ef345cebd7cab7c6b5305bb2130325256ba188e6329d4a4\",\"status\":\"COMPLETED\",\"variantKey\":\"single\"},{\"actionId\":\"8\",\"actionVersionId\":318,\"itemId\":1002,\"modeResults\":[{\"completedReps\":2,\"durationSeconds\":15,\"mode\":\"coach\",\"score\":80,\"source\":\"ar_measured\",\"status\":\"COMPLETED\"},{\"completedReps\":2,\"durationSeconds\":15,\"mode\":\"game\",\"score\":80,\"source\":\"ar_measured\",\"status\":\"COMPLETED\"}],\"position\":1,\"sha256\":\"74ecca013728125db69cedc6a1521a497a968cb54b382af81967e79890195e2e\",\"status\":\"COMPLETED\",\"variantKey\":\"single\"},{\"actionId\":\"9\",\"actionVersionId\":319,\"itemId\":1003,\"modeResults\":[{\"completedReps\":2,\"durationSeconds\":15,\"mode\":\"coach\",\"score\":80,\"source\":\"ar_measured\",\"status\":\"COMPLETED\"},{\"completedReps\":2,\"durationSeconds\":15,\"mode\":\"game\",\"score\":80,\"source\":\"ar_measured\",\"status\":\"COMPLETED\"}],\"position\":2,\"sha256\":\"8179dd05b9743697c86fc3af3c2afd18b90a9b6fa50c9bc1fd9fd432f37e046b\",\"status\":\"COMPLETED\",\"variantKey\":\"single\"},{\"actionId\":\"10\",\"actionVersionId\":320,\"itemId\":1004,\"modeResults\":[{\"completedReps\":2,\"durationSeconds\":15,\"mode\":\"coach\",\"score\":80,\"source\":\"ar_measured\",\"status\":\"COMPLETED\"},{\"completedReps\":2,\"durationSeconds\":15,\"mode\":\"game\",\"score\":80,\"source\":\"ar_measured\",\"status\":\"COMPLETED\"}],\"position\":3,\"sha256\":\"a7795fc2caaee3a716b085f8f9c00177da35dcb8b5582eb2a6a1e634897089e5\",\"status\":\"COMPLETED\",\"variantKey\":\"single\"},{\"actionId\":\"11\",\"actionVersionId\":321,\"itemId\":1005,\"modeResults\":[{\"completedReps\":2,\"durationSeconds\":15,\"mode\":\"coach\",\"score\":80,\"source\":\"ar_measured\",\"status\":\"COMPLETED\"},{\"completedReps\":2,\"durationSeconds\":15,\"mode\":\"game\",\"score\":80,\"source\":\"ar_measured\",\"status\":\"COMPLETED\"}],\"position\":4,\"sha256\":\"070efbb574de1700a02ee624f9f7fe748a6b5dc75f0dc99e2d5e4fa5559a28df\",\"status\":\"COMPLETED\",\"variantKey\":\"single\"},{\"actionId\":\"12\",\"actionVersionId\":322,\"itemId\":1006,\"modeResults\":[{\"completedReps\":2,\"durationSeconds\":15,\"mode\":\"coach\",\"score\":80,\"source\":\"ar_measured\",\"status\":\"COMPLETED\"},{\"completedReps\":2,\"durationSeconds\":15,\"mode\":\"game\",\"score\":80,\"source\":\"ar_measured\",\"status\":\"COMPLETED\"}],\"position\":5,\"sha256\":\"450c24d430dbea8008d079fc850b3c33c072423cae9438c755aa095d445b6080\",\"status\":\"COMPLETED\",\"variantKey\":\"single\"},{\"actionId\":\"13\",\"actionVersionId\":323,\"itemId\":1007,\"modeResults\":[{\"completedReps\":2,\"durationSeconds\":15,\"mode\":\"coach\",\"score\":80,\"source\":\"ar_measured\",\"status\":\"COMPLETED\"},{\"completedReps\":2,\"durationSeconds\":15,\"mode\":\"game\",\"score\":80,\"source\":\"ar_measured\",\"status\":\"COMPLETED\"}],\"position\":6,\"sha256\":\"93fdc2c3aac2f840cccd101763082abccad5a8dcdd7f151ebdd6bb44ec3f6540\",\"status\":\"COMPLETED\",\"variantKey\":\"single\"},{\"actionId\":\"14\",\"actionVersionId\":324,\"itemId\":1008,\"modeResults\":[{\"completedReps\":2,\"durationSeconds\":15,\"mode\":\"coach\",\"score\":80,\"source\":\"ar_measured\",\"status\":\"COMPLETED\"},{\"completedReps\":2,\"durationSeconds\":15,\"mode\":\"game\",\"score\":80,\"source\":\"ar_measured\",\"status\":\"COMPLETED\"}],\"position\":7,\"sha256\":\"cbd9f8497981c796f5e1a1dbc9c0d61292d739172fd5f8e689617a59002f1560\",\"status\":\"COMPLETED\",\"variantKey\":\"single\"},{\"actionId\":\"15\",\"actionVersionId\":325,\"itemId\":1009,\"modeResults\":[{\"completedReps\":2,\"durationSeconds\":15,\"mode\":\"coach\",\"score\":80,\"source\":\"ar_measured\",\"status\":\"COMPLETED\"},{\"completedReps\":2,\"durationSeconds\":15,\"mode\":\"game\",\"score\":80,\"source\":\"ar_measured\",\"status\":\"COMPLETED\"}],\"position\":8,\"sha256\":\"1ea5bd80c70a9ef8d8b76248043cfa0d14dfd9fddf2c702a1cf665e7be84bb56\",\"status\":\"COMPLETED\",\"variantKey\":\"single\"},{\"actionId\":\"16\",\"actionVersionId\":326,\"itemId\":1010,\"modeResults\":[{\"completedReps\":2,\"durationSeconds\":15,\"mode\":\"coach\",\"score\":80,\"source\":\"ar_measured\",\"status\":\"COMPLETED\"},{\"completedReps\":2,\"durationSeconds\":15,\"mode\":\"game\",\"score\":80,\"source\":\"ar_measured\",\"status\":\"COMPLETED\"}],\"position\":9,\"sha256\":\"6932f794140f2954ba71781d220a3f0b771acd83f42295e696ab47b7cb1c1586\",\"status\":\"COMPLETED\",\"variantKey\":\"single\"}],\"preTrainingEventId\":\"pre:bridge-fixture\",\"prescriptionOrderId\":5010,\"protocolVersion\":2,\"requestToken\":\"bridge_req_10\",\"resourceManifestSha256\":\"57be8f661e115cb089c79b21368ac3cc3c28d2540ce2481c3b78b6710cbcef6a\",\"resultRevision\":3,\"sessionId\":\"bridge_10\",\"source\":\"ar_measured\",\"status\":\"COMPLETED\",\"userId\":\"bridge_fixture_patient\"}",
+          "utf8Hex": "7b22636f6d706c65746564223a747275652c22637265617465644174223a22323032362d31302d32315430303a30313a30302e3030305a222c226475726174696f6e5365636f6e6473223a3330302c226974656d526573756c7473223a5b7b22616374696f6e4964223a2237222c22616374696f6e56657273696f6e4964223a3331372c226974656d4964223a313030312c226d6f6465526573756c7473223a5b7b22636f6d706c6574656452657073223a322c226475726174696f6e5365636f6e6473223a31352c226d6f6465223a22636f616368222c2273636f7265223a38302c22736f75726365223a2261725f6d65617375726564222c22737461747573223a22434f4d504c45544544227d2c7b22636f6d706c6574656452657073223a322c226475726174696f6e5365636f6e6473223a31352c226d6f6465223a2267616d65222c2273636f7265223a38302c22736f75726365223a2261725f6d65617375726564222c22737461747573223a22434f4d504c45544544227d5d2c22706f736974696f6e223a302c22736861323536223a2264613139346161393163653239666337396566333435636562643763616237633662353330356262323133303332353235366261313838653633323964346134222c22737461747573223a22434f4d504c45544544222c2276617269616e744b6579223a2273696e676c65227d2c7b22616374696f6e4964223a2238222c22616374696f6e56657273696f6e4964223a3331382c226974656d4964223a313030322c226d6f6465526573756c7473223a5b7b22636f6d706c6574656452657073223a322c226475726174696f6e5365636f6e6473223a31352c226d6f6465223a22636f616368222c2273636f7265223a38302c22736f75726365223a2261725f6d65617375726564222c22737461747573223a22434f4d504c45544544227d2c7b22636f6d706c6574656452657073223a322c226475726174696f6e5365636f6e6473223a31352c226d6f6465223a2267616d65222c2273636f7265223a38302c22736f75726365223a2261725f6d65617375726564222c22737461747573223a22434f4d504c45544544227d5d2c22706f736974696f6e223a312c22736861323536223a2237346563636130313337323831323564623639636564633661313532316134393761393638636235346233383261663831393637653739383930313935653265222c22737461747573223a22434f4d504c45544544222c2276617269616e744b6579223a2273696e676c65227d2c7b22616374696f6e4964223a2239222c22616374696f6e56657273696f6e4964223a3331392c226974656d4964223a313030332c226d6f6465526573756c7473223a5b7b22636f6d706c6574656452657073223a322c226475726174696f6e5365636f6e6473223a31352c226d6f6465223a22636f616368222c2273636f7265223a38302c22736f75726365223a2261725f6d65617375726564222c22737461747573223a22434f4d504c45544544227d2c7b22636f6d706c6574656452657073223a322c226475726174696f6e5365636f6e6473223a31352c226d6f6465223a2267616d65222c2273636f7265223a38302c22736f75726365223a2261725f6d65617375726564222c22737461747573223a22434f4d504c45544544227d5d2c22706f736974696f6e223a322c22736861323536223a2238313739646430356239373433363937633836666333616633633261666431386239306139623666613530633962633166643966643433326633376530343662222c22737461747573223a22434f4d504c45544544222c2276617269616e744b6579223a2273696e676c65227d2c7b22616374696f6e4964223a223130222c22616374696f6e56657273696f6e4964223a3332302c226974656d4964223a313030342c226d6f6465526573756c7473223a5b7b22636f6d706c6574656452657073223a322c226475726174696f6e5365636f6e6473223a31352c226d6f6465223a22636f616368222c2273636f7265223a38302c22736f75726365223a2261725f6d65617375726564222c22737461747573223a22434f4d504c45544544227d2c7b22636f6d706c6574656452657073223a322c226475726174696f6e5365636f6e6473223a31352c226d6f6465223a2267616d65222c2273636f7265223a38302c22736f75726365223a2261725f6d65617375726564222c22737461747573223a22434f4d504c45544544227d5d2c22706f736974696f6e223a332c22736861323536223a2261373739356663326361616565336137313662303835663866396330303137376461333564636238623535383265623261366131653633343839373038396535222c22737461747573223a22434f4d504c45544544222c2276617269616e744b6579223a2273696e676c65227d2c7b22616374696f6e4964223a223131222c22616374696f6e56657273696f6e4964223a3332312c226974656d4964223a313030352c226d6f6465526573756c7473223a5b7b22636f6d706c6574656452657073223a322c226475726174696f6e5365636f6e6473223a31352c226d6f6465223a22636f616368222c2273636f7265223a38302c22736f75726365223a2261725f6d65617375726564222c22737461747573223a22434f4d504c45544544227d2c7b22636f6d706c6574656452657073223a322c226475726174696f6e5365636f6e6473223a31352c226d6f6465223a2267616d65222c2273636f7265223a38302c22736f75726365223a2261725f6d65617375726564222c22737461747573223a22434f4d504c45544544227d5d2c22706f736974696f6e223a342c22736861323536223a2230373065666262353734646531373030613032656536323466396637666537343861366235646337356630646339396532643565346661353535396132386466222c22737461747573223a22434f4d504c45544544222c2276617269616e744b6579223a2273696e676c65227d2c7b22616374696f6e4964223a223132222c22616374696f6e56657273696f6e4964223a3332322c226974656d4964223a313030362c226d6f6465526573756c7473223a5b7b22636f6d706c6574656452657073223a322c226475726174696f6e5365636f6e6473223a31352c226d6f6465223a22636f616368222c2273636f7265223a38302c22736f75726365223a2261725f6d65617375726564222c22737461747573223a22434f4d504c45544544227d2c7b22636f6d706c6574656452657073223a322c226475726174696f6e5365636f6e6473223a31352c226d6f6465223a2267616d65222c2273636f7265223a38302c22736f75726365223a2261725f6d65617375726564222c22737461747573223a22434f4d504c45544544227d5d2c22706f736974696f6e223a352c22736861323536223a2234353063323464343330646265613830303864303739666338353062336333336330373234323363616539343338633735356161303935643434356236303830222c22737461747573223a22434f4d504c45544544222c2276617269616e744b6579223a2273696e676c65227d2c7b22616374696f6e4964223a223133222c22616374696f6e56657273696f6e4964223a3332332c226974656d4964223a313030372c226d6f6465526573756c7473223a5b7b22636f6d706c6574656452657073223a322c226475726174696f6e5365636f6e6473223a31352c226d6f6465223a22636f616368222c2273636f7265223a38302c22736f75726365223a2261725f6d65617375726564222c22737461747573223a22434f4d504c45544544227d2c7b22636f6d706c6574656452657073223a322c226475726174696f6e5365636f6e6473223a31352c226d6f6465223a2267616d65222c2273636f7265223a38302c22736f75726365223a2261725f6d65617375726564222c22737461747573223a22434f4d504c45544544227d5d2c22706f736974696f6e223a362c22736861323536223a2239336664633263336161633266383430636363643130313736333038326162636361643561386463646437663135316562646436626234346563336636353430222c22737461747573223a22434f4d504c45544544222c2276617269616e744b6579223a2273696e676c65227d2c7b22616374696f6e4964223a223134222c22616374696f6e56657273696f6e4964223a3332342c226974656d4964223a313030382c226d6f6465526573756c7473223a5b7b22636f6d706c6574656452657073223a322c226475726174696f6e5365636f6e6473223a31352c226d6f6465223a22636f616368222c2273636f7265223a38302c22736f75726365223a2261725f6d65617375726564222c22737461747573223a22434f4d504c45544544227d2c7b22636f6d706c6574656452657073223a322c226475726174696f6e5365636f6e6473223a31352c226d6f6465223a2267616d65222c2273636f7265223a38302c22736f75726365223a2261725f6d65617375726564222c22737461747573223a22434f4d504c45544544227d5d2c22706f736974696f6e223a372c22736861323536223a2263626439663834393739383163373936663565316131646263396330643631323932643733393137326664356638653638393631376135393030326631353630222c22737461747573223a22434f4d504c45544544222c2276617269616e744b6579223a2273696e676c65227d2c7b22616374696f6e4964223a223135222c22616374696f6e56657273696f6e4964223a3332352c226974656d4964223a313030392c226d6f6465526573756c7473223a5b7b22636f6d706c6574656452657073223a322c226475726174696f6e5365636f6e6473223a31352c226d6f6465223a22636f616368222c2273636f7265223a38302c22736f75726365223a2261725f6d65617375726564222c22737461747573223a22434f4d504c45544544227d2c7b22636f6d706c6574656452657073223a322c226475726174696f6e5365636f6e6473223a31352c226d6f6465223a2267616d65222c2273636f7265223a38302c22736f75726365223a2261725f6d65617375726564222c22737461747573223a22434f4d504c45544544227d5d2c22706f736974696f6e223a382c22736861323536223a2231656135626438306337306139656638643862373632343830343363666130643134646664396664646632633730326131636636363565376265383462623536222c22737461747573223a22434f4d504c45544544222c2276617269616e744b6579223a2273696e676c65227d2c7b22616374696f6e4964223a223136222c22616374696f6e56657273696f6e4964223a3332362c226974656d4964223a313031302c226d6f6465526573756c7473223a5b7b22636f6d706c6574656452657073223a322c226475726174696f6e5365636f6e6473223a31352c226d6f6465223a22636f616368222c2273636f7265223a38302c22736f75726365223a2261725f6d65617375726564222c22737461747573223a22434f4d504c45544544227d2c7b22636f6d706c6574656452657073223a322c226475726174696f6e5365636f6e6473223a31352c226d6f6465223a2267616d65222c2273636f7265223a38302c22736f75726365223a2261725f6d65617375726564222c22737461747573223a22434f4d504c45544544227d5d2c22706f736974696f6e223a392c22736861323536223a2236393332663739343134306632393534626137313738316432323061336630623737316163643833663432323935653639366162343762376362316331353836222c22737461747573223a22434f4d504c45544544222c2276617269616e744b6579223a2273696e676c65227d5d2c22707265547261696e696e674576656e744964223a227072653a6272696467652d66697874757265222c22707265736372697074696f6e4f726465724964223a353031302c2270726f746f636f6c56657273696f6e223a322c2272657175657374546f6b656e223a226272696467655f7265715f3130222c227265736f757263654d616e6966657374536861323536223a2235376265386636363165313135636230383963373962323133363861633363633363323864323534306365323438316333623738623637313063626365663661222c22726573756c745265766973696f6e223a332c2273657373696f6e4964223a226272696467655f3130222c22736f75726365223a2261725f6d65617375726564222c22737461747573223a22434f4d504c45544544222c22757365724964223a226272696467655f666978747572655f70617469656e74227d",
+          "sha256": "16f4abef5e08f86cc4fbf445a76b28c092cc10088a42e2baa66aa7f456d613d1",
+          "receipt": {
+            "sessionId": "bridge_10",
+            "resultRevision": 3,
+            "resultContentSha256": "16f4abef5e08f86cc4fbf445a76b28c092cc10088a42e2baa66aa7f456d613d1"
+          }
+        }
+      ]
+    }
+  ]
+}

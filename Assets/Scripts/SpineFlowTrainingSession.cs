@@ -30,7 +30,7 @@ public struct SpineFlowTrainingVolume
 // one result to the phone when the user leaves the gaming completion panel.
 public sealed class SpineFlowTrainingSession : MonoBehaviour
 {
-    private const int ProtocolVersion = 1;
+    private const int ProtocolVersion = 2;
     private const string PayloadExtra = "spineflow_payload_json";
     private const string ProtocolVersionExtra = "spineflow_protocol_version";
     private const string MobilePackage = "com.metaspine.mobile";
@@ -137,13 +137,11 @@ public sealed class SpineFlowTrainingSession : MonoBehaviour
     }
 
     [Serializable]
-    private sealed class ActionResultPayload
+    private sealed class ModeResult
     {
-        public string actionId;
-        public string actionName;
+        public string mode;
         public int overallScore;
         public int rawOverallScore;
-        public string trainingMode;
         public int plannedRepetitions;
         public int completedRepetitions;
         public int durationSeconds;
@@ -160,30 +158,22 @@ public sealed class SpineFlowTrainingSession : MonoBehaviour
         public WarningPayload[] warnings;
         public bool passed;
         public bool cheatingDetected;
+        public string level;
     }
 
     [Serializable]
-    private sealed class GameResultPayload
+    private sealed class ItemResult
     {
-        public string gameId;
-        public string gameName;
-        public int score;
-        public int averageScore;
-        public int rawAverageScore;
-        public int bestScore;
-        public int rawBestScore;
-        public int scoreSampleCount;
-        public int completedRepetitions;
-        public string scoreMappingVersion;
-        public string level;
-        public int durationSeconds;
+        public string itemId;
+        public string itemName;
+        public string arTaskType;
+        public ModeResult[] modeResults;
     }
 
     [Serializable]
     private sealed class ResultPayload
     {
-        public string schemaVersion = "0.1";
-        public int protocolVersion = ProtocolVersion;
+        public int protocolVersion = 2;
         public string messageType = ResultMessage;
         public string sessionId;
         public string userId;
@@ -200,8 +190,9 @@ public sealed class SpineFlowTrainingSession : MonoBehaviour
         public int overallScore;
         public int rawOverallScore;
         public string scoreMappingVersion;
-        public ActionResultPayload[] actionResults;
-        public GameResultPayload[] gameResults;
+        public string prescriptionOrderId;
+        public string resourceManifestSha256;
+        public ItemResult[] itemResults;
         public string[] abnormalEvents;
     }
 
@@ -988,37 +979,55 @@ public sealed class SpineFlowTrainingSession : MonoBehaviour
             abnormalEvents = new string[0]
         };
 
-        List<ActionResultPayload> actions = new List<ActionResultPayload>();
-        List<GameResultPayload> games = new List<GameResultPayload>();
+        // V2: 按 itemId 分组，每个 item 包含多个 mode 的结果
+        Dictionary<string, List<ModeResult>> itemModeMap = new Dictionary<string, List<ModeResult>>();
         foreach (PlannedAction action in startPayload.trainingPlan.recommendedActions)
         {
             string mode = ResolveMode(action);
             ModeMeasurement measurement = mode == "coach" ? coachMeasurement : gameMeasurement;
             if (measurement == null) continue;
-            actions.Add(BuildActionResult(action, mode, measurement));
-            if (mode == "game")
+
+            string itemId = action.actionId ?? string.Empty;
+            if (!itemModeMap.ContainsKey(itemId))
             {
-                games.Add(BuildGameResult(action, measurement));
+                itemModeMap[itemId] = new List<ModeResult>();
+            }
+            itemModeMap[itemId].Add(BuildModeResult(action, mode, measurement));
+        }
+
+        List<ItemResult> items = new List<ItemResult>();
+        foreach (PlannedAction action in startPayload.trainingPlan.recommendedActions)
+        {
+            string itemId = action.actionId ?? string.Empty;
+            if (itemModeMap.ContainsKey(itemId))
+            {
+                items.Add(new ItemResult
+                {
+                    itemId = itemId,
+                    itemName = action.actionName,
+                    arTaskType = action.arTaskType,
+                    modeResults = itemModeMap[itemId].ToArray()
+                });
+                itemModeMap.Remove(itemId);
             }
         }
 
-        result.actionResults = actions.ToArray();
-        result.gameResults = games.ToArray();
+        result.prescriptionOrderId = string.Empty;
+        result.resourceManifestSha256 = string.Empty;
+        result.itemResults = items.ToArray();
         return JsonUtility.ToJson(result);
     }
 
-    private ActionResultPayload BuildActionResult(
+    private ModeResult BuildModeResult(
         PlannedAction action,
         string mode,
         ModeMeasurement measurement)
     {
-        return new ActionResultPayload
+        return new ModeResult
         {
-            actionId = action.actionId,
-            actionName = action.actionName,
+            mode = mode,
             overallScore = measurement.averageScore,
             rawOverallScore = measurement.rawAverageScore,
-            trainingMode = mode,
             plannedRepetitions = SafeRepetitionProduct(action.sets, action.reps),
             completedRepetitions = measurement.completedRepetitions,
             durationSeconds = measurement.durationSeconds,
@@ -1034,32 +1043,8 @@ public sealed class SpineFlowTrainingSession : MonoBehaviour
             metricsAvailable = false,
             warnings = new WarningPayload[0],
             passed = measurement.IsAcceptable,
-            cheatingDetected = false
-        };
-    }
-
-    private GameResultPayload BuildGameResult(PlannedAction action, ModeMeasurement measurement)
-    {
-        string actionId = action.actionId ?? string.Empty;
-        string baseId = actionId.EndsWith("_game", StringComparison.Ordinal)
-            ? actionId.Substring(0, actionId.Length - "_game".Length)
-            : actionId;
-        return new GameResultPayload
-        {
-            gameId = baseId + "_challenge",
-            gameName = string.IsNullOrWhiteSpace(action.actionName)
-                ? "Dead Bug Challenge"
-                : action.actionName,
-            score = measurement.averageScore,
-            averageScore = measurement.averageScore,
-            rawAverageScore = measurement.rawAverageScore,
-            bestScore = measurement.bestScore,
-            rawBestScore = measurement.rawBestScore,
-            scoreSampleCount = measurement.scoreSampleCount,
-            completedRepetitions = measurement.completedRepetitions,
-            scoreMappingVersion = ScoreMappingVersion,
-            level = measurement.level,
-            durationSeconds = measurement.durationSeconds
+            cheatingDetected = false,
+            level = measurement.level
         };
     }
 

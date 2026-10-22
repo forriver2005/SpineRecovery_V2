@@ -5,6 +5,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.withContext
+import org.json.JSONObject
 import java.io.ByteArrayOutputStream
 import java.net.HttpURLConnection
 import java.net.URI
@@ -21,8 +22,14 @@ internal class PatientHttpTransport(
         val text: String get() = decodeUtf8(bytes)
 
         fun requireSuccess(message: String) {
-            if (status !in 200..299) throw ApiHttpException(status, message, retryAfterSeconds)
+            if (status in 200..299) return
+            throw ApiHttpException(status, message, retryAfterSeconds, errorCodeOf())
         }
+
+        // 只在调用方显式读了错误正文时才有内容；解析失败一律视为「无错误码」，不抛二次异常。
+        internal fun errorCodeOf(): String? = runCatching {
+            JSONObject(text).optJSONObject("details")?.optString("code")?.takeIf(String::isNotBlank)
+        }.getOrNull()
     }
 
     suspend fun request(

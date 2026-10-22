@@ -75,6 +75,27 @@ object UnifiedMobileBridge {
                 }, row.optString("preTrainingEventId"), row.optString("planJson"),
                 row.optBoolean("feedbackPending"), row.optString("endReason"), row.optString("replaySessionId"))
         }
+
+        // P5.7：识别并提交 V2 训练结果（protocolVersion = 2）到 V2 上传通道
+        for (record in records) {
+            val resultJson = record.resultJson.takeIf { it.isNotBlank() } ?: continue
+            val resultObj = runCatching { JSONObject(resultJson) }.getOrNull() ?: continue
+            val protocolVersion = resultObj.optInt("protocolVersion", 1)
+
+            if (protocolVersion == 2) {
+                // V2 格式：解析并提交到 V2 结果存储
+                val patientId = PatientCredentials.credential(context, id)?.patientId
+                if (patientId != null) {
+                    try {
+                        val v2Result = PrescriptionResultV2.parse(resultObj, patientId)
+                        sync.submitResult(id, v2Result)
+                    } catch (error: ResultInputException) {
+                        android.util.Log.w("UnifiedMobileBridge",
+                            "V2 结果解析失败: sessionId=${record.sessionId}, error=${error.message}")
+                    }
+                }
+            }
+        }
         val painRecords = objects(input.optJSONArray("painHistory")).map { row ->
             PainHistoryRecord(row.getString("id"), row.getString("recordedAt"), row.optInt("painLevel"),
                 PainRecordSource.entries.firstOrNull { it.name == row.optString("source") }

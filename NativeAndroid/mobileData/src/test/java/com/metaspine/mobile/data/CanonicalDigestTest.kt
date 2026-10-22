@@ -50,6 +50,19 @@ class CanonicalDigestTest {
     }
 
     @Test
+    fun `规范文本的 UTF-8 字节与 utf8Hex 一致`() {
+        for (vector in vectors()) {
+            val name = vector.getString("name")
+            val wire = JSONObject(vector.getString("wireJson"))
+            wire.put("userId", vector.getString("__patientId"))
+            val hex = CanonicalJson.canonicalize(wire)
+                .toByteArray(Charsets.UTF_8)
+                .joinToString("") { "%02x".format(it) }
+            assertEquals("UTF-8 字节不一致: $name", vector.getString("utf8Hex"), hex)
+        }
+    }
+
+    @Test
     fun `回执字段与本地计算一致`() {
         for (vector in vectors()) {
             val receipt = vector.getJSONObject("receipt")

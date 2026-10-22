@@ -23,6 +23,8 @@ class ServerSyncCoordinator(
     private val loadSyncableUser: (String) -> DemoUserData? = { null },
 ) {
     private val store = PendingSyncStore(context)
+    // P5.3/P5.5：结果的修订号与 ACK 状态独立于同步游标，逐条核对回执。
+    private val results = ResultRevisionStore(context)
     private var flushJob: Job? = null
     // 评审 #2：防抖任务按账号隔离——单一任务会让两个账号在 5 秒窗口内互相取消
     private val debounceJobs = mutableMapOf<String, Job>()
@@ -66,6 +68,8 @@ class ServerSyncCoordinator(
 
     companion object {
         private const val TAG = "ServerSyncCoordinator"
+        /** P5.7：V2 结果任务（与 V1 `upload:N` 批次任务并存于同一队列）。 */
+        private const val KIND_RESULT_V2 = "result:v2"
     }
 
     init {
@@ -104,6 +108,65 @@ class ServerSyncCoordinator(
     fun onForeground() {
         scope.launch { recomputePending(); flush() }
     }
+
+    // ---------- P5.7：V2 结果通道 ----------
+
+    /**
+     * V2 结果的唯一出站入口：冻结 → 分配修订号 → 单条任务入队 → 冲刷。
+     *
+     * 一次训练可能产生多次修订（未开始快照 → 首模式完成 → 全部完成），
+     * 每次提交都独立成任务，因为服务器要求修订号严格递增，**必须按序到达**：
+     * 把多个修订打包进一个批次无法保证服务器接受顺序，也会让 ACK 粒度变粗。
+     *
+     * @return 实际入队的记录；内容未变（幂等重试）或已完成时返回 null。
+     * @throws RevisionConflict 内容变化但修订号回退，或冻结身份被改写。
+     * @throws ResultInputException.ResultInvalid 快照本身不合法。
+     */
+    fun submitResult(accountId: String, result: PrescriptionResultV2): ResultRecord? {
+        if (accountId in forgottenAccountIds) return null
+        val patientId = PatientCredentials.credential(context, accountId)?.patientId
+        if (patientId == null) {
+            // 摘要必须注入 patientId；没有身份就无法冻结——保留原结果，等激活完成后重新提交。
+            android.util.Log.w(TAG, "缺少患者身份，无法冻结训练结果: sessionId=${result.sessionId}")
+            return null
+        }
+        val record = results.freeze(accountScope(accountId), result, patientId)
+        if (record.ackState == AckState.Acked) return null
+        enqueueResult(accountId, record)
+        scope.launch { flush() }
+        return record
+    }
+
+    /** 同一 sessionId 只保留最新修订：旧修订先到会让服务器判定为回退冲突。 */
+    private fun enqueueResult(accountId: String, record: ResultRecord) {
+        // 冻结记录已存在时先清掉该会话更旧的待发任务（崩溃恢复、多修订并发提交都会产生）。
+        val queued = store.pendingIds(accountId)
+        for (id in queued) {
+            val stale = store.element(accountId, id) ?: continue
+            val cursor = QueueCursor.fromJson(stale.optJSONObject("cursor"))
+            if (stale.optString("kind") != KIND_RESULT_V2) continue
+            if (cursor.resultReceipts.none { it.sessionId == record.sessionId }) continue
+            if (cursor.resultReceipts.all { it.resultRevision < record.resultRevision }) {
+                store.remove(accountId, id)
+            }
+        }
+        val id = "$KIND_RESULT_V2:${record.sessionId}:${record.resultRevision}"
+        if (store.hasElement(accountId, id)) return
+        store.enqueue(
+            accountId,
+            queueElement(
+                id = id,
+                kind = KIND_RESULT_V2,
+                payload = JSONObject().put("sessions", JSONArray().put(JSONObject(record.body))),
+                cursor = QueueCursor(
+                    resultScope = record.scope,
+                    resultReceipts = listOf(record.receipt),
+                ),
+            ),
+        )
+    }
+
+    private fun accountScope(accountId: String) = "account:$accountId"
 
     /** 评审 #6：注销网络回调，由 MainActivity.onDestroy 调用。 */
     fun close() {
@@ -256,19 +319,23 @@ class ServerSyncCoordinator(
                 }
 
                 val generation = accountGenerations[accountId] ?: 0
+                val kind = item.optString("kind")
+                val cursor = QueueCursor.fromJson(item.optJSONObject("cursor"))
                 val result = when {
+                    kind == KIND_RESULT_V2 -> uploadFrozenResult(accountId, payload, cursor, token)
                     // SF-06：upload 拆批后 kind 为 "upload:1"、"upload:2"…（按批入队）
-                    item.optString("kind").startsWith("upload") -> TrainingSyncClient.upload(payload, token)
+                    kind.startsWith("upload") -> TrainingSyncClient.upload(payload, token)
                     else -> PatientSyncClient.sync(payload, token)
                 }
                 if (generation != (accountGenerations[accountId] ?: 0)) continue
                 if (result.isSuccess) {
                     // P2.5：移除队列元素与推进游标在同一次 commit() 内原子完成，
                     // 消除「已移除但游标未推进」的重发窗口。
+                    // V2 的 ACK 已在 uploadFrozenResult 内逐条核对并落盘，这里只移除任务。
                     if (store.commitAck(accountId, id, item.optJSONObject("cursor"))) {
-                        android.util.Log.i(TAG, "冲刷成功 kind=${item.optString("kind")}")
+                        android.util.Log.i(TAG, "冲刷成功 kind=$kind")
                     } else {
-                        android.util.Log.w(TAG, "ACK 提交时队列元素已不存在 kind=${item.optString("kind")}")
+                        android.util.Log.w(TAG, "ACK 提交时队列元素已不存在 kind=$kind")
                     }
                     continue
                 }
@@ -276,6 +343,25 @@ class ServerSyncCoordinator(
                 val failure = result.exceptionOrNull()
                 if (failure is ApiHttpException && (failure.httpStatus == 401 || failure.httpStatus == 403)) {
                     pauseForCredentials(accountId)
+                    return@launch
+                }
+                // P5.6：练前问卷未确认——保留任务与原依赖重发，不隔离（隔离会永久丢结果）。
+                if (failure is ApiHttpException && failure.errorCode == "PRE_TRAINING_EVENT_NOT_FOUND") {
+                    val record = results.load(cursor.resultScope.orEmpty(),
+                        cursor.resultReceipts.firstOrNull()?.sessionId.orEmpty())
+                    if (record?.preTrainingEventId != null) {
+                        results.blockOnDependency(
+                            record.scope, record.sessionId, record.resultRevision,
+                            record.preTrainingEventId
+                        )
+                    }
+                    val attempts = store.bumpAttempts(accountId, id).coerceAtLeast(1)
+                    val delaySeconds = maxOf(backoffSeconds(attempts), failure.retryAfterSeconds ?: 0L)
+                    android.util.Log.i(TAG, "V2 结果等待练前事件确认，退避 ${delaySeconds}s")
+                    scope.launch {
+                        delay(delaySeconds * 1_000)
+                        flush()
+                    }
                     return@launch
                 }
                 if (failure is ApiHttpException && failure.httpStatus in setOf(400, 409, 413, 422)) {
@@ -307,6 +393,51 @@ class ServerSyncCoordinator(
                 return@launch
             }
         }
+    }
+
+    /**
+     * 发送一条冻结结果并按四元组逐条确认。
+     *
+     * 回执全部核对通过才算成功；本地记录已被新修订取代时，这条任务属于过期快照，
+     * 直接移除（继续重发旧的递增修订号只会被服务器拒绝）。
+     */
+    private suspend fun uploadFrozenResult(
+        accountId: String,
+        payload: JSONObject,
+        cursor: QueueCursor,
+        token: String,
+    ): Result<List<ResultReceipt>> {
+        val sessions = payload.optJSONArray("sessions")
+        if (sessions == null || sessions.length() == 0) {
+            return Result.failure(IllegalArgumentException("V2 任务缺少冻结快照"))
+        }
+        val scope = cursor.resultScope
+            ?: return Result.failure(IllegalArgumentException("V2 任务缺少 scope"))
+        val expected = cursor.resultReceipts
+        if (expected.isEmpty()) {
+            return Result.failure(IllegalArgumentException("V2 任务缺少期望回执"))
+        }
+        val verified = TrainingSyncClient.uploadV2Sessions(sessions, expected, token)
+        if (verified.isFailure) return verified
+        for (receipt in verified.getOrThrow()) {
+            val confirmed = results.acknowledge(
+                scope, receipt.sessionId, receipt.resultRevision, receipt.resultContentSha256
+            )
+            if (!confirmed) {
+                // 服务器回执与本机当前事实不符：本地已推进到更新的修订，旧任务必须作废。
+                android.util.Log.e(
+                    TAG,
+                    "回执与本地记录不符，作废过期任务 ${receipt.sessionId}#${receipt.resultRevision}"
+                )
+                store.remove(accountId, "$KIND_RESULT_V2:${receipt.sessionId}:${receipt.resultRevision}")
+                return Result.failure(IllegalStateException("回执与本地结果不一致"))
+            }
+            val record = results.load(scope, receipt.sessionId)
+            if (record?.blockedBy != null) {
+                results.clearDependency(scope, record.sessionId, record.blockedBy)
+            }
+        }
+        return verified
     }
 
     private fun nextPending(): Pair<String, JSONObject>? {

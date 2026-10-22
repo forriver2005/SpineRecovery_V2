@@ -80,6 +80,8 @@ class PendingSyncStore(context: Context) {
         val editor = prefs.edit()
             .putString(key, SecureLocalData.seal(key, next.toString()))
             .putBoolean(CORRUPT_PREFIX + accountId, false)
+        // V2 结果任务的 ACK 由 ResultRevisionStore 逐条推进（四元组核对），
+        // 不并入训练游标——否则回执与游标会各记一半。
         if (cursor.sessionIds.isNotEmpty() || cursor.painIds.isNotEmpty() ||
             cursor.qHashes.isNotEmpty() || cursor.profileHash != null ||
             cursor.lifecycle != null || cursor.imuCalibrationState != null ||
@@ -138,6 +140,28 @@ class PendingSyncStore(context: Context) {
 
     /** 队首元素（不移除）；空队列返回 null。 */
     fun peek(accountId: String): JSONObject? = readArray(queueKey(accountId)).optJSONObject(0)
+
+    fun hasElement(accountId: String, id: String): Boolean =
+        element(accountId, id) != null
+
+    fun element(accountId: String, id: String): JSONObject? {
+        val queue = readArray(queueKey(accountId))
+        for (index in 0 until queue.length()) {
+            val item = queue.optJSONObject(index) ?: continue
+            if (item.optString("id") == id) return item
+        }
+        return null
+    }
+
+    /** 队列中全部元素 id（供按会话清理过期修订）。 */
+    fun pendingIds(accountId: String): List<String> {
+        val queue = readArray(queueKey(accountId))
+        return buildList {
+            for (index in 0 until queue.length()) {
+                queue.optJSONObject(index)?.optString("id")?.takeIf(String::isNotBlank)?.let(::add)
+            }
+        }
+    }
 
     fun remove(accountId: String, id: String) {
         val key = queueKey(accountId)
@@ -311,6 +335,9 @@ internal data class QueueCursor(
     val lifecycle: String? = null,
     val imuCalibrationState: String? = null,
     val feedbackEventIds: Set<String> = emptySet(),
+    /** P5.5：V2 结果任务必须保留 scope + 逐条期望回执，ACK 时逐项核对。 */
+    val resultScope: String? = null,
+    val resultReceipts: List<ResultReceipt> = emptyList(),
 ) {
     fun toJson(): JSONObject = JSONObject()
         .put("sessionIds", JSONArray(sessionIds.sorted()))
@@ -320,6 +347,8 @@ internal data class QueueCursor(
         .put("lifecycle", lifecycle ?: JSONObject.NULL)
         .put("imuCalibrationState", imuCalibrationState ?: JSONObject.NULL)
         .put("feedbackEventIds", JSONArray(feedbackEventIds.sorted()))
+        .put("resultScope", resultScope ?: JSONObject.NULL)
+        .put("resultReceipts", JSONArray(resultReceipts.map { it.toJson() }))
 
     companion object {
         fun fromJson(json: JSONObject?): QueueCursor {
@@ -333,6 +362,12 @@ internal data class QueueCursor(
                 imuCalibrationState = json.opt("imuCalibrationState")
                     ?.takeIf { it !== JSONObject.NULL } as? String,
                 feedbackEventIds = json.optJSONArray("feedbackEventIds").toStringSet(),
+                resultScope = json.opt("resultScope")?.takeIf { it !== JSONObject.NULL } as? String,
+                resultReceipts = json.optJSONArray("resultReceipts")?.let { array ->
+                    (0 until array.length()).mapNotNull { index ->
+                        array.optJSONObject(index)?.let(ResultReceipt::fromJson)
+                    }
+                } ?: emptyList(),
             )
         }
     }

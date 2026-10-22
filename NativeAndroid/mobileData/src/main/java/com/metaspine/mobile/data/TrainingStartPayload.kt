@@ -201,14 +201,19 @@ data class TrainingStartPayload(
             )
         }
 
-        /** 医生处方 → AR 动作。单动作处方展开为现有教练/游戏两个动作；剂量全部取医生值。 */
+        /**
+         * 医生处方 → AR 动作。单动作处方展开为现有教练/游戏两个动作；剂量全部取医生值。
+         *
+         * 多动作处方在 P4 只是完整下发与保存，执行层仍是一次一个动作：这里明确报告能力缺口，
+         * 不截取第一项，也不假装已支持多动作执行。
+         */
         private fun trainingActionsForPrescription(
             order: DownloadedOrder
         ): List<TrainingAction> {
             val item = requireNotNull(order.singleItem) {
-                "医生处方包含多个动作，手机端一次只能执行一个动作，请联系医生调整。"
+                "医生处方包含多个动作，手机端暂不支持顺序执行，请联系医生调整。"
             }
-            require(item.actionId == "dead_bug" || item.actionId == "bird_dog") {
+            require(order.items.all { it.actionId in TrainingDirectiveParser.SUPPORTED_ACTION_IDS }) {
                 "医生处方包含手机端不支持的动作"
             }
             require(

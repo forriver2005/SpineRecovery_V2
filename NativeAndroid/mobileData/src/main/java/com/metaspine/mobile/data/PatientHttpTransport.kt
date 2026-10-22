@@ -32,12 +32,14 @@ internal class PatientHttpTransport(
         body: String? = null,
         connectTimeoutMs: Int = 10_000,
         readTimeoutMs: Int = 15_000,
-        readErrorStatuses: Set<Int> = emptySet()
+        readErrorStatuses: Set<Int> = emptySet(),
+        negotiationHeaders: Map<String, String> = emptyMap()
     ): Response = withContext(Dispatchers.IO) {
         val context = currentCoroutineContext()
         context.ensureActive()
         val url = resolveUrl(origin(), path)
         require(method == "GET" || method == "POST")
+        requireNegotiationHeaders(negotiationHeaders)
         val connection = openConnection(url)
         try {
             connection.instanceFollowRedirects = false
@@ -49,6 +51,7 @@ internal class PatientHttpTransport(
             token?.takeIf(String::isNotBlank)?.let {
                 connection.setRequestProperty("Authorization", "Bearer $it")
             }
+            negotiationHeaders.forEach { (name, value) -> connection.setRequestProperty(name, value) }
             if (body != null) {
                 connection.doOutput = true
                 connection.setRequestProperty("Content-Type", "application/json; charset=utf-8")
@@ -88,6 +91,25 @@ internal class PatientHttpTransport(
 
     companion object {
         const val MAX_RESPONSE_BYTES = 1024 * 1024
+
+        /**
+         * 受控协商头：传输层只接受这里的白名单，调用方不能借它发任意头。
+         * D01 的 `X-SpineFlow-Directive-Version: 2` 是唯一用途；缺头服务器即 400。
+         */
+        internal val DIRECTIVE_VERSION_HEADER = "X-SpineFlow-Directive-Version"
+        internal const val DIRECTIVE_VERSION = "2"
+        internal val DIRECTIVE_VERSION_HEADERS =
+            mapOf(DIRECTIVE_VERSION_HEADER to DIRECTIVE_VERSION)
+        private val ALLOWED_NEGOTIATION_HEADERS = setOf(DIRECTIVE_VERSION_HEADER)
+
+        private fun requireNegotiationHeaders(headers: Map<String, String>) {
+            headers.forEach { (name, value) ->
+                require(name in ALLOWED_NEGOTIATION_HEADERS) { "不支持的协商头: $name" }
+                require(value.isNotBlank() && value.length <= 32 &&
+                    value.none { it < ' ' || it == '\u007f' }) { "协商头取值不合法: $name" }
+            }
+        }
+
         val shared = PatientHttpTransport()
 
         internal fun resolveUrl(origin: String, path: String): URL {

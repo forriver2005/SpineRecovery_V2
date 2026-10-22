@@ -14,8 +14,8 @@ import org.json.JSONObject
 class TrainingDirectiveCoordinator(
     private val storage: DirectiveSnapshotStorage,
     private val fetchDirective: suspend (String) -> Result<JSONObject> = PatientDirectiveClient::fetch,
-    private val sendReceipt: suspend (String, Long) -> Result<PatientDirectiveClient.ReceiptInfo> =
-        PatientDirectiveClient::postReceipt,
+    private val sendStopReceipt: suspend (String, Long) -> Result<PatientDirectiveClient.ReceiptInfo> =
+        PatientDirectiveClient::postStopReceipt,
     private val nowMillis: () -> Long = System::currentTimeMillis
 ) {
 
@@ -51,21 +51,29 @@ class TrainingDirectiveCoordinator(
         // 回执失败不阻塞训练：已在本地保存的处方仍然安全，下次拉取会重试。
         submitReceiptIfNeeded(effective, snapshot)
 
-        return when (snapshot.state) {
-            TrainingDirectiveState.Ready -> DirectiveRefreshResult.Ready(snapshot)
+        return when {
+            // 解析器已拒绝非 2 版本；这里再挡一次，避免将来放宽解析时把旧快照当可训练。
+            snapshot.state == TrainingDirectiveState.Ready &&
+                snapshot.directiveVersion == PatientDirectiveClient.DIRECTIVE_VERSION ->
+                DirectiveRefreshResult.Ready(snapshot)
             else -> DirectiveRefreshResult.NotTrainable(snapshot, DirectiveMessages.forState(snapshot))
         }
     }
 
+    /**
+     * P4.1 只保留停训简式回执；处方回执必须走两阶段（`directive_saved` / `assets_ready`），
+     * 由 P4.5 的持久化队列提交——这里若发简式 `{orderId}` 会被服务器 400
+     * `STOP_RECEIPT_ORDER_TYPE_MISMATCH`，且无法表达保存与资源就绪的区别。
+     */
     private suspend fun submitReceiptIfNeeded(
         credential: PatientServerCredential,
         snapshot: TrainingDirectiveSnapshot
     ) {
-        val activeOrder = snapshot.prescription ?: snapshot.stopOrder ?: return
+        val stopOrder = snapshot.stopOrder ?: return
         // Server 已经记录过该版本（receivedAt 非空）时无需重复提交。
-        if (!activeOrder.receivedAt.isNullOrBlank()) return
-        // 回执是尽力而为：任何异常都不能影响“本次刷新结论”，否则会把已确认的处方误判为不可用。
-        runCatching { sendReceipt(credential.patientToken, activeOrder.orderId) }
+        if (!stopOrder.receivedAt.isNullOrBlank()) return
+        // 停训回执是尽力而为：失败不能把已确认的状态误判为不可用。
+        runCatching { sendStopReceipt(credential.patientToken, stopOrder.orderId) }
     }
 
     private fun failureResult(
@@ -123,7 +131,7 @@ object DirectiveMessages {
     const val STOPPED_HEADLINE = "医生已暂停训练"
     const val WAITING_HEADLINE = "等待医生下达新处方"
     const val UNSUPPORTED_HEADLINE = "当前处方暂不支持手机执行"
-    const val UNSUPPORTED_DETAIL = "当前处方包含多个动作或不支持的动作，请联系医生调整"
+    const val UNSUPPORTED_DETAIL = "当前处方包含手机端暂不支持的动作，请联系医生调整"
     const val STALE_CACHE_NOTICE = "当前无法确认最新状态，请连接医院局域网后刷新"
     const val EXECUTION_DISCLAIMER = "“手机已获取”只表示指令已保存到本机，不代表患者已开始或已完成训练。"
 
@@ -145,8 +153,12 @@ object DirectiveMessages {
     }
 
     /** 处方卡正文：动作、组数 × 次数、保持秒数与医生备注。 */
-    fun prescriptionDetail(item: DownloadedPrescriptionItem): String =
+    fun prescriptionDetail(item: AdmissionPrescriptionItemV2): String =
         "${item.actionName} ${item.sets} 组 × ${item.reps} 次，保持 ${item.holdSeconds} 秒"
+
+    /** 多项处方逐条展示，保持服务器下发的 position 顺序。 */
+    fun prescriptionDetail(order: DownloadedOrder): String =
+        order.items.joinToString("\n") { "${it.position + 1}. " + prescriptionDetail(it) }
 
     fun fetchedAtLabel(epochMillis: Long): String {
         if (epochMillis <= 0L) return "尚未刷新"

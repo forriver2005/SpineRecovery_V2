@@ -174,7 +174,7 @@ class ResultRevisionPolicyTest {
     fun `出站正文与回执四元组一致`() {
         val result = revisions()[2]
         val record = ResultRevisionPolicy.next(scope, result, result.freeze(patientId), null)
-        assertEquals(result.toJson().toString(), record.body)
+        assertEquals(CanonicalJson.canonicalize(result.toJson()), record.body)
         assertEquals(result.sessionId, record.receipt.sessionId)
         assertEquals(record.resultRevision, record.receipt.resultRevision)
         assertEquals(record.contentSha256, record.receipt.resultContentSha256)
@@ -192,5 +192,55 @@ class ResultRevisionPolicyTest {
         assertEquals(record.body, restored.body)
         assertEquals(AckState.InFlight, restored.ackState)
         assertEquals(2L, restored.acknowledgedRevision)
+    }
+
+    @Test
+    fun `终态允许原样重放但不能产生新修订`() {
+        val result = revisions().last()
+        val existing = freeze(result)
+        assertSame(existing, ResultRevisionPolicy.next(scope, result, result.freeze(patientId), existing))
+        val changed = PrescriptionResultV2.parse(result.toJson().put("resultRevision", 4), patientId)
+        conflict { ResultRevisionPolicy.next(scope, changed, changed.freeze(patientId), existing) }
+    }
+
+    @Test
+    fun `已完成模式的分数次数和时长不能改写`() {
+        val existing = freeze(revisions()[1])
+        for ((field, value) in listOf("score" to 81, "completedReps" to 7, "durationSeconds" to 16)) {
+            val raw = revisions()[1].toJson().put("resultRevision", 3).put("durationSeconds", 100)
+            raw.getJSONArray("itemResults").getJSONObject(0).getJSONArray("modeResults")
+                .getJSONObject(0).put(field, value)
+            val changed = PrescriptionResultV2.parse(raw, patientId)
+            conflict { ResultRevisionPolicy.next(scope, changed, changed.freeze(patientId), existing) }
+        }
+    }
+
+    @Test
+    fun `练前事件无论是否阻塞都不能替换或删除`() {
+        val previous = freeze(revisions()[1])
+        for (existing in listOf(previous, previous.copy(blockedBy = previous.preTrainingEventId))) {
+            for (remove in listOf(false, true)) {
+                val raw = revisions()[1].toJson().put("resultRevision", 3)
+                if (remove) raw.remove("preTrainingEventId") else raw.put("preTrainingEventId", "pre:other")
+                val changed = PrescriptionResultV2.parse(raw, patientId)
+                conflict { ResultRevisionPolicy.next(scope, changed, changed.freeze(patientId), existing) }
+            }
+        }
+    }
+
+    @Test
+    fun `未完成模式计数或时长减少不能覆盖旧事实`() {
+        val raw = revisions()[1].toJson()
+        raw.getJSONArray("itemResults").getJSONObject(0).getJSONArray("modeResults")
+            .getJSONObject(0).put("status", "INTERRUPTED")
+        val previous = PrescriptionResultV2.parse(raw, patientId)
+        val existing = freeze(previous)
+        for (field in listOf("completedReps", "durationSeconds")) {
+            val changedRaw = previous.toJson().put("resultRevision", 3)
+            val mode = changedRaw.getJSONArray("itemResults").getJSONObject(0).getJSONArray("modeResults").getJSONObject(0)
+            mode.put(field, mode.getInt(field) - 1)
+            val changed = PrescriptionResultV2.parse(changedRaw, patientId)
+            conflict { ResultRevisionPolicy.next(scope, changed, changed.freeze(patientId), existing) }
+        }
     }
 }

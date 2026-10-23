@@ -58,8 +58,12 @@ namespace SpineRecovery.App
             if (HasPendingFeedback && CurrentPlan.accountId == plan.accountId) return false;
             // Clone once so later UI/config edits cannot change the active prescription.
             plan = JsonUtility.FromJson<TrainingPlan>(JsonUtility.ToJson(plan));
-            plan.sessionId = Guid.NewGuid().ToString("N");
-            plan.startedAt = DateTimeOffset.UtcNow.ToString("O");
+            if (NativeMobileService.Available && (string.IsNullOrWhiteSpace(plan.sessionId) ||
+                string.IsNullOrWhiteSpace(plan.requestToken) || string.IsNullOrWhiteSpace(plan.startedAt) ||
+                !plan.TryReadPrescription(out _))) return false;
+            if (string.IsNullOrWhiteSpace(plan.sessionId)) plan.sessionId = Guid.NewGuid().ToString("N");
+            if (string.IsNullOrWhiteSpace(plan.startedAt))
+                plan.startedAt = DateTimeOffset.UtcNow.ToString("yyyy-MM-dd'T'HH:mm:ss.fff'Z'");
             if (!SpineFlowTrainingSession.BeginUnifiedTraining(plan)) return false;
             ReplaySessionContext.Clear();
             CurrentPlan = plan;
@@ -75,11 +79,21 @@ namespace SpineRecovery.App
         {
             if (CurrentPlan == null || string.IsNullOrEmpty(resultJson)) return;
             ResultState state = JsonUtility.FromJson<ResultState>(resultJson);
+            string previousNetworkJson = CurrentResult?.networkResultJson;
+            TrainingNetworkResult.TryCreate(CurrentPlan,
+                SpineFlowTrainingSession.CaptureUnifiedNetworkFacts(CurrentPlan.sessionId), previousNetworkJson,
+                out string networkJson, out string networkError);
+            if (!string.IsNullOrEmpty(networkError))
+                Debug.LogWarning("[MobileBridge] Result projection unavailable: " + networkError);
             CurrentResult = new TrainingHistoryRecord
             {
                 sessionId = CurrentPlan.sessionId, actionId = CurrentPlan.actionId,
                 completedAt = state.createdAt, completed = state.completed,
                 resultJson = resultJson, preTrainingEventId = CurrentPlan.preTrainingEventId,
+                networkResultJson = networkJson, networkResultError = networkError,
+                feedback = CurrentResult?.feedback, feedbackFeeling = CurrentResult?.feedbackFeeling,
+                feedbackDifficulty = CurrentResult?.feedbackDifficulty,
+                feedbackRecordedAt = CurrentResult?.feedbackRecordedAt,
                 endReason = state.completed ? state.endReason : "", feedbackPending = state.completed,
                 planJson = JsonUtility.ToJson(CurrentPlan),
                 replaySessionId = ReplaySessionContext.SessionId ?? CurrentResult?.replaySessionId
@@ -130,6 +144,9 @@ namespace SpineRecovery.App
         {
             if (CurrentResult == null) return;
             CurrentResult.feedback = feeling + " / " + difficulty;
+            CurrentResult.feedbackFeeling = feeling;
+            CurrentResult.feedbackDifficulty = difficulty;
+            CurrentResult.feedbackRecordedAt = DateTimeOffset.UtcNow.ToString("O");
             CurrentResult.feedbackPending = false;
             Persist();
             SaveToUser();

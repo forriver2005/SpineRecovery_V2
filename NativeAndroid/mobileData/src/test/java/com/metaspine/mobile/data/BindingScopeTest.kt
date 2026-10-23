@@ -11,6 +11,18 @@ import org.junit.Test
  */
 class BindingScopeTest {
 
+    @Test
+    fun `绑定可与凭据一起序列化且错医院不能匹配`() {
+        val binding = scope()
+        assertEquals(binding, BindingScope.fromJson(binding.toJson()))
+        assertTrue(binding.matchesOriginAndPatient(binding.origin, binding.patientId))
+        assertFalse(binding.matchesOriginAndPatient("https://hospital-b.example.com", binding.patientId))
+        val identity = ServiceIdentity("hospital", "svc-a", "hospital_a", "医院A", "patient", 1)
+        assertTrue(binding.matchesHospital(identity))
+        assertFalse(binding.matchesHospital(identity.copy(serviceId = "svc-b")))
+        assertFalse(binding.matchesHospital(identity.copy(role = "central")))
+    }
+
     private fun scope(
         origin: String = "https://hospital-a.example.com",
         serviceId: String = "svc-a",

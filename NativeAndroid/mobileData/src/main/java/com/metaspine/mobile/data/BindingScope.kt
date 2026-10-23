@@ -18,6 +18,27 @@ data class BindingScope(
     val accountId: String,
     val credentialGeneration: Long
 ) {
+    fun storageKey(): String = toJson().put("hospitalName", "").toString()
+
+    fun toJson(): JSONObject = JSONObject()
+        .put("origin", origin).put("serviceId", serviceId)
+        .put("hospitalKey", hospitalKey).put("hospitalName", hospitalName)
+        .put("patientId", patientId).put("accountId", accountId)
+        .put("credentialGeneration", credentialGeneration)
+
+    fun matchesOriginAndPatient(origin: String, patientId: String): Boolean =
+        this.origin == origin && this.patientId == patientId
+
+    fun matchesHospital(identity: ServiceIdentity): Boolean =
+        identity.isHospital && serviceId == identity.serviceId && hospitalKey == identity.hospitalKey
+
+    companion object {
+        fun fromJson(json: JSONObject) = BindingScope(
+            json.getString("origin"), json.getString("serviceId"), json.getString("hospitalKey"),
+            json.optString("hospitalName"), json.getString("patientId"), json.getString("accountId"),
+            json.getLong("credentialGeneration"))
+    }
+
     fun matches(other: BindingScope?): Boolean =
         other != null &&
             origin == other.origin &&
@@ -38,21 +59,11 @@ object BindingScopeStore {
     private fun key(accountId: String) = KEY_PREFIX + accountId.trim().lowercase()
 
     fun save(context: Context, scope: BindingScope): Boolean {
-        val json = JSONObject()
-            .put("origin", scope.origin)
-            .put("serviceId", scope.serviceId)
-            .put("hospitalKey", scope.hospitalKey)
-            .put("hospitalName", scope.hospitalName)
-            .put("patientId", scope.patientId)
-            .put("accountId", scope.accountId)
-            .put("credentialGeneration", scope.credentialGeneration)
-        val key = key(scope.accountId)
-        return prefs(context).edit()
-            .putString(key, SecureLocalData.seal(key, json.toString()))
-            .commit()
+        return PatientCredentials.saveBindingScope(context, scope)
     }
 
     fun load(context: Context, accountId: String): BindingScope? =
+        PatientCredentials.bindingScope(context, accountId) ?:
         SecureLocalData.read(prefs(context), key(accountId))?.let { raw ->
             runCatching {
                 val json = JSONObject(raw)
@@ -69,7 +80,8 @@ object BindingScopeStore {
         }
 
     fun clear(context: Context, accountId: String) {
-        prefs(context).edit().remove(key(accountId)).apply()
+        PatientCredentials.clearBindingScope(context, accountId)
+        check(prefs(context).edit().remove(key(accountId)).commit())
     }
 
     /** 新绑定或重新激活时推进代际，使旧 scope 的在途回包与队列失效。 */

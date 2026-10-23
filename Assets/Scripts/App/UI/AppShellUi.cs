@@ -16,6 +16,12 @@ namespace SpineRecovery.App
         private bool nativeBusy;
         private string previewActivationCode;
         private int loginGeneration;
+        private int sessionIdentityGeneration;
+        private int directiveRefreshGeneration;
+        private bool directiveRefreshPending;
+        private int questionnaireRefreshGeneration;
+        private bool questionnaireRefreshPending;
+        private NativeQuestionnaireTask[] nativeQuestionnaires = System.Array.Empty<NativeQuestionnaireTask>();
         private bool auxiliaryPageOpen;
         private AppRoute auxiliaryReturnRoute;
         private RectTransform safeContent;
@@ -216,8 +222,15 @@ namespace SpineRecovery.App
 
         private void HandleSessionChanged(UserSession session)
         {
+            sessionIdentityGeneration++;
+            directiveRefreshGeneration++;
+            directiveRefreshPending = false;
+            questionnaireRefreshGeneration++;
+            questionnaireRefreshPending = false;
+            nativeQuestionnaires = System.Array.Empty<NativeQuestionnaireTask>();
             if (session == null)
             {
+                nativeBusy = false;
                 loginGeneration++;
                 NativeMobileService.Call("logout");
             }
@@ -225,6 +238,8 @@ namespace SpineRecovery.App
 
         private void OnDestroy()
         {
+            directiveRefreshGeneration++;
+            questionnaireRefreshGeneration++;
             SceneManager.sceneLoaded -= HandleSceneLoaded;
             if (bootstrap != null) bootstrap.State.SessionChanged -= HandleSessionChanged;
         }
@@ -327,7 +342,7 @@ namespace SpineRecovery.App
             UserSession session = bootstrap != null && bootstrap.State != null ? bootstrap.State.Session : null;
             if (session == null) return new HomeScreen.State { Name = "" };
 
-            MonthlyQuestionnaireAssignment assignment = bootstrap.MonthlyAssignments != null
+            MonthlyQuestionnaireAssignment assignment = !NativeMobileService.Available && bootstrap.MonthlyAssignments != null
                 ? bootstrap.MonthlyAssignments.GetActive(session.accountId)
                 : null;
             HomeScreen.MonthlyEntryStatus monthlyStatus = HomeScreen.MonthlyEntryStatus.Disabled;
@@ -337,6 +352,9 @@ namespace SpineRecovery.App
                     ? HomeScreen.MonthlyEntryStatus.Open
                     : HomeScreen.MonthlyEntryStatus.New;
             }
+            if (NativeMobileService.Available && nativeQuestionnaires.Any(task =>
+                task.taskId > 0 && string.IsNullOrEmpty(task.completedAt) && task.availability == "available"))
+                monthlyStatus = HomeScreen.MonthlyEntryStatus.Open;
 
             return new HomeScreen.State
             {
@@ -390,6 +408,55 @@ namespace SpineRecovery.App
             JsonUtility.FromJsonOverwrite(JsonUtility.ToJson(user), bootstrap.State.Session);
             RefreshHomeSummary();
             RefreshHistorySummary();
+            RefreshDirectiveSilently();
+            RefreshQuestionnairesSilently();
+        }
+
+        private void RefreshQuestionnairesSilently()
+        {
+            UserSession session = bootstrap?.State?.Session;
+            if (!NativeMobileService.Available || NativeMobileService.Instance == null ||
+                session?.profile?.activationBound != true || questionnaireRefreshPending) return;
+            string account = session.accountId;
+            int sessionGeneration = loginGeneration;
+            int generation = ++questionnaireRefreshGeneration;
+            questionnaireRefreshPending = true;
+            NativeMobileService.Instance.Request("routineRefresh", new NativeRequest { accountId = account }, reply =>
+            {
+                if (this == null || generation != questionnaireRefreshGeneration ||
+                    sessionGeneration != loginGeneration || bootstrap?.State?.Session?.accountId != account) return;
+                questionnaireRefreshPending = false;
+                if (!reply.ok)
+                {
+                    Debug.LogWarning("[MobileBridge] Background questionnaire refresh did not complete.");
+                    return;
+                }
+                nativeQuestionnaires = JsonUtility.FromJson<NativeQuestionnaireTasks>(reply.dataJson)?.items
+                    ?? System.Array.Empty<NativeQuestionnaireTask>();
+                RefreshHomeSummary();
+            });
+        }
+
+        private void RefreshDirectiveSilently()
+        {
+            UserSession session = bootstrap?.State?.Session;
+            if (!NativeMobileService.Available || NativeMobileService.Instance == null ||
+                session?.profile?.activationBound != true || nativeBusy || directiveRefreshPending) return;
+
+            string account = session.accountId;
+            int sessionGeneration = loginGeneration;
+            int generation = ++directiveRefreshGeneration;
+            directiveRefreshPending = true;
+            // Native code persists the full snapshot. Refreshing it neither creates a
+            // training session nor changes the existing page's messages or authorization.
+            NativeMobileService.Instance.Request("refreshDirective", new NativeRequest { accountId = account }, reply =>
+            {
+                if (this == null || generation != directiveRefreshGeneration ||
+                    sessionGeneration != loginGeneration || bootstrap?.State?.Session?.accountId != account) return;
+                directiveRefreshPending = false;
+                if (!reply.ok)
+                    Debug.LogWarning("[MobileBridge] Background directive refresh did not complete.");
+            });
         }
 
         [System.Serializable] private sealed class ImportedReplayList { public string[] items; }
@@ -553,6 +620,12 @@ namespace SpineRecovery.App
             user.preTrainingCheckPassed = answers.Pain < QuestionnaireUi.PainStopThreshold;
             user.preTrainingRecordedAt = System.DateTimeOffset.UtcNow.ToString("O");
             user.preTrainingEventId = "pre:" + user.preTrainingRecordedAt;
+            HealthEventRecord.Append(user, "preTrainingQuestionnaire", user.preTrainingRecordedAt,
+                new PreTrainingSnapshot
+                {
+                    prePainLevel = answers.Pain, allowedToTrain = user.preTrainingCheckPassed,
+                    recordedAt = user.preTrainingRecordedAt,
+                }, user.preTrainingEventId, answers.Regions, answers.Leg);
             bootstrap.Users.AppendPainRecord(user, new PainHistoryRecord
             {
                 id = user.preTrainingEventId,
@@ -560,6 +633,8 @@ namespace SpineRecovery.App
                 painLevel = answers.Pain,
                 source = "DailyQuestionnaire",
                 painParts = painParts,
+                pointsCaptured = false,
+                painFree = answers.Pain == 0,
             });
             lastPreTrainingParts = painParts;
 
@@ -666,6 +741,15 @@ namespace SpineRecovery.App
                 return;
             }
 
+            if (NativeMobileService.Available)
+            {
+                RefreshQuestionnairesSilently();
+                // The current JOA/SF-MPQ pages have no approved field mapping to
+                // the server's frozen schemas. Keep the real task pending.
+                Debug.LogWarning("[MobileBridge] Monthly schema has no supported field mapping.");
+                return;
+            }
+
             MonthlyQuestionnaireAssignment assignment = bootstrap.MonthlyAssignments.GetActive(user.accountId);
             if (assignment == null)
             {
@@ -718,6 +802,7 @@ namespace SpineRecovery.App
 
         private void FinishMonthlyQuestionnaire()
         {
+            if (NativeMobileService.Available) return;
             UserSession user = bootstrap.State.Session;
             if (user == null)
             {
@@ -807,6 +892,8 @@ namespace SpineRecovery.App
                         bootstrap.State.SetSession(JsonUtility.FromJson<UserSession>(reply.dataJson));
                         activationMessage.text = "医生档案绑定成功。";
                         bootstrap.Router.Navigate(AppRoute.Home);
+                        RefreshDirectiveSilently();
+                        RefreshQuestionnairesSilently();
                     });
                 return;
             }
@@ -1022,7 +1109,7 @@ namespace SpineRecovery.App
             RefreshHomeSummary();
             if (session.IsReturningUser)
             {
-                if (session.profile.ageYears <= 0)
+                if (!NativeMobileService.Available && session.profile.ageYears <= 0)
                 {
                     session.profile.gender = "男"; session.profile.ageYears = 35; session.profile.heightCm = 175; session.profile.weightKg = 70;
                     if (session.latestPainLevel <= 0) session.latestPainLevel = 3;
@@ -1043,6 +1130,8 @@ namespace SpineRecovery.App
                 bootstrap.Router.Navigate(AppRoute.Home);
             }
             bootstrap.Training.RestoreForCurrentUser();
+            RefreshDirectiveSilently();
+            RefreshQuestionnairesSilently();
         }
 
         private GameObject CreateFormPanel(Transform parent, string title, string subtitle, System.Action<Transform> build)
@@ -1170,6 +1259,13 @@ namespace SpineRecovery.App
             UserSession user = bootstrap.State.Session;
             user.basicSituation = selectedSituation; user.symptoms = new[] { selectedSymptom };
             user.userTags = BuildUserTags(user);
+            user.intakeReviewRequired = selectedSymptom == "无力" || selectedSituation == "acute";
+            HealthEventRecord.Append(user, "admissionIntake", System.DateTimeOffset.UtcNow.ToString("O"),
+                new AdmissionIntakeSnapshot
+                {
+                    situation = selectedSituation, symptom = selectedSymptom,
+                    goals = (string[])(user.goals ?? System.Array.Empty<string>()).Clone(),
+                });
             if (selectedSymptom == "无力" || selectedSituation == "acute")
             {
                 user.intakeReviewRequired = true;
@@ -1218,13 +1314,31 @@ namespace SpineRecovery.App
             user.latestPainLevel = user.painLevels.Length > 0 ? Mathf.Max(user.painLevels) : 0;
             user.userTags = BuildUserTags(user);
             user.intakeCompleted = true;
+            string recordedAt = System.DateTimeOffset.UtcNow.ToString("O");
+            HealthEventRecord.Append(user, "admissionSurvey", recordedAt, new AdmissionSurveySnapshot
+            {
+                painLevel = user.latestPainLevel, requiresClinicalReview = user.intakeReviewRequired,
+            });
+            string[] pointKeys = { "left_waist", "right_waist", "left_upper_arm", "right_upper_arm", "left_hip", "right_hip", "left_leg", "right_leg" };
+            string[] pointLabels = { "左腰部", "右腰部", "左大臂", "右大臂", "左臀部", "右臀部", "左腿", "右腿" };
+            var points = new PainPointSnapshot[selectedPainParts.Count];
+            for (int i = 0; i < points.Length; i++)
+            {
+                int labelIndex = System.Array.IndexOf(pointKeys, selectedPainParts[i]);
+                points[i] = new PainPointSnapshot
+                {
+                    bodyPart = selectedPainParts[i], bodyPartLabel = pointLabels[labelIndex],
+                    painLevel = painLevelsByPart[selectedPainParts[i]],
+                };
+            }
             bootstrap.Users.AppendPainRecord(user, new PainHistoryRecord
             {
-                id = "intake:" + System.DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(),
-                recordedAt = System.DateTimeOffset.UtcNow.ToString("O"),
+                id = "intake:" + System.Guid.NewGuid().ToString("N"),
+                recordedAt = recordedAt,
                 painLevel = user.latestPainLevel,
                 source = "AdmissionQuestionnaire",
-                painParts = user.painParts,
+                painParts = (string[])user.painParts.Clone(),
+                points = points, pointsCaptured = true, painFree = user.painFree,
             });
             bootstrap.Router.Navigate(AppRoute.MobileAdmission);
         }
@@ -1447,7 +1561,7 @@ namespace SpineRecovery.App
             user.extensionResponse = extensionResponse;
             user.flexionPainPhase = flexionPainPhase;
             user.extensionPainPhase = extensionPainPhase;
-            user.admissionCompletedAt = System.DateTimeOffset.Now.ToString("o");
+            user.admissionCompletedAt = System.DateTimeOffset.UtcNow.ToString("O");
             List<string> tags = new List<string>(user.userTags ?? System.Array.Empty<string>());
             tags.RemoveAll(tag => tag == "屈曲方向偏好" || tag == "伸展方向偏好");
             if (extensionResponse == "relieved" && flexionResponse != "relieved") tags.Add("伸展方向偏好");
@@ -1455,6 +1569,23 @@ namespace SpineRecovery.App
             user.userTags = tags.ToArray();
             user.admissionReviewRequired = Mathf.Max(flexionAdmissionPain, extensionAdmissionPain) >= 8;
             user.admissionCompleted = true;
+            HealthEventRecord.Append(user, "mobileAdmissionAssessment", user.admissionCompletedAt,
+                new AdmissionAssessmentSnapshot
+                {
+                    completedAt = user.admissionCompletedAt,
+                    flexion = new AdmissionMovementSnapshot
+                    {
+                        movementType = "fis", completionCount = flexionCompletedCount,
+                        painResponse = flexionResponse, firstPainPhase = flexionPainPhase,
+                        painLevel = flexionAdmissionPain,
+                    },
+                    extension = new AdmissionMovementSnapshot
+                    {
+                        movementType = "eis", completionCount = extensionCompletedCount,
+                        painResponse = extensionResponse, firstPainPhase = extensionPainPhase,
+                        painLevel = extensionAdmissionPain,
+                    },
+                });
             bootstrap.Users.Save(user);
             if (user.admissionReviewRequired) { bootstrap.Router.Navigate(AppRoute.AdmissionDecision); return; }
             bootstrap.Router.Navigate(AppRoute.Home);
@@ -1617,12 +1748,33 @@ namespace SpineRecovery.App
                 nativeBusy = true;
                 arTrainingMessage.text = "正在获取本次医生处方…";
                 string account = user.accountId;
+                int generation = loginGeneration;
+                int identityGeneration = sessionIdentityGeneration;
                 NativeMobileService.Instance.Request("plan", new NativeRequest { accountId = account }, reply =>
                 {
+                    if (this == null || generation != loginGeneration || identityGeneration != sessionIdentityGeneration ||
+                        bootstrap.State.Session?.accountId != account) return;
                     nativeBusy = false;
-                    if (bootstrap.State.Session?.accountId != account) return;
                     if (!reply.ok) { arTrainingMessage.text = reply.error; return; }
-                    LaunchPlan(JsonUtility.FromJson<TrainingPlan>(reply.dataJson));
+                    TrainingPlan plan;
+                    try { plan = JsonUtility.FromJson<TrainingPlan>(reply.dataJson); }
+                    catch (System.ArgumentException) { plan = null; }
+                    if (plan == null || plan.accountId != account || plan.patientId != bootstrap.State.Session.profile?.patientId ||
+                        !plan.CanConsumePrescription())
+                    {
+                        arTrainingMessage.text = "无法启动训练，请检查处方和场景配置。";
+                        return;
+                    }
+                    nativeBusy = true;
+                    NativeMobileService.Instance.Request("confirmPlan", new NativeRequest
+                    { accountId = account, planToken = plan.planToken, consumerConfirmed = true }, confirmed =>
+                    {
+                        if (this == null || generation != loginGeneration || identityGeneration != sessionIdentityGeneration ||
+                            bootstrap.State.Session?.accountId != account) return;
+                        nativeBusy = false;
+                        if (!confirmed.ok) { arTrainingMessage.text = confirmed.error; return; }
+                        LaunchPlan(plan);
+                    });
                 });
                 return;
             }

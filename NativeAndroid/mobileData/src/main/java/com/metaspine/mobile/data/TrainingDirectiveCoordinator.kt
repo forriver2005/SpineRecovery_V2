@@ -68,10 +68,10 @@ data class TrainingPrescriptionHandoff(
 }
 
 /**
- * P4：下行协调器 —— 「拉取 → 校验 → 保存 → 下载资源 → 两阶段回执 → 交接」。
+ * P4：接收保存、准备文件、消费者确认后提交 ready，三个入口各自推进真实状态。
  *
  * 关键规则：
- * - 只有**本次在线刷新成功且 state=ready、全部资源已验证、`assets_ready` 已被接受**
+ * - 只有本次 prepare 成功、已有消费者确认且 `assets_ready` 已被接受
  *   才返回 [DirectiveRefreshResult.Ready]；
  * - `directive_saved` 只在快照与回执任务持久化成功后提交；
  * - `assets_ready` 只在全部固定文件核对通过、且消费者确认能力后提交；
@@ -83,12 +83,13 @@ class TrainingDirectiveCoordinator(
     private val receipts: PrescriptionReceiptStorage? = null,
     private val assets: PrescriptionAssetStorage? = null,
     private val handoffGate: (TrainingPrescriptionHandoff) -> List<String> = { emptyList() },
-    private val fetchDirective: suspend (String) -> Result<JSONObject> = PatientDirectiveClient::fetch,
-    private val sendStopReceipt: suspend (String, Long) -> Result<PatientDirectiveClient.ReceiptInfo> =
-        PatientDirectiveClient::postStopReceipt,
+    private val isCurrent: (BindingScope) -> Boolean = { true },
+    private val fetchDirective: (suspend (String) -> Result<JSONObject>)? = null,
+    private val sendStopReceipt: (suspend (String, Long) -> Result<PatientDirectiveClient.ReceiptInfo>)? = null,
     private val sendPrescriptionReceipt:
-        suspend (String, Long, String, String) -> Result<PatientDirectiveClient.ReceiptInfo> =
-        PatientDirectiveClient::postPrescriptionReceipt,
+        (suspend (String, Long, String, String) -> Result<PatientDirectiveClient.ReceiptInfo>)? = null,
+    private val fetchResourceStatus: (suspend (String) -> Result<PrescriptionResourceStatus>)? = null,
+    private val elapsedMillis: () -> Long = { android.os.SystemClock.elapsedRealtime() },
     private val nowMillis: () -> Long = System::currentTimeMillis
 ) {
 
@@ -96,14 +97,45 @@ class TrainingDirectiveCoordinator(
         accountId: String,
         credential: PatientServerCredential?,
         scope: BindingScope? = null
+    ): DirectiveRefreshResult = refreshInternal(accountId, credential, scope, receiveOnly = false)
+
+    /** 仅准备交接；消费者尚未读取资源，此时绝不发送 assets_ready。 */
+    suspend fun prepare(
+        accountId: String,
+        credential: PatientServerCredential?,
+        scope: BindingScope
+    ): DirectiveRefreshResult = refreshInternal(accountId, credential, scope, receiveOnly = false)
+
+    /**
+     * 仅接收医生指令：保存完整快照并确认接收，不下载资源、不检查训练能力或练前数据。
+     * [DirectiveRefreshResult.Received] 只表示接收结果，绝不授予训练资格。
+     */
+    suspend fun receiveOnly(
+        accountId: String,
+        credential: PatientServerCredential?,
+        scope: BindingScope
+    ): DirectiveRefreshResult = refreshInternal(accountId, credential, scope, receiveOnly = true)
+
+    private suspend fun refreshInternal(
+        accountId: String,
+        credential: PatientServerCredential?,
+        scope: BindingScope?,
+        receiveOnly: Boolean
     ): DirectiveRefreshResult {
         val effective = credential
             ?: return DirectiveRefreshResult.NotActivated("尚未完成激活码绑定，请联系医生")
+        require(scope == null || (scope.patientId == effective.patientId && scope.accountId == accountId)) {
+            "医院绑定与当前患者不一致"
+        }
+        if (scope != null && !isCurrent(scope)) return bindingChanged()
 
         // PAT 换绑到别的患者后，旧快照立即作废。
         storage.clearIfPatientChanged(accountId, effective.patientId)
 
-        val fetched = fetchDirective(effective.patientToken)
+        val observedElapsedMillis = if (receiveOnly) 0L else elapsedMillis()
+        val fetched = fetchDirective?.invoke(effective.patientToken)
+            ?: PatientDirectiveClient.fetch(effective.patientToken, scope?.origin ?: SpineFlowServerConfig.BASE_URL)
+        if (scope != null && !isCurrent(scope)) return bindingChanged()
         val data = fetched.getOrElse { error -> return failureResult(accountId, effective, error) }
 
         val snapshot = try {
@@ -124,25 +156,37 @@ class TrainingDirectiveCoordinator(
         storage.write(accountId, snapshot)
 
         if (snapshot.state == TrainingDirectiveState.Stopped) {
-            submitStopReceiptIfNeeded(effective, snapshot)
-            return DirectiveRefreshResult.NotTrainable(snapshot, DirectiveMessages.forState(snapshot))
+            val stop = requireNotNull(snapshot.stopOrder)
+            val receipt = if (stop.receivedAt.isNullOrBlank()) {
+                if (scope != null && !isCurrent(scope)) return bindingChanged()
+                sendStopReceipt?.invoke(effective.patientToken, stop.orderId)
+                    ?: PatientDirectiveClient.postStopReceipt(effective.patientToken, stop.orderId,
+                        scope?.origin ?: SpineFlowServerConfig.BASE_URL)
+            } else null
+            if (scope != null && !isCurrent(scope)) return bindingChanged()
+            val acknowledged = receipt?.getOrNull()?.let { info ->
+                snapshot.copy(stopOrder = stop.copy(receivedAt = info.receivedAt)).also {
+                    storage.write(accountId, it)
+                }
+            } ?: snapshot
+            return if (receiveOnly) {
+                DirectiveRefreshResult.Received(
+                    acknowledged,
+                    receiptPending = receipt?.isFailure == true,
+                    message = receipt?.exceptionOrNull()?.let {
+                        receiptFailureMessage(it, "停训指令已保存，接收回执待重试")
+                    } ?: DirectiveMessages.forState(acknowledged)
+                )
+            } else DirectiveRefreshResult.NotTrainable(acknowledged, DirectiveMessages.forState(acknowledged))
         }
 
         val order = snapshot.prescription
-        if (snapshot.state != TrainingDirectiveState.Ready || order == null || scope == null) {
+        if (order == null || scope == null || (!receiveOnly && snapshot.state != TrainingDirectiveState.Ready)) {
+            if (receiveOnly) return DirectiveRefreshResult.Received(snapshot, false, DirectiveMessages.forState(snapshot))
             return DirectiveRefreshResult.NotTrainable(snapshot, DirectiveMessages.forState(snapshot))
         }
 
-        return deliverPrescription(effective, snapshot, order, scope)
-    }
-
-    private suspend fun submitStopReceiptIfNeeded(
-        credential: PatientServerCredential,
-        snapshot: TrainingDirectiveSnapshot
-    ) {
-        val stopOrder = snapshot.stopOrder ?: return
-        if (!stopOrder.receivedAt.isNullOrBlank()) return
-        runCatching { sendStopReceipt(credential.patientToken, stopOrder.orderId) }
+        return deliverPrescription(effective, snapshot, order, scope, receiveOnly, observedElapsedMillis)
     }
 
     /**
@@ -152,7 +196,9 @@ class TrainingDirectiveCoordinator(
         credential: PatientServerCredential,
         snapshot: TrainingDirectiveSnapshot,
         order: DownloadedOrder,
-        scope: BindingScope
+        scope: BindingScope,
+        receiveOnly: Boolean,
+        observedElapsedMillis: Long
     ): DirectiveRefreshResult {
         val manifest = order.resourceManifestSha256
         if (manifest != order.prescription.computeManifestSha256()) {
@@ -173,11 +219,18 @@ class TrainingDirectiveCoordinator(
                 blockingReasons = emptyList()
             )
         if (task.phase == ReceiptPhase.NotSubmitted) {
-            val saved = sendPrescriptionReceipt(
+            if (!isCurrent(scope)) return bindingChanged()
+            // 先持久保存待确认任务；失败或响应丢失时下次接收可重放同一订单与摘要。
+            receipts?.write(scope, task)
+            val saved = sendPrescriptionReceipt?.invoke(
                 credential.patientToken, order.orderId, PatientDirectiveClient.PHASE_SAVED, manifest
-            )
+            ) ?: PatientDirectiveClient.postPrescriptionReceipt(credential.patientToken, order.orderId,
+                PatientDirectiveClient.PHASE_SAVED, manifest, scope.origin)
+            if (!isCurrent(scope)) return bindingChanged()
             val info = saved.getOrElse { error ->
                 // 保存阶段的失败必须保留任务，下一次刷新原样重试同一订单与摘要。
+                if (receiveOnly) return DirectiveRefreshResult.Received(
+                    snapshot, true, receiptFailureMessage(error, "处方已保存，接收回执待重试"))
                 return DirectiveRefreshResult.NotTrainable(
                     snapshot, receiptFailureMessage(error, "处方保存回执失败"))
             }
@@ -185,10 +238,23 @@ class TrainingDirectiveCoordinator(
             receipts?.write(scope, task)
         }
 
+        if (receiveOnly) return DirectiveRefreshResult.Received(
+            snapshot, false, "医生处方已保存")
+
+        var leaseAnchor = snapshot.resourceLease?.let { ObservedResourceLease(it, observedElapsedMillis) }
+            ?: return DirectiveRefreshResult.NotTrainable(snapshot, "资源授权缺失，请重新刷新医生处方")
+        if (!leaseAnchor.isValidAt(elapsedMillis())) {
+            return DirectiveRefreshResult.NotTrainable(snapshot, "资源授权已过期，请重新刷新医生处方")
+        }
+
         // ── 阶段 2：下载并核对全部固定文件 ──────────────────────────────────────
         val handedOff = mutableListOf<HandedOffAsset>()
         val failures = mutableListOf<Long>()
         for (item in order.items) {
+            if (!isCurrent(scope)) return bindingChanged()
+            if (!leaseAnchor.isValidAt(elapsedMillis())) {
+                return DirectiveRefreshResult.NotTrainable(snapshot, "资源授权已过期，请重新刷新医生处方")
+            }
             val asset = item.asset
             val cached = assets?.existing(order.orderId, item.itemId, asset.sha256)
             if (cached != null) {
@@ -196,7 +262,7 @@ class TrainingDirectiveCoordinator(
                 continue
             }
             val downloaded = try {
-                assets?.download(credential.patientToken, order, item)
+                assets?.download(credential.patientToken, order, item, leaseAnchor.lease)
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (error: ApiHttpException) {
@@ -215,7 +281,17 @@ class TrainingDirectiveCoordinator(
             if (downloaded == null) {
                 failures.add(item.itemId)
             } else {
-                handedOff.add(HandedOffAsset(item, downloaded, asset.fileSize))
+                val downloadedLease = downloaded.leaseAnchor
+                if (downloadedLease == null || !downloadedLease.isValidAt(elapsedMillis())) {
+                    failures.add(item.itemId)
+                } else {
+                    try { downloadedLease.lease.requireSuccessorOf(leaseAnchor.lease) }
+                    catch (error: IllegalArgumentException) {
+                        return DirectiveRefreshResult.NotTrainable(snapshot, error.message ?: "资源授权已失效")
+                    }
+                    leaseAnchor = downloadedLease
+                    handedOff.add(HandedOffAsset(item, downloaded.file, downloaded.byteCount))
+                }
             }
         }
         val blocking = buildList {
@@ -235,30 +311,66 @@ class TrainingDirectiveCoordinator(
                 snapshot, blocking.firstOrNull() ?: "资源尚未就绪，请稍后重试")
         }
 
-        // ── 阶段 3：全部条件满足才提交 assets_ready ─────────────────────────────
-        if (task.phase != ReceiptPhase.AssetsReady) {
-            val ready = sendPrescriptionReceipt(
-                credential.patientToken, order.orderId,
-                PatientDirectiveClient.PHASE_ASSETS_READY, manifest
-            )
-            val info = ready.getOrElse { error ->
-                // 服务器可能已记录、只是响应丢失：保持 saved，下一次原样重放。
-                return DirectiveRefreshResult.NotTrainable(
-                    snapshot, receiptFailureMessage(error, "资源就绪回执失败"))
-            }
-            task = task.copy(
-                phase = ReceiptPhase.AssetsReady,
-                assetsReadyReceivedAt = info.assetsReadyAt ?: info.receivedAt,
-                failedAssetItemIds = emptyList(),
-                blockingReasons = emptyList()
-            )
-            receipts?.write(scope, task)
+        if (!isCurrent(scope)) return bindingChanged()
+        if (!leaseAnchor.isValidAt(elapsedMillis())) {
+            return DirectiveRefreshResult.NotTrainable(snapshot, "资源授权已过期，请重新刷新医生处方")
         }
+        val handoff = TrainingPrescriptionHandoff(scope, order, manifest, handedOff, emptyList())
+        if (!handoff.hasVerifiedFiles()) {
+            return DirectiveRefreshResult.NotTrainable(snapshot, "处方文件未通过校验，请重新获取资源")
+        }
+        return DirectiveRefreshResult.Prepared(snapshot, handoff, leaseAnchor)
+    }
 
-        return DirectiveRefreshResult.Ready(
-            snapshot,
-            TrainingPrescriptionHandoff(scope, order, manifest, handedOff, emptyList())
-        )
+    /** 已有消费者实际读取并认可合同后调用。准备票据仅在本次进程和绑定内有效。 */
+    suspend fun confirmReady(
+        credential: PatientServerCredential,
+        prepared: DirectiveRefreshResult.Prepared,
+        consumerConfirmed: Boolean
+    ): DirectiveRefreshResult {
+        val handoff = prepared.handoff
+        val scope = handoff.scope
+        val order = handoff.order
+        fun blocked(message: String) = DirectiveRefreshResult.NotTrainable(prepared.snapshot, message)
+        if (!isCurrent(scope) || credential.patientId != scope.patientId) return bindingChanged()
+        if (!consumerConfirmed) return blocked("资源消费者尚未确认可用")
+        if (!prepared.leaseAnchor.isValidAt(elapsedMillis())) return blocked("资源授权已过期，请重新刷新医生处方")
+        if (!handoff.hasVerifiedFiles()) return blocked("处方文件已变化，请重新获取资源")
+        val receiptStorage = receipts ?: return blocked("处方保存回执尚未确认")
+        val task = receiptStorage.read(scope, order.orderId)
+            ?.takeIf { it.resourceManifestSha256 == handoff.manifestSha256 && it.phase != ReceiptPhase.NotSubmitted }
+            ?: return blocked("处方保存回执尚未确认")
+
+        val statusObserved = elapsedMillis()
+        val status = fetchResourceStatus?.invoke(credential.patientToken)
+            ?: PatientDirectiveClient.resourceStatus(credential.patientToken, scope.origin)
+        if (!isCurrent(scope)) return bindingChanged()
+        val currentStatus = status.getOrElse { return blocked(receiptFailureMessage(it, "资源状态暂不可确认")) }
+        try {
+            currentStatus.lease.requireSuccessorOf(prepared.leaseAnchor.lease)
+            currentStatus.requireAvailable(order)
+        } catch (error: IllegalArgumentException) { return blocked(error.message ?: "资源授权已失效") }
+        val currentLease = ObservedResourceLease(currentStatus.lease, statusObserved)
+        if (!currentLease.isValidAt(elapsedMillis())) return blocked("资源授权已过期")
+        if (!handoff.hasVerifiedFiles()) return blocked("处方文件已变化，请重新获取资源")
+        if (!isCurrent(scope)) return bindingChanged()
+        receiptStorage.write(scope, task.copy(readyPending = true))
+        // 每次交接都重放 ready；服务端重新核对当前停训/撤销状态，并保留首次时间。
+        val ready = sendPrescriptionReceipt?.invoke(credential.patientToken, order.orderId,
+            PatientDirectiveClient.PHASE_ASSETS_READY, handoff.manifestSha256)
+            ?: PatientDirectiveClient.postPrescriptionReceipt(credential.patientToken, order.orderId,
+                PatientDirectiveClient.PHASE_ASSETS_READY, handoff.manifestSha256, scope.origin)
+        if (!isCurrent(scope)) return bindingChanged()
+        val info = ready.getOrElse { return blocked(receiptFailureMessage(it, "资源就绪回执待重试")) }
+        if (!currentLease.isValidAt(elapsedMillis())) return blocked("资源授权已过期，请重新刷新医生处方")
+        if (!handoff.hasVerifiedFiles()) return blocked("处方文件已变化，请重新获取资源")
+        require(!info.assetsReadyAt.isNullOrBlank()) { "资源就绪回执缺少就绪时间" }
+        receiptStorage.write(scope, task.copy(phase = ReceiptPhase.AssetsReady, assetsReadyReceivedAt = info.assetsReadyAt,
+            failedAssetItemIds = emptyList(), blockingReasons = emptyList(), readyPending = false))
+        val snapshot = prepared.snapshot.copy(prescription = order.copy(
+            receivedAt = info.receivedAt, assetsReadyAt = info.assetsReadyAt), resourceLease = currentStatus.lease)
+        storage.write(scope.accountId, snapshot)
+        return DirectiveRefreshResult.Ready(snapshot, handoff)
     }
 
     private fun receiptFailureMessage(error: Throwable, fallback: String): String =
@@ -268,6 +380,9 @@ class TrainingDirectiveCoordinator(
             error is DirectiveProtocolException && error.message != null -> error.message!!
             else -> fallback
         }
+
+    private fun bindingChanged() = DirectiveRefreshResult.Unavailable(
+        "医院绑定已变更，请重新刷新医生指令", cached = null)
 
     private fun failureResult(
         accountId: String,
@@ -301,11 +416,34 @@ interface PrescriptionReceiptStorage {
 /** 固定资源端口：返回已发布的本地文件；失败必须抛出而不是返回半文件。 */
 interface PrescriptionAssetStorage {
     fun existing(orderId: Long, itemId: Long, sha256: String): File?
-    suspend fun download(patientToken: String, order: DownloadedOrder, item: AdmissionPrescriptionItemV2): File?
+    suspend fun download(patientToken: String, order: DownloadedOrder, item: AdmissionPrescriptionItemV2,
+        expectedLease: TrainingResourceLease): PrescriptionAssetClient.VerifiedAsset?
 }
+
+/** 不信任旧缓存或先前检查结果；消费者确认前后均核对同一组原始字节。 */
+internal fun TrainingPrescriptionHandoff.hasVerifiedFiles(): Boolean = runCatching { complete &&
+    order.items.all { item -> assets.singleOrNull { it.item.itemId == item.itemId }?.let { local ->
+        local.item == item && local.byteCount == item.asset.fileSize && local.file.isFile &&
+            local.file.length() == item.asset.fileSize &&
+            PrescriptionAssetClient.sha256Hex(local.file) == item.asset.sha256
+    } == true }
+}.getOrDefault(false)
 
 /** 本次刷新对“能否开始训练”的结论。 */
 sealed interface DirectiveRefreshResult {
+    data class Prepared(
+        val snapshot: TrainingDirectiveSnapshot,
+        val handoff: TrainingPrescriptionHandoff,
+        val leaseAnchor: ObservedResourceLease
+    ) : DirectiveRefreshResult
+
+    /** 接收刷新成功；回执可以待重试，资源与训练能力尚未在此入口确认。 */
+    data class Received(
+        val snapshot: TrainingDirectiveSnapshot,
+        val receiptPending: Boolean,
+        val message: String
+    ) : DirectiveRefreshResult
+
     /**
      * 本次在线刷新成功、资源已验证且 `assets_ready` 已被接受；
      * 仍需通过手机本地训练前安全检查。

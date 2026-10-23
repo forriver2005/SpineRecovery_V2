@@ -116,10 +116,10 @@ object PatientActivationClient {
 
     /**
      * 完整 V2 首方：1–10 项有序、每项带冻结资源身份；不再限制单项。
-     * 与 D01 共用 [AdmissionPrescriptionV2]；A02 的条目 ID 字段名是 `id`，D01 是 `itemId`。
+     * A02 的条目 ID 字段名是 `id`，且没有下载路径；D01 使用 `itemId` 并提供下载路径。
      */
     internal fun parsePrescriptionV2(json: JSONObject): AdmissionPrescriptionV2 =
-        AdmissionPrescriptionV2.fromJson(json, itemIdKey = "id")
+        AdmissionPrescriptionV2.fromActivationJson(json)
 
     /**
      * 失败文案（设计 §8.8）。

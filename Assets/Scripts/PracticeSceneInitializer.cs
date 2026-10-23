@@ -211,7 +211,7 @@ public class PracticeSceneInitializer : MonoBehaviour
     /// - 本地文件路径（如 /sdcard/cache/deadbug.motion.json）
     /// - content:// URI（Android FileProvider）
     /// </summary>
-    private string ReadJsonFromUri(string uri)
+    public static string ReadJsonFromUri(string uri)
     {
         // content:// URI 走 Android 接口
         if (uri.StartsWith("content://"))

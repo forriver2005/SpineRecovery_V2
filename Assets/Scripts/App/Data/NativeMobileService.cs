@@ -10,6 +10,8 @@ namespace SpineRecovery.App
         public string accountId;
         public string password;
         public string code;
+        public string planToken;
+        public bool consumerConfirmed;
         public long taskId;
         public string questionId;
         public string answerType;
@@ -17,6 +19,24 @@ namespace SpineRecovery.App
         public bool boolValue;
         public string textValue;
         public string[] values = Array.Empty<string>();
+    }
+
+    [Serializable]
+    public sealed class NativeQuestionnaireTask
+    {
+        public long taskId;
+        public string completedAt;
+        public string availability;
+        public int templateVersion;
+        public string schemaJson;
+        public string answersJson;
+        public string requestId;
+    }
+
+    [Serializable]
+    public sealed class NativeQuestionnaireTasks
+    {
+        public NativeQuestionnaireTask[] items = Array.Empty<NativeQuestionnaireTask>();
     }
 
     [Serializable]

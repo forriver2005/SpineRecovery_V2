@@ -71,16 +71,70 @@ class PrescriptionV2ContractTest {
     }
 
     @Test
-    fun `首方条目 ID 字段名是 id`() {
-        val directive = prescriptionOf(cases()[0])
-        val asActivation = JSONObject(directive.toString())
-        val items = asActivation.getJSONArray("items")
-        for (index in 0 until items.length()) {
-            val item = items.getJSONObject(index)
-            item.put("id", item.getLong("itemId")).remove("itemId")
+    fun `首方以id映射全部条目且不要求D01下载路径`() {
+        for (case in cases()) {
+            val asActivation = JSONObject(prescriptionOf(case).toString())
+            val items = asActivation.getJSONArray("items")
+            for (index in 0 until items.length()) {
+                val item = items.getJSONObject(index)
+                item.put("id", item.getLong("itemId")).remove("itemId")
+                item.getJSONObject("asset").remove("downloadPath")
+            }
+            val parsed = PatientActivationClient.parsePrescriptionV2(asActivation)
+            assertEquals(items.length(), parsed.items.size)
+            assertTrue(parsed.items.all { it.asset.downloadPath.isEmpty() })
+            assertEquals(parsed.resourceManifestSha256, parsed.computeManifestSha256())
+            assertEquals(parsed, AdmissionPrescriptionV2.fromJson(parsed.toJson()))
         }
-        val parsed = AdmissionPrescriptionV2.fromJson(asActivation, itemIdKey = "id")
-        assertEquals(1001L, parsed.items.first().itemId)
+    }
+
+    @Test
+    fun `真实A02首次成功及原样重放响应可被完整激活解析器接受`() {
+        // 隔离服务器真实 HTTP 201 及同请求 HTTP 200 的响应正文相同，不含 PAT。
+        val envelope = javaClass.getResourceAsStream("/fixtures/real-a02.json")!!
+            .bufferedReader(Charsets.UTF_8).use { JSONObject(it.readText()) }
+        val data = envelope.getJSONObject("data")
+        val initial = PatientActivationClient.parseRedeem(data)
+        val replay = PatientActivationClient.parseRedeem(JSONObject(data.toString()))
+        assertEquals(initial, replay)
+        assertEquals(data.getString("patientId"), initial.patientId)
+        val prescription = requireNotNull(initial.prescriptionV2)
+        assertEquals(1L, prescription.orderId)
+        assertEquals(1L, prescription.items.single().itemId)
+        assertEquals(2, prescription.items.single().sets)
+        assertEquals(6, prescription.items.single().reps)
+        assertEquals(5, prescription.items.single().holdSeconds)
+        assertEquals("", prescription.items.single().asset.downloadPath)
+        assertEquals(prescription.resourceManifestSha256, prescription.computeManifestSha256())
+    }
+
+    @Test
+    fun `D01仍要求下载路径不受A02缺省映射影响`() {
+        val json = JSONObject(prescriptionOf(cases()[0]).toString())
+        json.getJSONArray("items").getJSONObject(0).getJSONObject("asset").remove("downloadPath")
+        assertThrows(Exception::class.java) {
+            AdmissionPrescriptionV2.fromDirectiveJson(json)
+        }
+    }
+
+    @Test
+    fun `ready回执必须提供就绪时间而saved允许空`() {
+        val json = JSONObject(cases()[0].getJSONObject("savedReceipt").toString())
+        val orderId = json.getLong("orderId")
+        val manifest = json.getString("resourceManifestSha256")
+        json.put("receivedAt", "2026-10-23 10:00:00").put("assetsReadyAt", JSONObject.NULL)
+        PatientDirectiveClient.parsePrescriptionReceipt(json, orderId, "directive_saved", manifest)
+        json.put("phase", "assets_ready")
+        assertThrows(IllegalArgumentException::class.java) {
+            PatientDirectiveClient.parsePrescriptionReceipt(json, orderId, "assets_ready", manifest)
+        }
+    }
+
+    @Test
+    fun `停训回执缺少保存时间不得确认`() {
+        assertThrows(IllegalArgumentException::class.java) {
+            PatientDirectiveClient.parseStopReceipt(JSONObject().put("orderId", 1), 1)
+        }
     }
 
     @Test

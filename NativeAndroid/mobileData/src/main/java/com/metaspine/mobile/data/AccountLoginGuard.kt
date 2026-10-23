@@ -30,6 +30,14 @@ class AccountLoginGuard(
                 is AccountActivationState.Activated -> {
                     val origin = SpineFlowServerConfig.BASE_URL
                     val scopeAtRequest = BindingScopeStore.load(context, id)
+                        ?: return AccountLoginResult.Blocked("医院绑定信息缺失，请恢复原医院绑定")
+                    if (!scopeAtRequest.matchesOriginAndPatient(origin, state.credential.patientId)) {
+                        return AccountLoginResult.Blocked("当前服务器不是账号绑定医院，本地数据已保留")
+                    }
+                    val hospital = ServiceIdentityClient.fetch().getOrThrow()
+                    if (!scopeAtRequest.matchesHospital(hospital) || SpineFlowServerConfig.BASE_URL != origin) {
+                        return AccountLoginResult.Blocked("医院身份不匹配，本地数据已保留")
+                    }
                     val status = checkServer(state.credential, id, PatientCredentials.installationId(context))
                     // A late response cannot authorize deletion/login after another binding replaces this one.
                     if (PatientCredentials.credential(context, id) != state.credential ||
@@ -74,6 +82,7 @@ class AccountLoginGuard(
         if (startUserId in ownedIds) phone.clearTemporaryTrainingData()
         TrainingDirectiveStore(context).clear(accountId)
         RoutineQuestionnaireStore(context).use { it.clearAccount(accountId) }
+        BindingScopeStore.clear(context, accountId)
         PatientCredentials.clearAccount(context, accountId)
         userStore.finishAccountDeletion(accountId)
     }

@@ -211,9 +211,21 @@ object PatientSyncClient {
             ?: "pre:content:${stableHash(check.toJson())}"
 
     /** Transport handles bounds and cancellation; the coordinator owns retry/idempotency. */
-    suspend fun sync(body: JSONObject, patientToken: String?): Result<Unit> = patientRequestResult {
-        val response = PatientHttpTransport.shared.request(SYNC_PATH, "POST", patientToken, body.toString())
+    suspend fun sync(body: JSONObject, patientToken: String?, origin: String = SpineFlowServerConfig.BASE_URL): Result<Unit> = patientRequestResult {
+        val response = PatientHttpTransport(origin = { origin }).request(SYNC_PATH, "POST", patientToken, body.toString())
         response.requireSuccess("同步失败，HTTP "+response.status)
-        check(JSONObject(response.text).optInt("code", -1) == 0) { "同步响应状态无效" }
+        verifyResponse(JSONObject(response.text), body.getString("userId"))
+    }
+    internal fun verifyResponse(json: JSONObject, patientId: String) {
+        val code = json.opt("code")
+        check(code is Number && code.toDouble() == 0.0) { "同步响应状态无效" }
+        val data = json.getJSONObject("data")
+        check(data.getString("userId") == patientId) { "同步响应患者不一致" }
+        val counts = data.getJSONObject("synced")
+        for (name in listOf("profile", "questionnaires", "painRecords", "lifecycle")) {
+            val count = counts.opt(name)
+            check(count is Number && count.toDouble().isFinite() && count.toDouble() >= 0 &&
+                count.toDouble() == count.toLong().toDouble()) { "同步响应计数无效" }
+        }
     }
 }

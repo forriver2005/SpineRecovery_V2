@@ -3,6 +3,7 @@ package com.metaspine.mobile.data
 import org.json.JSONObject
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
+import org.junit.Assert.assertNull
 import org.junit.Assert.fail
 import org.junit.Test
 
@@ -285,5 +286,63 @@ class PrescriptionResultV2Test {
 
         val longToken = requestOf(snapshots().first()).put("sessionId", "x".repeat(129))
         assertTrue(parseError(longToken) is ResultInputException.ResultInvalid)
+    }
+
+    @Test
+    fun `修订号和资源编号不得超出JS安全整数`() {
+        for (field in listOf("resultRevision", "prescriptionOrderId")) {
+            assertTrue(parseError(requestOf(snapshots().first()).put(field, 9_007_199_254_740_992L))
+                is ResultInputException.ResultInvalid)
+        }
+        for (field in listOf("itemId", "actionVersionId")) {
+            val raw = requestOf(snapshots().first())
+            raw.getJSONArray("itemResults").getJSONObject(0).put(field, 9_007_199_254_740_992L)
+            assertTrue(parseError(raw) is ResultInputException.ResultInvalid)
+        }
+        val maximum = PrescriptionResultV2.parse(requestOf(snapshots().first())
+            .put("resultRevision", MAX_SAFE_RESULT_INTEGER), patientId)
+        assertEquals(MAX_SAFE_RESULT_INTEGER, maximum.resultRevision)
+    }
+
+    @Test
+    fun `整数语义接受小数和指数形式但不截断小数`() {
+        val raw = requestOf(snapshots().first()).put("protocolVersion", 2.0).put("resultRevision", 1.0)
+        val item = raw.getJSONArray("itemResults").getJSONObject(0)
+        item.put("position", 0.0)
+        item.getJSONArray("modeResults").getJSONObject(0).put("completedReps", 0.0)
+        assertEquals(1L, PrescriptionResultV2.parse(raw, patientId).resultRevision)
+        assertTrue(parseError(raw.put("resultRevision", 1.5)) is ResultInputException.ResultInvalid)
+        assertTrue(parseError(raw.put("resultRevision", "1")) is ResultInputException.ResultInvalid)
+    }
+
+    @Test
+    fun `score缺字段不能补成null且会话不能是NOT_STARTED`() {
+        val raw = requestOf(snapshots().first())
+        raw.getJSONArray("itemResults").getJSONObject(0).getJSONArray("modeResults").getJSONObject(0).remove("score")
+        assertTrue(parseError(raw) is ResultInputException.ResultInvalid)
+        assertTrue(parseError(requestOf(snapshots().first()).put("status", "NOT_STARTED")) is ResultInputException.ResultInvalid)
+        for (field in listOf("userId", "preTrainingEventId")) {
+            assertTrue(parseError(requestOf(snapshots().first()).put(field, JSONObject.NULL)) is ResultInputException.ResultInvalid)
+        }
+    }
+
+    @Test
+    fun `ACK修订号拒绝小数强转字符串及超安全整数`() {
+        val expected = PrescriptionResultV2.parse(requestOf(snapshots().last()), patientId).toReceipt(patientId)
+        for (value in listOf(3.9, "3", 9_007_199_254_740_992L, JSONObject.NULL)) {
+            assertNull(ResultReceipt.fromJson(expected.toJson().put("resultRevision", value)))
+        }
+        assertEquals(expected, ResultReceipt.fromJson(expected.toJson().put("resultRevision", 3.0)))
+    }
+
+    @Test
+    fun `冻结正文保留孤立代理项且UTF8发送后摘要不变`() {
+        val raw = requestOf(snapshots().first()).put("preTrainingEventId", "pre:\uD800")
+        val result = PrescriptionResultV2.parse(raw, patientId)
+        val frozen = result.freeze(patientId)
+        assertTrue(frozen.body.contains("\\ud800"))
+        val wire = JSONObject(String(frozen.body.toByteArray(Charsets.UTF_8), Charsets.UTF_8))
+        assertEquals("pre:\uD800", wire.getString("preTrainingEventId"))
+        assertEquals(frozen.contentSha256, ResultDigest.contentSha256(wire, patientId))
     }
 }

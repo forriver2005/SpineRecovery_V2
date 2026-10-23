@@ -3,6 +3,8 @@ package com.metaspine.mobile.data
 import org.json.JSONArray
 import org.json.JSONObject
 import java.math.BigDecimal
+import java.math.MathContext
+import java.math.RoundingMode
 
 /**
  * 服务器 `lib/prescription-v2-results.js` 中 `stable()` 的等价实现，用于结果规范摘要。
@@ -27,7 +29,7 @@ internal object CanonicalJson {
             is Boolean -> out.append(if (value) "true" else "false")
             is Double -> out.append(jsNumber(value))
             is Float -> out.append(jsNumber(value.toDouble()))
-            is Int, is Long, is Short, is Byte -> out.append(value.toString())
+            is Int, is Short, is Byte -> out.append(value.toString())
             is Number -> out.append(jsNumber(value.toDouble()))
             else -> throw IllegalArgumentException("规范摘要不支持的值类型: ${value::class.java.name}")
         }
@@ -54,10 +56,12 @@ internal object CanonicalJson {
         out.append(']')
     }
 
-    /** JSON.stringify 的字符串转义：只转义引号、反斜杠和控制字符。 */
+    /** JSON.stringify 的 well-formed 转义：孤立 UTF-16 代理项必须保留为 \uXXXX。 */
     private fun appendString(text: String, out: StringBuilder) {
         out.append('"')
-        for (ch in text) {
+        var index = 0
+        while (index < text.length) {
+            val ch = text[index]
             when (ch) {
                 '"' -> out.append("\\\"")
                 '\\' -> out.append("\\\\")
@@ -66,18 +70,21 @@ internal object CanonicalJson {
                 '\n' -> out.append("\\n")
                 '\r' -> out.append("\\r")
                 '\t' -> out.append("\\t")
-                else -> if (ch < ' ') {
+                else -> if (ch < ' ' || (ch.isSurrogate() &&
+                    !(ch.isHighSurrogate() && index + 1 < text.length && text[index + 1].isLowSurrogate()))) {
                     out.append("\\u").append(ch.code.toString(16).padStart(4, '0'))
                 } else {
                     out.append(ch)
+                    if (ch.isHighSurrogate()) out.append(text[++index])
                 }
             }
+            index++
         }
         out.append('"')
     }
 
     /**
-     * JS `Number.prototype.toString()` 的最小实现：80.0 → "80"，-0.0 → "0"，
+     * JS `Number.prototype.toString()`：最短往返数字中选最接近原二进制值者，平局取偶数。
      * 1.0e-7 → "1e-7"，1.0e21 → "1e+21"。
      */
     internal fun jsNumber(value: Double): String {
@@ -87,8 +94,7 @@ internal object CanonicalJson {
             return value.toLong().toString()
         }
         val negative = value < 0
-        // BigDecimal.valueOf(Double) 走 Double.toString 的最短往返表示，等价于 JS ToShortest。
-        val decimal = BigDecimal.valueOf(value).stripTrailingZeros()
+        val decimal = shortestRoundTrip(kotlin.math.abs(value))
         val digits = decimal.unscaledValue().abs().toString()
         val k = digits.length
         val n = k - decimal.scale()          // 小数点位置：value = 0.digits × 10^n
@@ -110,6 +116,26 @@ internal object CanonicalJson {
         } else {
             sign + digits.first() + "." + digits.substring(1) + "e" + expText
         }
+    }
+
+    /**
+     * 使用精确二进制值的十进制展开，逐个有效位数检查相邻候选。
+     * Double.toString 的结果不能直接作为 JS 最短表示（例如最小非零 Double）。
+     */
+    private fun shortestRoundTrip(value: Double): BigDecimal {
+        val exact = BigDecimal(value)
+        for (precision in 1..17) {
+            val rounded = exact.round(MathContext(precision, RoundingMode.HALF_EVEN))
+            val unit = rounded.ulp()
+            val candidates = listOf(rounded, rounded.subtract(unit), rounded.add(unit))
+                .map { it.stripTrailingZeros() }
+                .filter { it.signum() > 0 && it.precision() <= precision && it.toDouble() == value }
+            if (candidates.isNotEmpty()) {
+                return candidates.minWithOrNull(compareBy<BigDecimal> { it.subtract(exact).abs() }
+                    .thenBy { if (it.unscaledValue().testBit(0)) 1 else 0 })!!
+            }
+        }
+        error("无法生成有限 Double 的最短表示")
     }
 }
 

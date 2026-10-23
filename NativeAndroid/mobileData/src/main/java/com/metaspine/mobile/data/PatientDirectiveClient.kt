@@ -11,6 +11,7 @@ import org.json.JSONObject
 object PatientDirectiveClient {
     const val DIRECTIVE_PATH = "/api/patient/training-directive"
     const val RECEIPT_PATH = "/api/patient/training-directive/receipts"
+    const val RESOURCE_STATUS_PATH = "/api/patient/resource-status"
 
     /** 处方回执阶段（D02 四字段之一）；停训仍用简式 `{orderId}`。 */
     const val PHASE_SAVED = "directive_saved"
@@ -29,14 +30,18 @@ object PatientDirectiveClient {
     )
 
     /** GET 只返回 `data`：状态语义全在 JSON 内，HTTP 层只区分 2xx / 非 2xx。 */
-    suspend fun fetch(patientToken: String): Result<JSONObject> =
+    suspend fun fetch(patientToken: String, origin: String = SpineFlowServerConfig.BASE_URL): Result<JSONObject> =
         request("GET", DIRECTIVE_PATH, patientToken, null,
             negotiationHeaders = PatientHttpTransport.DIRECTIVE_VERSION_HEADERS,
-            readErrorStatuses = setOf(400))
+            readErrorStatuses = setOf(400), origin = origin)
+
+    suspend fun resourceStatus(patientToken: String, origin: String = SpineFlowServerConfig.BASE_URL): Result<PrescriptionResourceStatus> =
+        request("GET", RESOURCE_STATUS_PATH, patientToken, null, readErrorStatuses = setOf(409, 503), origin = origin)
+            .mapCatching(PrescriptionResourceStatus::fromJson)
 
     /** 停训简式回执：首次 201、重复 200，服务器保留首次时间。 */
-    suspend fun postStopReceipt(patientToken: String, orderId: Long): Result<ReceiptInfo> =
-        request("POST", RECEIPT_PATH, patientToken, JSONObject().put("orderId", orderId))
+    suspend fun postStopReceipt(patientToken: String, orderId: Long, origin: String = SpineFlowServerConfig.BASE_URL): Result<ReceiptInfo> =
+        request("POST", RECEIPT_PATH, patientToken, JSONObject().put("orderId", orderId), origin = origin)
             .mapCatching { parseStopReceipt(it, orderId) }
 
     /** 处方回执：严格四字段（P4 §4）；缺字段或多字段服务端一律 400。 */
@@ -44,7 +49,8 @@ object PatientDirectiveClient {
         patientToken: String,
         orderId: Long,
         phase: String,
-        resourceManifestSha256: String
+        resourceManifestSha256: String,
+        origin: String = SpineFlowServerConfig.BASE_URL
     ): Result<ReceiptInfo> {
         require(phase == PHASE_SAVED || phase == PHASE_ASSETS_READY) { "处方回执阶段不合法: $phase" }
         require(Regex("^[a-f0-9]{64}$").matches(resourceManifestSha256)) { "清单摘要格式不合法" }
@@ -53,18 +59,20 @@ object PatientDirectiveClient {
             .put("directiveVersion", DIRECTIVE_VERSION)
             .put("phase", phase)
             .put("resourceManifestSha256", resourceManifestSha256)
-        return request("POST", RECEIPT_PATH, patientToken, body, readErrorStatuses = setOf(409))
+        return request("POST", RECEIPT_PATH, patientToken, body, readErrorStatuses = setOf(409, 503), origin = origin)
             .mapCatching { parsePrescriptionReceipt(it, orderId, phase, resourceManifestSha256) }
     }
 
     internal fun parseStopReceipt(data: JSONObject, orderId: Long): ReceiptInfo {
         val respondedOrderId = data.optLong("orderId", 0L)
         require(respondedOrderId == orderId) { "回执响应缺少有效指令编号" }
+        val receivedAt = data.opt("receivedAt") as? String
+        require(!receivedAt.isNullOrBlank()) { "回执响应缺少保存时间" }
         return ReceiptInfo(
             orderId = respondedOrderId,
             phase = "",
             resourceManifestSha256 = "",
-            receivedAt = data.optString("receivedAt"),
+            receivedAt = receivedAt,
             assetsReadyAt = null,
             alreadyRecorded = data.optBoolean("created", false).not()
         )
@@ -86,14 +94,16 @@ object PatientDirectiveClient {
         require(data.optString("resourceManifestSha256") == resourceManifestSha256) {
             "回执响应的清单摘要不一致"
         }
-        val receivedAt = data.optString("receivedAt")
-        require(receivedAt.isNotBlank()) { "回执响应缺少保存时间" }
+        val receivedAt = data.opt("receivedAt") as? String
+        require(!receivedAt.isNullOrBlank()) { "回执响应缺少保存时间" }
+        val assetsReadyAt = (data.opt("assetsReadyAt") as? String)?.takeIf(String::isNotBlank)
+        require(phase != PHASE_ASSETS_READY || assetsReadyAt != null) { "资源就绪回执缺少就绪时间" }
         return ReceiptInfo(
             orderId = orderId,
             phase = phase,
             resourceManifestSha256 = resourceManifestSha256,
             receivedAt = receivedAt,
-            assetsReadyAt = data.optString("assetsReadyAt").takeIf(String::isNotBlank),
+            assetsReadyAt = assetsReadyAt,
             alreadyRecorded = false
         )
     }
@@ -104,9 +114,10 @@ object PatientDirectiveClient {
         patientToken: String,
         body: JSONObject?,
         negotiationHeaders: Map<String, String> = emptyMap(),
-        readErrorStatuses: Set<Int> = emptySet()
+        readErrorStatuses: Set<Int> = emptySet(),
+        origin: String
     ): Result<JSONObject> = patientRequestResult {
-        val response = PatientHttpTransport.shared.request(
+        val response = PatientHttpTransport(origin = { origin }).request(
             path, method, patientToken, body?.toString(),
             readErrorStatuses = readErrorStatuses,
             negotiationHeaders = negotiationHeaders

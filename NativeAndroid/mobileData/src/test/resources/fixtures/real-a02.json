@@ -1,0 +1,50 @@
+{
+  "code": 0,
+  "message": "账号激活成功",
+  "data": {
+    "status": "activated",
+    "patientId": "pt_35cbd516fc664d9487b5fee378f21eb3",
+    "identity": {
+      "displayName": "Isolated A02 fixture",
+      "idCardMasked": "1101**********002X",
+      "phoneMasked": "138****8000"
+    },
+    "doctor": {
+      "id": 3,
+      "username": "doctor"
+    },
+    "prescription": {
+      "prescriptionContractVersion": 2,
+      "resourceManifestSha256": "d908017d1cc6f29ce3255419fd58dad10827d63bcb90ddf8d3fff741fde8467b",
+      "assetsReadyAt": null,
+      "resourceAvailable": true,
+      "orderId": 1,
+      "reason": "V2 bridge fixture",
+      "items": [
+        {
+          "id": 1,
+          "orderId": 1,
+          "position": 0,
+          "actionId": "dead_bug",
+          "actionName": "Test action dead_bug",
+          "sets": 2,
+          "reps": 6,
+          "holdSeconds": 5,
+          "asset": {
+            "actionVersionId": 1,
+            "variantKey": "single",
+            "formatVersion": 1,
+            "runtimeContractVersion": 1,
+            "doseProfile": "sequence-coach-game-v1",
+            "supportedModes": [
+              "coach",
+              "game"
+            ],
+            "fileSize": 8413,
+            "sha256": "6f7e84bbf793e324e70aa54bddea3270d0bbf6ea6ec35b914d427bce703e92c7"
+          }
+        }
+      ]
+    }
+  }
+}

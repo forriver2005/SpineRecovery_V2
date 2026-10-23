@@ -1,6 +1,7 @@
 package com.metaspine.mobile.data
 
 import org.json.JSONObject
+import org.json.JSONArray
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -95,5 +96,25 @@ class CanonicalDigestTest {
             .put("b", 1)
             .put("a", "线\u0001\"\\\n中")
         assertEquals("{\"a\":\"线\\u0001\\\"\\\\\\n中\",\"b\":1}", CanonicalJson.canonicalize(value))
+    }
+
+    @Test
+    fun `JS生成的二进制浮点边界与随机向量全部一致`() {
+        val vectors = javaClass.getResourceAsStream("/fixtures/js-number-vectors.json")!!
+            .bufferedReader(Charsets.UTF_8).use { JSONArray(it.readText()) }
+        for (index in 0 until vectors.length()) {
+            val vector = vectors.getJSONObject(index)
+            val bits = java.lang.Long.parseUnsignedLong(vector.getString("bits"), 16)
+            val value = java.lang.Double.longBitsToDouble(bits)
+            assertEquals("bits=${vector.getString("bits")}", vector.getString("json"), CanonicalJson.jsNumber(value))
+        }
+    }
+
+    @Test
+    fun `最小非零数与孤立代理项符合JS语义`() {
+        assertEquals("5e-324", CanonicalJson.jsNumber(Double.MIN_VALUE))
+        assertEquals("\"\\ud800\"", CanonicalJson.canonicalize("\uD800"))
+        assertEquals("\"\\udc00\"", CanonicalJson.canonicalize("\uDC00"))
+        assertEquals("\"😀\"", CanonicalJson.canonicalize("\uD83D\uDE00"))
     }
 }

@@ -57,6 +57,24 @@ class RoutineQuestionnaireStore(context: Context, name: String = "routine_questi
                     db.delete("bindings", "account_id = ?", arrayOf(scope.accountId))
                     put("account_id", scope.accountId); put("patient_id", scope.patientId); put("fingerprint", scope.fingerprint)
                 })
+                // The original authenticated origin/PAT/patient scope may resume its own frozen request.
+                // New credentials or a different hospital never receive these quarantined payloads.
+                db.rawQuery(
+                    "SELECT task_id,payload FROM quarantine_tasks WHERE account_id=? AND patient_id=? AND fingerprint=?",
+                    args(scope)
+                ).use { cursor ->
+                    while (cursor.moveToNext()) {
+                        val taskId = cursor.getLong(0)
+                        val payload = cursor.getString(1)
+                        val row = LocalRoutineTask.decode(SecureLocalData.open(aad(scope, taskId), payload))
+                        check(row.task.taskId == taskId)
+                        db.insertOrThrow("tasks", null, ContentValues().apply {
+                            put("account_id", scope.accountId); put("patient_id", scope.patientId)
+                            put("task_id", taskId); put("payload", payload)
+                        })
+                    }
+                }
+                db.delete("quarantine_tasks", "account_id=? AND patient_id=? AND fingerprint=?", args(scope))
             }
         }
     }

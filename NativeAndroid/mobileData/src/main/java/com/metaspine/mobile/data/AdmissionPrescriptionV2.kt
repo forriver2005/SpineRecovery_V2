@@ -7,7 +7,8 @@ import org.json.JSONObject
  * V2 处方的完整冻结模型（技术文档 §8）。
  *
  * A02 首方与 D01 下行处方映射到同一模型：首方 `items[].id` 映射为 [AdmissionPrescriptionItemV2.itemId]，
- * 两种响应其余字段一致。本模型只承载传输事实，不包含剂量改写或执行算法。
+ * A02 不提供下载路径；该引用为空，直到 D01 下发当前授权路径。
+ * 本模型只承载传输事实，不包含剂量改写或执行算法。
  */
 data class AdmissionPrescriptionAsset(
     val actionVersionId: Long,
@@ -18,6 +19,7 @@ data class AdmissionPrescriptionAsset(
     val supportedModes: List<String>,
     val fileSize: Long,
     val sha256: String,
+    /** A02 首方为空；只有 D01 提供当前处方的固定下载路径。 */
     val downloadPath: String
 )
 
@@ -76,13 +78,28 @@ data class AdmissionPrescriptionV2(
          * 解析 V2 处方。外层响应的 directiveVersion 由调用方单独校验；
          * 此处只负责处方自身版本与条目完整性，任何缺项都直接失败，不截项、不补默认动作。
          */
-        fun fromJson(json: JSONObject, itemIdKey: String = "itemId"): AdmissionPrescriptionV2 {
+        fun fromJson(json: JSONObject, itemIdKey: String = "itemId"): AdmissionPrescriptionV2 =
+            parse(json, itemIdKey, requireDownloadPath = true)
+
+        /** A02 使用 id，冻结资源身份完整，但不携带下载授权路径。 */
+        fun fromActivationJson(json: JSONObject): AdmissionPrescriptionV2 =
+            parse(json, itemIdKey = "id", requireDownloadPath = false)
+
+        /** D01 使用 itemId，必须携带固定资源的下载路径。 */
+        fun fromDirectiveJson(json: JSONObject): AdmissionPrescriptionV2 =
+            parse(json, itemIdKey = "itemId", requireDownloadPath = true)
+
+        private fun parse(
+            json: JSONObject,
+            itemIdKey: String,
+            requireDownloadPath: Boolean
+        ): AdmissionPrescriptionV2 {
             val version = json.optInt("prescriptionContractVersion", -1)
             require(version == CONTRACT_VERSION) { "处方合同版本不支持: $version（需要 2）" }
             val items = json.getJSONArray("items")
             require(items.length() in MIN_ITEMS..MAX_ITEMS) { "处方动作数量异常: ${items.length()}" }
             val parsed = (0 until items.length()).map { index ->
-                parseItem(items.getJSONObject(index), itemIdKey)
+                parseItem(items.getJSONObject(index), itemIdKey, requireDownloadPath)
             }
             require(parsed.map { it.position } == parsed.indices.toList()) { "处方条目顺序与 position 不一致" }
             return AdmissionPrescriptionV2(
@@ -105,7 +122,11 @@ internal fun AdmissionPrescriptionItemV2.toJson(): JSONObject = JSONObject()
     .put("holdSeconds", holdSeconds)
     .put("asset", asset.toJson())
 
-private fun parseItem(json: JSONObject, itemIdKey: String): AdmissionPrescriptionItemV2 {
+private fun parseItem(
+    json: JSONObject,
+    itemIdKey: String,
+    requireDownloadPath: Boolean
+): AdmissionPrescriptionItemV2 {
     val asset = json.getJSONObject("asset")
     val modes = asset.getJSONArray("supportedModes")
     return AdmissionPrescriptionItemV2(
@@ -125,7 +146,7 @@ private fun parseItem(json: JSONObject, itemIdKey: String): AdmissionPrescriptio
             supportedModes = (0 until modes.length()).map { modes.getString(it) },
             fileSize = asset.getLong("fileSize"),
             sha256 = asset.getString("sha256"),
-            downloadPath = asset.getString("downloadPath")
+            downloadPath = if (requireDownloadPath) asset.getString("downloadPath") else ""
         )
     )
 }

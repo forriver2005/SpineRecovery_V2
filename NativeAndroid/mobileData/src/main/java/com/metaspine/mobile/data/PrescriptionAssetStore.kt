@@ -56,7 +56,8 @@ data class PrescriptionAssetRecord(
  */
 class PrescriptionAssetStore(
     private val root: File,
-    private val scope: BindingScope
+    private val scope: BindingScope,
+    private val elapsedMillis: () -> Long = { android.os.SystemClock.elapsedRealtime() }
 ) : PrescriptionAssetStorage {
     private val indexFile = File(root, "index.json")
 
@@ -65,10 +66,12 @@ class PrescriptionAssetStore(
         orderId: Long,
         itemId: Long,
         actionVersionId: Long,
-        sha256: String
+        sha256: String,
+        variantKey: String = "single"
     ): File {
-        val directory = File(root, "assets/${scope.hospitalKey}/${scope.serviceId}")
-        return File(directory, "o${orderId}_i${itemId}_v${actionVersionId}_${sha256.take(16)}.bin")
+        val sourceKey = ResultDigest.sha256Hex(listOf(scope.origin, scope.serviceId, scope.hospitalKey).joinToString("|"))
+        val directory = File(root, "assets/$sourceKey")
+        return File(directory, "o${orderId}_i${itemId}_v${actionVersionId}_${variantKey}_${sha256}.bin")
     }
 
     /** 临时文件必须与目标同目录，renameTo 才能保持原子性。 */
@@ -83,7 +86,7 @@ class PrescriptionAssetStore(
         sha256: String,
         temp: File
     ): File {
-        val destination = destinationFor(orderId, itemId, actionVersionId, sha256)
+        val destination = destinationFor(orderId, itemId, actionVersionId, sha256, variantKey)
         check(destination.parentFile?.isDirectory == true || destination.parentFile?.mkdirs() == true) {
             "资源缓存目录无法创建"
         }
@@ -134,11 +137,11 @@ class PrescriptionAssetStore(
         return file
     }
 
-    fun recordFor(orderId: Long, itemId: Long): PrescriptionAssetRecord? =
+    fun recordFor(orderId: Long, itemId: Long, sha256: String? = null): PrescriptionAssetRecord? =
         readIndex().firstOrNull {
             it.orderId == orderId && it.itemId == itemId &&
                 it.origin == scope.origin && it.serviceId == scope.serviceId &&
-                it.hospitalKey == scope.hospitalKey
+                it.hospitalKey == scope.hospitalKey && (sha256 == null || it.sha256 == sha256)
         }
 
     /**
@@ -146,15 +149,16 @@ class PrescriptionAssetStore(
      * 这里不返回“上一次的版本”——处方冻结的是具体字节，不是动作名。
      */
     override fun existing(orderId: Long, itemId: Long, sha256: String): File? {
-        val record = recordFor(orderId, itemId)?.takeIf { it.sha256 == sha256 } ?: return null
+        val record = recordFor(orderId, itemId, sha256) ?: return null
         return verifiedFile(record)
     }
 
     override suspend fun download(
         patientToken: String,
         order: DownloadedOrder,
-        item: AdmissionPrescriptionItemV2
-    ): File? {
+        item: AdmissionPrescriptionItemV2,
+        expectedLease: TrainingResourceLease
+    ): PrescriptionAssetClient.VerifiedAsset {
         val asset = item.asset
         return PrescriptionAssetClient.download(
             patientToken = patientToken,
@@ -162,11 +166,16 @@ class PrescriptionAssetStore(
             expectedSha256 = asset.sha256,
             expectedFileSize = asset.fileSize,
             origin = { scope.origin },
+            expectedLease = expectedLease,
+            expectedActionId = item.actionId,
+            expectedVersionId = asset.actionVersionId,
+            expectedVariantKey = asset.variantKey,
+            elapsedMillis = elapsedMillis,
             publish = { temp ->
                 publish(order.orderId, item.itemId, asset.actionVersionId, asset.variantKey,
                     asset.sha256, temp)
             }
-        ).file
+        )
     }
 
     fun readIndex(): List<PrescriptionAssetRecord> = runCatching {
@@ -179,15 +188,16 @@ class PrescriptionAssetStore(
 
     private fun writeRecord(record: PrescriptionAssetRecord) {
         val records = readIndex().filterNot {
-            it.orderId == record.orderId && it.itemId == record.itemId
+            it.origin == record.origin && it.serviceId == record.serviceId && it.hospitalKey == record.hospitalKey &&
+                it.orderId == record.orderId && it.itemId == record.itemId &&
+                it.actionVersionId == record.actionVersionId && it.variantKey == record.variantKey && it.sha256 == record.sha256
         } + record
         persist(records)
     }
 
     private fun removeRecord(record: PrescriptionAssetRecord) {
         persist(readIndex().filterNot {
-            it.relativePath == record.relativePath && it.orderId == record.orderId &&
-                it.itemId == record.itemId
+            it == record
         })
     }
 
@@ -218,6 +228,15 @@ class PrescriptionAssetStore(
             require(canonical.path.startsWith(root.path + File.separator)) { "资源不在处方缓存目录内" }
             androidx.core.content.FileProvider.getUriForFile(
                 context, context.packageName + PROVIDER_AUTHORITY_SUFFIX, canonical)
+        }.getOrNull()
+
+        /** URI 必须能通过实际 ContentResolver 打开；消费者仍需读取并验证资源合同。 */
+        fun readableContentUriFor(context: Context, file: File): android.net.Uri? = runCatching {
+            val uri = requireNotNull(contentUriFor(context, file))
+            requireNotNull(context.contentResolver.openInputStream(uri)).use { input ->
+                require(input.read() >= 0) { "处方文件为空或无法读取" }
+            }
+            uri
         }.getOrNull()
 
         private const val LOCATION = "prescription_assets"

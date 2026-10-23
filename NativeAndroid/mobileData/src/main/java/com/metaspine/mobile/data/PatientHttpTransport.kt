@@ -41,10 +41,12 @@ internal class PatientHttpTransport(
         readTimeoutMs: Int = 15_000,
         readErrorStatuses: Set<Int> = emptySet(),
         negotiationHeaders: Map<String, String> = emptyMap()
-    ): Response = withContext(Dispatchers.IO) {
+    ): Response {
+        val requestOrigin = origin()
+        return withContext(Dispatchers.IO) {
         val context = currentCoroutineContext()
         context.ensureActive()
-        val url = resolveUrl(origin(), path)
+        val url = resolveUrl(requestOrigin, path)
         require(method == "GET" || method == "POST")
         requireNegotiationHeaders(negotiationHeaders)
         val connection = openConnection(url)
@@ -93,6 +95,7 @@ internal class PatientHttpTransport(
             throw error
         } finally {
             connection.disconnect()
+        }
         }
     }
 

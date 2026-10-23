@@ -175,7 +175,8 @@ data class TrainingStartPayload(
         /**
          * Only the prescription fetched for this online training attempt may enter the patient flow.
          *
-         * [handoff] 必须来自本次刷新且已 `assets_ready`；[assetUri] 负责把已验证文件签成
+         * [handoff] 必须来自本次 prepare；生成载荷不代表 ready，消费者确认后才可开始训练。
+         * [assetUri] 负责把已验证文件签成
          * AR 可读的 `content://`，签发失败同样视为能力缺口，不退回旧动作包。
          */
         fun forPrescription(
@@ -191,6 +192,7 @@ data class TrainingStartPayload(
             require(handoff.complete && handoff.assets.size == prescription.items.size) {
                 "处方资源尚未完成校验，请重新下拉处方后再开始训练。"
             }
+            require(handoff.hasVerifiedFiles()) { "处方文件已变化，请重新获取资源" }
             // 这些 require 文案会经 Home 的「进入AR训练」失败提示直接呈现给患者，
             // 因此使用面向患者的中文说明（与下方疼痛阈值提示保持同一风格）。
             val dailyCheck = requireNotNull(user.latestPreTrainingCheck) {
@@ -237,7 +239,7 @@ data class TrainingStartPayload(
         }
 
         /**
-         * 医生处方 → AR 动作。单动作处方展开为现有教练/游戏两个动作；剂量全部取医生值。
+         * 医生处方 → AR 动作。教练剂量取医生值；游戏保留现有单局与时长选择语义。
          *
          * 多动作处方在 P4 只是完整下发与保存，执行层仍是一次一个动作：这里明确报告能力缺口，
          * 不截取第一项，也不假装已支持多动作执行。

@@ -73,8 +73,10 @@ class TrainingUploadV2Test {
         val body = TrainingSyncClient.buildV2UploadBody(records)
         val sessions = body.getJSONArray("sessions")
         assertEquals(2, sessions.length())
-        assertEquals(records[0].body, JSONObject(sessions.getJSONObject(0).toString()).toString())
-        assertEquals(records[1].body, JSONObject(sessions.getJSONObject(1).toString()).toString())
+        val wire = TrainingSyncClient.serializeFrozenSessions(sessions)
+        assertEquals("{\"sessions\":[${records.joinToString(",") { it.body }}]}", wire)
+        assertEquals(records[0].body, CanonicalJson.canonicalize(sessions.getJSONObject(0)))
+        assertEquals(records[1].body, CanonicalJson.canonicalize(sessions.getJSONObject(1)))
         // 不含旧 V1 包装字段，也不注入本机补写的 key。
         assertEquals(setOf("sessions"), body.keys().asSequence().toSet())
         assertEquals(2, sessions.getJSONObject(0).getInt("protocolVersion"))

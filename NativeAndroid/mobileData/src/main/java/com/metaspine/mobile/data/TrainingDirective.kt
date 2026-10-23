@@ -62,7 +62,8 @@ data class TrainingDirectiveSnapshot(
     val prescription: DownloadedOrder?,
     val stopOrder: DownloadedStopOrder?,
     val compatibilityCode: String?,
-    val compatibilityMessage: String?
+    val compatibilityMessage: String?,
+    val resourceLease: TrainingResourceLease? = null
 ) {
     /**
      * `ready` 且处方完整时的完整订单；动作白名单与单动作执行能力由交接层判定并给出
@@ -130,7 +131,7 @@ object TrainingDirectiveParser {
         val compatibilityMessage = compatibility
             ?.text("message", MAX_TEXT_LENGTH, required = false)?.takeIf(String::isNotBlank)
 
-        return when (state) {
+        val parsed = when (state) {
             TrainingDirectiveState.Ready -> {
                 if (stopOrder != null) {
                     throw DirectiveProtocolException("ready 状态不应同时下发停止训练指令")
@@ -175,6 +176,11 @@ object TrainingDirectiveParser {
                 )
             }
         }
+        val lease = data.optJSONObject("resourceLease")?.let {
+            try { TrainingResourceLease.fromJson(it) }
+            catch (error: RuntimeException) { throw DirectiveProtocolException(error.message ?: "资源租约不合法") }
+        }
+        return parsed.copy(resourceLease = lease)
     }
 
     private fun snapshot(
@@ -204,7 +210,7 @@ object TrainingDirectiveParser {
     private fun parseOrder(json: JSONObject): DownloadedOrder {
         // 处方级校验（版本 2、1–10 项、position 连续、资源身份齐全）全部交给共享模型。
         val prescription = try {
-            AdmissionPrescriptionV2.fromJson(json, itemIdKey = "itemId")
+            AdmissionPrescriptionV2.fromDirectiveJson(json)
         } catch (error: RuntimeException) {
             // 共享模型用 require 表达契约失败，org.json 缺字段抛 JSONException；
             // 统一转成协议异常，协调器才会保留最后一次可展示快照而不是崩溃。
@@ -216,8 +222,8 @@ object TrainingDirectiveParser {
             reason = json.text("reason", MAX_TEXT_LENGTH, required = false),
             createdBy = json.text("createdBy", MAX_NAME_LENGTH, required = false),
             createdAt = json.text("createdAt", MAX_TIME_LENGTH, required = false),
-            receivedAt = json.optString("receivedAt").takeIf(String::isNotBlank),
-            assetsReadyAt = json.optString("assetsReadyAt").takeIf(String::isNotBlank)
+            receivedAt = (json.opt("receivedAt") as? String)?.takeIf(String::isNotBlank),
+            assetsReadyAt = (json.opt("assetsReadyAt") as? String)?.takeIf(String::isNotBlank)
         )
     }
 
@@ -226,7 +232,7 @@ object TrainingDirectiveParser {
         reason = json.text("reason", MAX_TEXT_LENGTH, required = false),
         createdBy = json.text("createdBy", MAX_NAME_LENGTH, required = false),
         createdAt = json.text("createdAt", MAX_TIME_LENGTH, required = false),
-        receivedAt = json.optString("receivedAt").takeIf(String::isNotBlank)
+        receivedAt = (json.opt("receivedAt") as? String)?.takeIf(String::isNotBlank)
     )
 
     /**
@@ -327,6 +333,7 @@ internal fun TrainingDirectiveSnapshot.toStoreJson(): JSONObject = JSONObject()
     .put("stopOrder", stopOrder?.toStoreJson())
     .put("compatibilityCode", compatibilityCode)
     .put("compatibilityMessage", compatibilityMessage)
+    .put("resourceLease", resourceLease?.toJson())
 
 internal fun DownloadedOrder.toStoreJson(): JSONObject = JSONObject()
     .put("prescription", prescription.toJson())
@@ -359,7 +366,8 @@ internal fun directiveSnapshotFromStoreJson(raw: String): TrainingDirectiveSnaps
         prescription = json.optJSONObject("prescription")?.let(::storedOrder),
         stopOrder = json.optJSONObject("stopOrder")?.let(::storedStopOrder),
         compatibilityCode = json.optString("compatibilityCode").takeIf(String::isNotBlank),
-        compatibilityMessage = json.optString("compatibilityMessage").takeIf(String::isNotBlank)
+        compatibilityMessage = json.optString("compatibilityMessage").takeIf(String::isNotBlank),
+        resourceLease = json.optJSONObject("resourceLease")?.let(TrainingResourceLease::fromJson)
     )
 }.getOrNull()
 
@@ -374,8 +382,8 @@ private fun storedOrder(json: JSONObject): DownloadedOrder? {
         reason = json.optString("reason"),
         createdBy = json.optString("createdBy"),
         createdAt = json.optString("createdAt"),
-        receivedAt = json.optString("receivedAt").takeIf(String::isNotBlank),
-        assetsReadyAt = json.optString("assetsReadyAt").takeIf(String::isNotBlank)
+        receivedAt = (json.opt("receivedAt") as? String)?.takeIf(String::isNotBlank),
+        assetsReadyAt = (json.opt("assetsReadyAt") as? String)?.takeIf(String::isNotBlank)
     )
 }
 
@@ -387,6 +395,6 @@ private fun storedStopOrder(json: JSONObject): DownloadedStopOrder? {
         reason = json.optString("reason"),
         createdBy = json.optString("createdBy"),
         createdAt = json.optString("createdAt"),
-        receivedAt = json.optString("receivedAt").takeIf(String::isNotBlank)
+        receivedAt = (json.opt("receivedAt") as? String)?.takeIf(String::isNotBlank)
     )
 }

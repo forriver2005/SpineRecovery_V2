@@ -17,6 +17,7 @@ class ApiHttpException(
     message: String,
     val retryAfterSeconds: Long? = null,
     val errorCode: String? = null,
+    val fieldErrors: String? = null,
 ) : RuntimeException(message)
 
 internal fun parseRetryAfterSeconds(value: String?, nowMillis: Long = System.currentTimeMillis()): Long? {

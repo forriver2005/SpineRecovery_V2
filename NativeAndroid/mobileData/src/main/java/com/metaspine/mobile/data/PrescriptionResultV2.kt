@@ -153,12 +153,12 @@ data class PrescriptionResultV2(
 
     /** 冻结体：同一份快照只序列化一次，正文与摘要此后不再重算。 */
     fun freeze(patientId: String): FrozenResult {
-        val body = toJson()
+        val body = CanonicalJson.canonicalize(toJson())
         val canonical = CanonicalJson.canonicalize(
-            JSONObject(body.toString()).put("userId", patientId)
+            JSONObject(body).put("userId", patientId)
         )
         return FrozenResult(
-            body = body.toString(),
+            body = body,
             canonicalUtf8 = canonical,
             contentSha256 = ResultDigest.sha256Hex(canonical),
             receipt = ResultReceipt(sessionId, resultRevision, ResultDigest.sha256Hex(canonical))
@@ -220,6 +220,7 @@ data class PrescriptionResultV2(
             val statusValue = raw.opt("status")
             val status = (statusValue as? String)?.let(ResultSessionStatus::fromWire)
                 ?: throw invalid("训练结果状态不合法: $statusValue")
+            if (status == ResultSessionStatus.NOT_STARTED) throw invalid("会话状态只能是 INTERRUPTED 或 COMPLETED")
             val completed = raw.opt("completed") as? Boolean
                 ?: throw invalid("训练结果缺少完成标记")
             if (completed != (status == ResultSessionStatus.COMPLETED)) {
@@ -241,7 +242,6 @@ data class PrescriptionResultV2(
                 ?: throw invalid("训练结果来源不合法")
 
             val preTrainingEventId = raw.opt("preTrainingEventId")
-                ?.takeIf { it !== JSONObject.NULL }
                 ?.let { value ->
                     val text = value as? String
                         ?: throw invalid("练前事件标识必须是字符串")
@@ -293,7 +293,7 @@ data class PrescriptionResultV2(
                 val item = array.optJSONObject(index)
                     ?: throw invalid("第 ${index + 1} 个训练条目格式不合法")
                 rejectUnknownKeys(item, ITEM_KEYS, "训练条目")
-                if (item.opt("position") != index) {
+                if (integer(item.opt("position"), 0, (MAX_ITEMS - 1).toLong()) != index.toLong()) {
                     throw invalid("训练条目顺序与处方不一致: 第 ${index + 1} 项")
                 }
                 if (item.opt("variantKey") != "single") {
@@ -359,8 +359,9 @@ data class PrescriptionResultV2(
                 ?: throw invalid("${mode.wireValue} 模式完成次数不合法")
             val durationSeconds = integer(json.opt("durationSeconds"), 0, 86_400)
                 ?: throw invalid("${mode.wireValue} 模式时长不合法")
+            if (!json.has("score")) throw invalid("${mode.wireValue} 模式缺少 score 字段")
             val score = when (val rawScore = json.opt("score")) {
-                null, JSONObject.NULL -> null
+                JSONObject.NULL -> null
                 is Number -> rawScore.toDouble().also {
                     if (!it.isFinite() || it < 0.0 || it > 100.0) {
                         throw invalid("${mode.wireValue} 模式分数超出 0–100")
@@ -421,22 +422,13 @@ data class PrescriptionResultV2(
 
         private fun optionalUserId(json: JSONObject): String? {
             val value = json.opt("userId") ?: return null
-            if (value === JSONObject.NULL) return null
             if (value !is String || value.isBlank() || value.length > 128) {
                 throw invalid("训练结果 userId 不合法")
             }
             return value
         }
 
-        /** 只接受 Int/Long；`80.0`、`"2"`、数组等一律拒绝，不静默截断。 */
-        private fun integer(value: Any?, min: Long, max: Long): Long? {
-            val number = when (value) {
-                is Int -> value.toLong()
-                is Long -> value
-                else -> return null
-            }
-            return number.takeIf { it in min..max }
-        }
+        private fun integer(value: Any?, min: Long, max: Long): Long? = resultSafeInteger(value, min, max)
 
         /**
          * 服务器 `utcInstant()`：必须是真实存在的 UTC 时刻，且字符串原样往返一致。
@@ -470,12 +462,25 @@ data class ResultReceipt(
 
     companion object {
         fun fromJson(json: JSONObject): ResultReceipt? {
-            val sessionId = json.optString("sessionId").takeIf(String::isNotBlank) ?: return null
-            val revision = (json.opt("resultRevision") as? Number)?.toLong() ?: return null
-            val sha = json.optString("resultContentSha256").takeIf(String::isNotBlank) ?: return null
+            val sessionId = (json.opt("sessionId") as? String)
+                ?.takeIf { Regex("^[A-Za-z0-9_-]{1,128}$").matches(it) } ?: return null
+            val revision = resultSafeInteger(json.opt("resultRevision"), 1, MAX_SAFE_RESULT_INTEGER) ?: return null
+            val sha = (json.opt("resultContentSha256") as? String)
+                ?.takeIf { Regex("^[a-f0-9]{64}$").matches(it) } ?: return null
             return ResultReceipt(sessionId, revision, sha)
         }
     }
+}
+
+internal const val MAX_SAFE_RESULT_INTEGER = 9_007_199_254_740_991L
+
+/** 与 JS Number.isSafeInteger 相同：接受 2.0/1e0，拒绝字符串、小数及越界值。 */
+internal fun resultSafeInteger(value: Any?, min: Long, max: Long): Long? {
+    if (value !is Number) return null
+    val number = value.toDouble()
+    if (!number.isFinite() || number != kotlin.math.floor(number) ||
+        number < min.toDouble() || number > minOf(max, MAX_SAFE_RESULT_INTEGER).toDouble()) return null
+    return number.toLong()
 }
 
 /**

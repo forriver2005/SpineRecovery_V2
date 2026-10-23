@@ -18,7 +18,8 @@ data class PrescriptionReceiptTask(
     val savedReceivedAt: String?,
     val assetsReadyReceivedAt: String?,
     val failedAssetItemIds: List<Long>,
-    val blockingReasons: List<String>
+    val blockingReasons: List<String>,
+    val readyPending: Boolean = false
 ) {
     internal fun toJson(): JSONObject = JSONObject()
         .put("orderId", orderId)
@@ -28,6 +29,7 @@ data class PrescriptionReceiptTask(
         .put("assetsReadyReceivedAt", assetsReadyReceivedAt)
         .put("failedAssetItemIds", JSONArray(failedAssetItemIds))
         .put("blockingReasons", JSONArray(blockingReasons))
+        .put("readyPending", readyPending)
 
     companion object {
         internal fun fromJson(json: JSONObject): PrescriptionReceiptTask =
@@ -36,15 +38,16 @@ data class PrescriptionReceiptTask(
                 resourceManifestSha256 = json.getString("resourceManifestSha256"),
                 phase = runCatching { ReceiptPhase.valueOf(json.getString("phase")) }
                     .getOrDefault(ReceiptPhase.NotSubmitted),
-                savedReceivedAt = json.optString("savedReceivedAt").takeIf(String::isNotBlank),
-                assetsReadyReceivedAt = json.optString("assetsReadyReceivedAt")
-                    .takeIf(String::isNotBlank),
+                savedReceivedAt = (json.opt("savedReceivedAt") as? String)?.takeIf(String::isNotBlank),
+                assetsReadyReceivedAt = (json.opt("assetsReadyReceivedAt") as? String)
+                    ?.takeIf(String::isNotBlank),
                 failedAssetItemIds = json.optJSONArray("failedAssetItemIds")?.let { array ->
                     (0 until array.length()).map { array.getLong(it) }
                 }.orEmpty(),
                 blockingReasons = json.optJSONArray("blockingReasons")?.let { array ->
                     (0 until array.length()).map { array.getString(it) }
-                }.orEmpty()
+                }.orEmpty(),
+                readyPending = json.optBoolean("readyPending", false)
             )
     }
 }

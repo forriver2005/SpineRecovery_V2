@@ -5,11 +5,18 @@ import java.security.MessageDigest
 import java.util.Locale
 import java.util.UUID
 
-data class RoutineScope(val accountId: String, val patientId: String, val fingerprint: String) {
+data class RoutineScope(val accountId: String, val patientId: String, val fingerprint: String, val origin: String = "") {
     companion object {
-        fun of(accountId: String, credential: PatientServerCredential, origin: String): RoutineScope {
-            val hash = MessageDigest.getInstance("SHA-256").digest((origin + "\n" + credential.patientToken).toByteArray())
-            return RoutineScope(accountId.trim().lowercase(Locale.ROOT), credential.patientId, hash.joinToString("") { "%02x".format(it) })
+        fun of(accountId: String, credential: PatientServerCredential, origin: String, binding: BindingScope? = null): RoutineScope {
+            val normalizedAccount = accountId.trim().lowercase(Locale.ROOT)
+            if (binding != null) require(binding.origin == origin && binding.patientId == credential.patientId &&
+                binding.accountId.trim().lowercase(Locale.ROOT) == normalizedAccount)
+            val material = origin + "\n" + credential.patientToken + (binding?.let {
+                "\n" + JSONObject().put("serviceId", it.serviceId).put("hospitalKey", it.hospitalKey)
+                    .put("credentialGeneration", it.credentialGeneration).toString()
+            } ?: "")
+            val hash = MessageDigest.getInstance("SHA-256").digest(material.toByteArray(Charsets.UTF_8))
+            return RoutineScope(normalizedAccount, credential.patientId, hash.joinToString("") { "%02x".format(it) }, origin)
         }
     }
 }
@@ -26,13 +33,21 @@ data class LocalRoutineTask(
     val problem: String? = null,
     val retryAt: Long = 0,
     val attempts: Int = 0,
-    val serverTime: String = ""
+    val serverTime: String = "",
+    val recordId: Long? = null,
+    val submissionStatus: String? = null,
+    val confirmedSubmissionBody: String? = null,
+    val problemCode: String? = null,
+    val fieldErrors: String? = null
 ) {
     fun encode(): String = JSONObject().put("task", JSONObject(task.raw)).put("receiptId", receiptId)
         .put("receiptAt", receiptAt ?: JSONObject.NULL).put("answers", answers)
         .put("pendingBody", pendingBody ?: JSONObject.NULL).put("completedAt", completedAt ?: JSONObject.NULL)
         .put("availability", availability).put("problem", problem ?: JSONObject.NULL)
-        .put("retryAt", retryAt).put("attempts", attempts).put("serverTime", serverTime).toString()
+        .put("retryAt", retryAt).put("attempts", attempts).put("serverTime", serverTime)
+        .put("recordId", recordId ?: JSONObject.NULL).put("submissionStatus", submissionStatus ?: JSONObject.NULL)
+        .put("confirmedSubmissionBody", confirmedSubmissionBody ?: JSONObject.NULL)
+        .put("problemCode", problemCode ?: JSONObject.NULL).put("fieldErrors", fieldErrors ?: JSONObject.NULL).toString()
     companion object {
         fun decode(raw: String): LocalRoutineTask {
             val o = JSONObject(raw)
@@ -42,13 +57,15 @@ data class LocalRoutineTask(
             fun nullable(key: String): String? = if (o.isNull(key)) null else o.getString(key)
             return LocalRoutineTask(RoutineQuestionnaireParser.task(o.getJSONObject("task"), true), o.getString("receiptId"),
                 nullable("receiptAt"), o.getString("answers"), nullable("pendingBody"), nullable("completedAt"),
-                o.getString("availability"), nullable("problem"), o.getLong("retryAt"), o.getInt("attempts"), o.getString("serverTime"))
+                o.getString("availability"), nullable("problem"), o.getLong("retryAt"), o.getInt("attempts"), o.getString("serverTime"),
+                if (o.isNull("recordId")) null else RoutineQuestionnaireParser.integer(o, "recordId"),
+                nullable("submissionStatus"), nullable("confirmedSubmissionBody"), nullable("problemCode"), nullable("fieldErrors"))
         }
     }
 }
 
 interface RoutineQuestionnaireStorage {
-    /** Atomically purge this account's old tasks when patient, PAT or origin changes. */
+    /** Quarantine the old binding; restore only records belonging to this exact original scope. */
     fun bind(scope: RoutineScope)
     fun matches(scope: RoutineScope): Boolean
     fun rejected(scope: RoutineScope): Boolean

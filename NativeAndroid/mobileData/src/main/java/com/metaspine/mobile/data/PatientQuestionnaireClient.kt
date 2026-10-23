@@ -3,6 +3,8 @@ package com.metaspine.mobile.data
 import org.json.JSONObject
 
 interface RoutineQuestionnaireApi {
+    /** Production clients freeze the hospital before entering the IO dispatcher; test APIs may ignore it. */
+    fun atOrigin(origin: String): RoutineQuestionnaireApi = this
     suspend fun open(token: String): JSONObject
     suspend fun detail(token: String, taskId: Long): JSONObject
     suspend fun receipt(token: String, taskId: Long, requestId: String): JSONObject
@@ -11,16 +13,32 @@ interface RoutineQuestionnaireApi {
 
 object PatientQuestionnaireClient : RoutineQuestionnaireApi {
     private const val PATH = "/api/patient/questionnaire-tasks"
-    override suspend fun open(token: String) = request(token, "GET", "$PATH?scope=open")
-    override suspend fun detail(token: String, taskId: Long) = request(token, "GET", "$PATH/$taskId")
+    override suspend fun open(token: String) = atOrigin(SpineFlowServerConfig.BASE_URL).open(token)
+    override suspend fun detail(token: String, taskId: Long) = atOrigin(SpineFlowServerConfig.BASE_URL).detail(token, taskId)
     override suspend fun receipt(token: String, taskId: Long, requestId: String) =
-        request(token, "POST", "$PATH/$taskId/receipts", JSONObject().put("requestId", requestId))
+        atOrigin(SpineFlowServerConfig.BASE_URL).receipt(token, taskId, requestId)
     override suspend fun submit(token: String, taskId: Long, body: JSONObject) =
-        request(token, "POST", "$PATH/$taskId/submissions", body)
+        atOrigin(SpineFlowServerConfig.BASE_URL).submit(token, taskId, body)
 
-    private suspend fun request(token: String, method: String, path: String, body: JSONObject? = null): JSONObject {
-        val response = PatientHttpTransport.shared.request(path, method, token, body?.toString())
-        response.requireSuccess("问卷请求失败")
+    override fun atOrigin(origin: String): RoutineQuestionnaireApi = object : RoutineQuestionnaireApi {
+        override fun atOrigin(origin: String): RoutineQuestionnaireApi = PatientQuestionnaireClient.atOrigin(origin)
+        override suspend fun open(token: String) = request(origin, token, "GET", "$PATH?scope=open")
+        override suspend fun detail(token: String, taskId: Long) = request(origin, token, "GET", "$PATH/$taskId")
+        override suspend fun receipt(token: String, taskId: Long, requestId: String) =
+            request(origin, token, "POST", "$PATH/$taskId/receipts", JSONObject().put("requestId", requestId))
+        override suspend fun submit(token: String, taskId: Long, body: JSONObject) =
+            request(origin, token, "POST", "$PATH/$taskId/submissions", body)
+    }
+
+    private suspend fun request(origin: String, token: String, method: String, path: String, body: JSONObject? = null): JSONObject {
+        val response = PatientHttpTransport(origin = { origin }).request(path, method, token, body?.toString(),
+            readErrorStatuses = setOf(400, 409, 410, 413, 422))
+        if (response.status !in 200..299) {
+            val details = runCatching { JSONObject(response.text).optJSONObject("details") }.getOrNull()
+            throw ApiHttpException(response.status, "问卷请求失败", response.retryAfterSeconds,
+                (details?.opt("code") as? String)?.takeIf(String::isNotBlank),
+                details?.optJSONArray("errors")?.toString())
+        }
         return decodeEnvelope(response.bytes)
     }
 

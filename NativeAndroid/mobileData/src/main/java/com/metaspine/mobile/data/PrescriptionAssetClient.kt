@@ -36,7 +36,8 @@ object PrescriptionAssetClient {
     data class VerifiedAsset(
         val file: File,
         val byteCount: Long,
-        val sha256: String
+        val sha256: String,
+        val leaseAnchor: ObservedResourceLease? = null
     )
 
     /**
@@ -52,6 +53,11 @@ object PrescriptionAssetClient {
         expectedFileSize: Long,
         origin: () -> String = { SpineFlowServerConfig.BASE_URL },
         openConnection: (URL) -> HttpURLConnection = { it.openConnection() as HttpURLConnection },
+        expectedLease: TrainingResourceLease? = null,
+        expectedActionId: String? = null,
+        expectedVersionId: Long? = null,
+        expectedVariantKey: String? = null,
+        elapsedMillis: () -> Long = { android.os.SystemClock.elapsedRealtime() },
         publish: (File) -> File
     ): VerifiedAsset = withContext(Dispatchers.IO) {
         try {
@@ -59,8 +65,24 @@ object PrescriptionAssetClient {
             requireAssetIdentity(expectedSha256, expectedFileSize)
             val temp = File.createTempFile("prescription-asset-", ".part")
             try {
-                val written = fetchBytes(url, patientToken, expectedFileSize, openConnection,
-                    temp)
+                val observed = if (expectedLease != null) elapsedMillis() else 0L
+                var leaseAnchor: ObservedResourceLease? = null
+                val written = fetchBytes(url, patientToken, expectedFileSize, openConnection, temp) { connection ->
+                    if (expectedLease != null) {
+                        val lease = TrainingResourceLease.fromJson(org.json.JSONObject()
+                            .put("contractVersion", 1)
+                            .put("generation", connection.getHeaderField("X-Resource-Generation"))
+                            .put("revision", connection.getHeaderField("X-Resource-Revision")?.toLongOrNull())
+                            .put("serverTime", connection.getHeaderField("X-Resource-Server-Time")?.toLongOrNull())
+                            .put("expiresAt", connection.getHeaderField("X-Resource-Lease-Expires")?.toLongOrNull()))
+                        lease.requireSuccessorOf(expectedLease)
+                        leaseAnchor = ObservedResourceLease(lease, observed)
+                        require(connection.getHeaderField("X-Motion-SHA256") == expectedSha256 &&
+                            connection.getHeaderField("X-Motion-Action-Id") == expectedActionId &&
+                            connection.getHeaderField("X-Motion-Version-Id") == expectedVersionId.toString() &&
+                            connection.getHeaderField("X-Motion-Variant-Key") == expectedVariantKey) { "资源响应身份与处方不一致" }
+                    }
+                }
                 val actualSha256 = sha256Hex(temp)
                 if (written != expectedFileSize) {
                     throw PrescriptionAssetException(
@@ -69,7 +91,10 @@ object PrescriptionAssetClient {
                 if (actualSha256 != expectedSha256) {
                     throw PrescriptionAssetException("资源摘要与处方清单不一致")
                 }
-                VerifiedAsset(publish(temp), written, actualSha256)
+                if (leaseAnchor != null && !leaseAnchor!!.isValidAt(elapsedMillis())) {
+                    throw PrescriptionAssetException("资源下载期间租约已过期")
+                }
+                VerifiedAsset(publish(temp), written, actualSha256, leaseAnchor)
             } finally {
                 if (temp.exists()) temp.delete()
             }
@@ -116,7 +141,8 @@ object PrescriptionAssetClient {
         patientToken: String,
         expectedFileSize: Long,
         openConnection: (URL) -> HttpURLConnection,
-        target: File
+        target: File,
+        validateHeaders: (HttpURLConnection) -> Unit
     ): Long {
         val connection = openConnection(url)
         try {
@@ -137,6 +163,7 @@ object PrescriptionAssetClient {
                 status == 404 -> throw ApiHttpException(status, "处方资源不存在或已撤销")
                 status !in 200..299 -> throw ApiHttpException(status, "资源下载失败，HTTP $status")
             }
+            validateHeaders(connection)
             val declared = connection.contentLengthLong
             if (declared > MAX_BYTES) throw PrescriptionAssetException("资源超过 16 MiB 上限")
             if (declared > 0L && declared != expectedFileSize) {

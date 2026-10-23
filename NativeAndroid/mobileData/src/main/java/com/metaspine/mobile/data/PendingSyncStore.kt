@@ -144,6 +144,12 @@ class PendingSyncStore(context: Context) {
     fun hasElement(accountId: String, id: String): Boolean =
         element(accountId, id) != null
 
+    /** A rejected frozen event/revision stays held when foreground recovery recomputes pending work. */
+    fun isQuarantined(accountId: String, id: String): Boolean {
+        val held = readArray("sync.quarantine.$accountId")
+        return (0 until held.length()).any { held.optJSONObject(it)?.optString("id") == id }
+    }
+
     fun element(accountId: String, id: String): JSONObject? {
         val queue = readArray(queueKey(accountId))
         for (index in 0 until queue.length()) {

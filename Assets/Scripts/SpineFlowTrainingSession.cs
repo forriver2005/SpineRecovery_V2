@@ -111,6 +111,9 @@ public sealed class SpineFlowTrainingSession : MonoBehaviour
         public string sessionId;
         public string userId;
         public string requestToken;
+        public string prescriptionJson;
+        public string preTrainingEventId;
+        public string startedAt;
         public string targetScene;
         public UserProfilePayload userProfile;
         public CallbackPayload callback;
@@ -550,6 +553,8 @@ public sealed class SpineFlowTrainingSession : MonoBehaviour
         {
             protocolVersion = ProtocolVersion, messageType = StartMessage,
             sessionId = plan.sessionId, userId = plan.patientId ?? plan.accountId,
+            requestToken = plan.requestToken, prescriptionJson = plan.prescriptionJson,
+            preTrainingEventId = plan.preTrainingEventId, startedAt = plan.startedAt,
             targetScene = plan.targetScene,
             userProfile = new UserProfilePayload { gender = plan.gender },
             trainingPlan = new TrainingPlanPayload { recommendedActions = actions.ToArray() }
@@ -565,6 +570,33 @@ public sealed class SpineFlowTrainingSession : MonoBehaviour
     {
         return instance != null && instance.unifiedSession && instance.HasValidStartPayload()
             ? instance.BuildResultJson() : null;
+    }
+
+    // Expose existing measured facts only. This does not change any timing,
+    // scoring, repetition counting or training-completion decision.
+    public static SpineRecovery.App.TrainingModeFacts[] CaptureUnifiedNetworkFacts(string sessionId)
+    {
+        if (instance == null || !instance.unifiedSession || instance.startPayload?.sessionId != sessionId)
+            return null;
+        return new[]
+        {
+            NetworkFacts("coach", instance.coachMeasurement, instance.coachTiming),
+            NetworkFacts("game", instance.gameMeasurement, instance.gameTiming),
+        };
+    }
+
+    private static SpineRecovery.App.TrainingModeFacts NetworkFacts(string mode, ModeMeasurement measurement, bool timing)
+    {
+        return new SpineRecovery.App.TrainingModeFacts
+        {
+            mode = mode, started = timing || measurement != null,
+            measurementAvailable = measurement != null,
+            completionObserved = measurement != null,
+            completedReps = measurement?.completedRepetitions ?? 0,
+            durationSeconds = measurement?.durationSeconds ?? 0,
+            scoreAvailable = measurement != null && measurement.HasScoreSummary,
+            score = measurement?.averageScore ?? 0,
+        };
     }
 
     public static int PlannedCoachHoldSeconds => instance != null ? instance.FindPlannedAction("coach")?.holdSeconds ?? -1 : -1;

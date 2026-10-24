@@ -26,7 +26,7 @@ public static class PracticeSceneController
         if (config == null)
         {
             Debug.LogWarning("[PracticeSceneController] 无当前配置，无法返回教练场景");
-            LoadFallbackScene("CoachingChoose");
+            LoadFallbackScene("ActionLibrary");
             return;
         }
 
@@ -37,7 +37,7 @@ public static class PracticeSceneController
         if (string.IsNullOrWhiteSpace(targetScene))
         {
             Debug.LogWarning("[PracticeSceneController] 配置中未设置教练场景，使用默认场景");
-            LoadFallbackScene("CoachingChoose");
+            LoadFallbackScene("ActionLibrary");
             return;
         }
 
@@ -69,7 +69,7 @@ public static class PracticeSceneController
     }
 
     /// <summary>
-    /// 加载练习场景（供其他场景调用，如 CoachingChoose）
+    /// 加载练习场景（供其他场景调用，如 ActionLibrary）
     /// </summary>
     /// <param name="actionId">动作 ID</param>
     /// <param name="targetSceneName">目标场景名（默认 testPractice）</param>

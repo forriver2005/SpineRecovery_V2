@@ -15,7 +15,7 @@ public class SceneSwitcher : MonoBehaviour
     public static string TestGamingSceneName => TestGamingScene;
     private const string HipThrustScene = "HipThrust";
     private const string PlayBackScene = "PlayBack";
-    private const string CoachingChooseScene = "CoachingChoose";
+    private const string ActionLibraryScene = "ActionLibrary";
     private const string GamingChooseScene = "GamingChoose";
 
     public void ReturnToMobileApp()
@@ -75,6 +75,7 @@ public class SceneSwitcher : MonoBehaviour
 
     public void LoadBirdDogGamingScene()
     {
+        if (IsCoachWithoutGame()) return;
         LoadSceneForCurrentMobileSession(ResolveReplayReturnScene(
             BirdDogGamingScene,
             ReplaySessionContext.ReturnGamingScene));
@@ -94,6 +95,7 @@ public class SceneSwitcher : MonoBehaviour
 
     public void LoadDeadBugGamingScene()
     {
+        if (IsCoachWithoutGame()) return;
         LoadSceneForCurrentMobileSession(ResolveReplayReturnScene(
             DeadBugGamingScene,
             ReplaySessionContext.ReturnGamingScene));
@@ -101,6 +103,7 @@ public class SceneSwitcher : MonoBehaviour
 
     public void LoadTestGamingScene()
     {
+        if (IsCoachWithoutGame()) return;
         LoadSceneForCurrentMobileSession(TestGamingScene);
     }
 
@@ -121,11 +124,11 @@ public class SceneSwitcher : MonoBehaviour
         LoadSceneForCurrentMobileSession(PlayBackScene);
     }
 
-    public void LoadCoachingChooseScene()
+    public void LoadActionLibraryScene()
     {
         if (!CoachingActionLibrary.OpenFromPractice())
         {
-            LoadSceneForCurrentMobileSession(CoachingChooseScene);
+            LoadSceneForCurrentMobileSession(ActionLibraryScene);
         }
     }
 
@@ -136,7 +139,7 @@ public class SceneSwitcher : MonoBehaviour
 
     /// <summary>
     /// 加载统一练习场景（testPractice），传入动作 ID 进行配置。
-    /// 用于从其他场景（如 CoachingChoose）跳转到数据驱动的练习场景。
+    /// 用于从其他场景（如 ActionLibrary）跳转到数据驱动的练习场景。
     /// </summary>
     /// <param name="actionId">动作 ID，如 "deadbug", "birddog"</param>
     public void LoadUnifiedPracticeScene(string actionId)
@@ -181,6 +184,13 @@ public class SceneSwitcher : MonoBehaviour
     private static void LoadSceneForCurrentMobileSession(string sceneName)
     {
         SceneManager.LoadScene(SpineFlowTrainingSession.ResolveSceneForMobileSession(sceneName));
+    }
+
+    private static bool IsCoachWithoutGame()
+    {
+        string scene = SceneManager.GetActiveScene().name;
+        return LumbarCoachMode.ForScene(scene) != null ||
+            (scene == PlayBackScene && LumbarCoachMode.ForScene(ReplaySessionContext.ReturnPracticeScene) != null);
     }
 
     private static string ResolveReplayReturnScene(string fallback, string replayTarget)

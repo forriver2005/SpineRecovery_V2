@@ -872,7 +872,8 @@ public class SegmentedCoachController : MonoBehaviour
     /// 设置关键帧播放后端（服务器下发动作）。segments 从 package 读取。
     /// 必须在 PlayAction1() 之前调用。
     /// </summary>
-    public void SetMotionBackend(CoachMotionPackage package, bool lockRootPosition = false)
+    public void SetMotionBackend(CoachMotionPackage package, bool lockRootPosition = false,
+        float transitionBlendSeconds = 0f)
     {
         if (hasStarted)
         {
@@ -898,7 +899,8 @@ public class SegmentedCoachController : MonoBehaviour
         keyframeBackend?.Dispose();
         keyframeBackend = null;
 
-        keyframeBackend = new KeyframeCoachMotionBackend(coachAnimator, package, lockRootPosition);
+        keyframeBackend = new KeyframeCoachMotionBackend(
+            coachAnimator, package, lockRootPosition, transitionBlendSeconds);
         motionBackend = keyframeBackend;
         backendType = CoachMotionBackendType.Keyframe;
 

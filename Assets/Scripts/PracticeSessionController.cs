@@ -107,6 +107,7 @@ public class PracticeSessionController : MonoBehaviour
     private float secondsSinceFreshTrackerBones = float.PositiveInfinity;
     private bool waitingForCompletionUprightPose;
     private float completionUprightReadySeconds;
+    private float completionWaitElapsed;
     private Quaternion lockedUserRotationInReference = Quaternion.identity;
     private Vector3 lockedCoachHeadwardInReference = Vector3.forward;
     private float lockedCoachVerticalAlignmentOffset;
@@ -115,6 +116,7 @@ public class PracticeSessionController : MonoBehaviour
     private Quaternion userLocalRotationBeforeDirectionLock = Quaternion.identity;
     private bool hasUserRotationBeforeDirectionLock;
     private bool trainingPlaybackStarted;
+    private float introductionWaitElapsed;
     private Renderer[] introductionCoachRenderers = System.Array.Empty<Renderer>();
     private Renderer[] introductionUserRenderers = System.Array.Empty<Renderer>();
     private readonly Dictionary<Renderer, bool> introductionRendererStates =
@@ -251,6 +253,22 @@ public class PracticeSessionController : MonoBehaviour
     private void LateUpdate()
     {
         if (MobileCoachControls.IsPaused) return;
+        if (practiceRunning && !trainingPlaybackStarted)
+        {
+            introductionWaitElapsed += Time.unscaledDeltaTime;
+            float expected = voicePromptManager != null
+                ? voicePromptManager.PracticeIntroductionDurationSeconds : 0f;
+            float timeout = poseScorer != null ? poseScorer.ProgressionTimeoutSeconds
+                : PoseScorer.DefaultProgressionTimeoutSeconds;
+            if (introductionWaitElapsed >= expected + timeout)
+            {
+                // Finish the normal introduction first. Only a lost callback
+                // gets a bounded release into the regular practice entry.
+                CancelPracticeIntroduction();
+                ShowBothIntroductionStage();
+                BeginFormalPracticePlayback();
+            }
+        }
         PreserveAuthoredUserScale();
         UpdateUserTrackerFreshness(Time.unscaledDeltaTime);
         UpdateCompletionPostureGate(Time.unscaledDeltaTime);
@@ -458,6 +476,7 @@ public class PracticeSessionController : MonoBehaviour
 
     private void BeginPracticeIntroduction()
     {
+        introductionWaitElapsed = 0f;
         CaptureIntroductionRendererStates();
 
         if (voicePromptManager != null)
@@ -1478,9 +1497,7 @@ public class PracticeSessionController : MonoBehaviour
                 poseScorer.SessionScores,
                 poseScorer.MaximumUserMotionDegrees,
                 poseScorer.MaximumCoachMotionDegrees,
-                coachActionController != null
-                    ? coachActionController.CompletedRepetitions
-                    : 0);
+                poseScorer.CompletedRepetitions);
         }
     }
 
@@ -1489,6 +1506,7 @@ public class PracticeSessionController : MonoBehaviour
         ResolvePresentationController();
         presentationController?.BeginPracticeCompletionPostureGate();
         completionUprightReadySeconds = 0f;
+        completionWaitElapsed = 0f;
 
         if (!requireUprightPoseForCompletionControls)
         {
@@ -1505,6 +1523,19 @@ public class PracticeSessionController : MonoBehaviour
     {
         if (!waitingForCompletionUprightPose)
         {
+            return;
+        }
+
+        completionWaitElapsed += deltaTime;
+        float timeout = poseScorer != null ? poseScorer.ProgressionTimeoutSeconds
+            : PoseScorer.DefaultProgressionTimeoutSeconds;
+        if (completionWaitElapsed >= timeout)
+        {
+            waitingForCompletionUprightPose = false;
+            ResetUserDirectionLock();
+            ResolvePresentationController();
+            presentationController?.NotifyPracticeCompletionUserUpright();
+            Debug.Log("[CoachFlow] Completion posture wait expired; releasing controls without requiring standing.", this);
             return;
         }
 
@@ -1541,6 +1572,7 @@ public class PracticeSessionController : MonoBehaviour
     {
         waitingForCompletionUprightPose = false;
         completionUprightReadySeconds = 0f;
+        completionWaitElapsed = 0f;
     }
 
     private void UpdateUserTrackerFreshness(float deltaTime)

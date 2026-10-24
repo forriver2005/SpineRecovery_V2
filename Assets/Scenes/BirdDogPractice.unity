@@ -1473,7 +1473,7 @@ MonoBehaviour:
         m_CallState: 2
       - m_Target: {fileID: 1723679895}
         m_TargetAssemblyTypeName: SceneSwitcher, Assembly-CSharp
-        m_MethodName: LoadCoachingChooseScene
+        m_MethodName: LoadActionLibraryScene
         m_Mode: 1
         m_Arguments:
           m_ObjectArgument: {fileID: 0}
@@ -18564,7 +18564,7 @@ MonoBehaviour:
   stabilityGraceDuration: 0.45
   stabilityProgressDecayRate: 0.35
   stabilityRecoveryDuration: 0.75
-  maximumFollowingWaitSeconds: 10
+  maximumFollowingWaitSeconds: 5
 --- !u!4 &1989429036
 Transform:
   m_ObjectHideFlags: 0

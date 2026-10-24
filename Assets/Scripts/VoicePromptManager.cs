@@ -80,6 +80,17 @@ public class VoicePromptManager : MonoBehaviour
         activePrompt == PromptKind.PracticeIntroduction;
     public bool IsPlayingStabilityCountdown => activePrompt == PromptKind.StabilityCountdown;
     public string ActivePromptName => activePrompt.ToString();
+    public float StabilityCountdownDurationSeconds =>
+        (keepStill != null ? keepStill.length + StabilityPromptGapSeconds : 0f) +
+        (count2 != null ? count2.length + StabilityNumberGapSeconds : StabilityMissingNumberStepSeconds) +
+        (count1 != null ? count1.length + StabilityNumberGapSeconds : StabilityMissingNumberStepSeconds) +
+        (start != null ? start.length : 0f);
+    public float PracticeIntroductionDurationSeconds =>
+        3f * Mathf.Max(0f, introductionVisualLeadSeconds) +
+        2f * Mathf.Max(0f, introductionStageGapSeconds) +
+        (coachIntroduction != null ? coachIntroduction.length : Mathf.Max(0f, missingIntroductionClipSeconds)) +
+        (userModelIntroduction != null ? userModelIntroduction.length : Mathf.Max(0f, missingIntroductionClipSeconds)) +
+        (readyCountdown != null ? readyCountdown.length : Mathf.Max(0f, missingIntroductionClipSeconds));
 
     private void Awake()
     {

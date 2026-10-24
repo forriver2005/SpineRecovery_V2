@@ -72,6 +72,8 @@ public class DeadBugStartMenuController : MonoBehaviour
     private bool practiceCompletionGateActive;
     private bool practiceCompletionPresentationReady;
     private bool practiceCompletionUserUpright;
+    private float practiceCompletionWaitElapsed;
+    private PoseScorer practicePoseScorer;
     private readonly Dictionary<GameObject, bool> occludedRootActiveStates =
         new Dictionary<GameObject, bool>();
     private readonly Dictionary<Renderer, bool> menuHiddenRendererStates = new Dictionary<Renderer, bool>();
@@ -266,7 +268,7 @@ public class DeadBugStartMenuController : MonoBehaviour
                 libraryButton.name = "ActionLibrary";
                 Button button = libraryButton.GetComponent<Button>();
                 button.onClick = new Button.ButtonClickedEvent();
-                button.onClick.AddListener(switcher.LoadCoachingChooseScene);
+                button.onClick.AddListener(switcher.LoadActionLibraryScene);
                 Image image = libraryButton.GetComponent<Image>();
                 Sprite librarySprite = Resources.Load<Sprite>(
                     "ActionLibrary/ActionLibraryButton");
@@ -294,6 +296,11 @@ public class DeadBugStartMenuController : MonoBehaviour
                     columnIndex = 0;
                     break;
                 case "Game":
+                    if (LumbarCoachMode.ForScene(gameObject.scene.name) != null)
+                    {
+                        child.gameObject.SetActive(false);
+                        continue;
+                    }
                     columnIndex = 1;
                     break;
                 case "PlayBack":
@@ -310,6 +317,8 @@ public class DeadBugStartMenuController : MonoBehaviour
             }
 
             child.gameObject.SetActive(true);
+            if (columnIndex > 1 && LumbarCoachMode.ForScene(gameObject.scene.name) != null)
+                columnIndex--;
             if (child is RectTransform rectTransform)
             {
                 rectTransform.sizeDelta = new Vector2(380f, 140f);
@@ -376,11 +385,26 @@ public class DeadBugStartMenuController : MonoBehaviour
     private void Update()
     {
         // The final score popup and a spoken completion cue can finish in
-        // either order. Recheck after the voice becomes idle so neither is
-        // cut off by the controls-only presentation.
-        if (practiceCompletionGateActive &&
-            practiceCompletionPresentationReady &&
-            practiceCompletionUserUpright)
+        // either order. Prefer their natural completion, with a bounded wait
+        // so a missing callback or upright pose cannot hide the controls.
+        if (!practiceCompletionGateActive || MobileCoachControls.IsPaused) return;
+        practiceCompletionWaitElapsed += Time.unscaledDeltaTime;
+        float timeout = practicePoseScorer != null ? practicePoseScorer.ProgressionTimeoutSeconds
+            : PoseScorer.DefaultProgressionTimeoutSeconds;
+        if (practiceCompletionWaitElapsed >= timeout &&
+            (!practiceCompletionPresentationReady || !practiceCompletionUserUpright ||
+             !IsPracticeCompletionVoiceFinished()))
+        {
+            ScorePopup pending = pendingPracticeScorePopup;
+            CancelPendingPracticeCompletion();
+            pending?.HideImmediately();
+            ResolveCompletionVoicePromptManager();
+            completionVoicePromptManager?.StopAll();
+            practiceCompletionPresentationReady = true;
+            practiceCompletionUserUpright = true;
+            Debug.Log("[CoachFlow] Completion presentation deadline reached; showing controls.", this);
+        }
+        if (practiceCompletionPresentationReady && practiceCompletionUserUpright)
         {
             TryShowGatedPracticeCompletionControls();
         }
@@ -917,6 +941,16 @@ public class DeadBugStartMenuController : MonoBehaviour
         }
 
         practiceCompletionGateActive = true;
+        practiceCompletionWaitElapsed = 0f;
+        if (practicePoseScorer == null)
+        {
+            foreach (PoseScorer candidate in FindObjectsOfType<PoseScorer>(true))
+            {
+                if (candidate.gameObject.scene != gameObject.scene) continue;
+                practicePoseScorer = candidate;
+                break;
+            }
+        }
         practiceCompletionPresentationReady = false;
         practiceCompletionUserUpright = false;
         SetPracticeActionMenuCanvasVisible(false);
@@ -981,6 +1015,7 @@ public class DeadBugStartMenuController : MonoBehaviour
         practiceCompletionGateActive = false;
         practiceCompletionPresentationReady = false;
         practiceCompletionUserUpright = false;
+        practiceCompletionWaitElapsed = 0f;
     }
 
     public bool IsPracticeCompletionPostureGateActive =>

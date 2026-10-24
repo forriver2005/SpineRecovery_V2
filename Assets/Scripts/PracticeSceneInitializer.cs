@@ -309,7 +309,7 @@ public class PracticeSceneInitializer : MonoBehaviour
             backButton.onClick.AddListener(() =>
             {
                 FindObjectOfType<PracticeSessionController>()?.StopPractice();
-                UnityEngine.SceneManagement.SceneManager.LoadScene("CoachingChoose");
+                UnityEngine.SceneManagement.SceneManager.LoadScene("ActionLibrary");
             });
         }
 

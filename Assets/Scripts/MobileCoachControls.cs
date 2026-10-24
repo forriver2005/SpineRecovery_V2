@@ -45,7 +45,7 @@ public sealed class MobileCoachControls : MonoBehaviour
     public void BackToSelection()
     {
         Stop();
-        SceneManager.LoadScene("CoachingChoose");
+        SceneManager.LoadScene("ActionLibrary");
     }
 
     public void BackToEntry()

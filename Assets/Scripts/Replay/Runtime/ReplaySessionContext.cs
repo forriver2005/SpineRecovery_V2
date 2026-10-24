@@ -148,7 +148,7 @@ public static class ReplayContextResolver
                 package != null ? package.formatVersion.ToString() : "builtin"),
             sourceScene = sourceScene,
             returnPracticeScene = sourceScene,
-            returnGamingScene = FirstNonEmpty(
+            returnGamingScene = LumbarCoachMode.ForScene(sourceScene) != null ? null : FirstNonEmpty(
                 config?.gamingSceneName,
                 InferGamingScene(actionId)),
             avatarId = ResolveAvatarId(userAnimator, gender),
@@ -190,8 +190,8 @@ public static class ReplayContextResolver
             returnPracticeScene = FirstNonEmpty(
                 request.returnPracticeScene,
                 request.sourceScene,
-                "CoachingChoose"),
-            returnGamingScene = FirstNonEmpty(
+                "ActionLibrary"),
+            returnGamingScene = LumbarCoachMode.ForAction(actionId) != null ? null : FirstNonEmpty(
                 request.returnGamingScene,
                 InferGamingScene(actionId)),
             avatarId = FirstNonEmpty(request.avatarId, gender),
@@ -249,6 +249,8 @@ public static class ReplayContextResolver
 
     private static string InferActionId(string sceneName)
     {
+        LumbarCoachProfile lumbar = LumbarCoachMode.ForScene(sceneName);
+        if (lumbar != null) return lumbar.actionId;
         return sceneName != null &&
             sceneName.IndexOf("bird", StringComparison.OrdinalIgnoreCase) >= 0
                 ? "birddog"
@@ -257,6 +259,7 @@ public static class ReplayContextResolver
 
     private static string InferGamingScene(string actionId)
     {
+        if (LumbarCoachMode.ForAction(actionId) != null) return null;
         return string.Equals(
             NormalizeActionId(actionId),
             "birddog",

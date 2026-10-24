@@ -228,9 +228,11 @@ public sealed class FormalActionScoreMappingSettings
 // Scores the IMU user's pose against the coach's frozen target pose at each
 // segment hold. Formal actions first reach a coarse profile-driven pose, then
 // accumulate a short low-motion hold before scoring. A bounded follow window
-// can bypass noisy stillness, but never the coarse active-region requirement.
-public class PoseScorer : MonoBehaviour
+// releases both pose and stillness requirements. Missing/invalid measurements
+// are skipped instead of blocking progression or generating a score.
+public partial class PoseScorer : MonoBehaviour
 {
+    public const float DefaultProgressionTimeoutSeconds = 5f;
     [Header("References")]
     [SerializeField] private SegmentedCoachController coachController;
     [SerializeField] private Animator coachAnimator;
@@ -256,6 +258,13 @@ public class PoseScorer : MonoBehaviour
         "recorded coach pose. Generic preserves the reusable target comparer.")]
     [SerializeField] private PoseGuidanceExercise guidanceExercise =
         PoseGuidanceExercise.Generic;
+    [Header("Hip Thrust Teaching")]
+    [Tooltip("Short core scoring window after the shared stability and spoken countdown stages. Not a treatment prescription.")]
+    [SerializeField, Range(0.5f, 3f)] private float hipThrustObservationSeconds = 2f;
+    [SerializeField, Min(0f)] private float hipThrustRestSeconds = 4f;
+    private HipThrustPoseGeometry hipThrustRestPose;
+    private bool hasHipThrustRestPose;
+    private bool UsesHipThrustTeaching => guidanceExercise == PoseGuidanceExercise.HipThrust;
     [SerializeField] private TargetedExercisePoseGuidanceSettings
         targetedExerciseGuidance = new TargetedExercisePoseGuidanceSettings();
     [Tooltip("VMC receiver that drives the user avatar. The scorer resolves it " +
@@ -401,8 +410,9 @@ public class PoseScorer : MonoBehaviour
     [Min(0f)] [SerializeField] private float stabilityProgressDecayRate = 0.35f;
     [Tooltip("Stable time that must be re-earned if the user moves during the spoken scoring countdown.")]
     [Min(0.1f)] [SerializeField] private float stabilityRecoveryDuration = 0.75f;
-    [Tooltip("Maximum time spent in the follow-and-adjust state. When reached, the attempt is scored as-is instead of trapping the session forever.")]
-    [Min(0f)] [SerializeField] private float maximumFollowingWaitSeconds = 10f;
+    [Tooltip("Shared deadline for preparation, following and pre-score countdown combined. Also used by return/rest and completion controls. A retry never restarts this deadline.")]
+    [Min(0.5f)] [SerializeField] private float maximumFollowingWaitSeconds = DefaultProgressionTimeoutSeconds;
+    public float ProgressionTimeoutSeconds => Mathf.Max(0.5f, maximumFollowingWaitSeconds);
 
     // Fired when a segment's scoring window finishes, with the averaged result.
     public event Action<SegmentScore> OnSegmentScored;
@@ -440,6 +450,7 @@ public class PoseScorer : MonoBehaviour
         WaitingStable,      // holding, waiting for user to stabilize
         PreparingScore,     // stable confirmed; synchronized voice countdown
         Scoring,            // counting down and sampling once per scoring beat
+        Resting,            // complete the full teaching rest after return readiness
     }
 
     private State currentState = State.Idle;
@@ -449,8 +460,9 @@ public class PoseScorer : MonoBehaviour
     private float stabilitySampleElapsed;
     private float unstableElapsed;
     private float followingElapsed;
+    private float countdownElapsed;
+    private bool followingGateReleased;
     private bool lastStabilityResult = true;
-    private bool preparingBestEffortScore;
     private HumanBodyBones[] effectiveStabilityBones;
 
     // Current segment scoring results
@@ -721,6 +733,7 @@ public class PoseScorer : MonoBehaviour
             coachController.OnAllComplete -= HandleAllComplete;
         }
 
+        lumbarTeachingEvidence?.Dispose();
         scoringEngine?.Dispose();
         scoringEngine = null;
         guidanceDiagnosticEngine?.Dispose();
@@ -750,13 +763,40 @@ public class PoseScorer : MonoBehaviour
             return;
         }
 
+        if (currentState == State.Resting)
+        {
+            UpdateTeachingRest();
+            UpdateHapticFeedback();
+            return;
+        }
+
+        if (currentState == State.WaitingStable)
+        {
+            followingElapsed += Time.deltaTime;
+            if (followingElapsed >= ProgressionTimeoutSeconds)
+            {
+                AdvanceAfterFollowingTimeout();
+                UpdateHapticFeedback();
+                return;
+            }
+        }
+
         if (currentState == State.WaitingStable)
         {
             UpdateWaitingStable();
         }
         else if (currentState == State.PreparingScore)
         {
-            UpdatePreparingScore();
+            countdownElapsed += Time.deltaTime;
+            float expected = voiceManager != null ? voiceManager.StabilityCountdownDurationSeconds : 0f;
+            if (countdownElapsed >= expected + ProgressionTimeoutSeconds)
+            {
+                // Only a missing countdown callback is released here. Its
+                // normal audio duration is never consumed by the pose budget.
+                voiceManager?.StopAll();
+                StartScoring();
+            }
+            else UpdatePreparingScore();
         }
         else if (currentState == State.Scoring)
         {
@@ -792,7 +832,7 @@ public class PoseScorer : MonoBehaviour
             guidanceDiagnosticEngine = new PoseHighlightDiagnosticEngine(
                 guidanceDiagnostics);
         }
-        if (UsesTargetedExerciseGuidance)
+        if (UsesTargetedExerciseGuidance || UsesHipThrustTeaching)
         {
             // Targeted Dead Bug / Bird Dog guidance must not inherit any
             // recorded coach-pose error.
@@ -802,7 +842,7 @@ public class PoseScorer : MonoBehaviour
         {
             guidanceDiagnosticEngine.BeginTarget(
                 coachAnimator,
-                GuidanceBones,
+                EffectiveGuidanceBones,
                 info.segmentKind,
                 info.poseGuidanceRule);
         }
@@ -850,9 +890,13 @@ public class PoseScorer : MonoBehaviour
         }
 
         Debug.Log($"PoseScorer: 训练完成！总平均分 {sessionAvg:F1} ({sessionScores.Count} 个片段)");
-        UpdateStatusText(
-            $"训练完成！总分 " +
-            $"{FormalActionScoreMappingSettings.RoundForDisplay(sessionAvg)}");
+        UpdateStatusText(sessionScores.Count == 0
+            ? "本轮流程结束，未取得有效评分数据"
+            : UsesLumbarTeaching
+            ? $"本轮教学结束，完成 {CompletedRepetitions} 次练习流程"
+            : UsesHipThrustTeaching
+            ? $"本轮教学结束，完成 {CompletedRepetitions} 次练习流程"
+            : $"训练完成！总分 {FormalActionScoreMappingSettings.RoundForDisplay(sessionAvg)}");
         OnAllScored?.Invoke(sessionScores);
 
         if (nextButton != null)
@@ -880,7 +924,7 @@ public class PoseScorer : MonoBehaviour
         // Include all guided limbs in motion tracking. These bones only answer
         // whether the user has finished moving; coarse action readiness is
         // evaluated separately from profile-driven region evidence.
-        foreach (HumanBodyBones bone in GuidanceBones)
+        foreach (HumanBodyBones bone in EffectiveGuidanceBones)
         {
             if (seen.Add(bone))
             {
@@ -899,10 +943,10 @@ public class PoseScorer : MonoBehaviour
     {
         voiceManager?.CancelStabilityCountdown();
         unstableElapsed = 0f;
-        preparingBestEffortScore = false;
         if (resetFollowingWait)
         {
             followingElapsed = 0f;
+            followingGateReleased = false;
         }
         stateTimer = requiredStableSeconds > 0f
             ? Mathf.Clamp(requiredStableSeconds, 0.1f, stabilityDuration)
@@ -928,6 +972,23 @@ public class PoseScorer : MonoBehaviour
             this);
     }
 
+    private bool CanSampleCurrentPose()
+    {
+        if (userAnimator == null || coachAnimator == null) return false;
+        guidanceInputIsFresh = !Application.isPlaying ||
+            UpdateGuidanceVmcFreshness(Time.unscaledDeltaTime);
+        return guidanceInputIsFresh && !HasHardPoseConstraint();
+    }
+
+    private void AdvanceAfterFollowingTimeout()
+    {
+        voiceManager?.StopAll();
+        hapticFeedback?.StopAllHaptics();
+        followingGateReleased = true;
+        Debug.Log($"[CoachFlow] Pose wait expired for '{currentSegmentInfo.label}'; preserving countdown and full scoring window.", this);
+        TryBeginScoringCountdown();
+    }
+
     private void UpdateWaitingStable()
     {
         UpdateStabilityGuidance();
@@ -937,31 +998,7 @@ public class PoseScorer : MonoBehaviour
         bool isStable = requiresRelaxedPreparation
             ? IsCurrentUserInRelaxedPreparationPose()
             : motionIsStable && coarseActionIsReady;
-        followingElapsed += Time.deltaTime;
-
         bool hasHighlightedMismatch = guidancePartsToHighlight.Count > 0;
-        bool maximumWaitReached =
-            maximumFollowingWaitSeconds > 0f &&
-            followingElapsed >= maximumFollowingWaitSeconds;
-
-        if (maximumWaitReached)
-        {
-            if (!requiresRelaxedPreparation && !coarseActionIsReady)
-            {
-                UpdateStatusText("请先把高亮提示的主动部位做到大致位置...");
-                return;
-            }
-
-            if (TryBeginScoringCountdown(true))
-            {
-                UpdateStatusText("本次跟做时间已到，按当前动作进入评分...");
-            }
-            else
-            {
-                UpdateStatusText("语音提示中，播放完后按当前动作进入评分...");
-            }
-            return;
-        }
 
         if (isStable)
         {
@@ -970,7 +1007,7 @@ public class PoseScorer : MonoBehaviour
 
             if (stateTimer <= 0f)
             {
-                if (!TryBeginScoringCountdown(false))
+                if (!TryBeginScoringCountdown())
                 {
                     UpdateStatusText("已达到稳定要求，语音播放完后进入倒计时...");
                 }
@@ -1009,7 +1046,7 @@ public class PoseScorer : MonoBehaviour
             // continuous instead of accumulating across unrelated poses.
             unstableElapsed = 0f;
             stateTimer = preparationConfirmationDuration;
-            UpdateStatusText(
+            UpdateStatusText(UsesShortTeaching ? currentSegmentInfo.label :
                 coachController != null &&
                 coachController.UsesDeadBugPreparationPose
                     ? "请躺下，双手举过头顶并伸直双腿..."
@@ -1037,7 +1074,7 @@ public class PoseScorer : MonoBehaviour
         UpdateStatusText($"请稳定姿势，已保持 {progress * 100f:0}%");
     }
 
-    private bool TryBeginScoringCountdown(bool bestEffort)
+    private bool TryBeginScoringCountdown()
     {
         // Do not queue a delayed announcement or interrupt a sentence belonging
         // to the current event. WaitingStable retries after speech finishes and
@@ -1047,12 +1084,11 @@ public class PoseScorer : MonoBehaviour
             return false;
         }
 
-        preparingBestEffortScore = bestEffort;
+        CaptureTeachingPreparation();
+        countdownElapsed = 0f;
         TransitionTo(
             State.PreparingScore,
-            bestEffort
-                ? "maximum follow time reached; scoring current attempt"
-                : "accumulated stability requirement met");
+            "accumulated stability requirement met");
         UpdateStatusText("准备评分...");
 
         if (voiceManager == null)
@@ -1065,7 +1101,6 @@ public class PoseScorer : MonoBehaviour
         {
             // An unexpected voice race must not strand PreparingScore. Return
             // to the live gate; no prompt is queued for delayed playback.
-            preparingBestEffortScore = false;
             TransitionTo(State.WaitingStable, "voice became busy before countdown started");
             return false;
         }
@@ -1076,6 +1111,12 @@ public class PoseScorer : MonoBehaviour
     private void UpdatePreparingScore()
     {
         UpdateStabilityGuidance();
+
+        if (followingGateReleased)
+        {
+            UpdateStatusText("请按当前能力跟做，准备评分...");
+            return;
+        }
 
         if (RequiresRelaxedPreparation())
         {
@@ -1089,23 +1130,6 @@ public class PoseScorer : MonoBehaviour
         }
 
         bool coarseActionIsReady = IsCoarseActionReady();
-
-        if (preparingBestEffortScore)
-        {
-            if (!coarseActionIsReady)
-            {
-                EnterFollowingPhase(
-                    "coarse action readiness lost during best-effort countdown",
-                    true,
-                    stabilityRecoveryDuration,
-                    false);
-                UpdateStatusText("主动部位偏离，请重新做到大致位置...");
-                return;
-            }
-
-            UpdateStatusText("请保持当前动作，准备评分...");
-            return;
-        }
 
         bool motionIsStable = CheckUserStability();
         bool isStable = RequiresRelaxedPreparation()
@@ -1145,8 +1169,8 @@ public class PoseScorer : MonoBehaviour
     {
         if (currentState == State.PreparingScore)
         {
-            // The timeout may bypass noisy motion, but active regions must
-            // still retain their low-threshold coarse readiness marker.
+            // The shared deadline also releases pose readiness; it is not
+            // restarted when a spoken countdown returns to following.
             bool requiresRelaxedPreparation = RequiresRelaxedPreparation();
             bool coarseActionIsReady = false;
             bool motionIsStable = false;
@@ -1160,7 +1184,7 @@ public class PoseScorer : MonoBehaviour
                 requiresRelaxedPreparation,
                 coarseActionIsReady,
                 motionIsStable,
-                preparingBestEffortScore);
+                followingGateReleased);
             if (isStable)
             {
                 StartScoring();
@@ -1178,20 +1202,21 @@ public class PoseScorer : MonoBehaviour
 
     private void UpdateScoring()
     {
-        if (HasHardPoseConstraint())
+        if (CanSampleCurrentPose())
         {
-            UpdateStatusText("检测到姿态数据异常，请重新校准...");
-            return;
+            // Sample only live, usable input. The clock still finishes when
+            // data is stale or the joint validity filter rejects the pose.
+            float score = CaptureScoringSample(Time.deltaTime);
+            UpdateStatusText($"评分中 {Mathf.CeilToInt(stateTimer)}s");
+            UpdateScoreText(
+                $"当前得分 {FormalActionScoreMappingSettings.RoundForDisplay(score)}");
+            scorePopup?.ShowLiveScore(score);
         }
-
-        // The original scorer evaluates every rendered frame. Audio beats are
-        // presentation only and must not define the statistical sample cadence.
-        float score = CaptureScoringSample(Time.deltaTime);
-        int remainingSec = Mathf.CeilToInt(stateTimer);
-        UpdateStatusText($"评分中 {remainingSec}s");
-        UpdateScoreText(
-            $"当前得分 {FormalActionScoreMappingSettings.RoundForDisplay(score)}");
-        scorePopup?.ShowLiveScore(score);
+        else
+        {
+            UpdateStatusText($"评分中 {Mathf.CeilToInt(stateTimer)}s；等待有效追踪数据");
+            UpdateScoreText("正在评分，暂无有效数据");
+        }
 
         if (stateTimer <= 0f)
         {
@@ -1201,10 +1226,11 @@ public class PoseScorer : MonoBehaviour
 
     private void StartScoring()
     {
-        TransitionTo(State.Scoring, "stability voice countdown completed");
-        preparingBestEffortScore = false;
-        // Use segment-specific duration if available, otherwise fall back to default
+        TransitionTo(State.Scoring, "readiness/countdown complete; starting full scoring window");
+        // A readiness timeout starts this entire window; it never consumes it.
         float duration = currentSegmentInfo.scoringDuration > 0f ? currentSegmentInfo.scoringDuration : scoringDuration;
+        if (UsesHipThrustTeaching && currentSegmentInfo.segmentKind == TrainingSegmentKind.CoreAction)
+            duration = Mathf.Clamp(hipThrustObservationSeconds, 0.5f, 3f);
         stateTimer = duration;
         frameScores.Clear();
         frameWorstRegions.Clear();
@@ -1226,7 +1252,7 @@ public class PoseScorer : MonoBehaviour
 
         UpdateStatusText($"评分中 {Mathf.CeilToInt(stateTimer)}s");
         Debug.Log(
-            $"PoseScorer: User stabilized, starting {duration}s scoring " +
+            $"PoseScorer: Starting full {duration}s scoring " +
             "countdown with per-frame score sampling.");
     }
 
@@ -1241,6 +1267,15 @@ public class PoseScorer : MonoBehaviour
 
     private void FinishScoring()
     {
+        if (frameScores.Count == 0)
+        {
+            scorePopup?.ShowUnmeasured();
+            UpdateScoreText("本段未测量：缺少有效追踪数据");
+            voiceManager?.FinishScoring(ShouldAnnounceNextAfterScore);
+            TransitionTo(State.Idle, "full scoring window completed without valid tracking");
+            CompleteScoringCheckpoint();
+            return;
+        }
         float avgScore = 0f;
         float bestScore = 0f;
         if (frameScores.Count > 0)
@@ -1293,26 +1328,24 @@ public class PoseScorer : MonoBehaviour
             PoseBodyRegion feedbackRegion = GetDominantFeedbackRegion();
             scorePopup.ShowAverageScore(
                 avgScore,
-                RobustPoseScoringEngine.GetEncouragingFeedback(avgScore, feedbackRegion));
+                UsesShortTeaching
+                    ? currentSegmentInfo.segmentKind == TrainingSegmentKind.Preparation
+                        ? "准备完成，跟随教练继续"
+                        : "缓慢回位，放松休息"
+                    : RobustPoseScoringEngine.GetEncouragingFeedback(avgScore, feedbackRegion));
         }
         else
         {
             Debug.LogWarning("PoseScorer: ScorePopup 未配置！");
         }
 
-        bool hasNextCheckpoint = coachController != null &&
-            coachController.HasNextAfterCurrentHold;
-
         // The manager serializes ding -> next action and skips the next-action
         // announcement at the final checkpoint.
-        voiceManager?.FinishScoring(hasNextCheckpoint);
+        voiceManager?.FinishScoring(ShouldAnnounceNextAfterScore);
 
         // Auto-advance to next segment
         TransitionTo(State.Idle, "segment scoring complete");
-        if (coachController != null)
-        {
-            coachController.AdvanceToNext();
-        }
+        CompleteScoringCheckpoint();
     }
 
     private bool RequiresRelaxedPreparation()
@@ -1324,6 +1357,7 @@ public class PoseScorer : MonoBehaviour
 
     private bool IsCurrentUserInRelaxedPreparationPose()
     {
+        if (UsesShortTeaching) return IsTeachingPoseReady();
         if (coachController != null &&
             coachController.UsesDeadBugPreparationPose)
         {
@@ -1537,7 +1571,7 @@ public class PoseScorer : MonoBehaviour
             return true;
         }
 
-        return coarseActionReady && (bestEffort || motionIsStable);
+        return bestEffort || (coarseActionReady && motionIsStable);
     }
 
     private static bool IsLegStraight(
@@ -1750,6 +1784,10 @@ public class PoseScorer : MonoBehaviour
     public float MaximumUserMotionDegrees => sessionMotionEvidence.MaximumUserMotionDegrees;
     public float MaximumCoachMotionDegrees => sessionMotionEvidence.MaximumCoachMotionDegrees;
     public string CurrentFlowPhase => currentState.ToString();
+    // One completed core/return pair is one practice attempt. Pose accuracy
+    // belongs in its score and must not silently discard the repetition.
+    public int CompletedRepetitions => coachController != null
+        ? coachController.CompletedRepetitions : 0;
     public float StabilityRemainingSeconds => Mathf.Max(0f, stateTimer);
     public bool CoarseActionReady => IsCoarseActionReady();
 
@@ -1766,9 +1804,10 @@ public class PoseScorer : MonoBehaviour
         stateTimer = stabilityDuration;
         followingElapsed = 0f;
         unstableElapsed = 0f;
-        preparingBestEffortScore = false;
         initialFollowInstructionAnnouncedEarly = false;
         sessionScores.Clear();
+        lumbarTeachingEvidence?.Reset();
+        hasHipThrustRestPose = false;
         CaptureSessionStartCalibration();
         scoringEngine?.Reset();
         if (guidanceDiagnosticEngine == null)
@@ -1776,7 +1815,12 @@ public class PoseScorer : MonoBehaviour
             guidanceDiagnosticEngine = new PoseHighlightDiagnosticEngine(
                 guidanceDiagnostics);
         }
-        if (UsesTargetedExerciseGuidance)
+        if (UsesLumbarTeaching)
+        {
+            guidanceDiagnosticEngine.Dispose();
+            guidanceDiagnosticEngine = new PoseHighlightDiagnosticEngine(guidanceDiagnostics);
+        }
+        else if (UsesTargetedExerciseGuidance || UsesHipThrustTeaching)
         {
             guidanceDiagnosticEngine.ResetTarget();
         }
@@ -1785,7 +1829,7 @@ public class PoseScorer : MonoBehaviour
             guidanceDiagnosticEngine.CaptureSessionReference(
                 userAnimator,
                 coachAnimator,
-                GuidanceBones);
+                EffectiveGuidanceBones);
         }
         sessionMotionEvidence.Begin(coachAnimator, userAnimator, scoringBones);
     }
@@ -1809,7 +1853,6 @@ public class PoseScorer : MonoBehaviour
         stateTimer = stabilityDuration;
         followingElapsed = 0f;
         unstableElapsed = 0f;
-        preparingBestEffortScore = false;
         initialFollowInstructionAnnouncedEarly = false;
         prevRotations.Clear();
         frameScores.Clear();
@@ -2312,6 +2355,7 @@ public class PoseScorer : MonoBehaviour
 
     private bool IsCoarseActionReady()
     {
+        if (UsesShortTeaching) return IsTeachingPoseReady();
         EnsureGuidanceState();
         return !RequiresCoarseActionReadiness ||
             coarseActionReadinessLatch.IsReady;
@@ -2366,7 +2410,15 @@ public class PoseScorer : MonoBehaviour
             UpdateGuidanceVmcFreshness(Time.unscaledDeltaTime);
 
         PoseHighlightFrameDiagnostics diagnostics;
-        if (UsesTargetedExerciseGuidance)
+        if (UsesHipThrustTeaching)
+        {
+            hasLatestTargetedGuidanceGeometry = false;
+            diagnostics = HipThrustPoseGuidance.TryCapture(userAnimator,
+                out HipThrustPoseGeometry pose)
+                ? HipThrustPoseGuidance.Evaluate(pose, hipThrustRestPose, hasHipThrustRestPose)
+                : default;
+        }
+        else if (UsesTargetedExerciseGuidance)
         {
             hasLatestTargetedGuidanceGeometry = TryCaptureTargetedExerciseGeometry(
                 out TargetedExercisePoseGeometry geometry);
@@ -2390,7 +2442,7 @@ public class PoseScorer : MonoBehaviour
             if (!guidanceDiagnosticEngine.HasTarget &&
                 !guidanceDiagnosticEngine.BeginTarget(
                     coachAnimator,
-                    GuidanceBones,
+                    EffectiveGuidanceBones,
                     currentSegmentInfo.segmentKind,
                     currentSegmentInfo.poseGuidanceRule))
             {
@@ -2402,7 +2454,7 @@ public class PoseScorer : MonoBehaviour
 
             diagnostics = guidanceDiagnosticEngine.Evaluate(
                 userAnimator,
-                GuidanceBones,
+                EffectiveGuidanceBones,
                 Time.deltaTime);
         }
 
@@ -2904,6 +2956,21 @@ public class PoseScorer : MonoBehaviour
         }
 
         ResolveGuidanceVmcReceiver();
+#if UNITY_EDITOR
+        // With no incoming stream, Play Mode evaluates the authored/manual
+        // avatar pose through the SAME diagnostics and scoring engine. A
+        // stationary avatar is a pose, not a missing pose. Once packets exist,
+        // the live-stream freshness rules apply normally.
+        if (userAnimator != null && userAnimator.isHuman &&
+            (guidanceVmcReceiver == null ||
+             (guidanceVmcReceiver.LastPacketframeCounterInFrame == 0 &&
+              guidanceVmcReceiver.LastBonePacketCounterInFrame == 0)))
+        {
+            if (!guidanceInputWasFresh) ResetGuidanceLatchState();
+            guidanceInputWasFresh = true;
+            return true;
+        }
+#endif
         if (guidanceVmcReceiver == null)
         {
             if (!hasLoggedMissingGuidanceReceiver)

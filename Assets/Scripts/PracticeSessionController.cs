@@ -109,7 +109,6 @@ public class PracticeSessionController : MonoBehaviour
     private float completionUprightReadySeconds;
     private float completionWaitElapsed;
     private Quaternion lockedUserRotationInReference = Quaternion.identity;
-    private Vector3 lockedCoachHeadwardInReference = Vector3.forward;
     private float lockedCoachVerticalAlignmentOffset;
     private Transform directionLockedUserRoot;
     private Transform directionLockedUserOriginalParent;
@@ -134,6 +133,7 @@ public class PracticeSessionController : MonoBehaviour
     private Camera coachOverlayCamera;
 
     public bool IsLyingOverheadPresentationReady =>
+        SupportsLyingDirectionPresentation() &&
         ShouldUseLyingOverheadPresentation(
             practiceRunning,
             hasLockedUserRotation,
@@ -282,6 +282,11 @@ public class PracticeSessionController : MonoBehaviour
         if (preparationDirectionAlignmentActive && !hasLockedUserRotation)
         {
             TryLockReadyUserDirection(Time.unscaledDeltaTime, false);
+        }
+
+        if (!hasLockedUserRotation)
+        {
+            AlignUserDisplayYawToCoach();
         }
 
         if (hasLockedUserRotation)
@@ -888,7 +893,10 @@ public class PracticeSessionController : MonoBehaviour
 
         bool hasFreshUserTrackerData = HasFreshUserTrackerData();
 
-        if (requirePreparationPoseBeforeDirectionLock)
+        bool requiresLyingPreparationPose =
+            requirePreparationPoseBeforeDirectionLock &&
+            SupportsLyingDirectionPresentation();
+        if (requiresLyingPreparationPose)
         {
             Animator userAnimator = motionRecorder.UserAnimator;
             Animator coachAnimator = motionRecorder.CoachAnimator;
@@ -918,7 +926,8 @@ public class PracticeSessionController : MonoBehaviour
                 return false;
             }
         }
-        else if (!hasFreshUserTrackerData)
+        else if (SupportsLyingDirectionPresentation() &&
+                 !hasFreshUserTrackerData)
         {
             if (reportResult)
             {
@@ -971,6 +980,17 @@ public class PracticeSessionController : MonoBehaviour
                 preparationMinimumSupportDropRatio);
     }
 
+    private bool SupportsLyingDirectionPresentation()
+    {
+        string sceneName = gameObject.scene.name;
+        return sceneName.IndexOf(
+                   "DeadBug",
+                   System.StringComparison.OrdinalIgnoreCase) >= 0 ||
+            sceneName.IndexOf(
+                "BirdDog",
+                System.StringComparison.OrdinalIgnoreCase) >= 0;
+    }
+
     private void UpdateDirectionPreparationReadiness(
         bool poseReady,
         float deltaTime)
@@ -1008,18 +1028,20 @@ public class PracticeSessionController : MonoBehaviour
         ResolveAvatarDirectionReference(userAnimator, coachAnimator);
 
         if (avatarDirectionReference == null ||
-            !TryGetBodyHeadwardDirection(
+            !TryGetStableAvatarHeading(
                 userAnimator,
+                avatarDirectionReference.up,
                 out Vector3 userHeadwardWorld) ||
-            !TryGetBodyHeadwardDirection(
+            !TryGetStableAvatarHeading(
                 coachAnimator,
+                avatarDirectionReference.up,
                 out Vector3 coachHeadwardWorld))
         {
             if (reportResult)
             {
                 Debug.LogWarning(
                     "PracticeSessionController could not lock the user display " +
-                    "direction because a reliable hip-to-torso direction is " +
+                    "direction because a reliable avatar heading is " +
                     "unavailable.",
                     this);
             }
@@ -1043,8 +1065,8 @@ public class PracticeSessionController : MonoBehaviour
             {
                 Debug.LogWarning(
                     "PracticeSessionController could not lock the user display " +
-                    "direction because the lying head-to-feet direction is " +
-                    "not horizontal enough to resolve.",
+                    "direction because the available avatar heading is not " +
+                    "horizontal enough to resolve.",
                     this);
             }
 
@@ -1063,9 +1085,6 @@ public class PracticeSessionController : MonoBehaviour
         lockedUserRotationInReference =
             Quaternion.Inverse(referenceRotation) *
             userRoot.rotation;
-        lockedCoachHeadwardInReference = Vector3.ProjectOnPlane(
-            coachHeadwardInReference,
-            Vector3.up).normalized;
         lockedCoachVerticalAlignmentOffset =
             TryGetLyingBodyPlaneHeightInReference(
                 userAnimator,
@@ -1087,14 +1106,149 @@ public class PracticeSessionController : MonoBehaviour
         if (reportResult)
         {
             Debug.Log(
-                "PracticeSessionController aligned only the user's horizontal " +
-                "lying direction to the coach and captured a stable " +
+                "PracticeSessionController aligned the user's horizontal " +
+                "display direction to the coach and captured a stable " +
                 "display-space rotation lock. Coach lying-plane correction: " +
                 $"{lockedCoachVerticalAlignmentOffset:F3} m.",
                 this);
         }
 
         return true;
+    }
+
+    private bool AlignUserDisplayYawToCoach()
+    {
+        if (motionRecorder == null ||
+            motionRecorder.UserAnimator == null ||
+            motionRecorder.CoachAnimator == null)
+        {
+            return false;
+        }
+
+        Animator userAnimator = motionRecorder.UserAnimator;
+        Animator coachAnimator = motionRecorder.CoachAnimator;
+        Transform userRoot = userAnimator.transform;
+        Transform coachRoot = coachAnimator.transform;
+        ResolveAvatarDirectionReference(userAnimator, coachAnimator);
+        if (avatarDirectionReference == null)
+        {
+            return false;
+        }
+
+        Vector3 userForwardInReference =
+            avatarDirectionReference.InverseTransformDirection(userRoot.forward);
+        Vector3 coachForwardInReference =
+            avatarDirectionReference.InverseTransformDirection(coachRoot.forward);
+        if (!TryCalculateYawAlignmentDegrees(
+                userForwardInReference,
+                coachForwardInReference,
+                Vector3.up,
+                out float correctionDegrees))
+        {
+            return false;
+        }
+
+        CaptureUserRotationBeforeDirectionLock(userRoot);
+        if (Mathf.Abs(correctionDegrees) > DirectionLockDeadZoneDegrees)
+        {
+            userRoot.rotation = Quaternion.AngleAxis(
+                correctionDegrees,
+                avatarDirectionReference.up) * userRoot.rotation;
+        }
+
+        return true;
+    }
+
+    private static bool TryGetBodyFacingDirection(
+        Animator animator,
+        Vector3 worldUp,
+        out Vector3 facing)
+    {
+        facing = Vector3.zero;
+        if (animator == null || worldUp.sqrMagnitude < 0.0001f)
+        {
+            return false;
+        }
+
+        Transform chest = animator.GetBoneTransform(HumanBodyBones.UpperChest) ??
+            animator.GetBoneTransform(HumanBodyBones.Chest) ??
+            animator.GetBoneTransform(HumanBodyBones.Spine);
+        Transform leftShoulder =
+            animator.GetBoneTransform(HumanBodyBones.LeftShoulder) ??
+            animator.GetBoneTransform(HumanBodyBones.LeftUpperArm);
+        Transform rightShoulder =
+            animator.GetBoneTransform(HumanBodyBones.RightShoulder) ??
+            animator.GetBoneTransform(HumanBodyBones.RightUpperArm);
+        Transform leftHip = animator.GetBoneTransform(HumanBodyBones.LeftUpperLeg);
+        Transform rightHip = animator.GetBoneTransform(HumanBodyBones.RightUpperLeg);
+        if (chest == null)
+        {
+            return false;
+        }
+
+        Vector3 lateral = Vector3.zero;
+        if (leftShoulder != null && rightShoulder != null)
+        {
+            lateral = rightShoulder.position - leftShoulder.position;
+        }
+        if (leftHip != null && rightHip != null)
+        {
+            Vector3 hipLateral = rightHip.position - leftHip.position;
+            lateral = lateral.sqrMagnitude > 0.0001f
+                ? lateral + hipLateral
+                : hipLateral;
+        }
+
+        Vector3 safeUp = worldUp.normalized;
+        lateral = Vector3.ProjectOnPlane(lateral, safeUp);
+        if (lateral.sqrMagnitude < 0.0001f)
+        {
+            lateral = Vector3.ProjectOnPlane(chest.right, safeUp);
+        }
+        if (lateral.sqrMagnitude < 0.0001f)
+        {
+            return false;
+        }
+
+        Vector3 candidate = Vector3.Cross(lateral.normalized, safeUp);
+        Vector3 chestForward = Vector3.ProjectOnPlane(chest.forward, safeUp);
+        if (chestForward.sqrMagnitude > 0.0001f &&
+            Vector3.Dot(candidate, chestForward.normalized) < 0f)
+        {
+            candidate = -candidate;
+        }
+
+        facing = candidate.normalized;
+        return facing.sqrMagnitude > 0.0001f;
+    }
+
+    private static bool TryGetStableAvatarHeading(
+        Animator animator,
+        Vector3 worldUp,
+        out Vector3 heading)
+    {
+        heading = Vector3.zero;
+        if (animator == null || worldUp.sqrMagnitude < 0.0001f)
+        {
+            return false;
+        }
+
+        if (TryGetBodyHeadwardDirection(animator, out Vector3 headward))
+        {
+            Vector3 safeUp = worldUp.normalized;
+            Vector3 horizontalHeadward = Vector3.ProjectOnPlane(
+                headward,
+                safeUp);
+            float headwardLengthSquared = headward.sqrMagnitude;
+            if (headwardLengthSquared > 0.0001f &&
+                horizontalHeadward.sqrMagnitude / headwardLengthSquared > 0.8f)
+            {
+                heading = horizontalHeadward.normalized;
+                return true;
+            }
+        }
+
+        return TryGetBodyFacingDirection(animator, worldUp, out heading);
     }
 
     private Transform ResolveAvatarDirectionReference(
@@ -1133,28 +1287,6 @@ public class PracticeSessionController : MonoBehaviour
         userRoot.rotation =
             avatarDirectionReference.rotation *
             lockedUserRotationInReference;
-
-        // A real VMC/IMU stream carries the person's room heading in the Hips
-        // bone, not in the avatar root. Restoring only the root therefore does
-        // not hold the displayed direction when a person lies down at another
-        // heading. Re-evaluate the latest tracked torso after restoring the
-        // authored display root and cancel only its horizontal yaw. Tracker
-        // pitch/roll and all exercise articulation remain untouched.
-        if (TryGetBodyHeadwardDirection(
-                motionRecorder.UserAnimator,
-                out Vector3 userHeadwardWorld) &&
-            TryCalculateYawAlignmentDegrees(
-                avatarDirectionReference.InverseTransformDirection(
-                    userHeadwardWorld),
-                lockedCoachHeadwardInReference,
-                Vector3.up,
-                out float yawCorrectionDegrees) &&
-            Mathf.Abs(yawCorrectionDegrees) > DirectionLockDeadZoneDegrees)
-        {
-            userRoot.rotation = Quaternion.AngleAxis(
-                yawCorrectionDegrees,
-                avatarDirectionReference.up) * userRoot.rotation;
-        }
 
         return true;
     }
@@ -1800,7 +1932,6 @@ public class PracticeSessionController : MonoBehaviour
         preparationPoseMissSeconds = 0f;
         secondsSinceFreshTrackerBones = float.PositiveInfinity;
         lockedUserRotationInReference = Quaternion.identity;
-        lockedCoachHeadwardInReference = Vector3.forward;
         lockedCoachVerticalAlignmentOffset = 0f;
         avatarDirectionReference = null;
     }

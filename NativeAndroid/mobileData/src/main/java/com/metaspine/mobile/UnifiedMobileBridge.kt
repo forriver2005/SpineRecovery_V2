@@ -398,7 +398,7 @@ object UnifiedMobileBridge {
                     .put("prescriptionOrderId", order.orderId).put("prescriptionJson", source.getJSONObject("trainingPlan").toString())
                     .put("preTrainingEventId", user.latestPreTrainingCheck?.recordedAt?.takeIf { it.isNotBlank() }?.let { "pre:$it" }.orEmpty())
             }
-            "routineRefresh", "routineAnswer", "routineSubmit" -> {
+            "routineRefresh", "routineAnswer", "routineSave", "routineSubmit" -> {
                 val credential = requireNotNull(PatientCredentials.credential(context, account)) { "请先激活医生档案" }
                 val origin = SpineFlowServerConfig.BASE_URL
                 val binding = requireNotNull(BindingScopeStore.load(context, account))
@@ -412,6 +412,9 @@ object UnifiedMobileBridge {
                     SpineFlowServerConfig.BASE_URL == origin }
                 var message = ""
                 if (command == "routineRefresh") message = routine.refresh(bound, credential, current).message
+                if (command == "routineSave") {
+                    routine.saveDraft(bound, body.getLong("taskId"), body.getString("answersJson"), current)
+                }
                 if (command == "routineAnswer") {
                     val taskId = body.getLong("taskId")
                     val row = routineStore.read(bound).find { it.task.taskId == taskId } ?: error("请先刷新问卷")
@@ -454,7 +457,9 @@ object UnifiedMobileBridge {
                 }
             }
             array.put(JSONObject().put("taskId", row.task.taskId).put("name", schema?.title ?: row.task.name)
+                .put("templateCode", row.task.code).put("availableAt", row.task.availableAt)
                 .put("completedAt", row.completedAt.orEmpty()).put("availability", row.availability)
+                .put("pendingSubmission", row.pendingBody != null)
                 .put("problem", row.problem.orEmpty()).put("questions", questions)
                 .put("templateVersion", row.task.version).put("schemaJson", JSONObject(row.task.raw).optJSONObject("template")?.optJSONObject("schema")?.toString().orEmpty())
                 .put("answersJson", row.answers).put("recordId", row.recordId ?: JSONObject.NULL)

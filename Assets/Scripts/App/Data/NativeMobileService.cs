@@ -18,19 +18,44 @@ namespace SpineRecovery.App
         public int numberValue;
         public bool boolValue;
         public string textValue;
+        public string answersJson;
         public string[] values = Array.Empty<string>();
+    }
+
+    [Serializable]
+    public sealed class NativeQuestionnaireOption
+    {
+        public string value;
+        public string label;
+    }
+
+    [Serializable]
+    public sealed class NativeQuestionnaireQuestion
+    {
+        public string id;
+        public string type;
+        public bool required;
+        public bool answerSet;
+        public string textValue;
+        public NativeQuestionnaireOption[] options = Array.Empty<NativeQuestionnaireOption>();
     }
 
     [Serializable]
     public sealed class NativeQuestionnaireTask
     {
         public long taskId;
+        public string templateCode;
+        public string availableAt;
         public string completedAt;
         public string availability;
+        public bool pendingSubmission;
+        public string submissionStatus;
+        public string problem;
         public int templateVersion;
         public string schemaJson;
         public string answersJson;
         public string requestId;
+        public NativeQuestionnaireQuestion[] questions = Array.Empty<NativeQuestionnaireQuestion>();
     }
 
     [Serializable]

@@ -67,6 +67,11 @@ namespace SpineRecovery.App
         private Text joaMessage;
         private Text joaNextCaption;
         private UnityAction onJoaNext;
+        private Button joaNextButton;
+        private Button sfmpqFinishButton;
+        private readonly Text[] stepLabels = new Text[2];
+        private readonly RectTransform[] progressFills = new RectTransform[2];
+        public event Action AnswersChanged;
 
         // ---- page 1: JOA self assessment -------------------------------------
 
@@ -101,7 +106,7 @@ namespace SpineRecovery.App
                     int choice = c;
                     Button button = QuestionnaireUi.MakeButton(daily, "Limit" + i + "_" + c,
                         QuestionnaireUi.OptionBackground, 12f, 20f + c * 105f, 111.5f + 89f * i, 100f, 44f,
-                        () => { activities[activity] = choice; RefreshActivities(); ClearJoaMessage(); });
+                        () => { activities[activity] = choice; RefreshActivities(); ClearJoaMessage(); AnswersChanged?.Invoke(); });
                     QuestionnaireUi.Label(button.transform, LimitLabels[c], 15, QuestionnaireUi.Ink,
                         TextAnchor.MiddleCenter, FontStyle.Bold, 0f, 0f, 100f, 44f);
                     activityButtons[i][c] = button;
@@ -121,6 +126,7 @@ namespace SpineRecovery.App
             joaMessage = QuestionnaireUi.Label(footer, "", 12.5f, QuestionnaireUi.DangerText, TextAnchor.MiddleCenter,
                 FontStyle.Normal, 20f, 4f, 350f, 16f);
             Button nextButton = QuestionnaireUi.PillButton(footer, "下一题", 20f, 24f, 350f, 52f, true, HandleJoaNext);
+            joaNextButton = nextButton;
             joaNextCaption = nextButton.GetComponentInChildren<Text>();
             QuestionnaireUi.Header(root, "腰椎康复系统", onBack);
             return panel;
@@ -139,7 +145,7 @@ namespace SpineRecovery.App
             BuildRatingCard(sfmpqContent, 928f, 314f, "疼痛带来的感受", AffectiveWords, affective, affectiveButtons);
 
             RectTransform footer = QuestionnaireUi.Footer(root, FooterHeight);
-            QuestionnaireUi.PillButton(footer, "完成", 20f, 24f, 350f, 52f, true, onFinish);
+            sfmpqFinishButton = QuestionnaireUi.PillButton(footer, "完成", 20f, 24f, 350f, 52f, true, onFinish);
             QuestionnaireUi.Header(root, "腰椎康复系统", onBack);
             return panel;
         }
@@ -170,6 +176,41 @@ namespace SpineRecovery.App
             if (joaNextCaption != null) joaNextCaption.text = caption;
         }
 
+        public void Restore(MonthlyQuestionnaireRecord record)
+        {
+            int[] selected = { record.backPain, record.legPain, record.walking, record.urination };
+            for (int i = 0; i < groups.Length; i++)
+            {
+                groups[i].Selected = selected[i];
+                RefreshRadio(groups[i]);
+            }
+            Array.Copy(record.activityLimits, activities, activities.Length);
+            Array.Copy(record.sfmpqSensory, sensory, sensory.Length);
+            Array.Copy(record.sfmpqAffective, affective, affective.Length);
+            RefreshActivities();
+            RefreshRatings(sensoryButtons, sensory);
+            RefreshRatings(affectiveButtons, affective);
+            ClearJoaMessage();
+        }
+
+        public void SetInteraction(bool editable, bool canSubmit)
+        {
+            foreach (RadioGroup group in groups)
+                foreach (Button button in group.Rows) button.interactable = editable;
+            foreach (Button[][] section in new[] { activityButtons, sensoryButtons, affectiveButtons })
+                foreach (Button[] row in section)
+                    foreach (Button button in row) button.interactable = editable;
+            joaNextButton.interactable = canSubmit;
+            sfmpqFinishButton.interactable = canSubmit;
+        }
+
+        public void SetTaskProgress(int module, int step, int total)
+        {
+            int page = module == MonthlyQuestionnaireAssignment.ModuleJoa ? 0 : 1;
+            stepLabels[page].text = step + " / " + total;
+            progressFills[page].SetSizeWithCurrentAnchors(RectTransform.Axis.Horizontal, 350f * step / total);
+        }
+
         /// <summary>Snapshot of the current answers; the caller fills in id and timestamp.</summary>
         public MonthlyQuestionnaireRecord CollectRecord()
         {
@@ -187,15 +228,15 @@ namespace SpineRecovery.App
 
         // ---- building blocks --------------------------------------------------
 
-        private static void BuildStepHeader(RectTransform content, int step, string title, string subtitle)
+        private void BuildStepHeader(RectTransform content, int step, string title, string subtitle)
         {
             QuestionnaireUi.Label(content, "月度评估", 13, QuestionnaireUi.Accent, TextAnchor.MiddleLeft,
                 FontStyle.Bold, 20f, 24f, 200f, 20f);
-            QuestionnaireUi.Label(content, step + " / " + TotalSteps, 13, QuestionnaireUi.Accent,
+            stepLabels[step - 1] = QuestionnaireUi.Label(content, step + " / " + TotalSteps, 13, QuestionnaireUi.Accent,
                 TextAnchor.MiddleRight, FontStyle.Bold, 270f, 24f, 100f, 20f);
             QuestionnaireUi.Box(content, "ProgressTrack", new Color(0.88f, 0.90f, 0.93f), 3f, 20f, 54f, 350f, 6f);
-            QuestionnaireUi.Box(content, "ProgressFill", QuestionnaireUi.Accent, 3f, 20f, 54f,
-                350f * step / TotalSteps, 6f);
+            progressFills[step - 1] = QuestionnaireUi.Box(content, "ProgressFill", QuestionnaireUi.Accent, 3f, 20f, 54f,
+                350f * step / TotalSteps, 6f).rectTransform;
             QuestionnaireUi.Label(content, title, 22, QuestionnaireUi.Accent, TextAnchor.MiddleLeft, FontStyle.Bold,
                 20f, 81f, 350f, 32f);
             QuestionnaireUi.Label(content, subtitle, 13.5f, QuestionnaireUi.Muted, TextAnchor.MiddleLeft,
@@ -217,7 +258,7 @@ namespace SpineRecovery.App
                 int index = i;
                 Button row = QuestionnaireUi.MakeButton(card, "Option" + i, QuestionnaireUi.OptionBackground, 14f,
                     20f, titleCentre + 23f + 58f * i, 310f, 46f,
-                    () => { group.Selected = index; RefreshRadio(group); ClearJoaMessage(); });
+                    () => { group.Selected = index; RefreshRadio(group); ClearJoaMessage(); AnswersChanged?.Invoke(); });
                 QuestionnaireUi.Label(row.transform, options[i], 14, QuestionnaireUi.Ink, TextAnchor.MiddleLeft,
                     FontStyle.Normal, 16f, 0f, 245f, 46f);
 
@@ -246,7 +287,7 @@ namespace SpineRecovery.App
             bar.rectTransform.localRotation = Quaternion.Euler(0f, 0f, angle);
         }
 
-        private static void BuildRatingCard(RectTransform content, float y, float height, string title,
+        private void BuildRatingCard(RectTransform content, float y, float height, string title,
             string[][] words, int[] values, Button[][] buttons)
         {
             const float firstColumn = 162f;
@@ -279,6 +320,7 @@ namespace SpineRecovery.App
                         {
                             values[word] = rating;
                             RefreshRatings(buttons, values);
+                            AnswersChanged?.Invoke();
                         });
                     QuestionnaireUi.Label(button.transform, RatingLabels[c], 15, QuestionnaireUi.Ink,
                         TextAnchor.MiddleCenter, FontStyle.Bold, 0f, 0f, buttonWidth, 44f);

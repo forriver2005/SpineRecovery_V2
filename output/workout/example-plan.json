@@ -1,0 +1,7 @@
+{
+  "actions": [
+    { "action": "deadbug", "difficulty": "simple", "sets": 2 },
+    { "action": "birddog", "difficulty": "standard", "sets": 2 },
+    { "action": "hipthrust", "difficulty": "hard", "sets": 1 }
+  ]
+}

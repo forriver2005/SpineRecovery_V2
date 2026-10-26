@@ -1,0 +1,1 @@
+PASS: authored sprites; no demo chart; menu hides skin; four gameplay notes; four HIT events; original MISS window; stop clears notes and hides skin.

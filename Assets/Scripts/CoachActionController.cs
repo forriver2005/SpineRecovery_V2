@@ -319,6 +319,16 @@ public class CoachActionController : MonoBehaviour
         }
     }
 
+    public void CancelTraining()
+    {
+        StopActionRoutine();
+        StopIdleVariations();
+        if (actionDiagnosticsRoutine != null) StopCoroutine(actionDiagnosticsRoutine);
+        actionDiagnosticsRoutine = null;
+        StopAtCurrentPose();
+        if (sideFeedback != null) sideFeedback.EndFeedback();
+    }
+
     private IEnumerator ReturnIdleAfterActionCompletes()
     {
         yield return null;

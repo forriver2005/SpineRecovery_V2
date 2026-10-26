@@ -1,0 +1,55 @@
+游戏动作串接入接口
+
+范围：DeadBug_RingSkinC、BirdDog_RingSkinC、HipThrust。旧视觉场景不启用此功能。
+所有调用须在 Unity 主线程执行。
+
+参数：
+actions 按数组顺序执行，允许重复动作。
+action: deadbug（死虫式）、birddog（鸟狗式）、hipthrust（臀桥）。
+difficulty: simple（简单）、standard（标准）、hard（进阶）。
+sets: 1–100。每组沿用当前难度的一轮完整游戏，通常分别为 4、8、12 次动作。
+最多 64 个动作条目，总组数最多 1000。
+
+示例 JSON 见 example-plan.json。
+
+加载计划但不开始：
+var session = GameWorkoutSession.Instance;
+bool accepted = session.SetPlanJson(json, out string error);
+// 或 session.SetPlan(new GameWorkoutPlan { actions = ... }, out error)
+// 返回 false 时读取 error；原计划不变。
+
+开始：
+if (session.StartPlan(out string error)) { ... }
+// 或由用户点击左侧“动作串”面板中的“开始动作串”。
+// 会自动加载第一动作的新视觉场景，等待躺姿校准，再沿用游戏的准备倒计时。
+// 执行期间拒绝替换参数、重复开始以及绕过动作串的单项开始。
+
+停止：
+session.Cancel();
+// 取消等待、倒计时及当前训练，回到开始菜单，不把未完成组计为完成。
+// 再次 StartPlan 从整个计划开头执行；不提供中断续练语义。
+
+状态：
+session.Plan 返回独立参数副本，修改该副本不会改变内部计划。
+session.ActionIndex 为当前动作条目的零起始索引；全部完成时等于 actions.Length。
+session.CompletedSets 为当前条目已完成组数；进入下一条目时归零。
+session.IsRunning / IsComplete / Status 可查询运行、完成与当前提示。
+session.Changed 事件：参数、阶段或组数发生变化。
+session.Finished 事件：全部动作组完成。
+session.Failed(string error) 事件：场景加载或启动失败。
+外部模块销毁时记得退订事件。
+
+切换行为：
+一组完成后展示结果 3 秒，然后继续下一组；完成规定组数后切换下一动作。
+每次进入新的动作场景重新进行躺姿校准，同场景连续组复用本次校准。
+统一校准姿势：仰卧屈膝、双脚着地、双臂放在身体两侧。
+站姿、四点跪姿、传感器不可用或持续晃动不能通过校准。
+校准后鸟狗式按教练进入四点跪姿；无需站立。
+新的游戏仍保留各自教练动画和难度节奏，不修改其评分权重。
+
+验证：
+Unity 菜单 Tools > Game Workout > Verify Calibration and Sequence。
+该工具仅在编辑器注入测试姿势和完成信号；运行时不会自动通过校准或伪造完成。
+真实穿戴设备的姿态质量、识别阈值和眼镜显示效果仍需设备联调。
+
+临时流程预览：三个新视觉场景当前已开启 SupineGameCalibration.skipCalibrationForPreview。单项和动作串跳过校准等待，未校准期间不记录姿态评分。恢复时将各场景该字段取消勾选。校准验证工具仅在测试运行中自动关闭此开关。

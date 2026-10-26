@@ -1,0 +1,2 @@
+PASS: all 440 original serialized objects retained. All 108 original MonoBehaviour components retained. 105 unchanged verbatim; 3 differ only in an explicit visual-field allowlist. Judgement radii, spawn ranges, note scales, entry/hold times, coach/scorer/clock references and training parameters unchanged.
+Source SHA256: d96d83943084736c054b2a013a77dc7c4bd03a4212e7792888c83fb5a05907b3

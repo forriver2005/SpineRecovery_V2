@@ -160,9 +160,14 @@ public class DeadBugGamingPoseScorer : MonoBehaviour
     public AnatomicalPoseScore LastFrameScore => lastFrameResult;
     public AnatomicalLimbScores LastLimbScores => lastLimbScores;
     public bool IsCalibrated => calibrated;
+    public bool IsCalibrationBypassed => GetComponent<SupineGameCalibration>() != null
+        && GetComponent<SupineGameCalibration>().skipCalibrationForPreview;
+    public bool CanStartTraining => calibrated || IsCalibrationBypassed;
     public bool IsCalibrating => calibrating;
     public Animator CoachAnimator => coachAnimator;
     public Animator UserAnimator => userAnimator;
+    public string CalibrationInstruction => GetComponent<SupineGameCalibration>() != null
+        ? SupineGameCalibration.Instruction : "请自然站立进行校准";
 
     private void Awake()
     {
@@ -199,6 +204,7 @@ public class DeadBugGamingPoseScorer : MonoBehaviour
         }
 
         calibrating = false;
+        GetComponent<SupineGameCalibration>()?.Release();
     }
 
     private void LateUpdate()
@@ -264,7 +270,26 @@ public class DeadBugGamingPoseScorer : MonoBehaviour
             StopCoroutine(calibrationRoutine);
         }
 
+        if (IsCalibrationBypassed)
+        {
+            calibrationRoutine = null;
+            calibrating = false;
+            calibrated = false;
+            GetComponent<SupineGameCalibration>().Release();
+            CalibrationStateChanged?.Invoke(false);
+            ReportCalibrationProgress(0f, "流程预览：已临时跳过校准");
+            return;
+        }
+
         calibrationRoutine = StartCoroutine(CalibrationSequence());
+    }
+
+    public void CancelScoringSession()
+    {
+        sessionActive = false;
+        activeCheckpoints.Clear();
+        recentFrameScores.Clear();
+        scoringEngine?.ResetSession();
     }
 
     private IEnumerator CalibrationSequence()
@@ -278,7 +303,8 @@ public class DeadBugGamingPoseScorer : MonoBehaviour
         calibrated = false;
         calibrating = true;
         CalibrationStateChanged?.Invoke(false);
-        ReportCalibrationProgress(0f, "\u8bf7\u81ea\u7136\u7ad9\u7acb\u5e76\u4fdd\u6301\u7a33\u5b9a");
+        ReportCalibrationProgress(0f, GetComponent<SupineGameCalibration>() != null
+            ? CalibrationInstruction : "请自然站立并保持稳定");
         scoringEngine.ResetSession();
         coachCalibrationDirections.Clear();
         userCalibrationDirections.Clear();
@@ -291,9 +317,21 @@ public class DeadBugGamingPoseScorer : MonoBehaviour
             yield break;
         }
 
-        PrepareStandingCalibrationPose();
+        var supine = GetComponent<SupineGameCalibration>();
+        if (supine != null)
+        {
+            if (!supine.Prepare(coachAnimator))
+            {
+                calibrating = false;
+                calibrationRoutine = null;
+                ReportCalibrationProgress(0f, "躺姿校准参考动作缺失");
+                yield break;
+            }
+        }
+        else PrepareStandingCalibrationPose();
         yield return null;
         yield return CollectStandingCalibration();
+        if (supine != null) supine.Release();
 
         scoringEngine.SetStandingCalibration(
             userCalibrationDirections,
@@ -308,7 +346,7 @@ public class DeadBugGamingPoseScorer : MonoBehaviour
                 : "\u6709\u6548\u9aa8\u9abc\u4e0d\u8db3\uff0c\u8bf7\u68c0\u67e5\u4f20\u611f\u5668");
 
         Debug.Log(
-            $"[DeadBugScore] Anatomical standing calibration complete: " +
+            $"[DeadBugScore] Anatomical {(supine != null ? "supine" : "standing")} calibration complete: " +
             $"segments={scoringEngine.CalibratedSegmentCount}, success={calibrated}.",
             this);
         calibrationRoutine = null;
@@ -325,13 +363,28 @@ public class DeadBugGamingPoseScorer : MonoBehaviour
         float sampleElapsed = 0f;
         float unstableDuringSample = 0f;
         bool samplingStarted = false;
+        var supine = GetComponent<SupineGameCalibration>();
 
         while (sampleElapsed < calibrationSampleDuration)
         {
+            if (supine != null) supine.SampleReference();
             int validBones = CountValidCalibrationBones();
             int sharedSegments = CountSharedCalibrationSegments();
             bool trackingReady = sharedSegments >= 5 && validBones >= minimumTrackedBones;
             bool stable = CheckCalibrationStability();
+            bool poseReady = supine == null || SupineGameCalibration.IsLying(userAnimator);
+            var source = supine != null ? FindObjectOfType<AvatarMotionSource>() : null;
+            bool inputReady = supine == null || (source != null && source.GetAvailable() > 0);
+            if (!poseReady || !inputReady)
+            {
+                stableElapsed = sampleElapsed = unstableDuringSample = 0f;
+                samplingStarted = false;
+                coachSamples.Clear();
+                userSamples.Clear();
+                ReportCalibrationProgress(0f, inputReady ? CalibrationInstruction : "等待动作传感器连接");
+                yield return null;
+                continue;
+            }
 
             if (trackingReady && stable)
             {
@@ -372,13 +425,13 @@ public class DeadBugGamingPoseScorer : MonoBehaviour
             {
                 ReportCalibrationProgress(
                     0f,
-                    "\u68c0\u6d4b\u5230\u6643\u52a8\uff0c\u8bf7\u4fdd\u6301\u81ea\u7136\u7ad9\u7acb");
+                    supine != null ? "检测到晃动，请保持仰卧稳定" : "检测到晃动，请保持自然站立");
             }
             else if (stableElapsed < calibrationStableDuration)
             {
                 ReportCalibrationProgress(
                     0f,
-                    $"\u4fdd\u6301\u7ad9\u7acb {calibrationStableDuration - stableElapsed:0.0}s");
+                    $"保持{(supine != null ? "仰卧" : "站立")} {calibrationStableDuration - stableElapsed:0.0}s");
             }
             else
             {
@@ -541,6 +594,9 @@ public class DeadBugGamingPoseScorer : MonoBehaviour
         lastSessionAverage = 0f;
         scoringEngine?.ResetSession();
         sessionActive = calibrated && coachAnimator != null && userAnimator != null;
+
+        // Preview can run without recording uncalibrated pose scores.
+        if (IsCalibrationBypassed && !calibrated) return;
 
         if (!sessionActive)
         {

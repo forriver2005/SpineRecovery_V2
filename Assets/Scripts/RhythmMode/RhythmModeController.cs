@@ -12,6 +12,8 @@ public sealed class RhythmModeController : MonoBehaviour
     [SerializeField] private RhythmHitFeedback feedback;
     [SerializeField] private Transform noteContainer;
     [SerializeField] private GameObject visualEffectRoot;
+    [Tooltip("Optional Ring Skin C presentation. Does not change note timing, paths or judgement.")]
+    [SerializeField] private RhythmSkinCVisuals visualSkin;
     [SerializeField] private bool followCoachScoringSession = true;
     [SerializeField] private bool startAutomaticallyWithoutCoach;
 
@@ -317,13 +319,10 @@ public sealed class RhythmModeController : MonoBehaviour
         noteObject.name = $"Target_{target}_{hitTime:0.00}";
         noteObject.transform.SetParent(noteContainer != null ? noteContainer : transform, false);
         noteObject.transform.localScale = noteBaseScale;
-        if (UsesRingArcTarget)
+        if (visualSkin == null)
         {
-            ApplyTargetMaterialColors(noteObject);
-        }
-        else
-        {
-            ApplyRandomMaterial(noteObject, target);
+            if (UsesRingArcTarget) ApplyTargetMaterialColors(noteObject);
+            else ApplyRandomMaterial(noteObject, target);
         }
 
         float noteRadius = Mathf.Max(noteBaseScale.x, noteBaseScale.y) * 0.5f;
@@ -370,6 +369,10 @@ public sealed class RhythmModeController : MonoBehaviour
 
     private GameObject CreateNoteObject(RhythmBodyTarget target)
     {
+        if (visualSkin != null)
+        {
+            return visualSkin.CreateNote(target, noteBaseScale);
+        }
         if (UsesRingArcTarget)
         {
             GameObject targetObject = CreatePrefabNote(

@@ -1,0 +1,13 @@
+# Direction three document contract
+Reference: C:/Users/23548/Documents/xwechat_files/wxid_dv2i6u8f201q12_fa7a/msg/file/2026-10/一种基于动作偏差定位与限时振动反馈的肌骨康复训练引导方法及系统.docx
+SHA256: 8a4143600a11b864721bd43e83b05528f8af02fd537787cb63a7297d67a51cc2
+Reference render: reference2.pdf and ref2_pages, 17 pages, 4 sections. Reference retained unchanged.
+Page geometry: 11907 x 16840 twips, margins top1321 right947 bottom851 left1412, header0 footer851, single column.
+Body: Normal style 1, Times New Roman Latin and 宋体 CJK, 12pt, 1.5 line spacing, justified, first-line indent 476twips. Subheadings: same 12pt bold, no indent. Chapter heading: centered 楷体 18pt bold. Figures: black linework, centered, followed by centered caption. No tables in source; use connected numbered paragraphs in output.
+Content sequence: abstract; abstract drawing; claims; description with title, technical field, background, invention, drawings, embodiments; drawings. Source four section breaks preserved. Section-specific footer PAGE fields preserved; description and drawings share section numbering, matching source.
+Slots: word/document.xml /w:document/w:body. All prose, equations, figures and captions are replacement slots for a new invention; all paragraphs may be cloned to grow these slots. Three intermediate sectPr and final sectPr are preserve-only. Source images/relationships remain in package unused; new drawing relationships may be appended.
+Package: ref2-inventory.json records every part and digest. Preserve all parts byte-for-byte except document.xml, document.xml.rels, styles.xml, settings.xml, core/app properties and content types. New PNG media allowed. Existing image files, numbering, headers, footers, theme and opaque parts preserved.
+Title: create/use black Title style for invention name; remove decorative bottom border from chapter style under document skill title rule. Other source typography and geometry preserved. No cover added.
+Reference imagery is substantive to directions one/two and is replaced, not copied. Five new diagrams planned, with Fig1 repeated as abstract drawing. Summary/claims/description section headings retain source role.
+Render: packaged render_docx.py attempted; failed because soffice.exe absent and runtime has no bundled LibreOffice on Windows. Use installed Microsoft Word COM read-only PDF export then bundled Poppler PNG conversion for actual pagination. Never modify original references via renderer. Inspect all final pages.
+Fidelity gates: same page geometry and section count, source-derived paragraph roles, clean all-page rendering, preserve-only package hashes unchanged, no old invention body text, numbered claims/figures coherent.

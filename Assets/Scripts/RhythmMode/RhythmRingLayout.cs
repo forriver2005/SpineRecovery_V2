@@ -15,6 +15,8 @@ public sealed class RhythmRingLayout : MonoBehaviour
     [SerializeField] private GameObject authoredGuideRingPrefab;
     [Min(0.01f)] [SerializeField] private float authoredGuideRingSourceRadius = 3f;
     [SerializeField] private Vector3 authoredGuideRingEulerAngles = Vector3.zero;
+    [Tooltip("Complete scene-authored skin. Replaces only generated ring graphics; path geometry is unchanged.")]
+    [SerializeField] private GameObject completeVisualRoot;
     [Range(0.8f, 1f)] [SerializeField] private float authoredInnerRingRadiusScale = 0.9667f;
     [Range(1f, 1.2f)] [SerializeField] private float authoredOuterRingRadiusScale = 1.03f;
 
@@ -148,6 +150,11 @@ public sealed class RhythmRingLayout : MonoBehaviour
     private void BuildVisuals()
     {
         ClearVisuals();
+        if (completeVisualRoot != null)
+        {
+            generatedVisuals.Add(completeVisualRoot);
+            return;
+        }
         lineMaterial = lineMaterialOverride != null ? lineMaterialOverride : CreateLineMaterial();
         ownsLineMaterial = lineMaterialOverride == null;
         if (!useAuthoredGuideRing || !CreateAuthoredGuideRing())

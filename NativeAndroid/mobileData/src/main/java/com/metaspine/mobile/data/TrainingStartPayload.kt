@@ -71,7 +71,9 @@ data class TrainingStartPayload(
      * 与 [recommendedActions] 并存：前者是 AR 场景要执行的动作，后者是“医生到底下了什么”，
      * 两者不一致时必须能在不查服务器的情况下发现。
      */
-    val prescription: TrainingPrescriptionHandoff? = null
+    val prescription: TrainingPrescriptionHandoff? = null,
+    /** Local execution still carries the doctor's immutable order snapshot, without an asset URI. */
+    val prescriptionSnapshot: AdmissionPrescriptionV2? = null
 ) {
     fun toJson(): String {
         val root = JSONObject()
@@ -165,7 +167,7 @@ data class TrainingStartPayload(
                         "userTags",
                         JSONArray(userTags)
                     )
-                    .apply { prescription?.let { put("prescription", it.toJson()) } }
+                    .apply { (prescriptionSnapshot ?: prescription?.order?.prescription)?.let { put("prescription", it.toJson()) } }
             )
 
         return root.toString(2)
@@ -179,6 +181,53 @@ data class TrainingStartPayload(
          * [assetUri] 负责把已验证文件签成
          * AR 可读的 `content://`，签发失败同样视为能力缺口，不退回旧动作包。
          */
+        /**
+         * Built-in action path: carry only the doctor's order and dose metadata.
+         * The Unity APK already contains the action scenes, so no motion package is downloaded.
+         */
+        fun forLocalPrescription(
+            user: DemoUserData,
+            flowType: DemoFlowType,
+            patientId: String,
+            order: DownloadedOrder
+        ): TrainingStartPayload {
+            require(patientId.isNotBlank()) { "尚未完成患者身份绑定，请联系医生" }
+            require(order.items.size == 1) { "医生处方包含多个动作，手机端暂不支持顺序执行" }
+            val item = requireNotNull(order.singleItem) { "医生处方参数不完整，请联系医生" }
+            require(item.actionId in TrainingDirectiveParser.SUPPORTED_ACTION_IDS) { "医生处方包含手机端不支持的动作" }
+            require(item.sets in 1..20 && item.reps in 1..100 && item.holdSeconds in 0..600) {
+                "医生处方参数超出支持范围"
+            }
+            val dailyCheck = requireNotNull(user.latestPreTrainingCheck) {
+                "请先完成训练前安全检查，再开始训练。"
+            }
+            require(dailyCheck.allowedToTrain) { "本次训练前安全检查未通过，暂时不能开始训练。" }
+            require(user.latestPainPoints.none { it.painLevel >= MobileAdmissionAssessment.SEVERE_PAIN_THRESHOLD }) {
+                "疼痛部位评分达到暂停训练阈值（${MobileAdmissionAssessment.SEVERE_PAIN_THRESHOLD}/10），不生成推荐动作。"
+            }
+            return create(
+                user = user,
+                flowType = flowType,
+                imuCalibrationRequired = true,
+                painPoints = user.latestPainPoints,
+                dailyCheck = dailyCheck,
+                actions = coachAndGameActions(
+                    actionId = item.actionId,
+                    displayName = item.actionName,
+                    coachSets = item.sets,
+                    coachReps = item.reps,
+                    coachHoldSeconds = item.holdSeconds,
+                    transitionSeconds = 2,
+                    gameDifficultySeconds = ArTrainingDefaults.GAME_DIFFICULTY_OPTIONS_SECONDS,
+                    motionPackageUri = null
+                ),
+                patientId = patientId,
+                prescriptionOrderId = order.orderId,
+                prescription = null,
+                prescriptionSnapshot = order.prescription
+            )
+        }
+
         fun forPrescription(
             user: DemoUserData,
             flowType: DemoFlowType,
@@ -327,7 +376,8 @@ data class TrainingStartPayload(
             actions: List<TrainingAction>,
             patientId: String,
             prescriptionOrderId: Long,
-            prescription: TrainingPrescriptionHandoff?
+            prescription: TrainingPrescriptionHandoff?,
+            prescriptionSnapshot: AdmissionPrescriptionV2? = prescription?.order?.prescription
         ): TrainingStartPayload {
             val now = OffsetDateTime.now()
             val userId = patientId
@@ -363,7 +413,8 @@ data class TrainingStartPayload(
                 recommendedActions = actions,
                 userTags = user.userTags,
                 prescriptionOrderId = prescriptionOrderId,
-                prescription = prescription
+                prescription = prescription,
+                prescriptionSnapshot = prescriptionSnapshot
             )
         }
 

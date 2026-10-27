@@ -321,27 +321,70 @@ namespace SpineRecovery.App
         private GameObject CreateRegisterPanel(Transform parent)
         {
             GameObject panel = CreatePanel("RegisterPanel", parent, new Color(0.973f, 0.980f, 1f));
-            CreateLabel(panel.transform, "注册账号", new Vector2(0, 250), 30);
-            CreateLabel(panel.transform, "创建账号后可以绑定激活档案。", new Vector2(0, 195), 16);
-            registerAccountInput = CreateInput(panel.transform, "设置账号", new Vector2(0, 115), false);
-            registerPasswordInput = CreateInput(panel.transform, "设置密码", new Vector2(0, 40), true);
-            registerConfirmInput = CreateInput(panel.transform, "再次输入密码", new Vector2(0, -35), true);
-            CreateButton(panel.transform, "注册并继续激活", new Vector2(0, -125), HandleRegisterClicked);
-            CreateButton(panel.transform, "返回登录", new Vector2(0, -195), () => bootstrap.Router.Navigate(AppRoute.Login));
+            GameObject designRoot = new GameObject("RegisterDesign390x884", typeof(RectTransform));
+            designRoot.transform.SetParent(panel.transform, false);
+            RectTransform designRect = designRoot.GetComponent<RectTransform>();
+            designRect.anchorMin = new Vector2(0.5f, 0.5f);
+            designRect.anchorMax = new Vector2(0.5f, 0.5f);
+            designRect.pivot = new Vector2(0.5f, 0.5f);
+            designRect.sizeDelta = new Vector2(LoginDesignWidth, LoginDesignHeight);
+            designRect.anchoredPosition = Vector2.zero;
+            float designScale = Mathf.Min(1080f / LoginDesignWidth, 1920f / LoginDesignHeight);
+            designRoot.transform.localScale = new Vector3(designScale, designScale, 1f);
+            CreateRasterImage(designRoot.transform, "AppUi/RegisterScreen", Vector2.zero,
+                new Vector2(LoginDesignWidth, LoginDesignHeight));
+
+            registerAccountInput = CreateInput(designRoot.transform, "设置账号", LoginDesignPosition(44f, 312f, 302f, 57f), false);
+            registerPasswordInput = CreateInput(designRoot.transform, "设置密码", LoginDesignPosition(44f, 380f, 302f, 57f), true);
+            registerConfirmInput = CreateInput(designRoot.transform, "再次输入密码", LoginDesignPosition(44f, 448f, 302f, 57f), true);
+            registerAccountInput.GetComponent<RectTransform>().sizeDelta = LoginDesignSize(302f, 57f);
+            registerPasswordInput.GetComponent<RectTransform>().sizeDelta = LoginDesignSize(302f, 57f);
+            registerConfirmInput.GetComponent<RectTransform>().sizeDelta = LoginDesignSize(302f, 57f);
+            MakeOverlayInput(registerAccountInput);
+            MakeOverlayInput(registerPasswordInput);
+            MakeOverlayInput(registerConfirmInput);
+
+            Button registerButton = CreateButton(designRoot.transform, "注册并继续激活",
+                LoginDesignPosition(44f, 530f, 302f, 52f), HandleRegisterClicked, 302f, 52f);
+            Button backButton = CreateButton(designRoot.transform, "返回登录",
+                LoginDesignPosition(190f, 604f, 110f, 28f), () => bootstrap.Router.Navigate(AppRoute.Login), 110f, 28f);
+            MakeOverlayButton(registerButton);
+            MakeOverlayButton(backButton);
             return panel;
         }
 
         private GameObject CreateActivationPanel(Transform parent)
         {
             GameObject panel = CreatePanel("ActivationPanel", parent, new Color(0.973f, 0.980f, 1f));
-            CreateLabel(panel.transform, "激活档案", new Vector2(0, 220), 30);
-            CreateLabel(panel.transform, "请输入医生建档时提供的 11 位手机号激活码。", new Vector2(0, 165), 16);
-            activationCodeInput = CreateInput(panel.transform, "激活码（11位手机号）", new Vector2(0, 80), false);
-            activationMessage = CreateLabel(panel.transform, "本地演示会保存绑定状态；正式环境可替换为服务器预览/核销。", new Vector2(0, 15), 14);
-            activationMessage.rectTransform.sizeDelta = new Vector2(760, 70);
-            CreateButton(panel.transform, "确认绑定", new Vector2(0, -75), HandleActivationClicked);
-            CreateButton(panel.transform, "跳过，稍后激活", new Vector2(0, -145), SkipActivation);
-            CreateButton(panel.transform, "返回登录", new Vector2(0, -215), () => bootstrap.State.ClearSession());
+            GameObject designRoot = new GameObject("ActivationDesign390x884", typeof(RectTransform));
+            designRoot.transform.SetParent(panel.transform, false);
+            RectTransform designRect = designRoot.GetComponent<RectTransform>();
+            designRect.anchorMin = new Vector2(0.5f, 0.5f);
+            designRect.anchorMax = new Vector2(0.5f, 0.5f);
+            designRect.pivot = new Vector2(0.5f, 0.5f);
+            designRect.sizeDelta = new Vector2(LoginDesignWidth, LoginDesignHeight);
+            designRect.anchoredPosition = Vector2.zero;
+            float designScale = Mathf.Min(1080f / LoginDesignWidth, 1920f / LoginDesignHeight);
+            designRoot.transform.localScale = new Vector3(designScale, designScale, 1f);
+            CreateRasterImage(designRoot.transform, "AppUi/ActivationScreen", Vector2.zero,
+                new Vector2(LoginDesignWidth, LoginDesignHeight));
+
+            activationCodeInput = CreateInput(designRoot.transform, "激活码（11位手机号）",
+                LoginDesignPosition(44f, 400f, 302f, 57f), false);
+            activationCodeInput.GetComponent<RectTransform>().sizeDelta = LoginDesignSize(302f, 57f);
+            MakeOverlayInput(activationCodeInput);
+            activationMessage = CreateLabel(designRoot.transform, "",
+                LoginDesignPosition(44f, 475f, 302f, 30f), 12);
+            activationMessage.rectTransform.sizeDelta = LoginDesignSize(302f, 30f);
+            activationMessage.alignment = TextAnchor.MiddleLeft;
+            activationMessage.color = new Color(0.35f, 0.40f, 0.48f, 1f);
+
+            Button activateButton = CreateButton(designRoot.transform, "确认绑定",
+                LoginDesignPosition(44f, 522f, 302f, 52f), HandleActivationClicked, 302f, 52f);
+            Button backButton = CreateButton(designRoot.transform, "返回登录",
+                LoginDesignPosition(165f, 598f, 90f, 28f), () => bootstrap.State.ClearSession(), 90f, 28f);
+            MakeOverlayButton(activateButton);
+            MakeOverlayButton(backButton);
             return panel;
         }
 
@@ -1237,7 +1280,7 @@ namespace SpineRecovery.App
             {
                 nativeBusy = true;
                 int generation = ++loginGeneration;
-                loginMessage.text = "正在登录…";
+                loginMessage.text = "";
                 NativeMobileService.Instance.Request("login", new NativeRequest
                 { accountId = accountInput.text, password = passwordInput.text }, reply =>
                 {
@@ -2265,7 +2308,9 @@ namespace SpineRecovery.App
             border.cornerRadius = 12f;
             border.borderThickness = 2.2f;
             border.raycastTarget = false;
-            border.SetBorderColor(new Color(1f, 1f, 1f, 0f));
+            // Registration and activation pages need a visible neutral field ring.
+            // The login page hides this ring after creating its raster overlay.
+            border.SetBorderColor(new Color(0.78f, 0.81f, 0.87f, 1f));
             return border;
         }
 

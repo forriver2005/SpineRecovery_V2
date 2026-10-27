@@ -15,6 +15,9 @@ public sealed class LumbarCoachProfile
     public string preparation, instruction, recovery;
     public PoseGuidanceRegionMask active, support;
     public HumanBodyBones[] scoringBones, movementBones;
+    public TrackerWearLocation[] targetHapticLocations;
+    public HumanBodyBones[][] targetHapticMovementBones;
+    public bool positiveHighlightAtTarget;
     public float[] recordedStart, recordedTarget;
 }
 
@@ -48,6 +51,9 @@ public static class LumbarCoachMode
             instruction = "按示范缓慢活动背部，小幅跟做，正常呼吸",
             recovery = "缓慢回到舒适支撑位，放松休息",
             active = PoseGuidanceRegionMask.Torso, support = BothLegs | BothArms,
+            targetHapticLocations = new[] { TrackerWearLocation.Abdomen },
+            targetHapticMovementBones = new[] { TrunkMotion },
+            positiveHighlightAtTarget = true,
             scoringBones = Join(Torso, Legs, new[] { HumanBodyBones.LeftUpperArm,
                 HumanBodyBones.RightUpperArm, HumanBodyBones.LeftLowerArm, HumanBodyBones.RightLowerArm }),
             movementBones = TrunkMotion
@@ -60,6 +66,10 @@ public static class LumbarCoachMode
             instruction = "按录制侧别短暂撑起，正常呼吸；可随时回落",
             recovery = "缓慢放下骨盆，回到侧卧支撑位休息",
             active = PoseGuidanceRegionMask.Torso, support = BothLegs | PoseGuidanceRegionMask.LeftArm,
+            targetHapticLocations = new[] { TrackerWearLocation.Abdomen },
+            targetHapticMovementBones = new[]
+                { Join(TrunkMotion, new[] { HumanBodyBones.LeftUpperLeg, HumanBodyBones.RightUpperLeg }) },
+            positiveHighlightAtTarget = true,
             scoringBones = Join(Torso, Legs, new[] { HumanBodyBones.LeftUpperArm, HumanBodyBones.LeftLowerArm }),
             movementBones = Join(TrunkMotion, new[] { HumanBodyBones.LeftUpperLeg, HumanBodyBones.RightUpperLeg })
         },
@@ -71,6 +81,9 @@ public static class LumbarCoachMode
             instruction = "按示范小幅卷起上背，不拉扯颈部，正常呼吸",
             recovery = "缓慢放下上背，仰卧放松休息",
             active = PoseGuidanceRegionMask.Torso, support = BothLegs,
+            targetHapticLocations = new[] { TrackerWearLocation.Abdomen },
+            targetHapticMovementBones = new[] { TrunkMotion },
+            positiveHighlightAtTarget = true,
             scoringBones = Join(Torso, Legs), movementBones = TrunkMotion
         },
         new LumbarCoachProfile
@@ -81,6 +94,13 @@ public static class LumbarCoachMode
             instruction = "按示范缓慢屈膝收腿，在舒适范围活动，不强拉",
             recovery = "双腿缓慢回到准备位置，放松休息",
             active = BothLegs, support = PoseGuidanceRegionMask.Torso,
+            targetHapticLocations = new[]
+                { TrackerWearLocation.LeftLowerLeg, TrackerWearLocation.RightLowerLeg },
+            targetHapticMovementBones = new[]
+            {
+                new[] { HumanBodyBones.LeftUpperLeg, HumanBodyBones.LeftLowerLeg },
+                new[] { HumanBodyBones.RightUpperLeg, HumanBodyBones.RightLowerLeg }
+            },
             scoringBones = Join(Torso, Legs), movementBones = Legs
         },
         new LumbarCoachProfile
@@ -91,6 +111,9 @@ public static class LumbarCoachMode
             instruction = "按示范小幅伸展，保持呼吸，不追求后伸幅度",
             recovery = "缓慢回到自然站姿，放松休息",
             active = PoseGuidanceRegionMask.Torso, support = BothLegs,
+            targetHapticLocations = new[] { TrackerWearLocation.Abdomen },
+            targetHapticMovementBones = new[] { TrunkMotion },
+            positiveHighlightAtTarget = true,
             scoringBones = Join(Torso, Legs), movementBones = TrunkMotion
         },
         new LumbarCoachProfile
@@ -101,6 +124,9 @@ public static class LumbarCoachMode
             instruction = "坐稳后按示范轻缓活动背部，小幅跟做，正常呼吸",
             recovery = "缓慢回到舒适坐姿，放松休息",
             active = PoseGuidanceRegionMask.Torso, support = PoseGuidanceRegionMask.None,
+            targetHapticLocations = new[] { TrackerWearLocation.Abdomen },
+            targetHapticMovementBones = new[] { TrunkMotion },
+            positiveHighlightAtTarget = true,
             scoringBones = Torso, movementBones = TrunkMotion
         },
         new LumbarCoachProfile
@@ -111,6 +137,9 @@ public static class LumbarCoachMode
             instruction = "站稳后按示范轻缓活动骨盆与背部，不追求幅度",
             recovery = "缓慢回到舒适站姿，放松休息",
             active = PoseGuidanceRegionMask.Torso, support = PoseGuidanceRegionMask.None,
+            targetHapticLocations = new[] { TrackerWearLocation.Abdomen },
+            targetHapticMovementBones = new[] { TrunkMotion },
+            positiveHighlightAtTarget = true,
             scoringBones = Torso, movementBones = TrunkMotion
         }
     };
@@ -249,6 +278,8 @@ public sealed class LumbarTeachingEvidence : IDisposable
 {
     private readonly LumbarCoachProfile profile;
     private readonly List<int> muscleIndices = new List<int>();
+    private readonly Dictionary<TrackerWearLocation, List<int>> hapticMuscleIndices =
+        new Dictionary<TrackerWearLocation, List<int>>();
     private HumanPoseHandler handler;
     private HumanPose pose;
     private float[] baseline;
@@ -263,6 +294,27 @@ public sealed class LumbarTeachingEvidence : IDisposable
                 int index = HumanTrait.MuscleFromBone((int)bone, axis);
                 if (index >= 0) muscleIndices.Add(index);
             }
+
+        if (profile.targetHapticLocations == null) return;
+        for (int locationIndex = 0;
+             locationIndex < profile.targetHapticLocations.Length;
+             locationIndex++)
+        {
+            HumanBodyBones[] targetBones =
+                profile.targetHapticMovementBones != null &&
+                locationIndex < profile.targetHapticMovementBones.Length
+                    ? profile.targetHapticMovementBones[locationIndex]
+                    : profile.movementBones;
+            var indices = new List<int>();
+            foreach (HumanBodyBones bone in targetBones)
+                for (int axis = 0; axis < 3; axis++)
+                {
+                    int index = HumanTrait.MuscleFromBone((int)bone, axis);
+                    if (index >= 0) indices.Add(index);
+                }
+            hapticMuscleIndices[profile.targetHapticLocations[locationIndex]] =
+                indices;
+        }
     }
 
     public bool Sample(Animator user, Animator coach, out float progress)
@@ -273,15 +325,52 @@ public sealed class LumbarTeachingEvidence : IDisposable
             Mathf.Abs(current.torsoTilt - target.torsoTilt) > 35f ||
             Mathf.Abs(current.pelvisTilt - target.pelvisTilt) > 35f ||
             Mathf.Abs(current.hipFlexion - target.hipFlexion) > 60f) return false;
+        if (!TryReadPose(user)) return false;
+        if (HasBaseline) progress = ProjectProgress(pose.muscles, baseline,
+            profile.recordedStart, profile.recordedTarget, muscleIndices);
+        return true;
+    }
+
+    public bool TryGetProgress(Animator user, out float progress)
+    {
+        return TryGetProgress(user, muscleIndices, out progress);
+    }
+
+    public bool TryGetProgress(
+        Animator user,
+        TrackerWearLocation location,
+        out float progress)
+    {
+        progress = 0f;
+        return hapticMuscleIndices.TryGetValue(
+                location,
+                out List<int> indices) &&
+            TryGetProgress(user, indices, out progress);
+    }
+
+    private bool TryGetProgress(
+        Animator user,
+        IReadOnlyList<int> indices,
+        out float progress)
+    {
+        progress = 0f;
+        if (!HasBaseline || profile.recordedStart == null ||
+            profile.recordedTarget == null || !TryReadPose(user)) return false;
+        progress = ProjectProgress(pose.muscles, baseline,
+            profile.recordedStart, profile.recordedTarget, indices);
+        return !float.IsNaN(progress) && !float.IsInfinity(progress);
+    }
+
+    private bool TryReadPose(Animator user)
+    {
+        if (user == null || !user.isHuman || user.avatar == null) return false;
         if (handler == null)
         {
             handler = new HumanPoseHandler(user.avatar, user.transform);
             pose = new HumanPose { muscles = new float[HumanTrait.MuscleCount] };
         }
         handler.GetHumanPose(ref pose);
-        if (HasBaseline) progress = ProjectProgress(pose.muscles, baseline,
-            profile.recordedStart, profile.recordedTarget, muscleIndices);
-        return true;
+        return pose.muscles != null && pose.muscles.Length >= HumanTrait.MuscleCount;
     }
 
     public void CaptureBaseline() => baseline = (float[])pose.muscles.Clone();

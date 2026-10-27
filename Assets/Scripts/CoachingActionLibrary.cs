@@ -42,6 +42,7 @@ public sealed class CoachingActionLibrary : MonoBehaviour
     [SerializeField] private RawImage previewImage;
     [SerializeField] private Camera previewCamera;
     [SerializeField] private GameObject coachPreview;
+    private Button startPracticeButton;
     private Animator coachAnimator;
     private RenderTexture previewTexture;
     private TextAsset loadedMotion;
@@ -194,6 +195,7 @@ public sealed class CoachingActionLibrary : MonoBehaviour
     private void BindInterface()
     {
         backButton.onClick.AddListener(GoBack);
+        CreateStartPracticeButton();
         int count = entries?.Length ?? 0;
         listContent.sizeDelta = new Vector2(520f, Mathf.Max(860, count * 84));
         cards = new Image[count];
@@ -217,6 +219,118 @@ public sealed class CoachingActionLibrary : MonoBehaviour
         }
     }
 
+    private void CreateStartPracticeButton()
+    {
+        GameObject buttonObject = new GameObject(
+            "StartPracticeButton", typeof(RectTransform), typeof(CanvasRenderer),
+            typeof(Image), typeof(Button));
+        buttonObject.transform.SetParent(previewImage.transform, false);
+
+        RectTransform rect = (RectTransform)buttonObject.transform;
+        rect.anchorMin = rect.anchorMax = new Vector2(1f, 0f);
+        rect.pivot = new Vector2(1f, 0f);
+        rect.anchoredPosition = new Vector2(-32f, 32f);
+        rect.sizeDelta = new Vector2(240f, 76f);
+
+        Image background = buttonObject.GetComponent<Image>();
+        background.color = new Color(0.10f, 0.38f, 0.31f, 0.98f);
+        startPracticeButton = buttonObject.GetComponent<Button>();
+        startPracticeButton.targetGraphic = background;
+        startPracticeButton.transition = Selectable.Transition.None;
+        startPracticeButton.interactable = false;
+        background.color = new Color(0.28f, 0.28f, 0.28f, 0.95f);
+        startPracticeButton.onClick.AddListener(StartSelectedPractice);
+
+        TMP_Text templateText = rowTemplate.GetComponentInChildren<TMP_Text>(true);
+        GameObject labelObject = new GameObject(
+            "Label", typeof(RectTransform), typeof(CanvasRenderer), typeof(TextMeshProUGUI));
+        labelObject.transform.SetParent(buttonObject.transform, false);
+        RectTransform labelRect = (RectTransform)labelObject.transform;
+        labelRect.anchorMin = Vector2.zero;
+        labelRect.anchorMax = Vector2.one;
+        labelRect.offsetMin = Vector2.zero;
+        labelRect.offsetMax = Vector2.zero;
+
+        TextMeshProUGUI label = labelObject.GetComponent<TextMeshProUGUI>();
+        label.font = templateText.font;
+        label.fontSharedMaterial = templateText.fontSharedMaterial;
+        label.fontSize = 28f;
+        label.color = Color.white;
+        label.alignment = TextAlignmentOptions.Center;
+        label.text = "开始练习";
+        label.raycastTarget = false;
+    }
+
+    private static string ResolvePracticeScene(Entry entry)
+    {
+        if (entry == null) return null;
+
+        LumbarCoachProfile lumbar = LumbarCoachMode.ForAction(entry.id) ??
+            LumbarCoachMode.ForAction(entry.displayName);
+        if (lumbar != null) return lumbar.sceneName;
+
+        switch (entry.id)
+        {
+            case "clip_09": return "HipThrustPractice";
+            case "clip_10":
+            case "clip_11":
+            case "clip_13": return LumbarCoachMode.ForAction("side_bridge")?.sceneName;
+            case "clip_29": return "DeadBugPractice";
+            case "clip_30": return "BirdDogPractice";
+            default: return null;
+        }
+    }
+
+    private void RefreshStartPracticeButton()
+    {
+        string sceneName = selectedIndex >= 0 && selectedIndex < entries.Length
+            ? ResolvePracticeScene(entries[selectedIndex]) : null;
+        if (!string.IsNullOrEmpty(sceneName))
+        {
+            sceneName = SpineFlowTrainingSession.ResolveSceneForMobileSession(sceneName);
+        }
+
+        bool available = !string.IsNullOrEmpty(sceneName) &&
+            Application.CanStreamedLevelBeLoaded(sceneName);
+        startPracticeButton.interactable = available;
+        startPracticeButton.targetGraphic.color = available
+            ? new Color(0.10f, 0.38f, 0.31f, 0.98f)
+            : new Color(0.28f, 0.28f, 0.28f, 0.95f);
+        if (!available) statusText.text = string.IsNullOrEmpty(sceneName)
+            ? "该动作暂无对应的教练模式场景"
+            : "对应的教练模式场景不可用";
+    }
+
+    private void StartSelectedPractice()
+    {
+        if (selectedIndex < 0 || selectedIndex >= entries.Length) return;
+
+        string destination = ResolvePracticeScene(entries[selectedIndex]);
+        if (string.IsNullOrEmpty(destination)) return;
+        destination = SpineFlowTrainingSession.ResolveSceneForMobileSession(destination);
+        if (!Application.CanStreamedLevelBeLoaded(destination))
+        {
+            statusText.text = "对应的教练模式场景不可用";
+            startPracticeButton.interactable = false;
+            return;
+        }
+
+        player?.Dispose();
+        player = null;
+        if (loadedMotion != null)
+        {
+            Resources.UnloadAsset(loadedMotion);
+            loadedMotion = null;
+        }
+
+        returnScene = null;
+        retainedPracticeScene = default;
+        retainedPracticeRoots = null;
+        retainedRootActiveStates = null;
+        DeadBugStartMenuController.ShowPracticeControlsOnNextLoad();
+        SceneManager.LoadScene(destination, LoadSceneMode.Single);
+    }
+
     private void Select(int index)
     {
         if (index < 0 || index >= entries.Length || coachAnimator == null)
@@ -226,6 +340,7 @@ public sealed class CoachingActionLibrary : MonoBehaviour
 
         player?.Dispose();
         player = null;
+        startPracticeButton.interactable = false;
         if (loadedMotion != null)
         {
             Resources.UnloadAsset(loadedMotion);
@@ -239,6 +354,7 @@ public sealed class CoachingActionLibrary : MonoBehaviour
         }
         selectedName.text = entries[index].displayName;
         statusText.text = "";
+        RefreshStartPracticeButton();
 
         loadedMotion = Resources.Load<TextAsset>(entries[index].motionPath);
         if (loadedMotion == null)

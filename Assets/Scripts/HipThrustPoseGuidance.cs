@@ -85,48 +85,40 @@ public static class HipThrustPoseGuidance
         return rest.hipFlexion - pose.hipFlexion;
     }
 
-    public static PoseHighlightFrameDiagnostics Evaluate(
-        HipThrustPoseGeometry pose, HipThrustPoseGeometry rest, bool hasRest)
+    public static PoseHighlightFrameDiagnostics EvaluateHeightTarget(
+        HipThrustPoseGeometry pose,
+        HipThrustPoseGeometry target,
+        float enterTolerance,
+        float exitTolerance)
     {
-        float torsoError = Mathf.Max(
-            Mathf.Max(pose.pelvisTilt, Mathf.Max(0f, pose.torsoTilt - 35f)),
-            Mathf.Max(0f, pose.hipAboveSupportLine - 0.1f) * 100f);
-        if (hasRest)
-            torsoError = Mathf.Max(torsoError, Mathf.Abs(pose.torsoBend - rest.torsoBend));
-        float symmetryError = Mathf.Max(
-            Mathf.Max(0f, pose.kneeAsymmetry - 0.1f) * 100f,
-            Mathf.Max(Mathf.Max(0f, 0.5f - pose.kneeWidthRatio),
-                Mathf.Max(0f, pose.kneeWidthRatio - 3f)) * 40f);
+        float heightDifference = Mathf.Abs(
+            pose.hipAboveSupportLine - target.hipAboveSupportLine);
+        float enter = Mathf.Max(0f, enterTolerance);
+        float exit = Mathf.Max(enter, exitTolerance);
+        PoseHighlightRegionDiagnostic torso = new PoseHighlightRegionDiagnostic
+        {
+            part = BodyPart.Torso,
+            isValid = true,
+            shouldActivate = heightDifference <= enter,
+            shouldClear = heightDifference > exit,
+            worstRawErrorDegrees = heightDifference * 100f,
+            severity = Mathf.Max(0f, exit - heightDifference),
+            relevantBoneCount = 1,
+            validBoneCount = 1,
+            trackingCoverage = 1f
+        };
+
         return new PoseHighlightFrameDiagnostics
         {
-            // Arms are supports, not alternating active limbs in a bridge.
             leftArm = new PoseHighlightRegionDiagnostic { part = BodyPart.LeftArm },
             rightArm = new PoseHighlightRegionDiagnostic { part = BodyPart.RightArm },
-            torso = Diagnostic(BodyPart.Torso, torsoError),
-            leftLeg = Diagnostic(BodyPart.LeftLeg,
-                Mathf.Max(KneeError(pose.leftKneeBend), symmetryError)),
-            rightLeg = Diagnostic(BodyPart.RightLeg,
-                Mathf.Max(KneeError(pose.rightKneeBend), symmetryError))
+            torso = torso,
+            leftLeg = new PoseHighlightRegionDiagnostic { part = BodyPart.LeftLeg },
+            rightLeg = new PoseHighlightRegionDiagnostic { part = BodyPart.RightLeg }
         };
     }
 
     private static float Bend(Vector3 hip, Vector3 knee, Vector3 foot) =>
         180f - Vector3.Angle(hip - knee, foot - knee);
 
-    private static float KneeError(float bend) =>
-        Mathf.Max(Mathf.Max(0f, 45f - bend), Mathf.Max(0f, bend - 135f));
-
-    private static PoseHighlightRegionDiagnostic Diagnostic(BodyPart part, float error) =>
-        new PoseHighlightRegionDiagnostic
-        {
-            part = part,
-            isValid = true,
-            shouldActivate = error > 25f,
-            shouldClear = error <= 15f,
-            worstRawErrorDegrees = error,
-            severity = Mathf.Max(0f, (error - 15f) / 10f),
-            relevantBoneCount = 1,
-            validBoneCount = 1,
-            trackingCoverage = 1f
-        };
 }

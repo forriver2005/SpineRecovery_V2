@@ -228,9 +228,15 @@ public sealed class CoachHapticFeedbackController : MonoBehaviour
     /// <summary>Triggers one pulse for a discrete gaming hit.</summary>
     public void PulseOnce(TrackerWearLocation location)
     {
+        TryPulseOnce(location);
+    }
+
+    /// <summary>Starts one pulse and reports whether a tracker accepted it.</summary>
+    public bool TryPulseOnce(TrackerWearLocation location)
+    {
         if (!enabledForDemo || !isActiveAndEnabled || applicationPaused)
         {
-            return;
+            return false;
         }
 
         if (endpointAddresses.Count == 0)
@@ -242,13 +248,14 @@ public sealed class CoachHapticFeedbackController : MonoBehaviour
             string.IsNullOrWhiteSpace(address) ||
             inFlightRequests.ContainsKey(location))
         {
-            return;
+            return false;
         }
 
         int durationMs = endpointDurations.TryGetValue(location, out int configuredDuration)
             ? configuredDuration
             : pulseDurationMs;
         StartCoroutine(SendPulse(location, address, durationMs));
+        return true;
     }
 
     /// <summary>

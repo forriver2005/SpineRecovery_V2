@@ -382,13 +382,15 @@ public class DeadBugStartMenuController : MonoBehaviour
         }
     }
 
-    private void Update()
+    // StartMenuCanvas is inactive during practice. The persistent practice
+    // controller must drive this gate; this component cannot rely on Update.
+    public void UpdatePracticeCompletionGate(float deltaTime)
     {
         // The final score popup and a spoken completion cue can finish in
         // either order. Prefer their natural completion, with a bounded wait
         // so a missing callback or upright pose cannot hide the controls.
         if (!practiceCompletionGateActive || MobileCoachControls.IsPaused) return;
-        practiceCompletionWaitElapsed += Time.unscaledDeltaTime;
+        practiceCompletionWaitElapsed += Mathf.Max(0f, deltaTime);
         float timeout = practicePoseScorer != null ? practicePoseScorer.ProgressionTimeoutSeconds
             : PoseScorer.DefaultProgressionTimeoutSeconds;
         if (practiceCompletionWaitElapsed >= timeout &&

@@ -262,8 +262,22 @@ public partial class PoseScorer : MonoBehaviour
     [Tooltip("Short core scoring window after the shared stability and spoken countdown stages. Not a treatment prescription.")]
     [SerializeField, Range(0.5f, 3f)] private float hipThrustObservationSeconds = 2f;
     [SerializeField, Min(0f)] private float hipThrustRestSeconds = 4f;
+    [Tooltip("Normalized hip-height difference needed to enter the green target band.")]
+    [SerializeField, Min(0f)] private float hipThrustHeightEnterTolerance = 0.08f;
+    [Tooltip("Normalized hip-height difference tolerated before leaving the green band.")]
+    [SerializeField, Min(0f)] private float hipThrustHeightExitTolerance = 0.12f;
+    [Tooltip("Independent, tighter hip-height band for the waist IMU target pulse.")]
+    [SerializeField, Min(0f)] private float hipThrustHapticHeightTolerance = 0.05f;
+    [Tooltip("Time the hip must remain in the haptic target band before one pulse.")]
+    [SerializeField, Min(0f)] private float hipThrustHapticConfirmationSeconds = 0.18f;
+    private static readonly Color HipThrustHeightReadyColor =
+        new Color(0.05f, 1f, 0.25f, 0.95f);
     private HipThrustPoseGeometry hipThrustRestPose;
     private bool hasHipThrustRestPose;
+    private bool hipThrustOptimalHeightPulseSent;
+    private bool hipThrustOptimalHeightPulsePending;
+    private bool hipThrustHapticHeightCandidateActive;
+    private float hipThrustHapticHeightStableSeconds;
     private bool UsesHipThrustTeaching => guidanceExercise == PoseGuidanceExercise.HipThrust;
     [SerializeField] private TargetedExercisePoseGuidanceSettings
         targetedExerciseGuidance = new TargetedExercisePoseGuidanceSettings();
@@ -753,6 +767,8 @@ public partial class PoseScorer : MonoBehaviour
         if (MobileCoachControls.IsPaused)
         {
             hapticFeedback?.StopAllHaptics();
+            ResetLumbarTargetFeedback(false);
+            pendingLumbarTargetPulses.Clear();
             return;
         }
         sessionMotionEvidence.Sample();
@@ -760,6 +776,7 @@ public partial class PoseScorer : MonoBehaviour
         if (currentState == State.Idle)
         {
             UpdateHapticFeedback();
+            DispatchPendingLumbarTargetPulses();
             return;
         }
 
@@ -767,6 +784,7 @@ public partial class PoseScorer : MonoBehaviour
         {
             UpdateTeachingRest();
             UpdateHapticFeedback();
+            DispatchPendingLumbarTargetPulses();
             return;
         }
 
@@ -777,6 +795,7 @@ public partial class PoseScorer : MonoBehaviour
             {
                 AdvanceAfterFollowingTimeout();
                 UpdateHapticFeedback();
+                DispatchPendingLumbarTargetPulses();
                 return;
             }
         }
@@ -805,6 +824,8 @@ public partial class PoseScorer : MonoBehaviour
         }
 
         UpdateHapticFeedback();
+        DispatchPendingHipThrustOptimalHeightPulse();
+        DispatchPendingLumbarTargetPulses();
 
     }
 
@@ -821,6 +842,11 @@ public partial class PoseScorer : MonoBehaviour
         }
 
         currentSegmentInfo = info;
+        ResetLumbarTargetFeedback(true);
+        hipThrustOptimalHeightPulseSent = false;
+        hipThrustOptimalHeightPulsePending = false;
+        hipThrustHapticHeightCandidateActive = false;
+        hipThrustHapticHeightStableSeconds = 0f;
         ResetVisualGuidanceEvidence();
         frameScores.Clear();
         frameWorstRegions.Clear();
@@ -992,6 +1018,8 @@ public partial class PoseScorer : MonoBehaviour
     private void UpdateWaitingStable()
     {
         UpdateStabilityGuidance();
+        UpdateHipThrustTargetHaptic();
+        UpdateLumbarTargetHaptic();
         bool motionIsStable = CheckUserStability();
         bool requiresRelaxedPreparation = RequiresRelaxedPreparation();
         bool coarseActionIsReady = IsCoarseActionReady();
@@ -1111,6 +1139,8 @@ public partial class PoseScorer : MonoBehaviour
     private void UpdatePreparingScore()
     {
         UpdateStabilityGuidance();
+        UpdateHipThrustTargetHaptic();
+        UpdateLumbarTargetHaptic();
 
         if (followingGateReleased)
         {
@@ -1955,9 +1985,67 @@ public partial class PoseScorer : MonoBehaviour
 
     private void UpdateStabilityGuidance()
     {
-        guidanceInputIsFresh = false;
+        guidanceInputIsFresh = !Application.isPlaying ||
+            UpdateGuidanceVmcFreshness(Time.unscaledDeltaTime);
         ShowMisalignedBodyParts();
         UpdateCoarseActionReadiness(Time.deltaTime);
+    }
+
+    private void UpdateHipThrustTargetHaptic()
+    {
+        if (!UsesHipThrustTeaching ||
+            currentSegmentInfo.segmentKind != TrainingSegmentKind.CoreAction ||
+            !guidanceInputIsFresh ||
+            !HipThrustPoseGuidance.TryCapture(
+                userAnimator,
+                out HipThrustPoseGeometry userPose) ||
+            !HipThrustPoseGuidance.TryCapture(
+                coachAnimator,
+                out HipThrustPoseGeometry coachPose))
+        {
+            hipThrustHapticHeightCandidateActive = false;
+            hipThrustHapticHeightStableSeconds = 0f;
+            return;
+        }
+
+        if (hipThrustOptimalHeightPulseSent)
+        {
+            return;
+        }
+
+        float heightError = Mathf.Abs(
+            userPose.hipAboveSupportLine - coachPose.hipAboveSupportLine);
+        float enterTolerance = Mathf.Max(0f, hipThrustHapticHeightTolerance);
+        float exitTolerance = enterTolerance + 0.03f;
+        if (!hipThrustHapticHeightCandidateActive)
+        {
+            if (heightError > enterTolerance)
+            {
+                hipThrustHapticHeightStableSeconds = 0f;
+                return;
+            }
+
+            hipThrustHapticHeightCandidateActive = true;
+        }
+        else if (heightError > exitTolerance)
+        {
+            hipThrustHapticHeightCandidateActive = false;
+            hipThrustHapticHeightStableSeconds = 0f;
+            return;
+        }
+
+        hipThrustHapticHeightStableSeconds += Mathf.Clamp(
+            Time.deltaTime,
+            0f,
+            0.1f);
+        if (hipThrustHapticHeightStableSeconds <
+            Mathf.Max(0f, hipThrustHapticConfirmationSeconds))
+        {
+            return;
+        }
+
+        hipThrustOptimalHeightPulseSent = true;
+        hipThrustOptimalHeightPulsePending = true;
     }
 
     private void EnsureHapticFeedbackController()
@@ -1988,11 +2076,27 @@ public partial class PoseScorer : MonoBehaviour
             MobileCoachControls.IsPaused);
     }
 
+    private void DispatchPendingHipThrustOptimalHeightPulse()
+    {
+        if (!hipThrustOptimalHeightPulsePending)
+        {
+            return;
+        }
+
+        hipThrustOptimalHeightPulsePending = false;
+        hapticFeedback.PulseOnce(TrackerWearLocation.Abdomen);
+    }
+
     private void BuildHapticLocationOverrides()
     {
         hapticLocationOverrides.Clear();
         hapticCandidateParts.Clear();
         hapticTrackerCandidates.Clear();
+        if (UsesHipThrustTeaching || UsesLumbarTeaching)
+        {
+            return;
+        }
+
         foreach (BodyPart part in confirmedGuidanceParts)
         {
             hapticCandidateParts.Add(part);
@@ -2403,19 +2507,20 @@ public partial class PoseScorer : MonoBehaviour
             ResolveGuidanceVmcReceiver();
         }
 
-        // EditMode validators drive HumanPose directly and intentionally have
-        // no live VMC receiver. Runtime/play mode keeps the full stale-input
-        // gate; editor-side pose diagnostics remain deterministic.
-        guidanceInputIsFresh = !Application.isPlaying ||
-            UpdateGuidanceVmcFreshness(Time.unscaledDeltaTime);
-
         PoseHighlightFrameDiagnostics diagnostics;
         if (UsesHipThrustTeaching)
         {
             hasLatestTargetedGuidanceGeometry = false;
-            diagnostics = HipThrustPoseGuidance.TryCapture(userAnimator,
-                out HipThrustPoseGeometry pose)
-                ? HipThrustPoseGuidance.Evaluate(pose, hipThrustRestPose, hasHipThrustRestPose)
+            diagnostics = currentSegmentInfo.segmentKind == TrainingSegmentKind.CoreAction &&
+                HipThrustPoseGuidance.TryCapture(userAnimator,
+                    out HipThrustPoseGeometry pose) &&
+                HipThrustPoseGuidance.TryCapture(coachAnimator,
+                    out HipThrustPoseGeometry target)
+                ? HipThrustPoseGuidance.EvaluateHeightTarget(
+                    pose,
+                    target,
+                    hipThrustHeightEnterTolerance,
+                    hipThrustHeightExitTolerance)
                 : default;
         }
         else if (UsesTargetedExerciseGuidance)
@@ -2459,14 +2564,31 @@ public partial class PoseScorer : MonoBehaviour
         }
 
         guidanceCandidateParts.Clear();
-        UpdateGuidancePart(BodyPart.LeftArm, diagnostics.leftArm);
-        UpdateGuidancePart(BodyPart.RightArm, diagnostics.rightArm);
-        UpdateGuidancePart(BodyPart.LeftLeg, diagnostics.leftLeg);
-        UpdateGuidancePart(BodyPart.RightLeg, diagnostics.rightLeg);
-        UpdateGuidancePart(BodyPart.Torso, diagnostics.torso);
+        UpdateGuidancePart(BodyPart.LeftArm, FilterLumbarHighlightRegion(
+            BodyPart.LeftArm, diagnostics.leftArm));
+        UpdateGuidancePart(BodyPart.RightArm, FilterLumbarHighlightRegion(
+            BodyPart.RightArm, diagnostics.rightArm));
+        UpdateGuidancePart(BodyPart.LeftLeg, FilterLumbarHighlightRegion(
+            BodyPart.LeftLeg, diagnostics.leftLeg));
+        UpdateGuidancePart(BodyPart.RightLeg, FilterLumbarHighlightRegion(
+            BodyPart.RightLeg, diagnostics.rightLeg));
+        UpdateGuidancePart(BodyPart.Torso, FilterLumbarHighlightRegion(
+            BodyPart.Torso, diagnostics.torso));
         UpdateConfirmedGuidanceParts(Time.deltaTime);
 
         UpdateGuidancePartColors();
+        bool showLumbarPositiveTarget = UpdateLumbarPositiveTargetHighlight(
+            diagnostics.torso);
+        if (showLumbarPositiveTarget &&
+            !guidancePartsToHighlight.Contains(BodyPart.Torso))
+        {
+            guidancePartsToHighlight.Add(BodyPart.Torso);
+        }
+        if (showLumbarPositiveTarget)
+        {
+            guidancePartColors[BodyPart.Torso] =
+                new Color(0.05f, 1f, 0.25f, 0.95f);
+        }
 
 #if UNITY_EDITOR || DEVELOPMENT_BUILD
         ReportGuidanceChange();
@@ -2482,7 +2604,9 @@ public partial class PoseScorer : MonoBehaviour
         BodyPart mostMisalignedPart = guidancePartsToHighlight[0];
         bool modelGuidanceShown = enableModelSurfaceHighlight &&
             modelBodyPartHighlighter != null &&
-            modelBodyPartHighlighter.Show(guidancePartColors);
+            (UsesHipThrustTeaching
+                ? modelBodyPartHighlighter.ShowHipPelvis(HipThrustHeightReadyColor)
+                : modelBodyPartHighlighter.Show(guidancePartColors));
         if (modelGuidanceShown)
         {
             // The surface overlay replaces the old picture card.
@@ -2493,7 +2617,11 @@ public partial class PoseScorer : MonoBehaviour
             // Keep the picture only as a fallback if an avatar mesh cannot
             // produce overlays (for example, an unsupported runtime model).
             modelBodyPartHighlighter?.Hide();
-            bodyPartFeedback?.ShowBodyPart(mostMisalignedPart);
+            bodyPartFeedback?.ShowBodyPart(
+                mostMisalignedPart,
+                UsesHipThrustTeaching || showLumbarPositiveTarget
+                    ? HipThrustHeightReadyColor
+                    : Color.white);
         }
     }
 
@@ -2869,7 +2997,9 @@ public partial class PoseScorer : MonoBehaviour
         guidancePartColors.Clear();
         foreach (BodyPart part in guidancePartsToHighlight)
         {
-            guidancePartColors[part] = guidanceHighlightColor;
+            guidancePartColors[part] = UsesHipThrustTeaching
+                ? HipThrustHeightReadyColor
+                : guidanceHighlightColor;
         }
     }
 

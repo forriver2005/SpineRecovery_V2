@@ -44,6 +44,11 @@ public class BodyPartFeedbackUI : MonoBehaviour
     /// </summary>
     public void ShowBodyPart(BodyPart part)
     {
+        ShowBodyPart(part, Color.white);
+    }
+
+    public void ShowBodyPart(BodyPart part, Color color)
+    {
         if (feedbackImage == null)
         {
             Debug.LogError("BodyPartFeedbackUI: feedbackImage 未配置！");
@@ -53,12 +58,14 @@ public class BodyPartFeedbackUI : MonoBehaviour
         Sprite sprite = GetSpriteForBodyPart(part);
         if (sprite != null)
         {
-            if (visiblePart == part && canvasGroup.alpha > 0.99f && feedbackImage.enabled)
+            if (visiblePart == part && feedbackImage.color == color &&
+                canvasGroup.alpha > 0.99f && feedbackImage.enabled)
             {
                 return;
             }
 
             feedbackImage.sprite = sprite;
+            feedbackImage.color = color;
             feedbackImage.enabled = true;
             canvasGroup.alpha = 1f;
             visiblePart = part;
@@ -113,5 +120,6 @@ public enum BodyPart
     RightArm,
     LeftLeg,
     RightLeg,
-    Torso
+    Torso,
+    HipPelvis
 }

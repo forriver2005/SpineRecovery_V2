@@ -135,6 +135,19 @@
       "motionPath": "ActionLibrary/Motions/clip_22",
       "source": "11_深蹲双腿硬拉/1/11_v1.motion.json",
       "viewAngle": 70
+    },
+    {
+      "id": "clip_29",
+      "displayName": "死虫",
+      "motionPath": "ActionLibrary/Motions/clip_29",
+      "source": "7_死虫/1/7_v1.motion.json",
+      "viewAngle": 70
+    },
+    {
+      "id": "clip_30",
+      "displayName": "鸟狗",
+      "motionPath": "ActionLibrary/Motions/clip_30",
+      "source": "8_鸟狗/1/8_v1.motion.json"
     }
   ]
 }

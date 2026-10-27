@@ -134,6 +134,7 @@ public class PracticeSessionController : MonoBehaviour
 
     public bool IsLyingOverheadPresentationReady =>
         SupportsLyingDirectionPresentation() &&
+        IsCoachLyingPresentationReady() &&
         ShouldUseLyingOverheadPresentation(
             practiceRunning,
             hasLockedUserRotation,
@@ -272,6 +273,8 @@ public class PracticeSessionController : MonoBehaviour
         PreserveAuthoredUserScale();
         UpdateUserTrackerFreshness(Time.unscaledDeltaTime);
         UpdateCompletionPostureGate(Time.unscaledDeltaTime);
+        ResolvePresentationController();
+        presentationController?.UpdatePracticeCompletionGate(Time.unscaledDeltaTime);
         UpdateCoachOverlayLabel();
 
         if (!practiceRunning || !alignUserDirectionToCoachOnStart)
@@ -891,62 +894,11 @@ public class PracticeSessionController : MonoBehaviour
             return false;
         }
 
-        bool hasFreshUserTrackerData = HasFreshUserTrackerData();
-
-        bool requiresLyingPreparationPose =
-            requirePreparationPoseBeforeDirectionLock &&
-            SupportsLyingDirectionPresentation();
-        if (requiresLyingPreparationPose)
-        {
-            Animator userAnimator = motionRecorder.UserAnimator;
-            Animator coachAnimator = motionRecorder.CoachAnimator;
-            ResolveAvatarDirectionReference(userAnimator, coachAnimator);
-            bool poseReady = IsUserInRelaxedDirectionLockPose(userAnimator);
-            if (!CanUseUserPoseForDirectionLock(
-                    hasFreshUserTrackerData,
-                    poseReady))
-            {
-                UpdateDirectionPreparationReadiness(false, deltaTime);
-                if (reportResult)
-                {
-                    Debug.Log(
-                        "PracticeSessionController left the user avatar " +
-                        "transform untouched because neither fresh Tracker " +
-                        "telemetry nor a live preparation pose is available.",
-                        this);
-                }
-
-                return false;
-            }
-
-            UpdateDirectionPreparationReadiness(poseReady, deltaTime);
-            if (!poseReady || preparationPoseReadySeconds + Mathf.Epsilon <
-                Mathf.Max(0f, preparationPoseHoldSeconds))
-            {
-                return false;
-            }
-        }
-        else if (SupportsLyingDirectionPresentation() &&
-                 !hasFreshUserTrackerData)
-        {
-            if (reportResult)
-            {
-                Debug.Log(
-                    "PracticeSessionController left the user avatar transform " +
-                    "untouched because no fresh Humanoid Tracker data is " +
-                    "available.",
-                    this);
-            }
-
-            return false;
-        }
-
         bool alignmentSucceeded = ApplyUserDirectionLock(reportResult);
         if (alignmentSucceeded)
         {
             Debug.Log(
-                "PracticeSessionController detected the relaxed exercise " +
-                "preparation pose, then aligned and locked the user " +
+                "PracticeSessionController aligned and locked the user " +
                 "display direction to the coach.",
                 this);
         }
@@ -991,6 +943,21 @@ public class PracticeSessionController : MonoBehaviour
                 System.StringComparison.OrdinalIgnoreCase) >= 0;
     }
 
+    private bool IsCoachLyingPresentationReady()
+    {
+        Animator coachAnimator = motionRecorder != null
+            ? motionRecorder.CoachAnimator
+            : null;
+        return coachAnimator != null &&
+            TryGetBodyHeadwardDirection(
+                coachAnimator,
+                out Vector3 coachHeadward) &&
+            IsHorizontalPreparationPose(
+                coachHeadward,
+                ResolveWorldUp(),
+                preparationMaximumTorsoTiltDegrees);
+    }
+
     private void UpdateDirectionPreparationReadiness(
         bool poseReady,
         float deltaTime)
@@ -1026,7 +993,6 @@ public class PracticeSessionController : MonoBehaviour
         }
 
         ResolveAvatarDirectionReference(userAnimator, coachAnimator);
-
         if (avatarDirectionReference == null ||
             !TryGetStableAvatarHeading(
                 userAnimator,
@@ -1170,6 +1136,7 @@ public class PracticeSessionController : MonoBehaviour
             return false;
         }
 
+        Transform head = animator.GetBoneTransform(HumanBodyBones.Head);
         Transform chest = animator.GetBoneTransform(HumanBodyBones.UpperChest) ??
             animator.GetBoneTransform(HumanBodyBones.Chest) ??
             animator.GetBoneTransform(HumanBodyBones.Spine);
@@ -1200,6 +1167,25 @@ public class PracticeSessionController : MonoBehaviour
         }
 
         Vector3 safeUp = worldUp.normalized;
+        if (head != null)
+        {
+            Vector3 headForward = Vector3.ProjectOnPlane(
+                head.forward,
+                safeUp);
+            if (headForward.sqrMagnitude > 0.0001f)
+            {
+                facing = headForward.normalized;
+                return true;
+            }
+        }
+
+        Vector3 chestForward = Vector3.ProjectOnPlane(chest.forward, safeUp);
+        if (chestForward.sqrMagnitude > 0.0001f)
+        {
+            facing = chestForward.normalized;
+            return true;
+        }
+
         lateral = Vector3.ProjectOnPlane(lateral, safeUp);
         if (lateral.sqrMagnitude < 0.0001f)
         {
@@ -1211,13 +1197,6 @@ public class PracticeSessionController : MonoBehaviour
         }
 
         Vector3 candidate = Vector3.Cross(lateral.normalized, safeUp);
-        Vector3 chestForward = Vector3.ProjectOnPlane(chest.forward, safeUp);
-        if (chestForward.sqrMagnitude > 0.0001f &&
-            Vector3.Dot(candidate, chestForward.normalized) < 0f)
-        {
-            candidate = -candidate;
-        }
-
         facing = candidate.normalized;
         return facing.sqrMagnitude > 0.0001f;
     }
@@ -1241,7 +1220,7 @@ public class PracticeSessionController : MonoBehaviour
                 safeUp);
             float headwardLengthSquared = headward.sqrMagnitude;
             if (headwardLengthSquared > 0.0001f &&
-                horizontalHeadward.sqrMagnitude / headwardLengthSquared > 0.8f)
+                horizontalHeadward.sqrMagnitude / headwardLengthSquared > 0.55f)
             {
                 heading = horizontalHeadward.normalized;
                 return true;

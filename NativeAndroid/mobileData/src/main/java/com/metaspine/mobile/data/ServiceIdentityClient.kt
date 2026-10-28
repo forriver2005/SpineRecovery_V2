@@ -23,8 +23,8 @@ data class ServiceIdentity(
 object ServiceIdentityClient {
     const val PATH = "/api/service-identity"
 
-    suspend fun fetch(): Result<ServiceIdentity> = patientRequestResult {
-        val response = PatientHttpTransport.shared.request(
+    suspend fun fetch(origin: String = SpineFlowServerConfig.BASE_URL): Result<ServiceIdentity> = patientRequestResult {
+        val response = PatientHttpTransport(origin = { origin }).request(
             PATH, connectTimeoutMs = 8_000, readTimeoutMs = 10_000
         )
         response.requireSuccess("服务身份请求失败, HTTP " + response.status)

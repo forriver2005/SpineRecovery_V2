@@ -2,14 +2,33 @@ plugins {
     id 'com.android.library'
 }
 
+// A LAN build trusts a stable server certificate; its current IP is discovered at runtime.
+def localServerPin = providers.gradleProperty('spineflowLocalCertificateSha256').orElse('').get().trim().toLowerCase()
+def localServiceId = providers.gradleProperty('spineflowLocalServiceId').orElse('hospital-a').get().trim()
+def localHospitalKey = providers.gradleProperty('spineflowLocalHospitalKey').orElse('hospital-a').get().trim()
+if (localServerPin && !(localServerPin ==~ /[0-9a-f]{64}/)) {
+    throw new GradleException('spineflowLocalCertificateSha256 must be a SHA-256 certificate fingerprint')
+}
+def debugOrigin = providers.gradleProperty('spineflowServerUrl')
+    .orElse(localServerPin ? 'http://spineflow.local:3001' : 'http://10.0.2.2:3101').get().trim()
+
 android {
     namespace 'com.metaspine.mobile.unified'
     compileSdk 36
-    defaultConfig { minSdk 29 }
+    defaultConfig {
+        minSdk 29
+        buildConfigField 'String', 'LOCAL_DISCOVERY_CERT_SHA256', groovy.json.JsonOutput.toJson(localServerPin)
+        buildConfigField 'String', 'LOCAL_DISCOVERY_SERVICE_ID', groovy.json.JsonOutput.toJson(localServiceId)
+        buildConfigField 'String', 'LOCAL_DISCOVERY_HOSPITAL_KEY', groovy.json.JsonOutput.toJson(localHospitalKey)
+    }
     buildFeatures { buildConfig true }
     buildTypes {
-        debug { buildConfigField 'String', 'SERVER_BASE_URL', '"http://10.0.2.2:3101"' }
-        release { buildConfigField 'String', 'SERVER_BASE_URL', '"https://api.metaspine.cn"' }
+        debug { buildConfigField 'String', 'SERVER_BASE_URL', groovy.json.JsonOutput.toJson(debugOrigin) }
+        release {
+            buildConfigField 'String', 'SERVER_BASE_URL', '"https://api.metaspine.cn"'
+            // Production HTTPS keeps its existing trust policy and does not scan the LAN.
+            buildConfigField 'String', 'LOCAL_DISCOVERY_CERT_SHA256', '""'
+        }
     }
     compileOptions {
         sourceCompatibility JavaVersion.VERSION_17

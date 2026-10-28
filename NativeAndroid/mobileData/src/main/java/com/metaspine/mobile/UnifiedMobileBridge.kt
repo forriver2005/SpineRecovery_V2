@@ -24,7 +24,7 @@ object UnifiedMobileBridge {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     private val identityGeneration = AtomicInteger()
     private val main = Handler(Looper.getMainLooper())
-    private data class PendingPlan(val token: String, val account: String, val generation: Int,
+    private data class PendingPlan(val token: String, val account: String, val generation: Int, val operation: Long,
         val credential: PatientServerCredential, val coordinator: TrainingDirectiveCoordinator,
         val prepared: DirectiveRefreshResult.Prepared)
     private var pendingPlan: PendingPlan? = null
@@ -32,8 +32,11 @@ object UnifiedMobileBridge {
     @JvmStatic @Synchronized fun initialize(host: Context) {
         if (::context.isInitialized) return
         context = host.applicationContext
+        LocalServerDiscovery.initialize(context)
         users = DemoUserStore(context)
-        SpineFlowServerConfig.baseUrlOverride = PatientCredentials.serverUrlOverride(context)
+        // A LAN route never rewrites the user's saved logical origin or credential preferences.
+        SpineFlowServerConfig.baseUrlOverride = if (LocalServerDiscovery.isEnabled) null
+            else PatientCredentials.serverUrlOverride(context)
         sync = ServerSyncCoordinator(context, scope) { accountId ->
             // P2.4 启动重算：按账号加载可同步状态（过滤 LEGACY_IMPORT / imported / 种子数据）。
             runCatching { syncable(users.loadUser(accountId)) }.getOrNull()
@@ -223,6 +226,23 @@ object UnifiedMobileBridge {
         }
     }
 
+    private fun activationOrigin(account: String): String {
+        val configured = SpineFlowServerConfig.BASE_URL
+        if (!LocalServerDiscovery.isEnabled) return configured
+        val binding = BindingScopeStore.load(context, account)
+        require(binding == null || LocalServerDiscovery.registerBinding(binding)) {
+            "当前服务器不是账号绑定医院，本地数据已保留"
+        }
+        val pending = PatientCredentials.activationPending(context, account)
+        if (pending != null && pending.origin.isNotBlank()) {
+            require(LocalServerDiscovery.acceptsOrigin(pending.origin, pending.serviceId, pending.hospitalKey)) {
+                "请连接原医院后重试激活，本地数据已保留"
+            }
+            return pending.origin
+        }
+        return binding?.origin ?: configured
+    }
+
     private suspend fun execute(command: String, body: JSONObject, generation: Int): JSONObject {
         val account = body.optString("accountId").trim().lowercase()
         when (command) {
@@ -235,17 +255,28 @@ object UnifiedMobileBridge {
                 return JSONObject(load(account))
             }
             "previewActivation" -> {
+                val origin = activationOrigin(account)
+                val operation = LocalServerDiscovery.prepareOperation(origin)
+                ServiceIdentityClient.requireHospital(ServiceIdentityClient.fetch(origin).getOrThrow())
+                require(LocalServerDiscovery.isCurrentOperation(operation)) { "网络连接已变化，请重试激活预览" }
                 val preview = PatientActivationClient.preview(body.getString("code"),
-                    PatientCredentials.installationId(context)).getOrThrow()
+                    PatientCredentials.installationId(context), origin).getOrThrow()
+                require(identityGeneration.get() == generation && LocalServerDiscovery.isCurrentOperation(operation)) {
+                    "激活预览请求已失效，请重试"
+                }
                 return JSONObject().put("message", "请确认：${preview.displayName}，${preview.idCardMasked}，医生 ${preview.doctorUsername}")
             }
             "activate" -> {
                 val code = PatientActivationClient.normalizeInput(body.getString("code"))
                 require(PatientActivationClient.isComplete(code)) { "请输入有效的11位建档手机号" }
-                val origin = SpineFlowServerConfig.BASE_URL
+                val origin = activationOrigin(account)
+                val configuredOrigin = SpineFlowServerConfig.BASE_URL
+                val operation = LocalServerDiscovery.prepareOperation(origin)
                 val serviceIdentity = ServiceIdentityClient.requireHospital(
-                    ServiceIdentityClient.fetch().getOrThrow())
-                require(SpineFlowServerConfig.BASE_URL == origin) { "医院地址已变化，请重试" }
+                    ServiceIdentityClient.fetch(origin).getOrThrow())
+                require(SpineFlowServerConfig.BASE_URL == configuredOrigin && LocalServerDiscovery.isCurrentOperation(operation)) {
+                    "医院连接已变化，请重试"
+                }
                 val priorScope = BindingScopeStore.load(context, account)
                 val existingPending = PatientCredentials.activationPending(context, account)
                     ?: PendingActivationBinding(PatientActivationClient.newRequestId(), code,
@@ -259,10 +290,11 @@ object UnifiedMobileBridge {
                 check(PatientCredentials.saveActivationPending(context, pending)) { "激活请求未能安全保存" }
                 val redeemed = PatientActivationClient.redeem(PatientActivationClient.buildRedeemBody(
                     pending.requestId, pending.activationCode, pending.proposedToken, pending.installationId, account
-                )).getOrThrow()
+                ), origin).getOrThrow()
                 // P2.7：网络回包在途期间若发生登出/切换（identityGeneration 变化），
                 // 不得把旧请求的凭据落到当前身份上。
-                require(identityGeneration.get() == generation && SpineFlowServerConfig.BASE_URL == origin &&
+                require(identityGeneration.get() == generation && SpineFlowServerConfig.BASE_URL == configuredOrigin &&
+                    LocalServerDiscovery.isCurrentOperation(operation) &&
                     BindingScopeStore.load(context, account) == priorScope) { "激活请求已取消，请重试" }
                 val sameBinding = priorScope?.matchesOriginAndPatient(origin, redeemed.patientId) == true &&
                     priorScope.matchesHospital(serviceIdentity) &&
@@ -278,6 +310,7 @@ object UnifiedMobileBridge {
                     accountId = account,
                     credentialGeneration = nextGeneration
                 )
+                check(LocalServerDiscovery.registerBinding(newScope)) { "医院身份不匹配，本地数据已保留" }
                 // P2.7：换绑（Origin/医院/患者变化）时旧队列属于旧绑定，绝不能用新 PAT
                 // 发往新医院——作废旧队列与在途回包；同院重放仅作废在途回包，保留合法未确认任务。
                 val bindingChanged = priorScope != null && (priorScope.origin != newScope.origin ||
@@ -290,6 +323,7 @@ object UnifiedMobileBridge {
                 check(PatientCredentials.saveActivatedCredential(context, account,
                     PatientServerCredential(redeemed.patientId, pending.proposedToken), redeemed.prescription,
                     redeemed.identity, redeemed.prescriptionV2, newScope))
+                LocalServerDiscovery.markBindingVerified(newScope)
                 val local = users.loadUser(account)
                 users.saveUser(HealthEventBridge.rebind(local, newScope.storageKey()))
                 sync.resumeAfterCredentialsUpdate(syncable(users.loadUser(account)))
@@ -298,10 +332,13 @@ object UnifiedMobileBridge {
             "refreshDirective" -> {
                 val credential = requireNotNull(PatientCredentials.credential(context, account))
                 val binding = requireNotNull(BindingScopeStore.load(context, account))
+                require(LocalServerDiscovery.registerBinding(binding)) { "当前服务器不是账号绑定医院，本地数据已保留" }
+                val operation = LocalServerDiscovery.prepareOperation(binding.origin)
                 val current = { candidate: BindingScope ->
                     identityGeneration.get() == generation && users.activeAccountId() == account &&
                         candidate.matches(BindingScopeStore.load(context, account)) &&
-                        candidate.matchesOriginAndPatient(SpineFlowServerConfig.BASE_URL, credential.patientId) &&
+                        LocalServerDiscovery.matchesBinding(candidate, SpineFlowServerConfig.BASE_URL, credential.patientId) &&
+                        LocalServerDiscovery.isCurrentOperation(operation) &&
                         PatientCredentials.credential(context, account) == credential
                 }
                 require(current(binding)) { "医院绑定已变化" }
@@ -325,7 +362,8 @@ object UnifiedMobileBridge {
             "confirmPlan" -> {
                 val plan = requireNotNull(pendingPlan) { "本次训练准备已失效" }
                 require(plan.token == body.getString("planToken") && plan.account == account &&
-                    plan.generation == generation && users.activeAccountId() == account && body.getBoolean("consumerConfirmed")) { "训练资源尚未完成交接" }
+                    plan.generation == generation && LocalServerDiscovery.isCurrentOperation(plan.operation) &&
+                    users.activeAccountId() == account && body.getBoolean("consumerConfirmed")) { "训练资源尚未完成交接" }
                 val confirmed = plan.coordinator.confirmReady(plan.credential, plan.prepared, true)
                 require(confirmed is DirectiveRefreshResult.Ready) { "本次处方暂不可训练，请重新进入" }
                 pendingPlan = null
@@ -343,10 +381,11 @@ object UnifiedMobileBridge {
                 val bindingScope = requireNotNull(BindingScopeStore.load(context, account)) {
                     "医院绑定信息缺失，请重新激活医生档案"
                 }
-                require(bindingScope.patientId == credential.patientId &&
-                    bindingScope.origin == SpineFlowServerConfig.BASE_URL) {
+                require(LocalServerDiscovery.registerBinding(bindingScope) &&
+                    LocalServerDiscovery.matchesBinding(bindingScope, SpineFlowServerConfig.BASE_URL, credential.patientId)) {
                     "医院绑定已变更，请重新激活医生档案"
                 }
+                val operation = LocalServerDiscovery.prepareOperation(bindingScope.origin)
                 val assetStore = PrescriptionAssetStore.forContext(context, bindingScope)
                 val coordinator = TrainingDirectiveCoordinator(
                     storage = TrainingDirectiveStore(context),
@@ -355,7 +394,8 @@ object UnifiedMobileBridge {
                     handoffGate = { handoff -> TrainingStartPayload.capabilityGaps(handoff.order) },
                     isCurrent = { candidate -> identityGeneration.get() == generation && users.activeAccountId() == account &&
                         candidate.matches(BindingScopeStore.load(context, account)) &&
-                        candidate.matchesOriginAndPatient(SpineFlowServerConfig.BASE_URL, credential.patientId) &&
+                        LocalServerDiscovery.matchesBinding(candidate, SpineFlowServerConfig.BASE_URL, credential.patientId) &&
+                        LocalServerDiscovery.isCurrentOperation(operation) &&
                         PatientCredentials.credential(context, account) == credential }
                 )
                 val refreshed = coordinator.prepare(account, credential, bindingScope)
@@ -371,7 +411,8 @@ object UnifiedMobileBridge {
                 val handoff = requireNotNull(refreshed.handoff) { "处方资源尚未完成校验，请重新下拉处方" }
                 require(identityGeneration.get() == generation &&
                     bindingScope.matches(BindingScopeStore.load(context, account)) &&
-                    bindingScope.origin == SpineFlowServerConfig.BASE_URL) { "医院绑定已变化" }
+                    LocalServerDiscovery.matchesBinding(bindingScope, SpineFlowServerConfig.BASE_URL, credential.patientId) &&
+                    LocalServerDiscovery.isCurrentOperation(operation)) { "医院绑定已变化" }
                 val payload = TrainingStartPayload.forPrescription(user,
                     if (user.isReturningUser) DemoFlowType.ReturningUser else DemoFlowType.FirstAdmission,
                     credential.patientId, handoff) { file ->
@@ -389,7 +430,7 @@ object UnifiedMobileBridge {
                 objects(actions).forEach { it.put("sceneName", if (it.getString("arTaskType") == "coach_training") coachScene else gameScene) }
                 val sessionId = UUID.randomUUID().toString()
                 val planToken = UUID.randomUUID().toString()
-                pendingPlan = PendingPlan(planToken, account, generation, credential, coordinator, refreshed)
+                pendingPlan = PendingPlan(planToken, account, generation, operation, credential, coordinator, refreshed)
                 val startedAt = java.time.Instant.now().truncatedTo(java.time.temporal.ChronoUnit.MILLIS).toString()
                 return JSONObject().put("sessionId", sessionId).put("requestToken", sessionId)
                     .put("planToken", planToken).put("startedAt", startedAt).put("accountId", account)
@@ -400,16 +441,21 @@ object UnifiedMobileBridge {
             }
             "routineRefresh", "routineAnswer", "routineSave", "routineSubmit" -> {
                 val credential = requireNotNull(PatientCredentials.credential(context, account)) { "请先激活医生档案" }
-                val origin = SpineFlowServerConfig.BASE_URL
                 val binding = requireNotNull(BindingScopeStore.load(context, account))
-                require(binding.matchesOriginAndPatient(origin, credential.patientId))
+                require(LocalServerDiscovery.registerBinding(binding) &&
+                    LocalServerDiscovery.matchesBinding(binding, SpineFlowServerConfig.BASE_URL, credential.patientId))
+                val origin = binding.origin
+                // Local draft editing must remain available while the server is offline.
+                val operation = if (command == "routineRefresh" || command == "routineSubmit")
+                    LocalServerDiscovery.prepareOperation(origin) else null
                 val bound = RoutineScope.of(account, credential, origin, binding)
                 // P2.7：在途回包只有「凭据、活动账号、Origin 均未变」才可写回，
                 // 切源后旧问卷回包不得修改新绑定的答卷/缓存。
                 val current = { identityGeneration.get() == generation && binding.matches(BindingScopeStore.load(context, account)) &&
                     PatientCredentials.credential(context, account) == credential &&
                     users.activeAccountId() == account &&
-                    SpineFlowServerConfig.BASE_URL == origin }
+                    LocalServerDiscovery.matchesBinding(binding, SpineFlowServerConfig.BASE_URL, credential.patientId) &&
+                    (operation == null || LocalServerDiscovery.isCurrentOperation(operation)) }
                 var message = ""
                 if (command == "routineRefresh") message = routine.refresh(bound, credential, current).message
                 if (command == "routineSave") {

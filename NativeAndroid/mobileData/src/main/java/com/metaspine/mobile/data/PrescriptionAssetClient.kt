@@ -52,7 +52,7 @@ object PrescriptionAssetClient {
         expectedSha256: String,
         expectedFileSize: Long,
         origin: () -> String = { SpineFlowServerConfig.BASE_URL },
-        openConnection: (URL) -> HttpURLConnection = { it.openConnection() as HttpURLConnection },
+        openConnection: (URL) -> HttpURLConnection = LocalServerDiscovery::openConnection,
         expectedLease: TrainingResourceLease? = null,
         expectedActionId: String? = null,
         expectedVersionId: Long? = null,
@@ -60,14 +60,17 @@ object PrescriptionAssetClient {
         elapsedMillis: () -> Long = { android.os.SystemClock.elapsedRealtime() },
         publish: (File) -> File
     ): VerifiedAsset = withContext(Dispatchers.IO) {
+        var connection: HttpURLConnection? = null
         try {
             val url = resolveAssetUrl(origin(), downloadPath)
             requireAssetIdentity(expectedSha256, expectedFileSize)
             val temp = File.createTempFile("prescription-asset-", ".part")
             try {
+                val requestConnection = openConnection(url)
+                connection = requestConnection
                 val observed = if (expectedLease != null) elapsedMillis() else 0L
                 var leaseAnchor: ObservedResourceLease? = null
-                val written = fetchBytes(url, patientToken, expectedFileSize, openConnection, temp) { connection ->
+                val written = fetchBytes(requestConnection, patientToken, expectedFileSize, temp) { connection ->
                     if (expectedLease != null) {
                         val lease = TrainingResourceLease.fromJson(org.json.JSONObject()
                             .put("contractVersion", 1)
@@ -94,6 +97,8 @@ object PrescriptionAssetClient {
                 if (leaseAnchor != null && !leaseAnchor!!.isValidAt(elapsedMillis())) {
                     throw PrescriptionAssetException("资源下载期间租约已过期")
                 }
+                currentCoroutineContext().ensureActive()
+                LocalServerDiscovery.validateConnection(requestConnection)
                 VerifiedAsset(publish(temp), written, actualSha256, leaseAnchor)
             } finally {
                 if (temp.exists()) temp.delete()
@@ -101,13 +106,17 @@ object PrescriptionAssetClient {
         } catch (cancelled: CancellationException) {
             throw cancelled
         } catch (error: PrescriptionAssetException) {
+            connection?.let(LocalServerDiscovery::invalidateConnection)
             throw error
         } catch (error: ApiHttpException) {
             // 401/404/503 的语义由调用方区分（凭据、撤销、租约），不能被包成通用下载失败。
             throw error
         } catch (error: Exception) {
+            connection?.let(LocalServerDiscovery::invalidateConnection)
             currentCoroutineContext().ensureActive()
             throw PrescriptionAssetException(error.message ?: "资源下载失败", error)
+        } finally {
+            connection?.disconnect()
         }
     }
 
@@ -136,16 +145,15 @@ object PrescriptionAssetClient {
         }
     }
 
-    private fun fetchBytes(
-        url: URL,
+    private suspend fun fetchBytes(
+        connection: HttpURLConnection,
         patientToken: String,
         expectedFileSize: Long,
-        openConnection: (URL) -> HttpURLConnection,
         target: File,
         validateHeaders: (HttpURLConnection) -> Unit
     ): Long {
-        val connection = openConnection(url)
-        try {
+        val context = currentCoroutineContext()
+        context.ensureActive()
             connection.instanceFollowRedirects = false
             connection.useCaches = false
             connection.requestMethod = "GET"
@@ -156,6 +164,7 @@ object PrescriptionAssetClient {
                 connection.setRequestProperty("Authorization", "Bearer $patientToken")
             }
             val status = connection.responseCode
+            LocalServerDiscovery.validateConnection(connection)
             when {
                 status in 300..399 -> throw PrescriptionAssetException("资源下载不允许重定向")
                 status == 401 || status == 403 ->
@@ -175,6 +184,7 @@ object PrescriptionAssetClient {
                     val buffer = ByteArray(64 * 1024)
                     var total = 0L
                     while (true) {
+                        context.ensureActive()
                         val count = input.read(buffer)
                         if (count < 0) break
                         total += count
@@ -184,12 +194,10 @@ object PrescriptionAssetClient {
                         output.write(buffer, 0, count)
                     }
                     output.fd.sync()
+                    LocalServerDiscovery.validateConnection(connection)
                     total
                 }
             }
-        } finally {
-            connection.disconnect()
-        }
     }
 
     internal fun sha256Hex(file: File): String {

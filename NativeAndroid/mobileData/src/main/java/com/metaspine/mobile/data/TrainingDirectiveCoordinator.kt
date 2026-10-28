@@ -153,6 +153,7 @@ class TrainingDirectiveCoordinator(
         }
 
         // 200 的每种状态都整体覆盖旧快照：撤销/停止必须立刻让旧处方失效。
+        if (scope != null && !isCurrent(scope)) return bindingChanged()
         storage.write(accountId, snapshot)
 
         if (snapshot.state == TrainingDirectiveState.Stopped) {
@@ -266,6 +267,7 @@ class TrainingDirectiveCoordinator(
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (error: ApiHttpException) {
+                if (!isCurrent(scope)) return bindingChanged()
                 // 凭据被拒是全局问题：继续下载其余条目没有意义，也不能把处方当成可用。
                 if (error.httpStatus == 401 || error.httpStatus == 403) {
                     receipts?.write(scope, task.copy(
@@ -278,6 +280,7 @@ class TrainingDirectiveCoordinator(
             } catch (error: PrescriptionAssetException) {
                 null
             }
+            if (!isCurrent(scope)) return bindingChanged()
             if (downloaded == null) {
                 failures.add(item.itemId)
             } else {
@@ -294,6 +297,7 @@ class TrainingDirectiveCoordinator(
                 }
             }
         }
+        if (!isCurrent(scope)) return bindingChanged()
         val blocking = buildList {
             if (failures.isNotEmpty()) add("有资源未通过校验，已保持保存状态")
             addAll(handoffGate(TrainingPrescriptionHandoff(
@@ -305,6 +309,7 @@ class TrainingDirectiveCoordinator(
             )))
         }
         if (blocking.isNotEmpty()) {
+            if (!isCurrent(scope)) return bindingChanged()
             receipts?.write(scope, task.copy(
                 failedAssetItemIds = failures, blockingReasons = blocking))
             return DirectiveRefreshResult.NotTrainable(
@@ -365,6 +370,7 @@ class TrainingDirectiveCoordinator(
         if (!currentLease.isValidAt(elapsedMillis())) return blocked("资源授权已过期，请重新刷新医生处方")
         if (!handoff.hasVerifiedFiles()) return blocked("处方文件已变化，请重新获取资源")
         require(!info.assetsReadyAt.isNullOrBlank()) { "资源就绪回执缺少就绪时间" }
+        if (!isCurrent(scope)) return bindingChanged()
         receiptStorage.write(scope, task.copy(phase = ReceiptPhase.AssetsReady, assetsReadyReceivedAt = info.assetsReadyAt,
             failedAssetItemIds = emptyList(), blockingReasons = emptyList(), readyPending = false))
         val snapshot = prepared.snapshot.copy(prescription = order.copy(

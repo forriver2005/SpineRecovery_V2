@@ -76,12 +76,13 @@ object PatientActivationClient {
         .put("installationId", installationId)
         .put("accountId", accountId.trim().lowercase())
 
-    suspend fun preview(activationCode: String, installationId: String): Result<ActivationPreview> =
-        request("POST", PREVIEW_PATH, buildPreviewBody(activationCode, installationId))
+    suspend fun preview(activationCode: String, installationId: String,
+        origin: String = SpineFlowServerConfig.BASE_URL): Result<ActivationPreview> =
+        request("POST", PREVIEW_PATH, buildPreviewBody(activationCode, installationId), origin)
             .mapCatching(::parsePreview)
 
-    suspend fun redeem(body: JSONObject): Result<ActivationRedeemResult> =
-        request("POST", REDEEM_PATH, body).mapCatching(::parseRedeem)
+    suspend fun redeem(body: JSONObject, origin: String = SpineFlowServerConfig.BASE_URL): Result<ActivationRedeemResult> =
+        request("POST", REDEEM_PATH, body, origin).mapCatching(::parseRedeem)
 
     internal fun parsePreview(data: JSONObject): ActivationPreview = ActivationPreview(
         displayName = data.getString("displayName"),
@@ -146,9 +147,10 @@ object PatientActivationClient {
     private suspend fun request(
         method: String,
         path: String,
-        body: JSONObject? = null
+        body: JSONObject? = null,
+        origin: String = SpineFlowServerConfig.BASE_URL
     ): Result<JSONObject> = patientRequestResult {
-        val response = PatientHttpTransport.shared.request(path, method, body = body?.toString())
+        val response = PatientHttpTransport(origin = { origin }).request(path, method, body = body?.toString())
         response.requireSuccess("激活请求失败，HTTP "+response.status)
         val json = JSONObject(response.text)
         check(json.optInt("code", -1) == 0) { json.optString("message", "服务器返回错误") }

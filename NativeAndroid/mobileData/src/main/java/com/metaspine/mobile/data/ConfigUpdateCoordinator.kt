@@ -3,6 +3,7 @@ package com.metaspine.mobile.data
 import android.content.Context
 import android.util.Log
 import com.metaspine.mobile.unified.BuildConfig
+import kotlinx.coroutines.CancellationException
 import org.json.JSONObject
 
 data class InstalledMotionPackage(
@@ -19,6 +20,9 @@ object ConfigUpdateCoordinator {
         val appContext = context.applicationContext
         val versions = VersionManager(appContext)
         return retryRunner.run {
+            val operation = try { LocalServerDiscovery.prepareOperation() }
+                catch (cancelled: CancellationException) { throw cancelled }
+                catch (error: Exception) { return@run Result.failure(error) }
             val currentVersion = versions.getConfigVersion()
             val checked = VersionCheckClient.checkUpdate(CONFIG_TYPE, currentVersion)
             val error = checked.exceptionOrNull()
@@ -31,7 +35,7 @@ object ConfigUpdateCoordinator {
                     Log.i(TAG, "配置已是最新版本，当前版本=$currentVersion")
                     Result.success(null)
                 } else {
-                    install(appContext, versions, update)
+                    install(appContext, versions, update, operation)
                 }
             }
         }
@@ -40,7 +44,8 @@ object ConfigUpdateCoordinator {
     private suspend fun install(
         context: Context,
         versions: VersionManager,
-        update: VersionInfo
+        update: VersionInfo,
+        operation: Long
     ): Result<InstalledMotionPackage> {
         if (!BuildConfig.DEBUG &&
             (!update.sha256.matches(Regex("[0-9a-fA-F]{64}")) ||
@@ -50,6 +55,7 @@ object ConfigUpdateCoordinator {
         }
         return VersionDownloader.downloadText(update.downloadUrl, update.fileSize)
         .mapCatching { json ->
+            check(LocalServerDiscovery.isCurrentOperation(operation)) { "网络连接已变化，保留原动作包" }
             // SF-18（安装侧校验）：结构非法 / 哈希与发布清单不一致 → 整体失败，
             // 不落盘、不推进版本，保留上一有效包与版本。
             structuralError(json)?.let { problem ->
@@ -61,6 +67,7 @@ object ConfigUpdateCoordinator {
                 }
             }
             val motionPackage = parseMotionPackage(json)
+            check(LocalServerDiscovery.isCurrentOperation(operation)) { "网络连接已变化，保留原动作包" }
             check(MotionPackageStore.save(context, motionPackage.actionId, json) != null) {
                 "动作包保存失败"
             }

@@ -72,7 +72,8 @@ class ServerSyncCoordinator(
 
     private fun current(binding: BindingScope, credential: PatientServerCredential? = null): Boolean =
         binding.accountId !in forgottenAccountIds && binding.matches(BindingScopeStore.load(context, binding.accountId)) &&
-            binding.matchesOriginAndPatient(SpineFlowServerConfig.BASE_URL,
+            LocalServerDiscovery.registerBinding(binding) &&
+            LocalServerDiscovery.matchesBinding(binding, SpineFlowServerConfig.BASE_URL,
                 PatientCredentials.credential(context, binding.accountId)?.patientId.orEmpty()) &&
             (credential == null || credential == PatientCredentials.credential(context, binding.accountId))
 
@@ -166,7 +167,15 @@ class ServerSyncCoordinator(
                 val (binding, item) = next() ?: return@launch
                 val credential = PatientCredentials.credential(context, binding.accountId) ?: return@launch
                 val generation = generations[binding.accountId] ?: 0
-                val stillCurrent = { current(binding, credential) && generation == (generations[binding.accountId] ?: 0) }
+                val operation = try { LocalServerDiscovery.prepareOperation(binding.origin) }
+                    catch (cancelled: CancellationException) { throw cancelled }
+                    catch (_: Exception) {
+                        scope.launch { delay(15_000); flush() }
+                        return@launch
+                    }
+                val stillCurrent = { current(binding, credential) && generation == (generations[binding.accountId] ?: 0) &&
+                    LocalServerDiscovery.isCurrentOperation(operation) }
+                if (!stillCurrent()) continue
                 val key = binding.storageKey()
                 val id = item.getString("id")
                 val body = item.getJSONObject("payload")

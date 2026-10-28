@@ -16,7 +16,7 @@ import java.nio.charset.CodingErrorAction
 /** Bounded JSON transport. Business status/DTOs and retry decisions belong to each client. */
 internal class PatientHttpTransport(
     private val origin: () -> String = { SpineFlowServerConfig.BASE_URL },
-    private val openConnection: (URL) -> HttpURLConnection = { it.openConnection() as HttpURLConnection }
+    private val openConnection: (URL) -> HttpURLConnection = LocalServerDiscovery::openConnection
 ) {
     data class Response(val status: Int, val bytes: ByteArray, val retryAfterSeconds: Long?) {
         val text: String get() = decodeUtf8(bytes)
@@ -51,6 +51,7 @@ internal class PatientHttpTransport(
         requireNegotiationHeaders(negotiationHeaders)
         val connection = openConnection(url)
         try {
+            context.ensureActive()
             connection.instanceFollowRedirects = false
             connection.useCaches = false
             connection.requestMethod = method
@@ -62,8 +63,10 @@ internal class PatientHttpTransport(
             }
             negotiationHeaders.forEach { (name, value) -> connection.setRequestProperty(name, value) }
             if (body != null) {
+                context.ensureActive()
                 connection.doOutput = true
                 connection.setRequestProperty("Content-Type", "application/json; charset=utf-8")
+                context.ensureActive()
                 connection.outputStream.use { it.write(body.toByteArray(Charsets.UTF_8)) }
             }
             context.ensureActive()
@@ -89,8 +92,12 @@ internal class PatientHttpTransport(
             } else byteArrayOf()
             context.ensureActive()
             decodeUtf8(bytes) // Never silently replace invalid UTF-8 with replacement characters.
+            LocalServerDiscovery.validateConnection(connection)
             Response(status, bytes, retryAfter)
+        } catch (cancelled: CancellationException) {
+            throw cancelled
         } catch (error: Exception) {
+            LocalServerDiscovery.invalidateConnection(connection)
             context.ensureActive() // Cancellation must not become an ordinary socket/IO failure.
             throw error
         } finally {

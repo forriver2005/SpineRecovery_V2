@@ -29,6 +29,10 @@ public sealed class GameWorkoutSession : MonoBehaviour
     private Coroutine transition;
     private bool awaitingCompletion;
     private bool startingSet;
+    private bool useRecordedCoachAnimations;
+    private string hipThrustSceneOverride;
+    private string SceneFor(string action) => action == "hipthrust" && !string.IsNullOrEmpty(hipThrustSceneOverride)
+        ? hipThrustSceneOverride : GameWorkoutPlan.SceneFor(action, useRecordedCoachAnimations);
 
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
     private static void ResetStatic() { instance = null; }
@@ -68,8 +72,10 @@ public sealed class GameWorkoutSession : MonoBehaviour
         error = null;
         if (IsRunning || plan == null) { error = IsRunning ? "动作串已在运行。" : "请先传入动作串参数。"; return false; }
         if (scene != null && scene.IsPlaying) { error = "请先结束当前单项训练。"; return false; }
+        useRecordedCoachAnimations = scene != null && scene.useRecordedCoachAnimations;
+        hipThrustSceneOverride = scene != null ? scene.hipThrustSceneOverride : null;
         foreach (var item in plan.actions)
-            if (!Application.CanStreamedLevelBeLoaded(GameWorkoutPlan.SceneFor(item.action)))
+            if (!Application.CanStreamedLevelBeLoaded(SceneFor(item.action)))
             { error = "动作场景未加入构建：" + item.action; return false; }
         ActionIndex = CompletedSets = 0;
         IsRunning = true;
@@ -128,7 +134,7 @@ public sealed class GameWorkoutSession : MonoBehaviour
         Status = "准备下一组动作";
         Changed?.Invoke();
         yield return new WaitForSecondsRealtime(3f);
-        string target = GameWorkoutPlan.SceneFor(plan.actions[ActionIndex].action);
+        string target = SceneFor(plan.actions[ActionIndex].action);
         if (SceneManager.GetActiveScene().name != target)
         {
             AsyncOperation load = SceneManager.LoadSceneAsync(target);

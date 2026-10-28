@@ -18,6 +18,8 @@ public sealed class HipThrustTaikoController : MonoBehaviour
 
     [Header("Source animation and sampled chart (frames relative to the imported clip)")]
     [SerializeField] private AnimationClip sourceClip;
+    [Tooltip("Optional recorded three-phase chart. Null retains the original taiko timing.")]
+    [SerializeField] private HipThrustPhaseTimeline phaseTimeline;
     [SerializeField] private HipBeat[] sourceBeats;
     [SerializeField] private int repeatStartFrame = 408;
     [SerializeField] private int repeatEndFrame = 1320;
@@ -70,6 +72,7 @@ public sealed class HipThrustTaikoController : MonoBehaviour
     private int passes = 1;
     private bool running, paused;
     private int score, hitCount, missCount;
+    private int consecutiveHits;
     private AvatarMotionSource motionSource;
     private float lastSampleTime;
     private HipThrustHitParticles hitParticles;
@@ -83,18 +86,27 @@ public sealed class HipThrustTaikoController : MonoBehaviour
     public int BeatCount => beats.Count;
     public int HitCount => hitCount;
     public int MissCount => missCount;
+    public int Score => score;
+    public int ConsecutiveHits => consecutiveHits;
+    public HipThrustPhaseTimeline PhaseTimeline => phaseTimeline;
     public Animator CoachAnimator => coachAnimator;
     public Animator PreviewAnimator => coachPreviewAnimator;
     public event Action Completed;
+    public event Action<bool> HitResolved;
     private float FrameRate => sourceClip.frameRate;
-    private double LoopStart => repeatStartFrame / (double)FrameRate;
-    private double LoopEnd => repeatEndFrame / (double)FrameRate;
+    private double LoopStart => (phaseTimeline != null ? phaseTimeline.repeatStartFrame : repeatStartFrame) / (double)FrameRate;
+    private double LoopEnd => (phaseTimeline != null ? phaseTimeline.repeatEndFrame : repeatEndFrame) / (double)FrameRate;
     private double LoopDuration => LoopEnd - LoopStart;
     private Vector2 JudgePosition => judgementImage.rectTransform.anchoredPosition;
     private float PixelsPerSecond => Mathf.Abs(noteSpawnAnchor.anchoredPosition.x - JudgePosition.x) / approachDuration;
 
     private void Awake()
     {
+        if (phaseTimeline != null)
+        {
+            phaseTimeline.Validate();
+            sourceClip = phaseTimeline.sourceClip;
+        }
         if (sourceClip == null || sourceBeats == null || sourceBeats.Length == 0 ||
             coachAnimator == null || coachPreviewAnimator == null || gamingCanvas == null)
         {
@@ -147,12 +159,13 @@ public sealed class HipThrustTaikoController : MonoBehaviour
     public void StartMode()
     {
         ClearNotes();
-        int repetitions = sourceBeats.Length;
+        int cycleCount = phaseTimeline != null ? phaseTimeline.cycles.Length : sourceBeats.Length;
+        int repetitions = cycleCount;
         if (repetitionsText != null && int.TryParse(repetitionsText.text, out int requested)) repetitions = requested;
-        passes = Mathf.Clamp(Mathf.CeilToInt(repetitions / (float)sourceBeats.Length), 1, 3);
+        passes = Mathf.Clamp(Mathf.CeilToInt(repetitions / (float)cycleCount), 1, 3);
         elapsed = 0d;
         lastSampleTime = 0f;
-        score = hitCount = missCount = 0;
+        score = hitCount = missCount = consecutiveHits = 0;
         paused = false;
         running = true;
         if (endMenuRoot != null) endMenuRoot.SetActive(false);
@@ -165,6 +178,15 @@ public sealed class HipThrustTaikoController : MonoBehaviour
 
     private void BuildChart()
     {
+        if (phaseTimeline != null)
+        {
+            for (int pass = 0; pass < passes; pass++)
+            foreach (var cycle in phaseTimeline.cycles)
+                beats.Add(new Beat { upTime = cycle.holdStartFrame / (double)FrameRate + pass * LoopDuration,
+                    holdEndTime = cycle.lowerStartFrame / (double)FrameRate + pass * LoopDuration,
+                    downTime = cycle.lowerEndFrame / (double)FrameRate + pass * LoopDuration });
+            return;
+        }
         for (int pass = 0; pass < passes; pass++)
         foreach (HipBeat source in sourceBeats)
             beats.Add(new Beat {
@@ -187,6 +209,8 @@ public sealed class HipThrustTaikoController : MonoBehaviour
         float normalized = SourceTimeAt(elapsed) / sourceClip.length;
         SampleCoach(coachAnimator, normalized);
         SampleCoach(coachPreviewAnimator, normalized);
+        // The ring presentation reads this same clock after coach sampling. It owns its own UI.
+        if (phaseTimeline != null) return;
         string phase = elapsed < LoopStart ? "准备动作" : "准备抬起";
         if (elapsed > beats[beats.Count - 1].downTime) phase = "完成动作";
         foreach (Beat beat in beats)
@@ -269,7 +293,7 @@ public sealed class HipThrustTaikoController : MonoBehaviour
                 beat.sampledSeconds += overlap;
                 if (poseMatches) beat.heldSeconds += overlap;
             }
-            if (poseMatches && beat.upHit && elapsed >= beat.upTime && elapsed < beat.holdEndTime && Time.time >= nextHoldSpark)
+            if (phaseTimeline == null && poseMatches && beat.upHit && elapsed >= beat.upTime && elapsed < beat.holdEndTime && Time.time >= nextHoldSpark)
             {
                 TailEndpoints(beat, out Vector2 from, out Vector2 to);
                 hitParticles.Trail(from, to);
@@ -331,11 +355,19 @@ public sealed class HipThrustTaikoController : MonoBehaviour
         if (hit)
         {
             hitCount++; score += points;
+            consecutiveHits++;
+        }
+        else { missCount++; consecutiveHits = 0; }
+        // Emit at the real endpoint judgement, before the recorded-artwork early return.
+        // The hold bonus is not a HIT and deliberately does not emit feedback.
+        HitResolved?.Invoke(hit);
+        if (phaseTimeline != null) return;
+        if (hit)
+        {
             TailEndpoints(beat, out Vector2 from, out Vector2 to);
             hitParticles.Burst(JudgePosition, from, to);
             if (beat.hold != null) beat.hold.color = new Color(0.65f, 1f, 1f);
         }
-        else missCount++;
         TMP_Text feedback = MakeText(hit ? "HIT" : "MISS", canvasVisualRoot, 42f);
         feedback.color = hit ? new Color(1f, 0.88f, 0.3f) : Color.white;
         SetRect(feedback.rectTransform, new Vector2(180, 65), JudgePosition + new Vector2(0, 92));

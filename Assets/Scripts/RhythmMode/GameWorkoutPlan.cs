@@ -14,13 +14,23 @@ public sealed class GameWorkoutPlan
 {
     public GameWorkoutAction[] actions;
 
-    public static string SceneFor(string action)
+    public static string SceneFor(string action, bool recordedCoach = false)
     {
+        if (recordedCoach)
+        {
+            switch (action)
+            {
+                case "deadbug": return "DeadBug_RingSkinC_Recorded";
+                case "birddog": return "BirdDog_RingSkinC_Recorded";
+                case "hipthrust": return "HipThrust_RingBridge_Recorded";
+                default: return null;
+            }
+        }
         switch (action)
         {
-            case "deadbug": return "DeadBug_RingSkinC";
-            case "birddog": return "BirdDog_RingSkinC";
-            case "hipthrust": return "HipThrust";
+            case "deadbug": return "DeadBug_RingSkinC_Recorded";
+            case "birddog": return "BirdDog_RingSkinC_Recorded";
+            case "hipthrust": return "HipThrust_RingBridge_Recorded";
             default: return null;
         }
     }

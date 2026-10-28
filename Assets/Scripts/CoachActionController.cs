@@ -12,6 +12,11 @@ public class CoachActionController : MonoBehaviour
     public event System.Action ScoringSessionCompleted;
 
     public string StartSegmentStateName => startSegmentState;
+    // Read-only presentation state; the sequence and its existing hold coroutine remain authoritative.
+    public bool IsPlayingAction => hasStarted;
+    public bool IsActionPaused => isPaused;
+    public bool IsHoldingPose => isDifficultyHold;
+    public float HoldElapsedSeconds { get; private set; }
     public int CurrentTotalScoredSegments { get; private set; } = 1;
 
     public struct ScoringCheckpointInfo
@@ -534,7 +539,7 @@ public class CoachActionController : MonoBehaviour
                 ScoringCheckpointInfo upCheckpoint = new ScoringCheckpointInfo(
                     upSegmentStates[pair], loop, safeLoopCount, pair, true, profile.holdSeconds);
                 ScoringCheckpointStarted?.Invoke(upCheckpoint);
-                yield return HoldCurrentPose(profile.holdSeconds);
+                if (profile.holdSeconds > 0f) yield return HoldCurrentPose(profile.holdSeconds);
                 ScoringCheckpointEnded?.Invoke(upCheckpoint);
 
                 yield return PlaySegmentToEnd(
@@ -546,7 +551,7 @@ public class CoachActionController : MonoBehaviour
                 ScoringCheckpointInfo downCheckpoint = new ScoringCheckpointInfo(
                     downSegmentStates[pair], loop, safeLoopCount, pair, false, profile.holdSeconds);
                 ScoringCheckpointStarted?.Invoke(downCheckpoint);
-                yield return HoldCurrentPose(profile.holdSeconds);
+                if (profile.holdSeconds > 0f) yield return HoldCurrentPose(profile.holdSeconds);
                 ScoringCheckpointEnded?.Invoke(downCheckpoint);
             }
         }
@@ -642,9 +647,11 @@ public class CoachActionController : MonoBehaviour
         coachAnimator.speed = 0f;
 
         float elapsed = 0f;
+        HoldElapsedSeconds = 0f;
         while (elapsed < safeHoldSeconds && hasStarted)
         {
             elapsed += Time.deltaTime;
+            HoldElapsedSeconds = elapsed;
             yield return null;
         }
 

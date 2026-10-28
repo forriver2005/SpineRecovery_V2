@@ -4,6 +4,17 @@ using UnityEngine;
 
 public sealed class RhythmModeController : MonoBehaviour
 {
+    [Serializable]
+    public sealed class RecordedSegmentTarget
+    {
+        public string stateName;
+        public RhythmBodyTarget first;
+        public RhythmBodyTarget second;
+    }
+
+    [Tooltip("Optional limb mapping for recorded animations; empty preserves the existing mapping.")]
+    [SerializeField] private RecordedSegmentTarget[] recordedSegmentTargets = new RecordedSegmentTarget[0];
+
     [Header("Session")]
     [SerializeField] private CoachActionController coachController;
     [SerializeField] private RhythmRingLayout layout;
@@ -529,6 +540,17 @@ public sealed class RhythmModeController : MonoBehaviour
         out RhythmBodyTarget first,
         out RhythmBodyTarget second)
     {
+        // Recorded clips may label a different limb pair. Empty in the original scenes.
+        if (recordedSegmentTargets != null)
+        foreach (var target in recordedSegmentTargets)
+        {
+            if (target != null && string.Equals(target.stateName, stateName, StringComparison.OrdinalIgnoreCase))
+            {
+                first = target.first;
+                second = target.second;
+                return true;
+            }
+        }
         if (ContainsState(leftFootRightHandLiftStates, stateName))
         {
             first = RhythmBodyTarget.LeftFoot;

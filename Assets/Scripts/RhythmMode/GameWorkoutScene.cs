@@ -7,6 +7,10 @@ using UnityEngine.UI;
 public sealed class GameWorkoutScene : MonoBehaviour
 {
     public string actionId;
+    [Tooltip("Keep workout transitions within the three recorded-coach scenes.")]
+    public bool useRecordedCoachAnimations;
+    public string hipThrustSceneOverride;
+    public bool hideWorkoutToggle;
     public DeadBugStartMenuController menu;
     public DeadBugGamingPoseScorer scorer;
     public CoachActionController coach;
@@ -98,6 +102,7 @@ public sealed class GameWorkoutScene : MonoBehaviour
             ((RectTransform)uiRoot.transform).sizeDelta = ((RectTransform)gameCanvas.transform).rect.size;
         }
         var toggle = ButtonAt("动作串", uiRoot.transform, new Vector2(24, -24), new Vector2(210, 100), TogglePanel);
+        toggle.gameObject.SetActive(!hideWorkoutToggle);
         summary = toggle.GetComponentInChildren<TMP_Text>();
         summary.fontSize = 25;
         panel = Rect("Workout Panel", uiRoot.transform, new Vector2(24, -135), new Vector2(440, 650)).gameObject;

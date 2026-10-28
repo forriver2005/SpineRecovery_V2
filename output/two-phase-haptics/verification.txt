@@ -1,0 +1,13 @@
+Real startup/countdown/standard-difficulty session; no wearable device. Test-only calibration bypass and perfect judgement.
+PASS BirdDog pose/targets: birddog_1_up -> RightFoot + LeftHand
+PASS BirdDog pose/targets: birddog_2_up -> LeftFoot + RightHand
+PASS BirdDog pose/targets: birddog_3_up -> RightFoot + LeftHand
+PASS BirdDog pose/targets: birddog_4_up -> LeftFoot + RightHand
+PASS BirdDog pose/targets: birddog_1_up -> RightFoot + LeftHand
+PASS BirdDog pose/targets: birddog_2_up -> LeftFoot + RightHand
+PASS BirdDog pose/targets: birddog_3_up -> RightFoot + LeftHand
+PASS BirdDog pose/targets: birddog_4_up -> LeftFoot + RightHand
+PASS BirdDog: actual start button, countdown, extend/return only, zero hold at every difficulty, pause/resume; 60576 pose samples including wrists/ankles/toes; 18 segments, 16 zero-hold checkpoints, 16 note results.
+PASS BirdDog: stopping restores menu and hides coach overlay.
+PASS DeadBug: actual start button, countdown, extend/return only, zero hold at every difficulty, pause/resume; 35246 pose samples including wrists/ankles/toes; 18 segments, 16 zero-hold checkpoints, 16 note results.
+PASS DeadBug: stopping restores menu and hides coach overlay.

@@ -6,6 +6,7 @@ public sealed class HipThrustPreviewFraming : MonoBehaviour
 {
     public Animator avatar;
     public Camera previewCamera;
+    [Min(0f)] public float framingPadding = 0.22f;
     static readonly HumanBodyBones[] Bones = {
         HumanBodyBones.Head, HumanBodyBones.Hips, HumanBodyBones.Chest,
         HumanBodyBones.LeftHand, HumanBodyBones.RightHand,
@@ -31,7 +32,7 @@ public sealed class HipThrustPreviewFraming : MonoBehaviour
         center.z = min.z - 3f;
         previewCamera.transform.position = rotation * center;
         previewCamera.orthographic = true;
-        previewCamera.orthographicSize = Mathf.Max((max.y - min.y + 0.22f) / 2f,
-            (max.x - min.x + 0.22f) / (2f * previewCamera.aspect));
+        previewCamera.orthographicSize = Mathf.Max((max.y - min.y + framingPadding) / 2f,
+            (max.x - min.x + framingPadding) / (2f * previewCamera.aspect));
     }
 }

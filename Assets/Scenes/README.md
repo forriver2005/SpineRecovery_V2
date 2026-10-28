@@ -1,19 +1,13 @@
 # 正式游戏场景
 
-直接打开对应场景，按原来的校准、选择难度、开始训练流程运行。
+| 游戏 | 场景文件 | Build Index |
+| --- | --- | --- |
+| 鸟狗式 | `BirdDog_RingSkinC_Recorded.unity` | 0 |
+| 死虫式 | `DeadBug_RingSkinC_Recorded.unity` | 1 |
+| 臀桥 | `HipThrust_RingBridge_Recorded.unity` | 2 |
 
-| 游戏 | 视觉 | 场景文件 | Build Index |
-| --- | --- | --- | --- |
-| 死虫式 | 旧版 | `DeadBug_Classic.unity` | 0 |
-| 鸟狗式 | 旧版 | `BirdDog_Classic.unity` | 1 |
-| 臀桥 | 原版 | `HipThrust.unity` | 2 |
-| 鸟狗式 | RingSkinC 新版 | `BirdDog_RingSkinC.unity` | 3 |
-| 死虫式 | RingSkinC 新版 | `DeadBug_RingSkinC.unity` | 4 |
+当前只保留以上三个场景，全部使用新录制动画及右侧教练窗口。鸟狗和死虫使用 RingSkinC 视觉，全部难度仅有伸展、收回；臀桥使用敲鼓素材，保留抬起、保持、放下。教练与视觉跟随同一播放进度，暂停时同步停止。
 
-Build Settings 启用上述五个游戏。测试场景保留在 `Tests/` 中，内容和 GUID 不变，默认不参与构建。
+直接打开场景并 Play，按校准、选择难度、开始训练流程操作。动作串统一路由到这三个场景。鸟狗左腿配右手、右腿配左手；臀桥 HIT 仅腰部震动。
 
-旧名称对应关系：`SpineV2Minimal` → `DeadBug_Classic`，`BirdDogMinimal` → `BirdDog_Classic`，`HipThrustMinimal` → `HipThrust`，`DeadBugRingSkinC` → `DeadBug_RingSkinC`。
-重命名保留场景原始字节、meta 文件和 GUID；旧版场景内部对象、动画、资源引用和逻辑没有修改。外部工具若按场景名称打开，使用上表中的新名称；原三个游戏的构建索引保持不变。
-
-新鸟狗式复制自鸟狗式旧版，保留 `birddog_start`、四组 `birddog_*_up/down`、`birddog_end`、原动作判定与训练流程，只接入环、音符、拖尾及命中效果的新视觉。
-两款新版均使用 `View Scale = 0.8`，背景单独铺满视野。设置与验证说明见 `Assets/RingSkinC/DEADBUG_INTEGRATION.md`。
+原始录制来源、骨骼处理及验证入口见项目根目录 `README.md`。素材文件夹中的集成说明记录历史接入过程，当前场景列表以此文件和 Build Settings 为准。

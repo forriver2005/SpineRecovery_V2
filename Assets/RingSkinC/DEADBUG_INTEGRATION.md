@@ -1,8 +1,9 @@
 # DeadBug、BirdDog / Ring Skin C
 
+> 当前入口为 `BirdDog_RingSkinC_Recorded.unity` 和 `DeadBug_RingSkinC_Recorded.unity`。两者已接入右侧教练窗口，全部难度只保留伸展、收回；鸟狗采用对侧手脚配对。Build Settings 仅保留鸟狗、死虫和鼓盘臀桥三个场景。下文为最初视觉接入记录，旧场景名称和当时的场景数量不代表当前配置；最新验证见 `output/two-phase-haptics/`。
+
 打开 `Assets/Scenes/DeadBug_RingSkinC.unity` 或 `Assets/Scenes/BirdDog_RingSkinC.unity`，按各自原流程选择难度并开始训练。
-两者分别复制自死虫式和鸟狗式原场景。现在五个正式游戏的名称与构建顺序见 `Assets/Scenes/README.md`。
-旧版仅重命名为 `DeadBug_Classic`、`BirdDog_Classic`；臀桥仅重命名为 `HipThrust`。这些场景的文件内容和 GUID 均未改变，三个原游戏的构建索引仍为 0、1、2。
+两者最初分别复制自死虫式和鸟狗式旧场景。现已删除 Classic 和旧测试场景，并添加三个 `_Recorded` 新动画副本，六个正式游戏的名称与构建顺序见 `Assets/Scenes/README.md`。三个原动画场景的文件内容和 GUID 保持不变。下文记录最初的视觉接入；新录制动画的手脚朝向、分段和验证见项目根目录 `README.md`。
 
 ## 视觉
 
@@ -35,5 +36,5 @@
 ## 编辑
 
 调整新场景 `RhythmModeRoot` 的 `RhythmSkinCVisuals` 引用，或 `RingLayout` 下的 `RingSkinC_GameVisuals` 实例。
-`Tools > Ring Skin C > Create DeadBug Scene` / `Create BirdDog Scene` 用于首次生成；为保护已有编辑，目标场景存在时不会覆盖。构建器只保存新副本，不保存旧版场景。
+`Tools > Ring Skin C > Create DeadBug Scene` / `Create BirdDog Scene` 为历史首次生成工具，依赖已删除的 Classic 源场景；当前直接编辑已有 RingSkinC 场景。目标场景存在时构建器不会覆盖。
 包内原来的 `Build Prefab + Demo Scene` 菜单仅生成独立素材演示，不用于游戏逻辑。

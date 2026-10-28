@@ -10,5 +10,6 @@
   "buildSettingsScenes": 5,
   "verifiedRealHoldGameSeconds": 30,
   "liveExecutorDose": "2 sets x 3 reps",
-  "hardwareInputs": "synthetic only"
+  "hardwareInputs": "synthetic only",
+  "pauseResumeRejectsStaleInput": true
 }

@@ -7,4 +7,4 @@ PASS new-score scene: original 4/8/12 dose/timing, menu/countdown/coach, calibra
 PASS 30-second scene: D01 prescription, executor per-set dose, exact 3 repetitions, coach + preview bones frozen (including hands/feet), artwork progress/countdown, pause/resume, descent/completion, result/menu.
 PASS real-time playback: first prescription hold ran for 30 game seconds with unchanged coach bones before descending.
 PASS live GameWorkoutSession: 2 sets x 3 reps, real automatic set transition/countdown, exactly 2 completion events.
-Runtime assertions: 1497822
+Runtime assertions: 1498439

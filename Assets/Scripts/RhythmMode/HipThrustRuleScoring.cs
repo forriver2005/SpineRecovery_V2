@@ -48,11 +48,20 @@ public sealed class HipThrustRuleScoring : MonoBehaviour
         { animator.Play("hipthrust_routine",0,frame/timeline.sourceClip.frameRate/timeline.sourceClip.length); animator.Update(0); }
     }
 
-    public void Tick(float deltaTime)
+    // Observe packet freshness even while the transport is paused. Otherwise a
+    // packet received early in a long pause could appear newly received on resume.
+    void Update() { ObserveInput(); }
+
+    void ObserveInput()
     {
         if(motion==null) motion=FindObjectOfType<AvatarMotionSource>();
         if(motion!=null && motion.LastPacketframeCounterInFrame!=lastCounter)
         { lastCounter=motion.LastPacketframeCounterInFrame; lastFrameAt=Time.unscaledTime; }
+    }
+
+    public void Tick(float deltaTime)
+    {
+        ObserveInput();
         InputFresh=motion!=null && motion.GetAvailable()!=0 && Time.unscaledTime-lastFrameAt<=.5f;
         bool valid=TargetsReady && InputFresh && calibration!=null && calibration.IsCalibrated;
         if(valid)

@@ -258,6 +258,12 @@ public static class HipThrustNewRulesVerification
             scorer.Begin("simple"); Seek(HipThrustHold30Timeline.PeakFrame(game.PhaseTimeline,0)/30d);
             for(int i=0;i<350;i++) { motion.ReportFrame(i*.01f,55); scorer.Tick(.01f); }
             Check(game.Score==100 && scorer.Progress>.99f,"Measured B pose did not reach new-rule score");
+            // A packet arrives during pause, then the sensor stops. Resume must
+            // not treat that old counter increment as fresh input.
+            motion.ReportFrame(4,55); Call(scorer,"Update");
+            typeof(HipThrustRuleScoring).GetField("lastFrameAt",Private).SetValue(scorer,Time.unscaledTime-1);
+            float held=scorer.Rule.ValidHoldSeconds; scorer.Tick(.01f);
+            Check(game.Score==0 && scorer.Rule.ValidHoldSeconds==held,"Resume counted stale input received during pause");
             float best=scorer.Rule.SessionBest; motion.SetAvailable(false); scorer.Tick(.01f);
             Check(game.Score==0 && scorer.Rule.SessionBest==best,"Unavailable input kept earning live score");
         }

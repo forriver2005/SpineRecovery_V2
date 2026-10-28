@@ -33,6 +33,7 @@ public sealed class RecordedDrumArtwork : MonoBehaviour
             var cycle = timeline.cycles[sample.cycle];
             duration = (sample.phase == 0 ? cycle.holdStartFrame-cycle.liftStartFrame :
                 sample.phase == 1 ? cycle.lowerStartFrame-cycle.holdStartFrame : cycle.lowerEndFrame-cycle.lowerStartFrame) / timeline.sourceClip.frameRate;
+            if (source.transport.Hold30Timeline != null) duration = source.transport.PresentationPhaseDuration(sample);
         }
         float since = p * duration;
         bool lift = sample.phase == 0, hold = sample.phase == 1, lower = sample.phase == 2;

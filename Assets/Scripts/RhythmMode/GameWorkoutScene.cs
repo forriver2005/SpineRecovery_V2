@@ -31,7 +31,7 @@ public sealed class GameWorkoutScene : MonoBehaviour
     private void Awake()
     {
         session = GameWorkoutSession.Instance;
-        menu.TrainingStartAllowed = () => session.AllowsStart(this);
+        menu.TrainingStartAllowed = () => session.AllowsStart(this) && (taiko == null || taiko.CanStart);
         menu.TrainingStarted += OnStarted;
         if (taiko != null) taiko.Completed += OnCompleted;
         else coach.ActionCompleted += OnCompleted;
@@ -66,6 +66,15 @@ public sealed class GameWorkoutScene : MonoBehaviour
         if (difficulty == "simple") menu.SelectSimpleDifficulty();
         else if (difficulty == "hard") menu.SelectHardDifficulty();
         else menu.SelectStandardDifficulty();
+    }
+
+    public bool PrepareDose(GameWorkoutAction action, out string error)
+    {
+        error = null;
+        if (action.action != "hipthrust_hold30") return true;
+        if (taiko == null || taiko.PrescriptionDose == null) { error = "30 秒臀桥处方入口缺失。"; return false; }
+        // The session executor already iterates sets. Each loaded run must receive only this set's reps.
+        return taiko.PrescriptionDose.SetDose(1, action.reps, out error);
     }
 
     public void StopTraining()
@@ -168,7 +177,7 @@ public sealed class GameWorkoutScene : MonoBehaviour
         details.rectTransform.SetSizeWithCurrentAnchors(RectTransform.Axis.Vertical, Mathf.Max(410, details.GetPreferredValues(details.text, 385, 0).y + 20));
     }
 
-    private static string Describe(GameWorkoutAction item) => $"{GameWorkoutPlan.ActionName(item.action)} · {GameWorkoutPlan.DifficultyName(item.difficulty)} · {item.sets} 组";
+    private static string Describe(GameWorkoutAction item) => $"{GameWorkoutPlan.ActionName(item.action)} · {GameWorkoutPlan.DifficultyName(item.difficulty)} · {item.sets} 组" + (item.action == "hipthrust_hold30" ? $" × {item.reps} 次" : "");
 
     private static RectTransform Rect(string name, Transform parent, Vector2 position, Vector2 size)
     {

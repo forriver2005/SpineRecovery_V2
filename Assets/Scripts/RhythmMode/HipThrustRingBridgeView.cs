@@ -29,6 +29,7 @@ public sealed class HipThrustRingBridgeView : MonoBehaviour
     GameObject pausePanel, previewPanel;
     GameObject endMenu;
     TMP_Text countdownSource, countdownNumber, coachPhase, coachTiming;
+    TMP_Text ruleHint;
     readonly Image[] phaseBadges = new Image[3];
     readonly TMP_Text[] phaseBadgeLabels = new TMP_Text[3];
     static readonly string[] PhaseNames = { "抬起", "保持", "放下" };
@@ -66,7 +67,7 @@ public sealed class HipThrustRingBridgeView : MonoBehaviour
         if (!visible) return;
         RenderAtSourceFrame(transport.IsRunning ? transport.SourceTime * transport.PhaseTimeline.sourceClip.frameRate : 0);
         score.text = transport.Score.ToString("N0", System.Globalization.CultureInfo.InvariantCulture);
-        combo.text = transport.ConsecutiveHits + " COMBO";
+        combo.text = transport.RuleScoring != null ? "LAST " + transport.RuleScoring.Rule.LastRoundBest.ToString("0") : transport.ConsecutiveHits + " COMBO";
         // The mobile bootstrap converts canvases on scene load. This HUD belongs
         // to the artwork camera's render texture, so retain its world-space scale.
         hud.renderMode = RenderMode.WorldSpace;
@@ -104,6 +105,7 @@ public sealed class HipThrustRingBridgeView : MonoBehaviour
             float frames = phase == 0 ? cycle.holdStartFrame-cycle.liftStartFrame :
                 phase == 1 ? cycle.lowerStartFrame-cycle.holdStartFrame : cycle.lowerEndFrame-cycle.lowerStartFrame;
             float remaining = frames * (1-CurrentSample.progress) / transport.PhaseTimeline.sourceClip.frameRate;
+            if (transport.Hold30Timeline != null) transport.Hold30Timeline.Evaluate(transport.Elapsed,out _,out remaining,out _);
             coachTiming.text = "剩余 " + remaining.ToString("F1", System.Globalization.CultureInfo.InvariantCulture) + " 秒";
         }
         for (int i=0;i<phaseBadges.Length;i++)
@@ -113,12 +115,20 @@ public sealed class HipThrustRingBridgeView : MonoBehaviour
         }
         phaseProgress.anchorMax = new Vector2(phase < 0 ? 0 : CurrentSample.progress, 1);
         phaseProgress.GetComponent<Image>().color = phase < 0 ? Color.white : PhaseColors[phase];
+        if (ruleHint != null)
+        {
+            ruleHint.text = transport.RuleScoring.Status;
+            if (transport.PrescriptionDose != null)
+                ruleHint.text = $"{(transport.PrescriptionDose.IsPreview ? "演示 " : "")}完成 {transport.CompletedDemonstrations}/{transport.PrescriptionDose.Total} 次 · " + ruleHint.text;
+        }
     }
 
     public void RenderAtSourceFrame(float frame)
     {
         bool repeated = transport.IsRunning && transport.Elapsed >= transport.PhaseTimeline.repeatEndFrame / (double)transport.PhaseTimeline.sourceClip.frameRate;
         CurrentSample = transport.PhaseTimeline.Evaluate(frame, repeated);
+        if (transport.IsRunning && transport.Hold30Timeline != null)
+            CurrentSample = transport.Hold30Timeline.Evaluate(transport.Elapsed,out _,out _,out _);
         chart.RenderRecorded(CurrentSample);
     }
 
@@ -176,6 +186,8 @@ public sealed class HipThrustRingBridgeView : MonoBehaviour
             coachPhase.name="Coach Phase";
             coachTiming=Label(root.transform,"跟随教练完成动作",Vector2.zero,new Vector2(220,20),12);
             coachTiming.name="Coach Timing";
+            if (transport.RuleScoring != null)
+                ruleHint=Label(root.transform,"保持位计分 · 满分 100",Vector2.zero,new Vector2(240,20),11);
             countdownPanel=Panel(root.transform,"Start Countdown",new Color(.06f,.07f,.2f,.96f));
             Label(countdownPanel,"准备开始",new Vector2(0,37),new Vector2(210,24),17);
             countdownNumber=Label(countdownPanel,"",new Vector2(0,-9),new Vector2(210,75),58);
@@ -212,6 +224,7 @@ public sealed class HipThrustRingBridgeView : MonoBehaviour
         Place(previewPanelRect, new Vector2(720,217), new Vector2(224,185));
         Place(coachPhase.rectTransform,new Vector2(720,329),new Vector2(220,25));
         Place(coachTiming.rectTransform,new Vector2(720,353),new Vector2(220,20));
+        if(ruleHint!=null) Place(ruleHint.rectTransform,new Vector2(714,376),new Vector2(250,20));
         Place(countdownPanel,new Vector2(422,215),new Vector2(220,128));
         Place(pausePanelRect, new Vector2(422,195), new Vector2(280,170));
         void Place(RectTransform rect, Vector2 point, Vector2 size)

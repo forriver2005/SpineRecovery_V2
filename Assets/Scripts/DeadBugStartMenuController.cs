@@ -9,6 +9,7 @@ public class DeadBugStartMenuController : MonoBehaviour
 {
     public event Action TrainingStarted;
     public Func<bool> TrainingStartAllowed { get; set; }
+    public string SelectedDifficultyKey => selectedDifficulty == Difficulty.Simple ? "simple" : selectedDifficulty == Difficulty.Hard ? "hard" : "standard";
     public bool IsTrainingMenuVisible => menuRoot != null && menuRoot.activeSelf;
     public const float PracticeControlTopY = 100f;
     public const float PracticeControlVerticalSpacing = 100f;

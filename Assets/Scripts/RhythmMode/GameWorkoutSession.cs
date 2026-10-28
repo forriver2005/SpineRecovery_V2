@@ -144,6 +144,7 @@ public sealed class GameWorkoutSession : MonoBehaviour
         yield return null;
         if (scene == null || scene.gameObject.scene.name != target) { Abort("动作串场景入口缺失。"); yield break; }
         scene.PrepareMenu(plan.actions[ActionIndex].difficulty);
+        if (!scene.PrepareDose(plan.actions[ActionIndex], out string doseError)) { Abort(doseError); yield break; }
         Status = scene.Scorer.IsCalibrationBypassed ? "流程预览：已临时跳过校准" : "请按提示完成躺姿校准";
         Changed?.Invoke();
         while (IsRunning && scene != null && !scene.Scorer.CanStartTraining) yield return null;

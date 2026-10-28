@@ -1,0 +1,82 @@
+using UnityEngine;
+
+/// <summary>The delivery package's continuous A/B rule, independent of the coach clock.</summary>
+public sealed class HipThrustHoldRule
+{
+    public enum Stage { Rest, Raising, Holding, Lowering }
+    public Stage Phase { get; private set; }
+    public float LiveScore => InputValid && Phase == Stage.Holding
+        ? Mathf.Lerp(entryScore, 100, Mathf.Clamp01(ValidHoldSeconds / maximumSeconds)) : 0;
+    public float ValidHoldSeconds { get; private set; }
+    public float RoundBest { get; private set; }
+    public float LastRoundBest { get; private set; }
+    public float SessionBest { get; private set; }
+    public int CompletedRounds { get; private set; }
+    public bool InputValid { get; private set; }
+    float raise, enter, exit, rest, enterQuality, validQuality, entryScore, maximumSeconds;
+    float confirmation, phaseElapsed;
+
+    public void Reset(string difficulty)
+    {
+        Phase = Stage.Rest;
+        ValidHoldSeconds = RoundBest = LastRoundBest = SessionBest = confirmation = phaseElapsed = 0;
+        CompletedRounds = 0; InputValid = false;
+        if (difficulty == "simple")
+        { raise=.08f; enter=.20f; exit=.14f; rest=.10f; enterQuality=35; validQuality=30; entryScore=85; maximumSeconds=3; }
+        else if (difficulty == "hard")
+        { raise=.20f; enter=.55f; exit=.40f; rest=.18f; enterQuality=65; validQuality=60; entryScore=75; maximumSeconds=7; }
+        else
+        { raise=.15f; enter=.40f; exit=.28f; rest=.15f; enterQuality=50; validQuality=45; entryScore=80; maximumSeconds=5; }
+    }
+
+    public void Step(float progress, float quality, float deltaTime, bool validInput)
+    {
+        InputValid = validInput && !float.IsNaN(progress) && !float.IsInfinity(progress)
+            && !float.IsNaN(quality) && !float.IsInfinity(quality);
+        if (!InputValid) { confirmation = 0; return; }
+        float dt = Mathf.Clamp(deltaTime, 0, .1f);
+        phaseElapsed += dt;
+        switch (Phase)
+        {
+            case Stage.Rest:
+                if (progress >= raise) Change(Stage.Raising);
+                break;
+            case Stage.Raising:
+                if (progress >= enter && quality >= enterQuality)
+                {
+                    confirmation += dt;
+                    if (confirmation + .000001f >= .30f) { ValidHoldSeconds = 0; Change(Stage.Holding); }
+                }
+                else
+                {
+                    confirmation = 0;
+                    if (progress <= rest) Change(Stage.Rest);
+                }
+                break;
+            case Stage.Holding:
+                if (quality >= validQuality) ValidHoldSeconds += dt;
+                RoundBest = Mathf.Max(RoundBest, LiveScore);
+                if (progress <= exit)
+                {
+                    confirmation += dt;
+                    if (confirmation + .000001f >= .12f)
+                    { LastRoundBest = RoundBest; Change(Stage.Lowering); }
+                }
+                else confirmation = 0;
+                break;
+            case Stage.Lowering:
+                if (progress <= rest || (phaseElapsed >= .2f && progress < enter))
+                {
+                    confirmation += dt;
+                    if (confirmation + .000001f >= .08f)
+                    { CompletedRounds++; RoundBest = 0; Change(Stage.Rest); }
+                }
+                else confirmation = 0;
+                break;
+        }
+        RoundBest = Mathf.Max(RoundBest, LiveScore);
+        SessionBest = Mathf.Max(SessionBest, RoundBest);
+    }
+
+    void Change(Stage next) { Phase = next; confirmation = phaseElapsed = 0; }
+}

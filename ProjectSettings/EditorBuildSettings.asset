@@ -14,4 +14,10 @@ EditorBuildSettings:
   - enabled: 1
     path: Assets/Scenes/HipThrust_RingBridge_Recorded.unity
     guid: 18d9c990cb476534d932194a16ac4c9d
+  - enabled: 1
+    path: Assets/Scenes/HipThrust_RingBridge_NewScoring.unity
+    guid: 234f7694059c72d42b32532ff9d38ba9
+  - enabled: 1
+    path: Assets/Scenes/HipThrust_RingBridge_Hold30.unity
+    guid: 32c04ff8c8691dc4b95cc042484fb8e2
   m_configObjects: {}

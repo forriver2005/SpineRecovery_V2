@@ -38,8 +38,10 @@ class TrainingDirectiveCoordinatorTest {
     private var gateCalls = 0
     private var failSnapshotWrite = false
     private var scopeCurrent = true
+    private var operationEpoch = 0L
     private var afterFetch: () -> Unit = {}
     private var afterReceipt: () -> Unit = {}
+    private var afterDownload: () -> Unit = {}
     private var elapsed = 1_000L
     private var statusCalls = 0
     private var statusOverride: PrescriptionResourceStatus? = null
@@ -78,21 +80,24 @@ class TrainingDirectiveCoordinatorTest {
             expectedLease: TrainingResourceLease
         ): PrescriptionAssetClient.VerifiedAsset? {
             assetCalls++
-            if (failDownload) return null
-            val file = File.createTempFile("asset-", ".bin")
-            file.deleteOnExit()
-            file.writeBytes(ByteArray(item.asset.fileSize.toInt()) { 7 })
-            return PrescriptionAssetClient.VerifiedAsset(file, file.length(), item.asset.sha256,
-                ObservedResourceLease(expectedLease, elapsed))
+            val downloaded = if (failDownload) null else {
+                val file = File.createTempFile("asset-", ".bin")
+                file.deleteOnExit()
+                file.writeBytes(ByteArray(item.asset.fileSize.toInt()) { 7 })
+                PrescriptionAssetClient.VerifiedAsset(file, file.length(), item.asset.sha256,
+                    ObservedResourceLease(expectedLease, elapsed))
+            }
+            afterDownload()
+            return downloaded
         }
     }
 
-    private fun coordinator() = TrainingDirectiveCoordinator(
+    private fun coordinator(capturedEpoch: Long = operationEpoch) = TrainingDirectiveCoordinator(
         storage = snapshots,
         receipts = receipts,
         assets = assets,
         handoffGate = { handoff -> gateCalls++; gate(handoff) },
-        isCurrent = { scopeCurrent },
+        isCurrent = { scopeCurrent && capturedEpoch == operationEpoch },
         fetchDirective = {
             afterFetch()
             Result.success(JSONObject(directiveJson.toString()))
@@ -278,11 +283,23 @@ class TrainingDirectiveCoordinatorTest {
     }
 
     @Test
-    fun `接收回执在途切换绑定不持久确认旧任务`() {
-        afterReceipt = { scopeCurrent = false }
+    fun `绑定不变但接收回执在途网络换代不持久确认旧任务`() {
+        val originalScope = scope.toJson().toString()
+        val originalKey = scope.storageKey()
+        afterReceipt = { operationEpoch++ }
         assertTrue(receiveOnly() is DirectiveRefreshResult.Unavailable)
-        assertEquals(ReceiptPhase.NotSubmitted, tasks.values.single().phase)
+        val task = tasks.values.single()
+        assertTrue(scopeCurrent)
+        assertEquals(originalScope, scope.toJson().toString())
+        assertEquals(originalKey, scope.storageKey())
+        assertEquals(ReceiptPhase.NotSubmitted, task.phase)
+        assertNull(task.savedReceivedAt)
+        assertNull(task.assetsReadyReceivedAt)
+        assertFalse(task.readyPending)
+        assertTrue(task.failedAssetItemIds.isEmpty())
+        assertTrue(task.blockingReasons.isEmpty())
         assertEquals(listOf(PatientDirectiveClient.PHASE_SAVED), sent.map { it.first })
+        assertEquals(0, assetCalls)
     }
 
     @Test
@@ -402,6 +419,57 @@ class TrainingDirectiveCoordinatorTest {
         val stored = tasks.values.single()
         assertEquals(ReceiptPhase.Saved, stored.phase)
         assertEquals(2, stored.failedAssetItemIds.size)
+    }
+
+    @Test
+    fun `绑定不变但下载成功回包前网络换代不推进资源状态`() {
+        val originalScope = scope.toJson().toString()
+        val originalKey = scope.storageKey()
+        afterDownload = { operationEpoch++ }
+
+        val result = prepareOnly()
+
+        assertTrue(result is DirectiveRefreshResult.Unavailable)
+        assertTrue(scopeCurrent)
+        assertEquals(originalScope, scope.toJson().toString())
+        assertEquals(originalKey, scope.storageKey())
+        val task = tasks.values.single()
+        assertEquals(ReceiptPhase.Saved, task.phase)
+        assertEquals("2026-10-21 10:00:00", task.savedReceivedAt)
+        assertNull(task.assetsReadyReceivedAt)
+        assertFalse(task.readyPending)
+        assertTrue(task.failedAssetItemIds.isEmpty())
+        assertTrue(task.blockingReasons.isEmpty())
+        assertEquals(listOf(PatientDirectiveClient.PHASE_SAVED), sent.map { it.first })
+        assertEquals(0, gateCalls)
+        assertEquals(0, statusCalls)
+    }
+
+    @Test
+    fun `绑定不变但下载401回包前网络换代不标记凭据或资源失败`() {
+        val originalScope = scope.toJson().toString()
+        val originalKey = scope.storageKey()
+        afterDownload = {
+            operationEpoch++
+            throw ApiHttpException(401, "模拟旧网络返回401")
+        }
+
+        val result = prepareOnly()
+
+        assertTrue(result is DirectiveRefreshResult.Unavailable)
+        assertTrue(scopeCurrent)
+        assertEquals(originalScope, scope.toJson().toString())
+        assertEquals(originalKey, scope.storageKey())
+        val task = tasks.values.single()
+        assertEquals(ReceiptPhase.Saved, task.phase)
+        assertEquals("2026-10-21 10:00:00", task.savedReceivedAt)
+        assertNull(task.assetsReadyReceivedAt)
+        assertFalse(task.readyPending)
+        assertTrue(task.failedAssetItemIds.isEmpty())
+        assertTrue(task.blockingReasons.isEmpty())
+        assertEquals(listOf(PatientDirectiveClient.PHASE_SAVED), sent.map { it.first })
+        assertEquals(0, gateCalls)
+        assertEquals(0, statusCalls)
     }
 
     @Test

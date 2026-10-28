@@ -26,6 +26,7 @@ $launcherGradle = Join-Path $projectPath 'launcher\build.gradle'
 $text = Get-Content -LiteralPath $launcherGradle -Raw
 $text = [regex]::Replace($text, 'compileSdkVersion\s+\d+', 'compileSdkVersion 36')
 $text = [regex]::Replace($text, 'targetSdkVersion\s+\d+', 'targetSdkVersion 36')
+$text = [regex]::Replace($text, 'buildToolsVersion\s+["''][^"'']+["'']', "buildToolsVersion '36.0.0'")
 $text = $text.Replace('proguard-android.txt', 'proguard-android-optimize.txt')
 [IO.File]::WriteAllText($launcherGradle, $text, (New-Object Text.UTF8Encoding($false)))
 # Adapt Unity 2022's IL2CPP task to the Gradle 9 / AGP 9 public APIs.
@@ -33,6 +34,7 @@ $unityGradle = Join-Path $projectPath 'unityLibrary\build.gradle'
 $text = Get-Content -LiteralPath $unityGradle -Raw
 $text = [regex]::Replace($text, 'compileSdkVersion\s+\d+', 'compileSdkVersion 36')
 $text = [regex]::Replace($text, 'targetSdkVersion\s+\d+', 'targetSdkVersion 36')
+$text = [regex]::Replace($text, 'buildToolsVersion\s+["''][^"'']+["'']', "buildToolsVersion '36.0.0'")
 $text = $text.Replace('android.ndkDirectory', 'android.ndkPath')
 $text = [regex]::Replace($text, '(?ms)^    exec \{(.*?)^    \}', '    providers.exec {$1    }.result.get()')
 $text = [regex]::Replace($text, '(?m)^\s*debugSymbolLevel\s*\r?\n', '')

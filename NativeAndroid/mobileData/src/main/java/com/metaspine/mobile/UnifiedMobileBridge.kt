@@ -25,8 +25,10 @@ object UnifiedMobileBridge {
     private val identityGeneration = AtomicInteger()
     private val main = Handler(Looper.getMainLooper())
     private data class PendingPlan(val token: String, val account: String, val generation: Int, val operation: Long,
-        val credential: PatientServerCredential, val coordinator: TrainingDirectiveCoordinator,
-        val prepared: DirectiveRefreshResult.Prepared)
+        val credential: PatientServerCredential, val binding: BindingScope,
+        val coordinator: TrainingDirectiveCoordinator?,
+        val prepared: DirectiveRefreshResult.Prepared?, val local: Boolean,
+        val localOrder: DownloadedOrder? = null)
     private var pendingPlan: PendingPlan? = null
 
     @JvmStatic @Synchronized fun initialize(host: Context) {
@@ -361,11 +363,29 @@ object UnifiedMobileBridge {
             }
             "confirmPlan" -> {
                 val plan = requireNotNull(pendingPlan) { "本次训练准备已失效" }
-                require(plan.token == body.getString("planToken") && plan.account == account &&
-                    plan.generation == generation && LocalServerDiscovery.isCurrentOperation(plan.operation) &&
-                    users.activeAccountId() == account && body.getBoolean("consumerConfirmed")) { "训练资源尚未完成交接" }
-                val confirmed = plan.coordinator.confirmReady(plan.credential, plan.prepared, true)
-                require(confirmed is DirectiveRefreshResult.Ready) { "本次处方暂不可训练，请重新进入" }
+                fun current(): Boolean = pendingPlan === plan && plan.account == account &&
+                    plan.generation == generation && identityGeneration.get() == generation &&
+                    LocalServerDiscovery.isCurrentOperation(plan.operation) && users.activeAccountId() == account &&
+                    plan.binding.matches(BindingScopeStore.load(context, account)) &&
+                    PatientCredentials.credential(context, account) == plan.credential &&
+                    LocalServerDiscovery.matchesBinding(plan.binding, SpineFlowServerConfig.BASE_URL,
+                        plan.credential.patientId)
+                require(current() && plan.token == body.getString("planToken") && body.getBoolean("consumerConfirmed")) {
+                    "训练资源尚未完成交接"
+                }
+                if (plan.local) {
+                    val latest = requireNotNull(plan.coordinator).receiveOnly(account, plan.credential, plan.binding)
+                    require(latest is DirectiveRefreshResult.Received &&
+                        isSameLocalTrainingOrder(requireNotNull(plan.localOrder), latest.snapshot)) {
+                        "医生处方已变化或训练已暂停，请重新进入"
+                    }
+                } else {
+                    val coordinator = requireNotNull(plan.coordinator)
+                    val prepared = requireNotNull(plan.prepared)
+                    val confirmed = coordinator.confirmReady(plan.credential, prepared, true)
+                    require(confirmed is DirectiveRefreshResult.Ready) { "本次处方暂不可训练，请重新进入" }
+                }
+                require(current()) { "本次训练准备已失效，请重新进入" }
                 pendingPlan = null
                 return JSONObject().put("planToken", plan.token).put("ready", true)
             }
@@ -386,17 +406,77 @@ object UnifiedMobileBridge {
                     "医院绑定已变更，请重新激活医生档案"
                 }
                 val operation = LocalServerDiscovery.prepareOperation(bindingScope.origin)
+                val isCurrent: (BindingScope) -> Boolean = { candidate ->
+                    identityGeneration.get() == generation && users.activeAccountId() == account &&
+                        candidate.matches(BindingScopeStore.load(context, account)) &&
+                        LocalServerDiscovery.matchesBinding(candidate, SpineFlowServerConfig.BASE_URL, credential.patientId) &&
+                        LocalServerDiscovery.isCurrentOperation(operation) &&
+                        PatientCredentials.credential(context, account) == credential
+                }
+
+                // Built-in doctor actions use the scenes bundled in the APK. Receive only the
+                // prescription metadata and dose; do not download the motion package.
+                val localCoordinator = TrainingDirectiveCoordinator(
+                    storage = TrainingDirectiveStore(context),
+                    receipts = PrescriptionReceiptStore(context),
+                    isCurrent = isCurrent
+                )
+                val locallyReceived = localCoordinator.receiveOnly(account, credential, bindingScope)
+                require(locallyReceived is DirectiveRefreshResult.Received) {
+                    when (locallyReceived) {
+                        is DirectiveRefreshResult.Unavailable -> locallyReceived.message
+                        is DirectiveRefreshResult.CredentialRejected -> locallyReceived.message
+                        is DirectiveRefreshResult.NotTrainable -> locallyReceived.message
+                        else -> "无法获取本次医生处方，请重试"
+                    }
+                }
+                require(locallyReceived.snapshot.state == TrainingDirectiveState.Ready) {
+                    locallyReceived.snapshot.message.ifBlank { "本次处方暂不可训练，请重新进入" }
+                }
+                run {
+                    val localOrder = locallyReceived.snapshot.prescription
+                    val localItem = localOrder?.singleItem
+                    val localDefinition = localItem?.let { LocalActionCatalog.find(it.actionId) }
+                    if (localOrder != null && localItem != null && localDefinition != null &&
+                        LocalActionCatalog.isLocallyExecutable(localItem.actionId)) {
+                        require(isCurrent(bindingScope)) { "医院绑定或网络连接已变化，请重新进入训练" }
+                        val payload = TrainingStartPayload.forLocalPrescription(
+                            user,
+                            if (user.isReturningUser) DemoFlowType.ReturningUser else DemoFlowType.FirstAdmission,
+                            credential.patientId,
+                            localOrder,
+                            bindingScope
+                        )
+                        val source = JSONObject(payload.toJson())
+                        val actions = source.getJSONObject("trainingPlan").getJSONArray("recommendedActions")
+                        val coachScene = requireNotNull(localDefinition.coachScene(user.profile?.gender == UserGender.Male))
+                        val gameScene = requireNotNull(localDefinition.gameScene)
+                        objects(actions).forEach { row ->
+                            row.put("sceneName", if (row.getString("arTaskType") == "coach_training") coachScene else gameScene)
+                        }
+                        val sessionId = UUID.randomUUID().toString()
+                        val planToken = UUID.randomUUID().toString()
+                        require(isCurrent(bindingScope)) { "医院绑定或网络连接已变化，请重新进入训练" }
+                        pendingPlan = PendingPlan(planToken, account, generation, operation, credential,
+                            bindingScope, localCoordinator, null, true, localOrder)
+                        val startedAt = java.time.Instant.now().truncatedTo(java.time.temporal.ChronoUnit.MILLIS).toString()
+                        return JSONObject().put("sessionId", sessionId).put("requestToken", sessionId)
+                            .put("planToken", planToken).put("startedAt", startedAt).put("accountId", account)
+                            .put("patientId", credential.patientId).put("gender", user.profile?.gender?.wireValue)
+                            .put("actionId", localItem.actionId).put("targetScene", coachScene).put("actions", actions)
+                            .put("prescriptionOrderId", localOrder.orderId)
+                            .put("prescriptionJson", source.getJSONObject("trainingPlan").toString())
+                            .put("preTrainingEventId", user.latestPreTrainingCheck?.recordedAt?.takeIf { it.isNotBlank() }?.let { "pre:$it" }.orEmpty())
+                    }
+                }
+
                 val assetStore = PrescriptionAssetStore.forContext(context, bindingScope)
                 val coordinator = TrainingDirectiveCoordinator(
                     storage = TrainingDirectiveStore(context),
                     receipts = PrescriptionReceiptStore(context),
                     assets = assetStore,
                     handoffGate = { handoff -> TrainingStartPayload.capabilityGaps(handoff.order) },
-                    isCurrent = { candidate -> identityGeneration.get() == generation && users.activeAccountId() == account &&
-                        candidate.matches(BindingScopeStore.load(context, account)) &&
-                        LocalServerDiscovery.matchesBinding(candidate, SpineFlowServerConfig.BASE_URL, credential.patientId) &&
-                        LocalServerDiscovery.isCurrentOperation(operation) &&
-                        PatientCredentials.credential(context, account) == credential }
+                    isCurrent = isCurrent
                 )
                 val refreshed = coordinator.prepare(account, credential, bindingScope)
                 require(refreshed is DirectiveRefreshResult.Prepared) {
@@ -421,16 +501,22 @@ object UnifiedMobileBridge {
                 val source = JSONObject(payload.toJson())
                 val order = handoff.order
                 val action = requireNotNull(order.singleItem)
-                val coachScene = when (action.actionId) {
-                    "bird_dog" -> if (user.profile?.gender == UserGender.Male) "maleBirdDogPractice" else "BirdDogPractice"
-                    else -> if (user.profile?.gender == UserGender.Male) "maleDeadBugPractice" else "DeadBugPractice"
-                }
-                val gameScene = if (action.actionId == "bird_dog") "BirdDogMinimal" else "SpineV2Minimal"
+                val mapped = LocalActionCatalog.find(action.actionId)
+                val coachScene = mapped?.coachScene(user.profile?.gender == UserGender.Male)
+                    ?: if (action.actionId == "bird_dog") {
+                        if (user.profile?.gender == UserGender.Male) "maleBirdDogPractice" else "BirdDogPractice"
+                    } else {
+                        if (user.profile?.gender == UserGender.Male) "maleDeadBugPractice" else "DeadBugPractice"
+                    }
+                val gameScene = mapped?.gameScene
+                    ?: if (action.actionId == "bird_dog") "BirdDogMinimal" else "SpineV2Minimal"
                 val actions = source.getJSONObject("trainingPlan").getJSONArray("recommendedActions")
                 objects(actions).forEach { it.put("sceneName", if (it.getString("arTaskType") == "coach_training") coachScene else gameScene) }
                 val sessionId = UUID.randomUUID().toString()
                 val planToken = UUID.randomUUID().toString()
-                pendingPlan = PendingPlan(planToken, account, generation, operation, credential, coordinator, refreshed)
+                require(isCurrent(bindingScope)) { "医院绑定或网络连接已变化，请重新进入训练" }
+                pendingPlan = PendingPlan(planToken, account, generation, operation, credential,
+                    bindingScope, coordinator, refreshed, false)
                 val startedAt = java.time.Instant.now().truncatedTo(java.time.temporal.ChronoUnit.MILLIS).toString()
                 return JSONObject().put("sessionId", sessionId).put("requestToken", sessionId)
                     .put("planToken", planToken).put("startedAt", startedAt).put("accountId", account)

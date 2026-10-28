@@ -24,22 +24,26 @@ Copy-Item -LiteralPath (Join-Path $nativeSource 'src') -Destination $nativeDesti
 
 $launcherGradle = Join-Path $projectPath 'launcher\build.gradle'
 $text = Get-Content -LiteralPath $launcherGradle -Raw
+$text = [regex]::Replace($text, 'compileSdkVersion\s+\d+', 'compileSdkVersion 36')
+$text = [regex]::Replace($text, 'targetSdkVersion\s+\d+', 'targetSdkVersion 36')
 $text = $text.Replace('proguard-android.txt', 'proguard-android-optimize.txt')
-Set-Content -LiteralPath $launcherGradle -Value $text -NoNewline -Encoding utf8
+[IO.File]::WriteAllText($launcherGradle, $text, (New-Object Text.UTF8Encoding($false)))
 # Adapt Unity 2022's IL2CPP task to the Gradle 9 / AGP 9 public APIs.
 $unityGradle = Join-Path $projectPath 'unityLibrary\build.gradle'
 $text = Get-Content -LiteralPath $unityGradle -Raw
+$text = [regex]::Replace($text, 'compileSdkVersion\s+\d+', 'compileSdkVersion 36')
+$text = [regex]::Replace($text, 'targetSdkVersion\s+\d+', 'targetSdkVersion 36')
 $text = $text.Replace('android.ndkDirectory', 'android.ndkPath')
 $text = [regex]::Replace($text, '(?ms)^    exec \{(.*?)^    \}', '    providers.exec {$1    }.result.get()')
 $text = [regex]::Replace($text, '(?m)^\s*debugSymbolLevel\s*\r?\n', '')
-Set-Content -LiteralPath $unityGradle -Value $text -NoNewline -Encoding utf8
+[IO.File]::WriteAllText($unityGradle, $text, (New-Object Text.UTF8Encoding($false)))
 
 $taskNdkVersion = [regex]::Match($text, 'ndkVersion "([^"]+)"')
 if ($taskNdkVersion.Success) {
     $launcherText = Get-Content -LiteralPath $launcherGradle -Raw
     if (!$launcherText.Contains('ndkVersion "')) {
         $launcherText = $launcherText.Replace('android {', 'android {' + "`n    ndkVersion `"" + $taskNdkVersion.Groups[1].Value + "`"")
-        Set-Content -LiteralPath $launcherGradle -Value $launcherText -NoNewline -Encoding utf8
+        [IO.File]::WriteAllText($launcherGradle, $launcherText, (New-Object Text.UTF8Encoding($false)))
     }
 }
 
@@ -48,7 +52,7 @@ $unityProguard = Join-Path $projectPath 'unityLibrary\proguard-unity.txt'
 if (Test-Path -LiteralPath $unityProguard) {
     $text = Get-Content -LiteralPath $unityProguard -Raw
     $text = [regex]::Replace($text, '(?m)^\s*-ignorewarnings\s*\r?\n', '')
-    Set-Content -LiteralPath $unityProguard -Value $text -NoNewline -Encoding utf8
+    [IO.File]::WriteAllText($unityProguard, $text, (New-Object Text.UTF8Encoding($false)))
 }
 
 $taskJavaHome = $env:JAVA_HOME

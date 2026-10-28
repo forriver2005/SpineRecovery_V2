@@ -60,8 +60,12 @@ namespace SpineRecovery.App
                 targetScene != coach.sceneName ||
                 !UnityEngine.Application.CanStreamedLevelBeLoaded(coach.sceneName) ||
                 !UnityEngine.Application.CanStreamedLevelBeLoaded(game.sceneName) ||
-                string.IsNullOrWhiteSpace(coach.motionPackageUri) ||
-                coach.motionPackageUri != game.motionPackageUri) return false;
+                coach.motionPackageUri != game.motionPackageUri ||
+                (string.IsNullOrWhiteSpace(coach.motionPackageUri) && !LocalActionCatalog.IsSupported(item.actionId))) return false;
+            // Built-in doctor actions execute from the APK scenes and only receive
+            // order/dose metadata. Remote motion packages remain supported for future actions.
+            if (string.IsNullOrWhiteSpace(coach.motionPackageUri)) return true;
+
             try
             {
                 string json = PracticeSceneInitializer.ReadJsonFromUri(coach.motionPackageUri);

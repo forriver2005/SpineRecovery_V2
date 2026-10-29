@@ -28,6 +28,7 @@ public sealed class SideBridgeHoldRule
     public float EnterQuality { get; private set; }
     public float ValidQuality { get; private set; }
     public float DefaultScoreSeconds { get; private set; }
+    public void BreakContinuity(){if(RequiresContinuousHold)continuousHold=pendingHold=0;HoldingCorrectly=false;confirmation=badSeconds=0;}
     float exit, rest, entryScore, scoreSeconds, confirmation, badSeconds, missingSeconds;
     double continuousHold,bestContinuous,totalValidHold,roundValidHold,pendingHold;
 

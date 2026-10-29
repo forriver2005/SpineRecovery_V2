@@ -18,6 +18,14 @@ public class CoachActionController : MonoBehaviour
     public bool IsHoldingPose => isDifficultyHold;
     public float HoldElapsedSeconds { get; private set; }
     public int CurrentTotalScoredSegments { get; private set; } = 1;
+    public double[] AssessmentDurations { get; private set; } = new double[0];
+    public float SegmentSeconds(string state,float speed)
+    {
+        if(coachAnimator!=null && coachAnimator.runtimeAnimatorController!=null)
+            foreach(var clip in coachAnimator.runtimeAnimatorController.animationClips)
+                if(clip!=null && clip.name==state)return clip.length/Mathf.Max(.05f,speed);
+        return 0;
+    }
 
     public struct ScoringCheckpointInfo
     {
@@ -521,6 +529,10 @@ public class CoachActionController : MonoBehaviour
         int safeLoopCount = Mathf.Max(1, profile.loopCount);
         int totalScoredSegments = Mathf.Max(1, safeLoopCount * pairCount * 2);
         CurrentTotalScoredSegments = totalScoredSegments;
+        AssessmentDurations=new double[safeLoopCount*pairCount];
+        for(int i=0;i<AssessmentDurations.Length;i++)
+            AssessmentDurations[i]=SegmentSeconds(upSegmentStates[i%pairCount],profile.upSpeed)+
+                SegmentSeconds(downSegmentStates[i%pairCount],profile.downSpeed);
         int completedScoredSegments = 0;
 
         ScoringSessionStarted?.Invoke();

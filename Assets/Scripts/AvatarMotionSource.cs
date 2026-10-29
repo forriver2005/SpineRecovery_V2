@@ -17,6 +17,9 @@ public sealed class AvatarMotionSource : MonoBehaviour
     public int LastBonePacketCounterInFrame { get; private set; }
     public int LastPacketframeCounterInFrame { get; private set; }
     public float RemoteTime { get; private set; }
+    public float LastFrameReceivedAt { get; private set; } = float.NegativeInfinity;
+    public bool HasFreshFrame => GetAvailable()!=0 && LastBonePacketCounterInFrame>0 &&
+        Time.unscaledTime-LastFrameReceivedAt<=.5f;
 
     public int GetAvailable() => inputAvailable && !Freeze ? 1 : 0;
     public float GetRemoteTime() => RemoteTime;
@@ -32,6 +35,7 @@ public sealed class AvatarMotionSource : MonoBehaviour
         RemoteTime = remoteTime;
         LastBonePacketCounterInFrame = Mathf.Max(0, humanoidBonePackets);
         LastPacketframeCounterInFrame++;
+        LastFrameReceivedAt=Time.unscaledTime;
     }
 
     public void SetAvailable(bool available)

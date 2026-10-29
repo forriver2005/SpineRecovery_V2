@@ -535,7 +535,7 @@ public sealed class RhythmModeController : MonoBehaviour
         return fallbackRuntimeMaterial;
     }
 
-    private bool TryGetSegmentTargets(
+    public bool TryGetSegmentTargets(
         string stateName,
         out RhythmBodyTarget first,
         out RhythmBodyTarget second)

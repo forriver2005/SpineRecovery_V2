@@ -10,6 +10,7 @@ public sealed class HipThrustHoldGeometry
         public readonly Dictionary<HumanBodyBones, Vector3> directions = new Dictionary<HumanBodyBones, Vector3>();
         public float leftHipAngle,rightHipAngle,leftKneeAngle,rightKneeAngle,bridgeLiftRatio;
         public bool hasBridgeLift,valid;
+        public float bodyFrontUp,torsoVertical;
     }
     sealed class QualityRule
     {
@@ -22,6 +23,8 @@ public sealed class HipThrustHoldGeometry
     readonly AnatomicalMotionScoringEngine poseCapture=new AnatomicalMotionScoringEngine(new AnatomicalMotionScoringSettings());
     static readonly HumanBodyBones[] scoredLegBones={HumanBodyBones.LeftUpperLeg,HumanBodyBones.LeftLowerLeg,HumanBodyBones.RightUpperLeg,HumanBodyBones.RightLowerLeg};
     public TargetPose restTarget,holdTarget;
+    public static bool HasSupineSupport(TargetPose pose,TargetPose target) => pose!=null&&target!=null&&
+        pose.torsoVertical<.7f&&Mathf.Abs(pose.bodyFrontUp)>.35f&&pose.bodyFrontUp*target.bodyFrontUp>0;
     public float currentLeftLegQuality,currentRightLegQuality,currentTorsoQuality;
     public float CalculateProgress(TargetPose pose)
     {
@@ -164,6 +167,12 @@ public sealed class HipThrustHoldGeometry
 
         pose.leftHipAngle = Vector3.Angle(chest.position - hips.position,
             leftKnee.position - hips.position);
+        var leftShoulder=animator.GetBoneTransform(HumanBodyBones.LeftUpperArm);
+        var rightShoulder=animator.GetBoneTransform(HumanBodyBones.RightUpperArm);
+        if(leftShoulder==null||rightShoulder==null)return false;
+        Vector3 torso=chest.position-hips.position;
+        pose.torsoVertical=Mathf.Abs(Vector3.Dot(torso.normalized,Vector3.up));
+        pose.bodyFrontUp=Vector3.Dot(Vector3.Cross(rightShoulder.position-leftShoulder.position,torso).normalized,Vector3.up);
         pose.rightHipAngle = Vector3.Angle(chest.position - hips.position,
             rightKnee.position - hips.position);
         pose.leftKneeAngle = Vector3.Angle(hips.position - leftKnee.position,

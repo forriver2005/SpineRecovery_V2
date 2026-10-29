@@ -49,19 +49,19 @@ public static class HipThrustNewRulesVerification
             Feed(rule,.01f,gates[n],qualityGates[n]); Check(Mathf.Abs(rule.LiveScore-bases[n])<.001f,"Wrong B entry score");
             Feed(rule,seconds[n]/2,1,100); Check(Mathf.Abs(rule.LiveScore-(100+bases[n])/2)<.02f,"Hold score not linear");
             float before=rule.LiveScore,hold=rule.ValidHoldSeconds;
-            Feed(rule,.5f,1,0); Check(rule.Phase==HipThrustHoldRule.Stage.Holding && rule.LiveScore==before,"Low quality must freeze accumulation");
-            Feed(rule,.5f,1,100,false); Check(rule.LiveScore==0 && rule.ValidHoldSeconds==hold,"Missing input earned points");
+            Feed(rule,.5f,1,0); Check(rule.Phase==HipThrustHoldRule.Stage.Holding && rule.LiveScore==0 && rule.ValidHoldSeconds==hold,"Poor posture retained a live score or earned time");
+            Feed(rule,.2f,1,100,false); Check(rule.LiveScore==0 && rule.ValidHoldSeconds==hold,"Missing input earned points");
             Feed(rule,seconds[n]/2+.02f,1,100); Check(rule.LiveScore>99.99f,"Wrong full-score duration");
             Feed(rule,.11f,0,0); Check(rule.Phase==HipThrustHoldRule.Stage.Holding,"Exit jitter not rejected");
             Feed(rule,.01f,0,0); Check(rule.Phase==HipThrustHoldRule.Stage.Lowering && rule.LiveScore==0 && rule.LastRoundBest>99.99f,"B exit must clear live and retain best");
             Feed(rule,.07f,0,0); Check(rule.CompletedRounds==0,"Rest confirmed early");
             Feed(rule,.01f,0,0); Check(rule.CompletedRounds==1 && rule.RoundBest==0 && rule.LastRoundBest>99.99f,"Round reset wrong");
-            rule.Reset(names[n]); Feed(rule,.5f,1,100); Feed(rule,.12f,0,0); Feed(rule,.3f,gates[n]-.01f,0);
-            Check(rule.CompletedRounds==1,"Relaxed return stuck");
+            rule.Reset(names[n]); Feed(rule,.1f,0,100);Feed(rule,.5f,1,100); Feed(rule,.12f,0,0); Feed(rule,.3f,gates[n]-.01f,0);
+            Check(rule.CompletedRounds==0,"Partial return counted");Feed(rule,.08f,0,0);Check(rule.CompletedRounds==1,"Full return not counted");
             rule.Reset(names[n]); Feed(rule,.2f,1,100); Feed(rule,.1f,1,100,false); Feed(rule,.2f,1,100);
             Check(rule.LiveScore==0,"Disconnected frames incorrectly joined entry confirmation");
         }
-        Log("PASS score: all 3 exact profiles; 0.30/0.12/0.08 second hysteresis; linear valid holds; low quality freeze; lost input; live zero outside B; best retention; relaxed return.");
+        Log("PASS score: all 3 profiles; low-position arming; 0.30/0.12/0.08 second hysteresis; linear valid holds; bad posture scores zero; missing input; best retention; strict low return.");
     }
     static void TestTimeline()
     {
@@ -255,15 +255,17 @@ public static class HipThrustNewRulesVerification
         var motion=UnityEngine.Object.FindObjectOfType<AvatarMotionSource>();
         try
         {
-            scorer.Begin("simple"); Seek(HipThrustHold30Timeline.PeakFrame(game.PhaseTimeline,0)/30d);
-            for(int i=0;i<350;i++) { motion.ReportFrame(i*.01f,55); scorer.Tick(.01f); }
-            Check(game.Score==100 && scorer.Progress>.99f,"Measured B pose did not reach new-rule score");
+            scorer.Begin("simple");Seek(game.AssessmentRepetitions()[0].start);
+            for(int i=0;i<15;i++){motion.ReportFrame(i*.01f,55);scorer.Tick(.01f);}
+            Seek(game.Hold30Timeline!=null?game.Hold30Timeline.Repetitions[0].top+.1:HipThrustHold30Timeline.PeakFrame(game.PhaseTimeline,0)/30d);
+            for(int i=0;i<(scorer.Rule.ContinuousHold?3100:350);i++) { motion.ReportFrame(i*.01f,55); scorer.Tick(.01f); }
+            Check(game.Score==100 && scorer.Progress>.99f,$"Measured B pose did not reach new-rule score: score={game.Score}, progress={scorer.Progress}, phase={scorer.Rule.Phase}, armed={scorer.Rule.LowConfirmed}, fresh={scorer.InputFresh}, quality={scorer.Quality}, tracking={scorer.TrackingQuality}");
             // A packet arrives during pause, then the sensor stops. Resume must
             // not treat that old counter increment as fresh input.
             motion.ReportFrame(4,55); Call(scorer,"Update");
             typeof(HipThrustRuleScoring).GetField("lastFrameAt",Private).SetValue(scorer,Time.unscaledTime-1);
             float held=scorer.Rule.ValidHoldSeconds; scorer.Tick(.01f);
-            Check(game.Score==0 && scorer.Rule.ValidHoldSeconds==held,"Resume counted stale input received during pause");
+            Check(game.Score==0 && scorer.Rule.ValidHoldSeconds<=held,"Resume counted stale input received during pause");
             float best=scorer.Rule.SessionBest; motion.SetAvailable(false); scorer.Tick(.01f);
             Check(game.Score==0 && scorer.Rule.SessionBest==best,"Unavailable input kept earning live score");
         }

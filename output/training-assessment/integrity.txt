@@ -1,0 +1,28 @@
+PASS main and validation C# source files are byte-identical.
+All six production scenes change only the static result placeholder 95 -> --.
+Existing user font changes, deleted old scene, README deletions and patent outputs are excluded from this commit.
+Assets/Scripts/AnatomicalMotionScoring.cs
+Assets/Scripts/AvatarMotionSource.cs
+Assets/Scripts/CoachActionController.cs
+Assets/Scripts/DeadBugGamingPoseScorer.cs
+Assets/Scripts/Editor/HipThrustNewRulesVerification.cs
+Assets/Scripts/Editor/SideBridgeGameVerification.cs
+Assets/Scripts/Editor/SideBridgeScoringVerification.cs
+Assets/Scripts/RhythmMode/GameWorkoutScene.cs
+Assets/Scripts/RhythmMode/HipThrustHoldGeometry.cs
+Assets/Scripts/RhythmMode/HipThrustHoldRule.cs
+Assets/Scripts/RhythmMode/HipThrustRuleScoring.cs
+Assets/Scripts/RhythmMode/HipThrustTaikoController.cs
+Assets/Scripts/RhythmMode/RhythmModeController.cs
+Assets/Scripts/RhythmMode/RhythmPoseJudge.cs
+Assets/Scripts/RhythmMode/SideBridgeHoldRule.cs
+Assets/Scripts/RhythmMode/SideBridgePoseScoring.cs
+Assets/Scripts/VmcGameModeBootstrap.cs
+Assets/Scripts/Editor/TrainingAssessmentVerification.cs
+Assets/Scripts/Editor/TrainingUsageAudit.cs
+Assets/Scripts/Editor/TrainingUsageScenarios.cs
+Assets/Scripts/RhythmMode/GameTrainingAssessment.cs
+Assets/Scripts/RhythmMode/PatientPoseReference.cs
+Assets/Scripts/RhythmMode/RhythmMovementRange.cs
+Assets/Scripts/RhythmMode/TrainingQualitySummary.cs
+Assets/Scripts/RhythmMode/TrainingResultView.cs

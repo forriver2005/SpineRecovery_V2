@@ -1,0 +1,22 @@
+Real Unity/recorded HumanPose. Adversarial inputs are synthetic; no wearable/clinical validation.
+PASS low-position arming, strict return, duplicate prevention, 30-second dose, bad-quality/height reset, lost input, and original hip score.
+PASS dynamic simple 30fps: all six recorded repetitions score 100 and qualify; targets 8.192, 6.933, 6.050 seconds.
+PASS dynamic simple 60fps: all six recorded repetitions score 100 and qualify; targets 8.192, 6.933, 6.050 seconds.
+PASS dynamic simple 120fps: all six recorded repetitions score 100 and qualify; targets 8.192, 6.933, 6.050 seconds.
+PASS dynamic standard 30fps: all six recorded repetitions score 100 and qualify; targets 8.033, 6.500, 5.767 seconds.
+PASS dynamic standard 60fps: all six recorded repetitions score 100 and qualify; targets 8.033, 6.500, 5.767 seconds.
+PASS dynamic standard 120fps: all six recorded repetitions score 100 and qualify; targets 8.033, 6.500, 5.767 seconds.
+PASS dynamic hard 30fps: all six recorded repetitions score 100 and qualify; targets 7.583, 5.467, 5.400 seconds.
+PASS dynamic hard 60fps: all six recorded repetitions score 100 and qualify; targets 7.583, 5.467, 5.400 seconds.
+PASS dynamic hard 120fps: all six recorded repetitions score 100 and qualify; targets 7.583, 5.467, 5.400 seconds.
+PASS hold30 simple 30fps: all six recorded repetitions score 100 and qualify; targets 8.192, 6.933, 6.050 seconds.
+PASS hold30 simple 60fps: all six recorded repetitions score 100 and qualify; targets 8.192, 6.933, 6.050 seconds.
+PASS hold30 simple 120fps: all six recorded repetitions score 100 and qualify; targets 8.192, 6.933, 6.050 seconds.
+PASS hold30 standard 30fps: all six recorded repetitions score 100 and qualify; targets 8.033, 6.500, 5.767 seconds.
+PASS hold30 standard 60fps: all six recorded repetitions score 100 and qualify; targets 8.033, 6.500, 5.767 seconds.
+PASS hold30 standard 120fps: all six recorded repetitions score 100 and qualify; targets 8.033, 6.500, 5.767 seconds.
+PASS hold30 hard 30fps: all six recorded repetitions score 100 and qualify; targets 7.583, 5.467, 5.400 seconds.
+PASS hold30 hard 60fps: all six recorded repetitions score 100 and qualify; targets 7.583, 5.467, 5.400 seconds.
+PASS hold30 hard 120fps: all six recorded repetitions score 100 and qualify; targets 7.583, 5.467, 5.400 seconds.
+PASS independent support-arm/alignment gates cannot be compensated by other quality terms.
+PASS assertions: 187

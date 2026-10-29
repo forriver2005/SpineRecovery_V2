@@ -1,0 +1,29 @@
+Assessment v1. Synthetic replay; no wearable or clinical validation.
+PASS pure model: no input, weighted components, dose caps, missing repetitions, 5/30 seconds, no lowering, missing data, NaN, 30/60/120 fps, interrupted continuous hold.
+REPLAY BirdDog_RingSkinC_Recorded 30 fps: score=100, quality=100.000, time=24.6400/24.6400, reps=4/4
+REPLAY BirdDog_RingSkinC_Recorded 60 fps: score=100, quality=100.000, time=24.6400/24.6400, reps=4/4
+REPLAY BirdDog_RingSkinC_Recorded 120 fps: score=100, quality=100.000, time=24.6400/24.6400, reps=4/4
+PASS BirdDog_RingSkinC_Recorded: real scene wiring, measured settlement, no-input restart, return button.
+REPLAY DeadBug_RingSkinC_Recorded 30 fps: score=100, quality=100.000, time=13.7600/13.7600, reps=4/4
+REPLAY DeadBug_RingSkinC_Recorded 60 fps: score=100, quality=100.000, time=13.7600/13.7600, reps=4/4
+REPLAY DeadBug_RingSkinC_Recorded 120 fps: score=100, quality=100.000, time=13.7600/13.7600, reps=4/4
+PASS DeadBug_RingSkinC_Recorded: real scene wiring, measured settlement, no-input restart, return button.
+REPLAY HipThrust_RingBridge_NewScoring 30 fps: score=100, quality=100.000, time=5.7000/5.7000, reps=4/4, coverage=1.00000
+REPLAY HipThrust_RingBridge_NewScoring 60 fps: score=100, quality=100.000, time=5.7000/5.7000, reps=4/4, coverage=1.00000
+REPLAY HipThrust_RingBridge_NewScoring 120 fps: score=100, quality=100.000, time=5.7000/5.7000, reps=4/4, coverage=1.00000
+PASS HipThrust_RingBridge_NewScoring: real scene wiring, measured settlement, no-input restart, return button.
+REPLAY HipThrust_RingBridge_Hold30 30 fps: score=100, quality=100.000, time=120.0000/120.0000, reps=4/4, coverage=1.00000
+REPLAY HipThrust_RingBridge_Hold30 60 fps: score=100, quality=100.000, time=120.0000/120.0000, reps=4/4, coverage=1.00000
+REPLAY HipThrust_RingBridge_Hold30 120 fps: score=100, quality=100.000, time=120.0000/120.0000, reps=4/4, coverage=1.00000
+PASS HipThrust_RingBridge_Hold30 pause during each 30-second hold: score=65, qualified=0, longest=15.03s.
+PASS HipThrust_RingBridge_Hold30: real scene wiring, measured settlement, no-input restart, return button.
+REPLAY SideBridge_RingBridge_Dynamic 30 fps: score=100, quality=100.000, time=21.1750/21.1750, reps=3/3, coverage=1.00000
+REPLAY SideBridge_RingBridge_Dynamic 60 fps: score=100, quality=100.000, time=21.1750/21.1750, reps=3/3, coverage=1.00000
+REPLAY SideBridge_RingBridge_Dynamic 120 fps: score=100, quality=100.000, time=21.1750/21.1750, reps=3/3, coverage=1.00000
+PASS SideBridge_RingBridge_Dynamic: real scene wiring, measured settlement, no-input restart, return button.
+REPLAY SideBridge_RingBridge_Hold30 30 fps: score=100, quality=100.000, time=90.0000/90.0000, reps=3/3, coverage=1.00000
+REPLAY SideBridge_RingBridge_Hold30 60 fps: score=100, quality=100.000, time=90.0000/90.0000, reps=3/3, coverage=1.00000
+REPLAY SideBridge_RingBridge_Hold30 120 fps: score=100, quality=100.000, time=90.0000/90.0000, reps=3/3, coverage=1.00000
+PASS SideBridge_RingBridge_Hold30 pause during each 30-second hold: score=65, qualified=0, longest=15.03s.
+PASS SideBridge_RingBridge_Hold30: real scene wiring, measured settlement, no-input restart, return button.
+Assertions: 3023

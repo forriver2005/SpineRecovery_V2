@@ -15,6 +15,7 @@ public sealed class RhythmPoseJudge : MonoBehaviour
     private AnatomicalLimbScores limbScores;
     private float waistScore;
     private bool hasWaistTracking;
+    GameTrainingAssessment assessment;
 
     public float SuccessThreshold => successThreshold;
     public Animator CoachAnimator => poseScorer != null ? poseScorer.CoachAnimator : null;
@@ -38,6 +39,8 @@ public sealed class RhythmPoseJudge : MonoBehaviour
     public bool TryHit(RhythmBodyTarget target, out float poseScore)
     {
         poseScore = GetScore(target);
+        if(assessment==null)assessment=FindObjectOfType<GameTrainingAssessment>();
+        if(assessment!=null&&assessment.Entry.taiko==null)poseScore=Mathf.Min(poseScore,assessment.EndpointQuality(target));
         if (!HasTracking(target) || poseScore < successThreshold)
         {
             return false;
@@ -47,6 +50,7 @@ public sealed class RhythmPoseJudge : MonoBehaviour
 
     public float GetScore(RhythmBodyTarget target)
     {
+        if(poseScorer==null||!poseScorer.IsSessionActive||poseScorer.IsScoringPaused||!poseScorer.HasFreshInput||!poseScorer.HasMatchingFloorPosture)return 0;
         switch (target)
         {
             case RhythmBodyTarget.LeftHand: return limbScores.leftArm.score;
@@ -59,6 +63,7 @@ public sealed class RhythmPoseJudge : MonoBehaviour
 
     private bool HasTracking(RhythmBodyTarget target)
     {
+        if(poseScorer==null||!poseScorer.IsSessionActive||poseScorer.IsScoringPaused||!poseScorer.HasFreshInput||!poseScorer.HasMatchingFloorPosture)return false;
         switch (target)
         {
             case RhythmBodyTarget.LeftHand: return limbScores.leftArm.validSegmentCount > 0;

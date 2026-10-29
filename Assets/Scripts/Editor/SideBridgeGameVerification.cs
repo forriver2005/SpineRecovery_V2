@@ -48,7 +48,7 @@ public static class SideBridgeGameVerification
             Feed(rule,.6f,0,100);Check(rule.CompletedRounds==1,"A-B-A not counted once");
             Feed(rule,3,0,100);Check(rule.CompletedRounds==1,"Rest produced extra repetitions");
         }
-        var legacy=new HipThrustHoldRule();legacy.Reset("simple");for(int i=0;i<360;i++)legacy.Step(.25f,100,.01f,true);Check(legacy.LiveScore==100,"Legacy hip entry threshold changed");
+        var legacy=new HipThrustHoldRule();legacy.Reset("simple");for(int i=0;i<10;i++)legacy.Step(0,100,.01f,true);for(int i=0;i<360;i++)legacy.Step(.25f,100,.01f,true);Check(legacy.LiveScore==100,"Hip entry threshold changed");
         Log("PASS side-specific thresholds reject partial lift; good holds score 100; poor quality clears live score/continuous hold; invalid input scores zero; true low return counts once; original hip thresholds preserved.");
     }
     static void VerifyTimeline()
@@ -238,7 +238,7 @@ public static class SideBridgeGameVerification
             animator.Play(game.RoutineStateName,0,game.PhaseTimeline.cycles[0].liftStartFrame/30f/game.PhaseTimeline.sourceClip.length);animator.Update(0);
             for(int i=0;i<15;i++){motion.ReportFrame(i*.01f,55);rule.Tick(.01f);}
             animator.Play(game.RoutineStateName,0,peak/30f/game.PhaseTimeline.sourceClip.length);animator.Update(0);
-            for(int i=0;i<1000;i++)
+            for(int i=0;i<(rule.sideBridge.Rule.RequiresContinuousHold?3000:1000);i++)
             {
                 typeof(HipThrustTaikoController).GetField("elapsed",Private).SetValue(game,game.Hold30Timeline.Repetitions[0].top+(i+1)*.01);
                 motion.ReportFrame(i*.01f,55);rule.Tick(.01f);

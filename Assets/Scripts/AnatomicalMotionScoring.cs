@@ -166,6 +166,13 @@ public sealed class AnatomicalMotionScoringEngine
         AddOrientation(animator, HumanBodyBones.Head, worldToBody, result);
         return result;
     }
+    public Dictionary<HumanBodyBones,Vector3> CaptureAlignedPose(Animator animator)
+    {
+        var pose=CaptureRawPose(animator);
+        foreach(var bone in new List<HumanBodyBones>(pose.Keys))
+            if(userCalibrationAlignments.TryGetValue(bone,out var alignment))pose[bone]=alignment*pose[bone];
+        return pose;
+    }
 
     public AnatomicalPoseScore Evaluate(Animator userAnimator, Animator coachAnimator, float deltaTime)
     {

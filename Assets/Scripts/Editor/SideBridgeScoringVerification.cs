@@ -68,7 +68,7 @@ public static class SideBridgeScoringVerification
         for(int i=0;i<1000;i++)partial.Step(1,100,.01f,true,0);
         Check(partial.ContinuousHoldSeconds==0,"Raised time outside the prescribed hold filled its goal");
         Feed(partial,29.9f,1);Feed(partial,.3f,0);Check(partial.QualifiedRounds==0,"Pre-hold time topped up an insufficient hold");
-        var hip=new HipThrustHoldRule();hip.Reset("simple");for(int i=0;i<360;i++)hip.Step(.25f,100,.01f,true);
+        var hip=new HipThrustHoldRule();hip.Reset("simple");for(int i=0;i<10;i++)hip.Step(0,100,.01f,true);for(int i=0;i<360;i++)hip.Step(.25f,100,.01f,true);
         Check(hip.LiveScore==100,"Original hip scoring changed");
         report.AppendLine("PASS low-position arming, strict return, duplicate prevention, 30-second dose, bad-quality/height reset, lost input, and original hip score.");
     }
@@ -91,6 +91,7 @@ public static class SideBridgeScoringVerification
                 foreach(string difficulty in new[]{"simple","standard","hard"})
                 foreach(int fps in new[]{30,60,120})
                 {
+                    typeof(DeadBugGamingPoseScorer).GetField("userAnimator",Private).SetValue(transport.RuleScoring.calibration,transport.CoachAnimator);
                     policy.Begin(difficulty);Check(policy.CaptureTargets(transport),"Reference profiles invalid");
                     float dt=1f/fps;int lastCompleted=0;
                     for(int i=0;i<=Math.Ceiling(timeline.Duration*fps);i++)

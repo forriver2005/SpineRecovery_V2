@@ -157,6 +157,27 @@ public class DeadBugGamingPoseScorer : MonoBehaviour
     public IReadOnlyList<DeadBugCheckpointScore> SessionScores => sessionScores;
     public float LastSessionAverage => lastSessionAverage;
     public bool IsSessionActive => sessionActive;
+    AvatarMotionSource assessmentMotion;
+    public bool HasFreshInput
+    {
+        get { if(assessmentMotion==null)assessmentMotion=FindObjectOfType<AvatarMotionSource>();
+            return calibrated && assessmentMotion!=null && assessmentMotion.HasFreshFrame; }
+    }
+    public bool IsScoringPaused => coachController!=null && coachController.IsActionPaused;
+    public Dictionary<HumanBodyBones,Vector3> CaptureAssessmentPose(bool user) => user
+        ? scoringEngine.CaptureAlignedPose(userAnimator):scoringEngine.CaptureRawPose(coachAnimator);
+    public bool HasMatchingFloorPosture => FloorOrientation(userAnimator,out float actualFront,out float actualTilt)&&
+        FloorOrientation(coachAnimator,out float expectedFront,out float expectedTilt)&&
+        (Mathf.Abs(expectedTilt)>.7f || (Mathf.Abs(actualTilt)<.7f&&Mathf.Abs(actualFront)>.35f&&actualFront*expectedFront>0));
+    static bool FloorOrientation(Animator avatar,out float front,out float tilt)
+    {
+        front=tilt=0;if(avatar==null||!avatar.isHuman)return false;
+        var hip=avatar.GetBoneTransform(HumanBodyBones.Hips);var chest=avatar.GetBoneTransform(HumanBodyBones.Chest)??avatar.GetBoneTransform(HumanBodyBones.Spine);
+        var left=avatar.GetBoneTransform(HumanBodyBones.LeftUpperArm);var right=avatar.GetBoneTransform(HumanBodyBones.RightUpperArm);
+        if(hip==null||chest==null||left==null||right==null)return false;
+        var torso=chest.position-hip.position;tilt=Vector3.Dot(torso.normalized,Vector3.up);
+        front=Vector3.Dot(Vector3.Cross(right.position-left.position,torso).normalized,Vector3.up);return true;
+    }
     public AnatomicalPoseScore LastFrameScore => lastFrameResult;
     public AnatomicalLimbScores LastLimbScores => lastLimbScores;
     public bool IsCalibrated => calibrated;
@@ -213,10 +234,13 @@ public class DeadBugGamingPoseScorer : MonoBehaviour
         {
             return;
         }
+        if(IsScoringPaused)return;
 
         sessionMotionEvidence.Sample();
 
-        float frameScore = ScoreCurrentPose();
+        float frameScore=0;
+        if(HasFreshInput)frameScore=ScoreCurrentPose();
+        else { lastFrameResult=default;lastLimbScores=default;scoringEngine?.ResetSession(); }
         float scoringSample = lastFrameResult.rawScore;
         LiveScoreChanged?.Invoke(frameScore);
         LimbScoresChanged?.Invoke(lastLimbScores);
@@ -764,6 +788,14 @@ public class DeadBugGamingPoseScorer : MonoBehaviour
             coachAnimator,
             Time.deltaTime,
             out lastLimbScores);
+        if(!HasMatchingFloorPosture)
+        {
+            lastFrameResult.score=lastFrameResult.rawScore=0;
+            lastLimbScores.leftArm.score=lastLimbScores.leftArm.rawScore=0;
+            lastLimbScores.rightArm.score=lastLimbScores.rightArm.rawScore=0;
+            lastLimbScores.leftLeg.score=lastLimbScores.leftLeg.rawScore=0;
+            lastLimbScores.rightLeg.score=lastLimbScores.rightLeg.rawScore=0;
+        }
         return lastFrameResult.score;
     }
 

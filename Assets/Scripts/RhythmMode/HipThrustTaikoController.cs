@@ -92,7 +92,7 @@ public sealed class HipThrustTaikoController : MonoBehaviour
     public int BeatCount => beats.Count;
     public int HitCount => hitCount;
     public int MissCount => missCount;
-    public int Score => ruleScoring != null ? Mathf.RoundToInt(ruleScoring.LiveScore) : score;
+    public int Score => ruleScoring != null ? Mathf.FloorToInt(ruleScoring.LiveScore+.0001f) : score;
     public HipThrustRuleScoring RuleScoring => ruleScoring;
     public HipThrustPrescriptionDose PrescriptionDose => hold30Dose;
     public HipThrustHold30Timeline Hold30Timeline => hold30Timeline;
@@ -116,6 +116,21 @@ public sealed class HipThrustTaikoController : MonoBehaviour
     public string ActionDisplayName => actionDisplayName;
     public Animator PreviewAnimator => coachPreviewAnimator;
     public event Action Completed;
+    public GameTrainingAssessment Assessment { get; set; }
+    public HipThrustHold30Timeline.Repetition[] AssessmentRepetitions()
+    {
+        if(hold30Timeline!=null)return hold30Timeline.Repetitions;
+        var result=new List<HipThrustHold30Timeline.Repetition>();
+        if(phaseTimeline!=null)
+        for(int pass=0;pass<passes;pass++)for(int i=0;i<phaseTimeline.cycles.Length;i++)
+        {
+            var c=phaseTimeline.cycles[i];double offset=pass*LoopDuration;
+            result.Add(new HipThrustHold30Timeline.Repetition(i,c.holdStartFrame,
+                c.liftStartFrame/(double)FrameRate+offset,c.holdStartFrame/(double)FrameRate+offset,
+                c.lowerEndFrame/(double)FrameRate+offset,(c.lowerStartFrame-c.holdStartFrame)/(double)FrameRate));
+        }
+        return result.ToArray();
+    }
     public event Action<bool> HitResolved;
     private float FrameRate => sourceClip.frameRate;
     private double LoopStart => (phaseTimeline != null ? phaseTimeline.repeatStartFrame : repeatStartFrame) / (double)FrameRate;
@@ -177,6 +192,7 @@ public sealed class HipThrustTaikoController : MonoBehaviour
     {
         if (!running || paused) return;
         if (ruleScoring != null) ruleScoring.Tick(Time.deltaTime);
+        if (Assessment != null) Assessment.ObserveBridge(Time.deltaTime);
         UpdateJudgements();
         if (elapsed >= Duration) CompleteSession();
     }
@@ -199,6 +215,7 @@ public sealed class HipThrustTaikoController : MonoBehaviour
         running = true;
         if (endMenuRoot != null) endMenuRoot.SetActive(false);
         BuildChart();
+        if (Assessment != null) Assessment.BeginBridge();
         if (difficultyLabel != null) difficultyLabel.text = hold30Dose != null ? GameWorkoutPlan.DifficultyName(startMenu.SelectedDifficultyKey) : passes == 1 ? "简单" : passes == 2 ? "标准" : "进阶";
         if (songClock != null) songClock.StartMusicImmediately();
         UpdateScore();
@@ -357,9 +374,10 @@ public sealed class HipThrustTaikoController : MonoBehaviour
     {
         if (ruleScoring != null && ruleScoring.sideBridge != null)
             return ruleScoring.MatchesSideBridgeCoach();
+        if(ruleScoring!=null)return ruleScoring.MatchesHipCoach();
         if (poseScorer == null || !poseScorer.IsCalibrated || poseScorer.UserAnimator == null) return false;
         if (motionSource == null) motionSource = FindObjectOfType<AvatarMotionSource>();
-        if (motionSource != null && motionSource.GetAvailable() == 0) return false;
+        if (motionSource == null || !motionSource.HasFreshFrame) return false;
         Animator user = poseScorer.UserAnimator;
         // Hip-to-knee height normalized by femur length distinguishes raised and lowered hips,
         // even when the incoming avatar only supplies bone rotations and has a different stature.
@@ -419,6 +437,7 @@ public sealed class HipThrustTaikoController : MonoBehaviour
     {
         if (!running) return;
         paused = !paused;
+        if(paused&&ruleScoring!=null)ruleScoring.BreakContinuity();
         if (hitParticles != null) hitParticles.Paused = paused;
         // The animation and all chart positions freeze together. Resume never restarts the chart.
         SetPhase(paused ? "已暂停" : "继续训练");
@@ -443,6 +462,7 @@ public sealed class HipThrustTaikoController : MonoBehaviour
 
     private void CompleteSession()
     {
+        if (Assessment != null) Assessment.Finish();
         running = paused = false;
         if (songClock != null) songClock.StopClock();
         if (resultLabel != null) resultLabel.text = ruleScoring != null ? ruleScoring.Result(beats.Count) : $"训练完成  {beats.Count} 次臀桥\n得分 {score}   HIT {hitCount}   MISS {missCount}";

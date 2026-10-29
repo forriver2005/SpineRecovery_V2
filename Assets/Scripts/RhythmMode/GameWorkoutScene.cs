@@ -30,6 +30,8 @@ public sealed class GameWorkoutScene : MonoBehaviour
 
     private void Awake()
     {
+        var assessment=gameObject.AddComponent<GameTrainingAssessment>();
+        assessment.Initialize(this);
         session = GameWorkoutSession.Instance;
         menu.TrainingStartAllowed = () => session.AllowsStart(this) && (taiko == null || taiko.CanStart);
         menu.TrainingStarted += OnStarted;

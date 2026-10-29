@@ -1,0 +1,4 @@
+Actual visible menu button/countdown/game transport; test calibration bypass, no wearable device.
+PASS visual-only adapter: no package state machine; exclusive fills and captions follow original samples; rendering never changes the game clock or score.
+PASS boundaries: 2900 quarter-frame samples; exact lift/hold/lower transitions and centre hold.
+PASS startup: start menu visible, artwork hidden; real Start button is top raycast hit; visible countdown and coach; no premature clock advance.

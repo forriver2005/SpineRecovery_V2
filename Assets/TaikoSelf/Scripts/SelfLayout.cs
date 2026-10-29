@@ -24,6 +24,7 @@ namespace TaikoSelf
         public const float DrumX = 422.0f, DrumY = 215.0f;
         /// <summary>SVG angles (deg, clockwise from +x) of each progress arc.</summary>
         public const float LiftStart = 179.0f, LiftSweep = 62.0f;
+        public const float HoldStart = 259.0f, HoldSweep = 102.0f;
         public const float ReturnStart = 19.0f, ReturnSweep = 142.0f;
 
         public static readonly Dictionary<string, LayerInfo> Layers = new Dictionary<string, LayerInfo>

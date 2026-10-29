@@ -13,6 +13,7 @@ public sealed class RecordedDrumArtwork : MonoBehaviour
     public Transform dotPivot, core;
     MaterialPropertyBlock arcProperties;
     MaterialPropertyBlock backgroundProperties;
+    SpriteRenderer holdProgress;
 
     public void LateUpdate() => Render(source.CurrentSample);
 
@@ -42,6 +43,7 @@ public sealed class RecordedDrumArtwork : MonoBehaviour
         SpriteAlpha.Set(liftProgress, lift ? Mathf.Clamp01(since/.1f) : 0);
         Clip(liftProgress, SelfLayout.LiftStart, SelfLayout.LiftSweep, p, 0);
         SpriteAlpha.Set(holdFill, hold ? .95f*p : 0);
+        RenderHoldProgress(hold, p);
         SpriteAlpha.Set(coreGlow, hold ? Mathf.Min(.9f,.3f+p*.84f) : 0);
         // Fit the delivered six-star reveal to the existing hold interval, without extending it.
         for (int i=0;i<stars.Length;i++)
@@ -107,5 +109,38 @@ public sealed class RecordedDrumArtwork : MonoBehaviour
         arcProperties.SetFloat("_Progress",progress);
         arcProperties.SetFloat("_AngleOffset",angleOffset);
         renderer.SetPropertyBlock(arcProperties);
+    }
+
+    void RenderHoldProgress(bool visible, float progress)
+    {
+        // Shared presentation adapter: all bridge variants use their own existing
+        // phase progress, including the 30-second hold. No separate visual timer.
+        if (holdProgress == null)
+        {
+            const string name = "Hold Progress Arc";
+            Transform existing = holdFill.transform.parent.Find(name);
+            holdProgress = existing != null ? existing.GetComponent<SpriteRenderer>() : null;
+            if (holdProgress == null)
+            {
+                var root = new GameObject(name);
+                root.layer = holdFill.gameObject.layer;
+                root.transform.SetParent(holdFill.transform.parent, false);
+                root.transform.localPosition = holdFill.transform.localPosition;
+                root.transform.localRotation = holdFill.transform.localRotation;
+                root.transform.localScale = holdFill.transform.localScale;
+                holdProgress = root.AddComponent<SpriteRenderer>();
+                // The existing full-rect sprite supplies a quad around the drum.
+                // The shader draws the gold arc analytically, keeping edges sharp.
+                holdProgress.sprite = holdFill.sprite;
+                holdProgress.sharedMaterial = holdFill.sharedMaterial;
+                holdProgress.sortingLayerID = holdFill.sortingLayerID;
+                holdProgress.sortingOrder = liftProgress.sortingOrder;
+            }
+        }
+        SpriteAlpha.Set(holdProgress, visible ? 1 : 0);
+        Clip(holdProgress, SelfLayout.HoldStart, SelfLayout.HoldSweep, Mathf.Clamp01(progress), 0);
+        holdProgress.GetPropertyBlock(arcProperties);
+        arcProperties.SetFloat("_HoldProgressArc", 1);
+        holdProgress.SetPropertyBlock(arcProperties);
     }
 }

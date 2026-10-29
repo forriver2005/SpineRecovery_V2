@@ -21,7 +21,16 @@ Asset: HipThrust_HeavenlyLoop.ogg
 梦幻合成器及柔和合唱音色，搭配金色星光及持续保持。
 应用于原版、新评分版及保持 30 秒版三个臀桥场景。
 
-License for all three source downloads: CC0 1.0 Universal
+左侧桥（动态与保持 30 秒）：Enchanted Tiki 86 — The Cynic Project / cynicmusic
+Source: https://opengameart.org/content/enchanted-tiki-86
+Download: https://opengameart.org/sites/default/files/enchanted%20tiki%2086_0.mp3
+Artist: https://cynicmusic.com/ / https://pixelsphere.org/
+Asset: SideBridge_EnchantedTiki.ogg
+轻柔、循环感较强的空间氛围，与月夜星光圆环保持一致。
+使用该页面的原始 CC0 文件，不使用后来的商业扩展版。
+固定增益 -6.29 dB，尾首交叉淡化 1.5 秒，44.1 kHz 双声道 Ogg Vorbis。
+
+License for all source downloads: CC0 1.0 Universal
 https://creativecommons.org/publicdomain/zero/1.0/
 https://creativecommons.org/publicdomain/zero/1.0/legalcode
 这些下载文件由各自作者在上述来源页发布为 CC0。

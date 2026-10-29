@@ -28,6 +28,8 @@ public sealed class HipThrustTaikoController : MonoBehaviour
     [SerializeField] private int repeatStartFrame = 408;
     [SerializeField] private int repeatEndFrame = 1320;
     [SerializeField] private string routineStateName = "hipthrust_routine";
+    [SerializeField] private string actionDisplayName = "臀桥";
+    [SerializeField] private string restTransitionStateName;
     [SerializeField] private string hipThrustStartStateName = "hipthrust_start";
     [SerializeField] private RuntimeAnimatorController hipThrustAnimatorController;
 
@@ -110,6 +112,8 @@ public sealed class HipThrustTaikoController : MonoBehaviour
     public int ConsecutiveHits => consecutiveHits;
     public HipThrustPhaseTimeline PhaseTimeline => phaseTimeline;
     public Animator CoachAnimator => coachAnimator;
+    public string RoutineStateName => routineStateName;
+    public string ActionDisplayName => actionDisplayName;
     public Animator PreviewAnimator => coachPreviewAnimator;
     public event Action Completed;
     public event Action<bool> HitResolved;
@@ -185,7 +189,7 @@ public sealed class HipThrustTaikoController : MonoBehaviour
         int repetitions = cycleCount;
         if (repetitionsText != null && int.TryParse(repetitionsText.text, out int requested)) repetitions = requested;
         passes = Mathf.Clamp(Mathf.CeilToInt(repetitions / (float)cycleCount), 1, 3);
-        hold30Timeline = hold30Dose != null ? new HipThrustHold30Timeline(phaseTimeline, hold30Dose.Total) : null;
+        hold30Timeline = hold30Dose != null ? new HipThrustHold30Timeline(phaseTimeline, hold30Dose.Total, hold30Dose.preserveRecordedTiming, hold30Dose.skipRecordedPlateauAfterHold, hold30Dose.preserveSourceGaps) : null;
         CompletedDemonstrations = 0;
         if (ruleScoring != null) ruleScoring.Begin(startMenu.SelectedDifficultyKey);
         elapsed = 0d;
@@ -241,8 +245,9 @@ public sealed class HipThrustTaikoController : MonoBehaviour
     {
         if (hold30Timeline != null) { hold30Timeline.Evaluate(elapsed, out _, out _, out int count); CompletedDemonstrations=count; }
         float normalized = SourceTimeAt(elapsed) / sourceClip.length;
-        SampleCoach(coachAnimator, normalized);
-        SampleCoach(coachPreviewAnimator, normalized);
+        if(hold30Timeline!=null && !string.IsNullOrEmpty(restTransitionStateName) && hold30Timeline.TryGetWrapProgress(elapsed,out float wrap))
+        {SampleCoach(coachAnimator,wrap,restTransitionStateName);SampleCoach(coachPreviewAnimator,wrap,restTransitionStateName);}
+        else {SampleCoach(coachAnimator, normalized);SampleCoach(coachPreviewAnimator, normalized);}
         // The ring presentation reads this same clock after coach sampling. It owns its own UI.
         if (phaseTimeline != null) return;
         string phase = elapsed < LoopStart ? "准备动作" : "准备抬起";
@@ -280,12 +285,12 @@ public sealed class HipThrustTaikoController : MonoBehaviour
         SetPhase(paused ? "已暂停" : phase);
     }
 
-    private void SampleCoach(Animator animator, float normalized)
+    private void SampleCoach(Animator animator, float normalized, string stateName=null)
     {
         animator.enabled = true;
         animator.cullingMode = AnimatorCullingMode.AlwaysAnimate;
         animator.speed = 0f;
-        animator.Play(routineStateName, 0, normalized);
+        animator.Play(stateName??routineStateName, 0, normalized);
         animator.Update(0f);
     }
 
@@ -350,6 +355,8 @@ public sealed class HipThrustTaikoController : MonoBehaviour
 
     private bool PoseMatchesCoach()
     {
+        if (ruleScoring != null && ruleScoring.sideBridge != null)
+            return ruleScoring.MatchesSideBridgeCoach();
         if (poseScorer == null || !poseScorer.IsCalibrated || poseScorer.UserAnimator == null) return false;
         if (motionSource == null) motionSource = FindObjectOfType<AvatarMotionSource>();
         if (motionSource != null && motionSource.GetAvailable() == 0) return false;

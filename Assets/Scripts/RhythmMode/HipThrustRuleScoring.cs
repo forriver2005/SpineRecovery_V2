@@ -5,12 +5,14 @@ public sealed class HipThrustRuleScoring : MonoBehaviour
 {
     public HipThrustTaikoController transport;
     public DeadBugGamingPoseScorer calibration;
+    public SideBridgePoseScoring sideBridge;
     public readonly HipThrustHoldRule Rule = new HipThrustHoldRule();
     public float Progress { get; private set; }
     public float Quality { get; private set; }
     public bool TargetsReady { get; private set; }
     public bool InputFresh { get; private set; }
     public string Status => !TargetsReady ? "动作参考不可用" : !InputFresh ? "等待动作数据" :
+        sideBridge!=null && !sideBridge.PostureReady ? "请保持左侧支撑、肩髋叠放" :
         Rule.Phase == HipThrustHoldRule.Stage.Holding ? "保持计分" : "抬起进入保持位后计分";
     readonly HipThrustHoldGeometry geometry = new HipThrustHoldGeometry();
     AvatarMotionSource motion;
@@ -20,11 +22,12 @@ public sealed class HipThrustRuleScoring : MonoBehaviour
     public void Begin(string difficulty)
     {
         Rule.Reset(difficulty); Progress=Quality=0; InputFresh=false;
+        if(sideBridge!=null) Rule.ResetSideBridge(difficulty);
         motion=FindObjectOfType<AvatarMotionSource>();
         lastCounter=motion!=null?motion.LastPacketframeCounterInFrame:0;
         lastFrameAt=float.NegativeInfinity;
         TargetsReady=CaptureTargets();
-        if(!TargetsReady) Debug.LogError("臀桥新评分无法采样录制动作的 A/B 参考姿态。",this);
+        if(!TargetsReady) Debug.LogError(transport.ActionDisplayName+"评分无法采样录制动作的 A/B 参考姿态。",this);
     }
 
     bool CaptureTargets()
@@ -34,6 +37,7 @@ public sealed class HipThrustRuleScoring : MonoBehaviour
         var state=animator.GetCurrentAnimatorStateInfo(0); float speed=animator.speed;
         try
         {
+            if(sideBridge!=null) return sideBridge.CaptureTargets(transport);
             Sample(timeline.cycles[0].liftStartFrame);
             if(!geometry.TryMeasurePose(animator,out geometry.restTarget)) return false;
             Sample(HipThrustHold30Timeline.PeakFrame(timeline,0));
@@ -45,7 +49,7 @@ public sealed class HipThrustRuleScoring : MonoBehaviour
         }
         finally { animator.Play(state.fullPathHash,0,state.normalizedTime); animator.Update(0); animator.speed=speed; }
         void Sample(int frame)
-        { animator.Play("hipthrust_routine",0,frame/timeline.sourceClip.frameRate/timeline.sourceClip.length); animator.Update(0); }
+        { animator.Play(transport.RoutineStateName,0,frame/timeline.sourceClip.frameRate/timeline.sourceClip.length); animator.Update(0); }
     }
 
     // Observe packet freshness even while the transport is paused. Otherwise a
@@ -66,11 +70,22 @@ public sealed class HipThrustRuleScoring : MonoBehaviour
         bool valid=TargetsReady && InputFresh && calibration!=null && calibration.IsCalibrated;
         if(valid)
         {
-            valid=geometry.TryMeasurePose(calibration.UserAnimator,out var pose);
-            if(valid) { Progress=geometry.CalculateProgress(pose); Quality=geometry.CalculatePoseQuality(pose,geometry.holdTarget,true); }
+            if(sideBridge!=null)
+            {
+                valid=sideBridge.Evaluate(calibration.UserAnimator,out float progress,out float quality);
+                Progress=progress;Quality=quality;
+            }
+            else
+            {
+                valid=geometry.TryMeasurePose(calibration.UserAnimator,out var pose);
+                if(valid) { Progress=geometry.CalculateProgress(pose); Quality=geometry.CalculatePoseQuality(pose,geometry.holdTarget,true); }
+            }
         }
         Rule.Step(Progress,Quality,deltaTime,valid);
     }
 
-    public string Result(int demonstrated) => $"训练完成  示范 {demonstrated} 次臀桥\n最高 {Rule.SessionBest:0} / 100　上轮 {Rule.LastRoundBest:0}\n识别往返 {Rule.CompletedRounds} 次";
+    public bool MatchesSideBridgeCoach() => sideBridge!=null && TargetsReady && InputFresh && calibration!=null && calibration.IsCalibrated &&
+        sideBridge.Matches(calibration.UserAnimator,transport.CoachAnimator);
+
+    public string Result(int demonstrated) => $"训练完成  示范 {demonstrated} 次{transport.ActionDisplayName}\n最高 {Rule.SessionBest:0} / 100　上轮 {Rule.LastRoundBest:0}\n识别往返 {Rule.CompletedRounds} 次";
 }

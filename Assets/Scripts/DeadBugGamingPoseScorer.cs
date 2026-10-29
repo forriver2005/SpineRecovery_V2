@@ -167,7 +167,7 @@ public class DeadBugGamingPoseScorer : MonoBehaviour
     public Animator CoachAnimator => coachAnimator;
     public Animator UserAnimator => userAnimator;
     public string CalibrationInstruction => GetComponent<SupineGameCalibration>() != null
-        ? SupineGameCalibration.Instruction : "请自然站立进行校准";
+        ? GetComponent<SupineGameCalibration>().PoseInstruction : "请自然站立进行校准";
 
     private void Awake()
     {
@@ -372,7 +372,7 @@ public class DeadBugGamingPoseScorer : MonoBehaviour
             int sharedSegments = CountSharedCalibrationSegments();
             bool trackingReady = sharedSegments >= 5 && validBones >= minimumTrackedBones;
             bool stable = CheckCalibrationStability();
-            bool poseReady = supine == null || SupineGameCalibration.IsLying(userAnimator);
+            bool poseReady = supine == null || supine.IsPoseReady(userAnimator);
             var source = supine != null ? FindObjectOfType<AvatarMotionSource>() : null;
             bool inputReady = supine == null || (source != null && source.GetAvailable() > 0);
             if (!poseReady || !inputReady)

@@ -1,0 +1,24 @@
+{
+  "title": "Enchanted Tiki 86",
+  "author": "cynicmusic / The Cynic Project",
+  "source": "https://opengameart.org/content/enchanted-tiki-86",
+  "download": "https://opengameart.org/sites/default/files/enchanted%20tiki%2086_0.mp3",
+  "license": "CC0-1.0",
+  "gain_db": -6.289999999999999,
+  "loop_overlap_seconds": 1.5,
+  "duration_seconds": 115.89757369614513,
+  "source_sha256": "3d6a51a5f20e885d93f2c8e8ef7ea189fca701063ab7f72aa37d114701c32dcf",
+  "output_sha256": "aebf683f5458e49a2d5f8781478b78bf17a9cc1efedc52f90963b5588d1b5fab",
+  "measured": {
+    "input_i": "-18.01",
+    "input_tp": "-5.72",
+    "input_lra": "7.30",
+    "input_thresh": "-28.17",
+    "output_i": "-18.71",
+    "output_tp": "-6.32",
+    "output_lra": "6.40",
+    "output_thresh": "-28.80",
+    "normalization_type": "dynamic",
+    "target_offset": "0.71"
+  }
+}

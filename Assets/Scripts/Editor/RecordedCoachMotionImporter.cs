@@ -19,14 +19,17 @@ public sealed class RecordedCoachMotionImporter : ScriptedImporter
         var package = JsonUtility.FromJson<CoachMotionPackage>(File.ReadAllText(context.assetPath));
         if (!package.IsValid(out string error)) throw new InvalidDataException(error);
         var frames = package.segments.Single().frames;
+        int cycleCount = map.peaks.Length;
+        if (cycleCount < 1 || map.boundaries.Length != cycleCount + 1)
+            throw new InvalidDataException("Phase boundaries must bracket every recorded cycle.");
         string prefix = map.action.ToLowerInvariant();
-        var info = new TextAsset($"{map.action}: original HumanPose recording, {map.fps} fps, 11 phase clips.") { name = map.action };
+        var info = new TextAsset($"{map.action}: original HumanPose recording, {map.fps} fps, {3 + cycleCount * 2} phase clips.") { name = map.action };
         context.AddObjectToAsset("source", info);
         context.SetMainObject(info);
         Add(prefix + "_routine", map.routineStart, map.routineEnd);
         Add(prefix + "_start", map.routineStart, map.boundaries[0]);
-        Add(prefix + "_end", map.boundaries[4], map.routineEnd);
-        for (int i = 0; i < 4; i++)
+        Add(prefix + "_end", map.boundaries[cycleCount], map.routineEnd);
+        for (int i = 0; i < cycleCount; i++)
         {
             Add(prefix + "_" + (i + 1) + "_up", map.boundaries[i], map.peaks[i]);
             Add(prefix + "_" + (i + 1) + "_down", map.peaks[i], map.boundaries[i + 1]);
@@ -60,7 +63,7 @@ public sealed class RecordedCoachMotionImporter : ScriptedImporter
         return other;
     }
 
-    static AnimationClip Bake(string name, CoachMotionFrame[] frames, int first, int last, float fps, float yaw, bool mirrorArms)
+    public static AnimationClip Bake(string name, CoachMotionFrame[] frames, int first, int last, float fps, float yaw, bool mirrorArms)
     {
         var clip = new AnimationClip { name = name, frameRate = fps };
         string[] properties = HumanTrait.MuscleName.Concat(new[] { "RootT.x", "RootT.y", "RootT.z", "RootQ.x", "RootQ.y", "RootQ.z", "RootQ.w" }).ToArray();

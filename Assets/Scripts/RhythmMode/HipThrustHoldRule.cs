@@ -79,4 +79,14 @@ public sealed class HipThrustHoldRule
     }
 
     void Change(Stage next) { Phase = next; confirmation = phaseElapsed = 0; }
+
+    // A side bridge must approach its measured top; the supine bridge's deliberately
+    // permissive 20/40/55% entry thresholds would reward a visibly sagging side bridge.
+    public void ResetSideBridge(string difficulty)
+    {
+        Reset(difficulty);
+        if (difficulty == "simple") { enter=.65f; exit=.48f; rest=.22f; enterQuality=60; validQuality=55; }
+        else if (difficulty == "hard") { enter=.85f; exit=.68f; rest=.25f; enterQuality=80; validQuality=75; }
+        else { enter=.75f; exit=.58f; rest=.23f; enterQuality=70; validQuality=65; }
+    }
 }

@@ -10,6 +10,11 @@ public sealed class SupineGameCalibration : MonoBehaviour
     public AnimationClip referenceClip;
     public float referenceSeconds = 6.8f;
     public const string Instruction = "请仰卧屈膝、双脚着地，双臂放身体两侧";
+    public bool leftSideBridge;
+    public string PoseInstruction => leftSideBridge ? "请按教练左侧支撑，左肘与左脚支撑，肩髋叠放" : Instruction;
+    public bool IsPoseReady(Animator avatar) => leftSideBridge
+        ? SideBridgePoseGeometry.TryMeasure(avatar,out var pose)&&pose.IsLeftSupport
+        : IsLying(avatar);
     private PlayableGraph graph;
 
     public bool Prepare(Animator coach)

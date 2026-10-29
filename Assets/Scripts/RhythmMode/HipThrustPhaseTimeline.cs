@@ -55,8 +55,8 @@ public sealed class HipThrustPhaseTimeline : ScriptableObject
 
     public void Validate()
     {
-        if (sourceClip == null || cycles == null || cycles.Length != 4 || recordedHeight == null || recordedHeight.length < 2)
-            throw new InvalidOperationException("The recorded bridge timeline requires a clip, four cycles and its height curve.");
+        if (sourceClip == null || cycles == null || cycles.Length == 0 || recordedHeight == null || recordedHeight.length < 2)
+            throw new InvalidOperationException("The recorded bridge timeline requires a clip, at least one cycle and its height curve.");
         int previousEnd = repeatStartFrame;
         foreach (Cycle c in cycles)
         {

@@ -9,11 +9,16 @@ public sealed class HipThrustPrescriptionDose : MonoBehaviour
     public HipThrustTaikoController transport;
     public DeadBugStartMenuController menu;
     public TMPro.TMP_Text menuDescription;
+    public string prescriptionActionId = "5";
+    public string actionDisplayName = "臀桥";
+    public bool preserveRecordedTiming;
+    public bool skipRecordedPlateauAfterHold;
+    public bool preserveSourceGaps;
     public int Sets { get; private set; }
     public int Reps { get; private set; }
     public int Total => Sets * Reps;
     public bool IsPreview { get; private set; }
-    public string Label => Total>0 ? $"{(IsPreview ? "演示处方" : "处方")} {Sets} 组 × {Reps} 次 · 保持 30 秒" : "等待臀桥处方";
+    public string Label => Total>0 ? $"{(IsPreview ? "演示处方" : "处方")} {Sets} 组 × {Reps} 次 · {(preserveRecordedTiming ? "录制节奏" : "保持 30 秒")}" : $"等待{actionDisplayName}处方";
     public string LastError { get; private set; }
     [Serializable] sealed class Prescription { public int prescriptionContractVersion; public Item[] items; }
     [Serializable] sealed class Item { public long itemId; public string actionId; public int sets; public int reps; }
@@ -44,11 +49,11 @@ public sealed class HipThrustPrescriptionDose : MonoBehaviour
             Item selected=null;
             foreach(var item in prescription.items)
             {
-                if(item==null || item.actionId!="5" || (itemId!=0 && item.itemId!=itemId)) continue;
-                if(selected!=null) throw new ArgumentException("处方包含多个臀桥项目，请指定 itemId。");
+                if(item==null || item.actionId!=prescriptionActionId || (itemId!=0 && item.itemId!=itemId)) continue;
+                if(selected!=null) throw new ArgumentException($"处方包含多个{actionDisplayName}项目，请指定 itemId。");
                 selected=item;
             }
-            if(selected==null) throw new ArgumentException("处方中没有指定的臀桥动作（actionId=5）。");
+            if(selected==null) throw new ArgumentException($"处方中没有指定的{actionDisplayName}动作（actionId={prescriptionActionId}）。");
             return SetDose(selected.sets,selected.reps,out error);
         }
         catch(Exception ex) { error=LastError=ex.Message; return false; }

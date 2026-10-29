@@ -1,0 +1,59 @@
+PASS Pre-existing file preserved: SourceHanSansSC-Heavy SDF.asset
+PASS Pre-existing file preserved: HipThrust_RingBridge_NewScoring.unity
+PASS Pre-existing file preserved: HipThrust_RingBridge_Hold30.unity
+PASS Pre-existing scene deletion preserved
+PASS Tested and installed bytes match: Assets/Audio/GameMusic/SideBridge_EnchantedTiki.ogg
+PASS Tested and installed bytes match: Assets/Audio/GameMusic/SideBridge_EnchantedTiki.ogg.meta
+PASS Tested and installed bytes match: Assets/Movements/RecordedSideBridge/SideBridge.coachrecording
+PASS Tested and installed bytes match: Assets/Movements/RecordedSideBridge/SideBridge.coachrecording.meta
+PASS Tested and installed bytes match: Assets/Movements/RecordedSideBridge/SideBridge.original-keyframes.json
+PASS Tested and installed bytes match: Assets/Movements/RecordedSideBridge/SideBridge.original-keyframes.json.meta
+PASS Tested and installed bytes match: Assets/Movements/RecordedSideBridge/SideBridge.phases.json
+PASS Tested and installed bytes match: Assets/Movements/RecordedSideBridge/SideBridge.phases.json.meta
+PASS Tested and installed bytes match: Assets/Movements/RecordedSideBridge/SideBridge.source.json
+PASS Tested and installed bytes match: Assets/Movements/RecordedSideBridge/SideBridge.source.json.meta
+PASS Tested and installed bytes match: Assets/Movements/RecordedSideBridge/SideBridgeTimeline.asset
+PASS Tested and installed bytes match: Assets/Movements/RecordedSideBridge/SideBridgeTimeline.asset.meta
+PASS Tested and installed bytes match: Assets/Movements/RecordedSideBridge/SideBridge_PreviewPrescription.json
+PASS Tested and installed bytes match: Assets/Movements/RecordedSideBridge/SideBridge_PreviewPrescription.json.meta
+PASS Tested and installed bytes match: Assets/Movements/RecordedSideBridge/SideBridge_Recorded.controller
+PASS Tested and installed bytes match: Assets/Movements/RecordedSideBridge/SideBridge_Recorded.controller.meta
+PASS Tested and installed bytes match: Assets/Movements/RecordedSideBridge/SideBridge_Wrap.anim
+PASS Tested and installed bytes match: Assets/Movements/RecordedSideBridge/SideBridge_Wrap.anim.meta
+PASS Tested and installed bytes match: Assets/Scenes/SideBridge_RingBridge_Dynamic.unity
+PASS Tested and installed bytes match: Assets/Scenes/SideBridge_RingBridge_Dynamic.unity.meta
+PASS Tested and installed bytes match: Assets/Scenes/SideBridge_RingBridge_Hold30.unity
+PASS Tested and installed bytes match: Assets/Scenes/SideBridge_RingBridge_Hold30.unity.meta
+PASS Tested and installed bytes match: Assets/Scripts/DeadBugGamingPoseScorer.cs
+PASS Tested and installed bytes match: Assets/Scripts/Editor/GameSceneOrganizer.cs
+PASS Tested and installed bytes match: Assets/Scripts/Editor/RecordedCoachMotionImporter.cs
+PASS Tested and installed bytes match: Assets/Scripts/Editor/SideBridgeGameBuilder.cs
+PASS Tested and installed bytes match: Assets/Scripts/Editor/SideBridgeGameBuilder.cs.meta
+PASS Tested and installed bytes match: Assets/Scripts/Editor/SideBridgeGameVerification.cs
+PASS Tested and installed bytes match: Assets/Scripts/Editor/SideBridgeGameVerification.cs.meta
+PASS Tested and installed bytes match: Assets/Scripts/RhythmMode/GameWorkoutPlan.cs
+PASS Tested and installed bytes match: Assets/Scripts/RhythmMode/GameWorkoutScene.cs
+PASS Tested and installed bytes match: Assets/Scripts/RhythmMode/HipThrustHold30Timeline.cs
+PASS Tested and installed bytes match: Assets/Scripts/RhythmMode/HipThrustHoldRule.cs
+PASS Tested and installed bytes match: Assets/Scripts/RhythmMode/HipThrustPhaseTimeline.cs
+PASS Tested and installed bytes match: Assets/Scripts/RhythmMode/HipThrustPrescriptionDose.cs
+PASS Tested and installed bytes match: Assets/Scripts/RhythmMode/HipThrustRuleScoring.cs
+PASS Tested and installed bytes match: Assets/Scripts/RhythmMode/HipThrustTaikoController.cs
+PASS Tested and installed bytes match: Assets/Scripts/RhythmMode/SideBridgePoseGeometry.cs
+PASS Tested and installed bytes match: Assets/Scripts/RhythmMode/SideBridgePoseGeometry.cs.meta
+PASS Tested and installed bytes match: Assets/Scripts/RhythmMode/SideBridgePoseScoring.cs
+PASS Tested and installed bytes match: Assets/Scripts/RhythmMode/SideBridgePoseScoring.cs.meta
+PASS Tested and installed bytes match: Assets/Scripts/RhythmMode/SupineGameCalibration.cs
+PASS Recording is a byte-exact copy of the original motion JSON
+PASS Only inherited unresolved sprite is the inactive legacy Score background
+PASS No new unresolved asset GUIDs: Assets/Scenes/SideBridge_RingBridge_Dynamic.unity
+PASS Inherited legacy Score wrapper remains inactive: Assets/Scenes/SideBridge_RingBridge_Dynamic.unity
+PASS No new unresolved asset GUIDs: Assets/Scenes/SideBridge_RingBridge_Hold30.unity
+PASS Inherited legacy Score wrapper remains inactive: Assets/Scenes/SideBridge_RingBridge_Hold30.unity
+PASS No new unresolved asset GUIDs: Assets/Movements/RecordedSideBridge/SideBridgeTimeline.asset
+PASS No new unresolved asset GUIDs: Assets/Movements/RecordedSideBridge/SideBridge_Recorded.controller
+PASS No new unresolved asset GUIDs: Assets/Movements/RecordedSideBridge/SideBridge_Wrap.anim
+PASS Six existing games registered, including both left-side bridge scenes
+PASS Completed runtime report: verification.txt
+PASS Completed runtime report: hip-regression.txt
+Scope: real Unity scenes and recorded HumanPose; scoring uses synthetic telemetry. No wearable or patient validation.

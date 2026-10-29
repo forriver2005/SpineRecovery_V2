@@ -33,22 +33,23 @@ public static class SideBridgeGameVerification
     }
     static void Check(bool value,string message){checks++;if(!value)throw new Exception(message);}
     static void Log(string value)=>File.AppendAllText(Output+"verification.txt",value+"\n");
-    static void Feed(HipThrustHoldRule rule,float seconds,float progress,float quality,bool valid=true)
+    static void Feed(SideBridgeHoldRule rule,float seconds,float progress,float quality,bool valid=true)
     {for(int i=0;i<Mathf.RoundToInt(seconds*100);i++)rule.Step(progress,quality,.01f,valid);}
     static void VerifyRule()
     {
         foreach(string difficulty in new[]{"simple","standard","hard"})
         {
-            var rule=new HipThrustHoldRule();rule.ResetSideBridge(difficulty);
+            var rule=new SideBridgeHoldRule();rule.Reset(difficulty);rule.BeginRepetition(3,3);
+            Feed(rule,.1f,0,100);
             Feed(rule,5,.4f,100);Check(rule.LiveScore==0,"Partial side lift earned hold score");
             Feed(rule,9,1,100);Check(rule.LiveScore==100,"Valid side hold did not reach 100");
-            float held=rule.ValidHoldSeconds;Feed(rule,1,1,0);Check(rule.ValidHoldSeconds==held,"Low quality accumulated hold time");
+            Feed(rule,1,1,0);Check(rule.LiveScore==0&&rule.ContinuousHoldSeconds==0,"Low quality retained current full score");
             Feed(rule,.2f,1,100,false);Check(rule.LiveScore==0,"Invalid input retained live score");
             Feed(rule,.6f,0,100);Check(rule.CompletedRounds==1,"A-B-A not counted once");
             Feed(rule,3,0,100);Check(rule.CompletedRounds==1,"Rest produced extra repetitions");
         }
-        var legacy=new HipThrustHoldRule();legacy.Reset("simple");Feed(legacy,3.6f,.25f,100);Check(legacy.LiveScore==100,"Legacy hip entry threshold changed");
-        Log("PASS side-specific thresholds reject partial lift; good holds score 100; poor quality freezes accumulation; invalid input scores zero; one A-B-A counts once; original hip thresholds preserved.");
+        var legacy=new HipThrustHoldRule();legacy.Reset("simple");for(int i=0;i<360;i++)legacy.Step(.25f,100,.01f,true);Check(legacy.LiveScore==100,"Legacy hip entry threshold changed");
+        Log("PASS side-specific thresholds reject partial lift; good holds score 100; poor quality clears live score/continuous hold; invalid input scores zero; true low return counts once; original hip thresholds preserved.");
     }
     static void VerifyTimeline()
     {
@@ -139,7 +140,13 @@ public static class SideBridgeGameVerification
             Check(EditorApplication.timeSinceStartup-started<85,"Runtime timeout "+stage);
             if(stage==1)
             {
-                if(view.IsCountdownVisible&&!countdown){Check(view.IsPreviewVisible,"No countdown coach");Capture(variant+"-countdown");countdown=true;}
+                if(view.IsCountdownVisible&&!countdown)
+                {
+                    Check(view.IsPreviewVisible,"No countdown coach");Capture(variant+"-countdown");
+                    Check(((TMPro.TMP_Text)typeof(HipThrustRingBridgeView).GetField("holdMetric",Private).GetValue(view)).text.Contains("准备开始计时"),"Countdown showed stale hold measurements");
+                    Check(((TMPro.TMP_Text)typeof(HipThrustRingBridgeView).GetField("repetitionMetric",Private).GetValue(view)).text.Contains("合格 0/3"),"Countdown showed previous-set completion");
+                    countdown=true;
+                }
                 if(!game.IsRunning)return;
                 Check(countdown&&game.RuleScoring.TargetsReady&&game.BeatCount==3,"Startup/targets/dose failed");
                 Check(!game.PrescriptionDose.SetDose(1,7,out _),"Dose mutated during training");
@@ -196,6 +203,7 @@ public static class SideBridgeGameVerification
     static void FinishStandalone()
     {
         Seek(game.Duration);Call(game,"LateUpdate");Check(!game.IsRunning&&game.CompletedDemonstrations==3,"Session did not finish exactly three reps");
+        Check(game.RuleScoring.sideBridge.Rule.QualifiedRounds==0,"Coach playback without patient input counted as qualified repetitions");
         entry.StopTraining();Check(entry.menu.IsTrainingMenuVisible,"Return menu failed");
         Log("PASS "+Path.GetFileNameWithoutExtension(Scene)+": real menu/countdown, all three phases, matching coach preview, music, pause/resume, exact dose, return menu.");
         if(variant++==0){stage=0;SceneManager.LoadScene(Path.GetFileNameWithoutExtension(SideBridgeGameBuilder.Hold30));}
@@ -226,19 +234,34 @@ public static class SideBridgeGameVerification
         var motion=UnityEngine.Object.FindObjectOfType<AvatarMotionSource>();
         try
         {
-            rule.Begin("simple");animator.Play(game.RoutineStateName,0,peak/30f/game.PhaseTimeline.sourceClip.length);animator.Update(0);
-            for(int i=0;i<360;i++){motion.ReportFrame(i*.01f,55);rule.Tick(.01f);}
-            Check(rule.Rule.LiveScore==100&&rule.MatchesSideBridgeCoach(),"Good live pose not scored/HIT");
-            float held=rule.Rule.ValidHoldSeconds;
+            rule.Begin("simple");
+            animator.Play(game.RoutineStateName,0,game.PhaseTimeline.cycles[0].liftStartFrame/30f/game.PhaseTimeline.sourceClip.length);animator.Update(0);
+            for(int i=0;i<15;i++){motion.ReportFrame(i*.01f,55);rule.Tick(.01f);}
+            animator.Play(game.RoutineStateName,0,peak/30f/game.PhaseTimeline.sourceClip.length);animator.Update(0);
+            for(int i=0;i<1000;i++)
+            {
+                typeof(HipThrustTaikoController).GetField("elapsed",Private).SetValue(game,game.Hold30Timeline.Repetitions[0].top+(i+1)*.01);
+                motion.ReportFrame(i*.01f,55);rule.Tick(.01f);
+            }
+            Check(rule.LiveScore==100&&rule.MatchesSideBridgeCoach(),"Good live pose not scored/HIT");
             typeof(HipThrustRuleScoring).GetField("lastFrameAt",Private).SetValue(rule,Time.unscaledTime-1);rule.Tick(.01f);
-            Check(rule.Rule.LiveScore==0&&rule.Rule.ValidHoldSeconds==held&&!rule.MatchesSideBridgeCoach(),"Stale input scored or HIT");
-            motion.SetAvailable(false);rule.Tick(.01f);Check(rule.Rule.LiveScore==0&&!rule.MatchesSideBridgeCoach(),"Disconnected input HIT");
+            Check(rule.LiveScore==0&&rule.sideBridge.Rule.ContinuousHoldSeconds==0&&!rule.MatchesSideBridgeCoach(),"Stale input scored or HIT");
+            motion.SetAvailable(false);rule.Tick(.01f);Check(rule.LiveScore==0&&!rule.MatchesSideBridgeCoach(),"Disconnected input HIT");
+            rule.Begin("simple");var rep=game.Hold30Timeline.Repetitions[0];
+            for(int i=0;i<=(rep.end+.3)*30;i++)
+            {
+                Seek(i/30d);motion.ReportFrame(i/30f,55);rule.Tick(1/30f);
+                if(i==Mathf.FloorToInt((float)(rep.lower-.1)*30))Capture(variant+"-measured-hold");
+            }
+            Check(rule.sideBridge.Rule.CompletedRounds==1&&rule.sideBridge.Rule.QualifiedRounds==1,"Fresh calibrated full recording did not count exactly one qualified repetition");
+            Capture(variant+"-measured-return");
+            Check(((TMPro.TMP_Text)typeof(HipThrustRingBridgeView).GetField("repetitionMetric",Private).GetValue(view)).text.Contains("合格 1/3"),"HUD confused qualified and demonstrated repetitions");
         }
         finally
         {
             typeof(DeadBugGamingPoseScorer).GetField("userAnimator",Private).SetValue(entry.scorer,original);
             typeof(DeadBugGamingPoseScorer).GetField("calibrated",Private).SetValue(entry.scorer,false);
-            rule.Begin("simple");
+            Seek(0);rule.Begin("simple");
         }
         Log("PASS geometry and scoring: left support gate, normalized elbow/ankle lift, body-scale/translation/yaw invariance, free arm ignored, fresh calibrated input scores 100, stale/disconnected input cannot score or HIT.");
     }

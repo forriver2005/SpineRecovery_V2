@@ -92,7 +92,7 @@ public sealed class HipThrustTaikoController : MonoBehaviour
     public int BeatCount => beats.Count;
     public int HitCount => hitCount;
     public int MissCount => missCount;
-    public int Score => ruleScoring != null ? Mathf.RoundToInt(ruleScoring.Rule.LiveScore) : score;
+    public int Score => ruleScoring != null ? Mathf.RoundToInt(ruleScoring.LiveScore) : score;
     public HipThrustRuleScoring RuleScoring => ruleScoring;
     public HipThrustPrescriptionDose PrescriptionDose => hold30Dose;
     public HipThrustHold30Timeline Hold30Timeline => hold30Timeline;

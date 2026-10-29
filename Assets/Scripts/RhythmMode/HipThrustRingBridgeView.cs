@@ -30,6 +30,8 @@ public sealed class HipThrustRingBridgeView : MonoBehaviour
     GameObject endMenu;
     TMP_Text countdownSource, countdownNumber, coachPhase, coachTiming;
     TMP_Text ruleHint;
+    RectTransform assessmentPanel,holdProgress;
+    TMP_Text qualityMetric,holdMetric,repetitionMetric;
     readonly Image[] phaseBadges = new Image[3];
     readonly TMP_Text[] phaseBadgeLabels = new TMP_Text[3];
     static readonly string[] PhaseNames = { "抬起", "保持", "放下" };
@@ -67,7 +69,9 @@ public sealed class HipThrustRingBridgeView : MonoBehaviour
         if (!visible) return;
         RenderAtSourceFrame(transport.IsRunning ? transport.SourceTime * transport.PhaseTimeline.sourceClip.frameRate : 0);
         score.text = transport.Score.ToString("N0", System.Globalization.CultureInfo.InvariantCulture);
-        combo.text = transport.RuleScoring != null ? "LAST " + transport.RuleScoring.Rule.LastRoundBest.ToString("0") : transport.ConsecutiveHits + " COMBO";
+        if(transport.RuleScoring!=null&&transport.RuleScoring.sideBridge!=null&&!transport.IsRunning)score.text="0";
+        combo.text = transport.RuleScoring != null ?
+            (transport.RuleScoring.sideBridge!=null?"HOLD / 100":"LAST " + transport.RuleScoring.LastRoundBest.ToString("0")) : transport.ConsecutiveHits + " COMBO";
         // The mobile bootstrap converts canvases on scene load. This HUD belongs
         // to the artwork camera's render texture, so retain its world-space scale.
         hud.renderMode = RenderMode.WorldSpace;
@@ -117,9 +121,19 @@ public sealed class HipThrustRingBridgeView : MonoBehaviour
         phaseProgress.GetComponent<Image>().color = phase < 0 ? Color.white : PhaseColors[phase];
         if (ruleHint != null)
         {
-            ruleHint.text = transport.RuleScoring.Status;
-            if (transport.PrescriptionDose != null)
-                ruleHint.text = $"{(transport.PrescriptionDose.IsPreview ? "演示 " : "")}完成 {transport.CompletedDemonstrations}/{transport.PrescriptionDose.Total} 次 · " + ruleHint.text;
+            ruleHint.text = transport.RuleScoring.sideBridge!=null&&!transport.IsRunning?"跟随倒计时准备动作":transport.RuleScoring.Status;
+            if (transport.PrescriptionDose != null && transport.RuleScoring.sideBridge==null)
+                ruleHint.text = $"示范 {transport.CompletedDemonstrations}/{transport.PrescriptionDose.Total} 次 · " + ruleHint.text;
+        }
+        if(assessmentPanel!=null)
+        {
+            var side=transport.RuleScoring.sideBridge;var rule=side.Rule;
+            bool started=transport.IsRunning;
+            bool ready=started&&transport.RuleScoring.InputFresh&&transport.RuleScoring.calibration!=null&&transport.RuleScoring.calibration.IsCalibrated;
+            qualityMetric.text=ready?$"动作质量 {side.TrackingQuality:0} / 100":"动作质量 — / 100";
+            holdMetric.text=started?$"{(rule.RequiresContinuousHold?"连续有效":"有效保持")} {rule.DisplayHoldSeconds:0.0} / {rule.TargetHoldSeconds:0.0} 秒":"有效保持 · 准备开始计时";
+            repetitionMetric.text=$"合格 {(started?rule.QualifiedRounds:0)}/{transport.PrescriptionDose.Total} 次 · 示范 {(started?transport.CompletedDemonstrations:0)}/{transport.PrescriptionDose.Total} 次";
+            holdProgress.anchorMax=new Vector2(started&&rule.TargetHoldSeconds>0?Mathf.Clamp01(rule.DisplayHoldSeconds/rule.TargetHoldSeconds):0,1);
         }
     }
 
@@ -188,6 +202,17 @@ public sealed class HipThrustRingBridgeView : MonoBehaviour
             coachTiming.name="Coach Timing";
             if (transport.RuleScoring != null)
                 ruleHint=Label(root.transform,"保持位计分 · 满分 100",Vector2.zero,new Vector2(240,20),11);
+            if(transport.RuleScoring!=null&&transport.RuleScoring.sideBridge!=null)
+            {
+                assessmentPanel=Panel(root.transform,"Measured Side Bridge",new Color(.055f,.055f,.16f,.96f));
+                qualityMetric=Label(assessmentPanel,"动作质量 — / 100",new Vector2(0,25),new Vector2(210,20),14);
+                holdMetric=Label(assessmentPanel,"有效保持",new Vector2(0,4),new Vector2(210,18),12);
+                repetitionMetric=Label(assessmentPanel,"合格次数",new Vector2(0,-28),new Vector2(218,18),11);
+                var track=Panel(assessmentPanel,"Measured Hold Progress",new Color(.2f,.21f,.36f));
+                Layout(track,new Vector2(0,-11),new Vector2(194,4));
+                holdProgress=Panel(track,"Fill",PhaseColors[1]);
+                holdProgress.anchorMin=holdProgress.anchorMax=Vector2.zero;holdProgress.offsetMin=holdProgress.offsetMax=Vector2.zero;
+            }
             countdownPanel=Panel(root.transform,"Start Countdown",new Color(.06f,.07f,.2f,.96f));
             Label(countdownPanel,"准备开始",new Vector2(0,37),new Vector2(210,24),17);
             countdownNumber=Label(countdownPanel,"",new Vector2(0,-9),new Vector2(210,75),58);
@@ -222,6 +247,7 @@ public sealed class HipThrustRingBridgeView : MonoBehaviour
         Place(pauseButton, new Vector2(40,30), new Vector2(44,44));
         Place(menuButton, new Vector2(65,369), new Vector2(94,28));
         Place(previewPanelRect, new Vector2(720,217), new Vector2(224,185));
+        if(assessmentPanel!=null)Place(assessmentPanel,new Vector2(720,78),new Vector2(224,82));
         Place(coachPhase.rectTransform,new Vector2(720,329),new Vector2(220,25));
         Place(coachTiming.rectTransform,new Vector2(720,353),new Vector2(220,20));
         if(ruleHint!=null) Place(ruleHint.rectTransform,new Vector2(714,376),new Vector2(250,20));

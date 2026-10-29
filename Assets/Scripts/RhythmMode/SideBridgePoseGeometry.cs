@@ -7,7 +7,7 @@ public sealed class SideBridgePoseGeometry
     {
         public float lift, trunkAngle, kneeAngle, elbowAngle, shoulderStack, pelvisStack, torsoVertical;
         public float shoulderOverElbow;
-        public Vector3 thigh, shin;
+        public Vector3 thigh, shin, shoulderAxis, pelvisAxis;
         public bool IsLeftSupport => shoulderStack > .45f && pelvisStack > .5f && torsoVertical < .6f;
     }
     public Pose Rest { get; private set; }
@@ -23,6 +23,14 @@ public sealed class SideBridgePoseGeometry
     }
 
     public float Progress(Pose pose) => Mathf.Clamp01((pose.lift-RestLift)/(TopLift-RestLift));
+
+    public static bool HasStableSupport(Pose pose,Pose target) => pose!=null&&target!=null&&pose.IsLeftSupport&&
+        pose.shoulderAxis.sqrMagnitude>.5f&&pose.pelvisAxis.sqrMagnitude>.5f&&
+        Mathf.Abs(pose.elbowAngle-target.elbowAngle)<=25 &&
+        Mathf.Abs(pose.shoulderOverElbow-target.shoulderOverElbow)<=.10f &&
+        Vector3.Angle(pose.shoulderAxis,target.shoulderAxis)<=25 &&
+        Vector3.Angle(pose.pelvisAxis,target.pelvisAxis)<=25 &&
+        Mathf.Abs(Vector3.Angle(pose.shoulderAxis,pose.pelvisAxis)-Vector3.Angle(target.shoulderAxis,target.pelvisAxis))<=20;
 
     public float Quality(Pose pose, Pose target)
     {
@@ -69,7 +77,8 @@ public sealed class SideBridgePoseGeometry
             pelvisStack=Vector3.Dot((rt.position-lt.position).normalized,Vector3.up),
             torsoVertical=Mathf.Abs(Vector3.Dot((chest.position-hip.position).normalized,Vector3.up)),
             shoulderOverElbow=Vector3.ProjectOnPlane(ls.position-elbow.position,Vector3.up).magnitude/span,
-            thigh=Local(knee.position-lt.position),shin=Local(lf.position-knee.position)
+            thigh=Local(knee.position-lt.position),shin=Local(lf.position-knee.position),
+            shoulderAxis=Local(rs.position-ls.position),pelvisAxis=Local(rt.position-lt.position)
         };
         return Finite(pose.lift)&&Finite(pose.trunkAngle)&&Finite(pose.kneeAngle)&&Finite(pose.elbowAngle)&&Finite(pose.shoulderStack)&&Finite(pose.pelvisStack)&&Finite(pose.torsoVertical)&&Finite(pose.shoulderOverElbow);
     }

@@ -1,0 +1,11 @@
+Real scenes/recorded HumanPose; synthetic calibration and telemetry for scoring tests. No wearable/patient validation.
+PASS side-specific thresholds reject partial lift; good holds score 100; poor quality clears live score/continuous hold; invalid input scores zero; true low return counts once; original hip thresholds preserved.
+PASS exact doses 1/3/7/100/2000, dynamic recorded timing, 30.000-second frozen peaks and progress, immediate descending phase, recorded rest gaps and 0.5-second loop return blend.
+PASS original HumanPose: 1141 frames plus both loop-blend endpoints, all humanoid bones including hands/feet/toes; max rotation 0.00000 deg, position 0.000003 m; no arm mirroring.
+PASS geometry and scoring: left support gate, normalized elbow/ankle lift, body-scale/translation/yaw invariance, free arm ignored, fresh calibrated input scores 100, stale/disconnected input cannot score or HIT.
+PASS SideBridge_RingBridge_Dynamic: real menu/countdown, all three phases, matching coach preview, music, pause/resume, exact dose, return menu.
+PASS geometry and scoring: left support gate, normalized elbow/ankle lift, body-scale/translation/yaw invariance, free arm ignored, fresh calibrated input scores 100, stale/disconnected input cannot score or HIT.
+PASS real-time 30-second hold: coach and preview frozen at recorded peak; progress advances; pause freezes both; lower starts after exactly 30 game seconds.
+PASS SideBridge_RingBridge_Hold30: real menu/countdown, all three phases, matching coach preview, music, pause/resume, exact dose, return menu.
+PASS live prescription executor: two sets x three left-side bridge repetitions, automatic next-set countdown, exactly two completed sets.
+Assertions: 2862629

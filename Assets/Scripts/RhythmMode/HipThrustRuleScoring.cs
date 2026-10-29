@@ -11,9 +11,20 @@ public sealed class HipThrustRuleScoring : MonoBehaviour
     public float Quality { get; private set; }
     public bool TargetsReady { get; private set; }
     public bool InputFresh { get; private set; }
-    public string Status => !TargetsReady ? "动作参考不可用" : !InputFresh ? "等待动作数据" :
+    public float LiveScore => sideBridge!=null?sideBridge.Rule.LiveScore:Rule.LiveScore;
+    public float LastRoundBest => sideBridge!=null?sideBridge.Rule.LastRoundBest:Rule.LastRoundBest;
+    public string Status => !TargetsReady ? "动作参考不可用" :
+        sideBridge!=null&&(calibration==null||!calibration.IsCalibrated)
+            ? calibration!=null&&calibration.IsCalibrationBypassed?"流程预览 · 未记录训练成绩":"请先完成动作校准" :
+        !InputFresh ? "等待动作数据" :
         sideBridge!=null && !sideBridge.PostureReady ? "请保持左侧支撑、肩髋叠放" :
+        sideBridge!=null ? SideStatus :
         Rule.Phase == HipThrustHoldRule.Stage.Holding ? "保持计分" : "抬起进入保持位后计分";
+    string SideStatus => !sideBridge.SupportReady?"请调整支撑肘和肩髋排列":
+        sideBridge.Rule.RoundFinished?"本次已记录 · 跟随下一次示范":
+        !sideBridge.Rule.LowConfirmed?"请先回到低位":
+        sideBridge.Rule.HoldingCorrectly?"姿势达标 · 有效保持中":
+        sideBridge.Rule.Phase==SideBridgeHoldRule.Stage.Lowering?"请完全放下后计次":"请按教练调整抬起幅度和姿势";
     readonly HipThrustHoldGeometry geometry = new HipThrustHoldGeometry();
     AvatarMotionSource motion;
     int lastCounter;
@@ -22,7 +33,7 @@ public sealed class HipThrustRuleScoring : MonoBehaviour
     public void Begin(string difficulty)
     {
         Rule.Reset(difficulty); Progress=Quality=0; InputFresh=false;
-        if(sideBridge!=null) Rule.ResetSideBridge(difficulty);
+        if(sideBridge!=null) sideBridge.Begin(difficulty);
         motion=FindObjectOfType<AvatarMotionSource>();
         lastCounter=motion!=null?motion.LastPacketframeCounterInFrame:0;
         lastFrameAt=float.NegativeInfinity;
@@ -68,6 +79,8 @@ public sealed class HipThrustRuleScoring : MonoBehaviour
         ObserveInput();
         InputFresh=motion!=null && motion.GetAvailable()!=0 && Time.unscaledTime-lastFrameAt<=.5f;
         bool valid=TargetsReady && InputFresh && calibration!=null && calibration.IsCalibrated;
+        if(sideBridge!=null&&TargetsReady)sideBridge.UpdateReference();
+        Progress=Quality=0;
         if(valid)
         {
             if(sideBridge!=null)
@@ -81,11 +94,18 @@ public sealed class HipThrustRuleScoring : MonoBehaviour
                 if(valid) { Progress=geometry.CalculateProgress(pose); Quality=geometry.CalculatePoseQuality(pose,geometry.holdTarget,true); }
             }
         }
-        Rule.Step(Progress,Quality,deltaTime,valid);
+        if(sideBridge!=null)
+        {
+            if(!TargetsReady||!InputFresh||calibration==null||!calibration.IsCalibrated)sideBridge.InvalidateInput();
+            sideBridge.Step(Progress,Quality,deltaTime,valid);
+        }
+        else Rule.Step(Progress,Quality,deltaTime,valid);
     }
 
     public bool MatchesSideBridgeCoach() => sideBridge!=null && TargetsReady && InputFresh && calibration!=null && calibration.IsCalibrated &&
         sideBridge.Matches(calibration.UserAnimator,transport.CoachAnimator);
 
-    public string Result(int demonstrated) => $"训练完成  示范 {demonstrated} 次{transport.ActionDisplayName}\n最高 {Rule.SessionBest:0} / 100　上轮 {Rule.LastRoundBest:0}\n识别往返 {Rule.CompletedRounds} 次";
+    public string Result(int demonstrated) => sideBridge!=null
+        ? $"示范结束  {demonstrated} 次{transport.ActionDisplayName}\n实际合格 {sideBridge.Rule.QualifiedRounds}/{demonstrated} 次 · 完整往返 {sideBridge.Rule.CompletedRounds} 次\n有效保持累计 {sideBridge.Rule.TotalValidHoldSeconds:0.0} 秒\n最高保持分 {sideBridge.Rule.SessionBest:0}/100（不代表处方已完成）"
+        : $"训练完成  示范 {demonstrated} 次{transport.ActionDisplayName}\n最高 {Rule.SessionBest:0} / 100　上轮 {Rule.LastRoundBest:0}\n识别往返 {Rule.CompletedRounds} 次";
 }

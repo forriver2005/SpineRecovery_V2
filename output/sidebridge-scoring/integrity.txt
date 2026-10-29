@@ -1,0 +1,13 @@
+PASS tested source matches installed source: Assets/Scripts/RhythmMode/SideBridgeHoldRule.cs
+PASS tested source matches installed source: Assets/Scripts/RhythmMode/SideBridgeHoldRule.cs.meta
+PASS tested source matches installed source: Assets/Scripts/RhythmMode/SideBridgePoseGeometry.cs
+PASS tested source matches installed source: Assets/Scripts/RhythmMode/SideBridgePoseScoring.cs
+PASS tested source matches installed source: Assets/Scripts/RhythmMode/HipThrustRuleScoring.cs
+PASS tested source matches installed source: Assets/Scripts/RhythmMode/HipThrustTaikoController.cs
+PASS tested source matches installed source: Assets/Scripts/RhythmMode/HipThrustRingBridgeView.cs
+PASS tested source matches installed source: Assets/Scripts/Editor/SideBridgeGameVerification.cs
+PASS tested source matches installed source: Assets/Scripts/Editor/SideBridgeScoringVerification.cs
+PASS tested source matches installed source: Assets/Scripts/Editor/SideBridgeScoringVerification.cs.meta
+PASS pre-existing file preserved: SourceHanSansSC-Heavy SDF.asset
+PASS pre-existing file preserved: HipThrust_RingBridge_NewScoring.unity
+PASS pre-existing file preserved: HipThrust_RingBridge_Hold30.unity

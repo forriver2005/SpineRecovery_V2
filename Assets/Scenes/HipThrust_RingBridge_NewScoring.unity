@@ -31492,7 +31492,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   musicSource: {fileID: 0}
-  song: {fileID: 8300000, guid: c1e3af5af2964fdeb38660f9fcda8b76, type: 3}
+  song: {fileID: 8300000, guid: 634ff55b0faf4a9fae3d1e66359d06c6, type: 3}
   musicVolume: 0.32
   scheduleLeadIn: 0.15
   calibrationOffsetSeconds: 0

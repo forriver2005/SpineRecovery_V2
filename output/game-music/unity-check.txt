@@ -1,0 +1,6 @@
+Music integration smoke check; real scene menu/countdown and audio playback, synthetic calibration bypass. No gameplay source edits.
+PASS BirdDog_RingSkinC_Recorded -> BirdDog_SpaceArp; stereo 44.1 kHz; real start/countdown; playback cursor advances; loops without resetting transport; stop restores menu.
+PASS DeadBug_RingSkinC_Recorded -> DeadBug_CrystalCave; stereo 44.1 kHz; real start/countdown; playback cursor advances; loops without resetting transport; stop restores menu.
+PASS HipThrust_RingBridge_Recorded -> HipThrust_HeavenlyLoop; stereo 44.1 kHz; real start/countdown; playback cursor advances; loops without resetting transport; stop restores menu; native pause/resume preserves audio cursor.
+PASS HipThrust_RingBridge_NewScoring -> HipThrust_HeavenlyLoop; stereo 44.1 kHz; real start/countdown; playback cursor advances; loops without resetting transport; stop restores menu; native pause/resume preserves audio cursor.
+PASS HipThrust_RingBridge_Hold30 -> HipThrust_HeavenlyLoop; stereo 44.1 kHz; real start/countdown; playback cursor advances; loops without resetting transport; stop restores menu; native pause/resume preserves audio cursor.

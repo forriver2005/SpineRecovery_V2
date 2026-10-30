@@ -1,0 +1,19 @@
+APK verification: PASS
+File: SpineRecovery_六项游戏测试_20261030.apk
+Bytes: 108869858
+SHA256: 38B09FE4688D9DE4A13AEE22A1F10A5197957B2230C2F7DFB716C0B307CFB398
+Package: com.metaspine.recovery.gamingtest
+Version: 0.2.0-test.20261030 (2026103001)
+Min SDK: 26; Target SDK: 35
+ABIs: arm64-v8a, armeabi-v7a; libmain, libunity, libil2cpp present for both
+Activity: com.unity3d.player.UnityPlayerActivity
+Orientation: landscape (0)
+Graphics: OpenGLES3
+INTERNET permission: present
+VR hardware requirement: none
+Signature: APK v2 verified, Android Debug certificate
+Alignment: zipalign -c 4 passed
+Test navigation compiled: GameTestMenu.EnabledForBuild returns true in generated Android IL2CPP code
+Build scenes: exact six from GameTestMenu.Scenes
+Physical Android device installation: NOT RUN (no device connected)
+Physical IMU verification: NOT RUN (user approved software-chain verification first)

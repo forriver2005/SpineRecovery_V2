@@ -1,0 +1,8 @@
+Synthetic poses -> installed SlimeVR :39540 -> VMC :39539 -> actual Unity user rig. No physical IMU.
+PASS BirdDog_RingSkinC_Recorded: real SlimeVR drives hips, both arms/hands, both legs/feet; named-bone rotations match, no idle score.
+PASS DeadBug_RingSkinC_Recorded: real SlimeVR drives hips, both arms/hands, both legs/feet; named-bone rotations match, no idle score.
+PASS HipThrust_RingBridge_NewScoring: real SlimeVR drives hips, both arms/hands, both legs/feet; named-bone rotations match, no idle score.
+PASS HipThrust_RingBridge_Hold30: real SlimeVR drives hips, both arms/hands, both legs/feet; named-bone rotations match, no idle score.
+PASS SideBridge_RingBridge_Dynamic: real SlimeVR drives hips, both arms/hands, both legs/feet; named-bone rotations match, no idle score.
+PASS SideBridge_RingBridge_Hold30: real SlimeVR drives hips, both arms/hands, both legs/feet; named-bone rotations match, no idle score.
+Assertions: 300

@@ -30,6 +30,8 @@ public sealed class GameWorkoutScene : MonoBehaviour
 
     private void Awake()
     {
+        if (GameTestMenu.EnabledForBuild && System.Array.IndexOf(GameTestMenu.Scenes, gameObject.scene.name) >= 0)
+            gameObject.AddComponent<GameTestMenu>().Initialize(this);
         var assessment=gameObject.AddComponent<GameTrainingAssessment>();
         assessment.Initialize(this);
         session = GameWorkoutSession.Instance;

@@ -80,7 +80,7 @@ public sealed class HipThrustRingBridgeView : MonoBehaviour
         hudRect.anchoredPosition3D = Vector3.zero;
         hudRect.localPosition = Vector3.zero;
         hudRect.localScale = Vector3.one * .01f;
-        pausePanel.SetActive(transport.IsPaused);
+        pausePanel.SetActive(transport.IsPaused && !GameTestMenu.EnabledForBuild);
         UpdateCoachPresentation();
         FitControls();
     }

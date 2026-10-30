@@ -140,6 +140,7 @@ public class CoachActionController : MonoBehaviour
     private Coroutine idleRoutine;
     private Coroutine actionDiagnosticsRoutine;
     private TrainingDifficulty selectedDifficulty = TrainingDifficulty.Standard;
+    public string SelectedDifficultyKey => selectedDifficulty==TrainingDifficulty.Simple?"simple":selectedDifficulty==TrainingDifficulty.Hard?"hard":"standard";
     private float activePlaybackSpeed = 1f;
     private bool isDifficultyHold;
 
@@ -692,16 +693,9 @@ public class CoachActionController : MonoBehaviour
 
     private DifficultyProfile GetSelectedDifficultyProfile()
     {
-        switch (selectedDifficulty)
-        {
-            case TrainingDifficulty.Simple:
-                return simpleDifficulty;
-            case TrainingDifficulty.Hard:
-                return hardDifficulty;
-            case TrainingDifficulty.Standard:
-            default:
-                return standardDifficulty;
-        }
+        // Difficulty is a scoring choice. Preserve the scene's original standard
+        // speed, repetition count and phase timing for all three choices.
+        return standardDifficulty;
     }
 
     private bool HasAnimatorState(string stateName)

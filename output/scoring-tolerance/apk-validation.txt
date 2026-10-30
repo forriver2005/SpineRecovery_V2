@@ -1,0 +1,9 @@
+APK signature verified with apksigner. Certificate SHA256: 1c74a308499a9f36664cc239ac53d006af0de674e4a533e34c3ba8036de4e1d6
+zipalign -c 4: PASS
+SHA256: 9D3F52F0FE82ADDA8BA389D055684FFB24A5FABCA7D94746CE3ACC5EB4D0E783
+Bytes: 108877098
+package: name='com.metaspine.recovery.gamingtest' versionCode='2026103002' versionName='0.2.1-test.20261030' platformBuildVersionName='15' platformBuildVersionCode='35' compileSdkVersion='35' compileSdkVersionCodename='15'
+sdkVersion:'26'
+targetSdkVersion:'35'
+launchable-activity: name='com.unity3d.player.UnityPlayerActivity'  label='' icon=''
+native-code: 'arm64-v8a' 'armeabi-v7a'

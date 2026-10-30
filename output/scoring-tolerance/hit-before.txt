@@ -1,0 +1,421 @@
+Recorded coach -> independent patient, actual calibration, endpoint HIT replay; synthetic input, not physical IMUs.
+birddog simple exact birddog_1_up RightFoot=True/100.0/100.0 LeftHand=True/100.0/100.0
+birddog simple exact birddog_2_up LeftFoot=True/100.0/100.0 RightHand=True/100.0/100.0
+birddog simple exact birddog_3_up RightFoot=True/100.0/100.0 LeftHand=True/100.0/100.0
+birddog simple exact birddog_4_up LeftFoot=True/100.0/100.0 RightHand=True/100.0/100.0
+TOTAL birddog simple exact hits=8/8 minimumQuality=100.0 minimumProgress=100.0
+birddog simple range80 birddog_1_up RightFoot=True/100.0/100.0 LeftHand=True/69.2/69.2
+birddog simple range80 birddog_2_up LeftFoot=True/100.0/100.0 RightHand=True/63.5/63.5
+birddog simple range80 birddog_3_up RightFoot=True/100.0/100.0 LeftHand=True/67.5/67.5
+birddog simple range80 birddog_4_up LeftFoot=True/100.0/100.0 RightHand=True/65.6/65.6
+TOTAL birddog simple range80 hits=8/8 minimumQuality=63.5 minimumProgress=63.5
+birddog simple range70 birddog_1_up RightFoot=True/68.4/68.4 LeftHand=False/11.0/11.0
+birddog simple range70 birddog_2_up LeftFoot=True/67.9/67.9 RightHand=False/5.6/5.6
+birddog simple range70 birddog_3_up RightFoot=True/68.5/68.5 LeftHand=False/9.3/9.3
+birddog simple range70 birddog_4_up LeftFoot=True/64.3/64.3 RightHand=False/9.6/9.6
+TOTAL birddog simple range70 hits=4/8 minimumQuality=5.6 minimumProgress=5.6
+birddog simple half birddog_1_up RightFoot=False/0.0/0.0 LeftHand=False/0.0/0.0
+birddog simple half birddog_2_up LeftFoot=False/0.0/0.0 RightHand=False/0.0/0.0
+birddog simple half birddog_3_up RightFoot=False/0.0/0.0 LeftHand=False/0.0/0.0
+birddog simple half birddog_4_up LeftFoot=False/0.0/0.0 RightHand=False/0.0/0.0
+TOTAL birddog simple half hits=0/8 minimumQuality=0.0 minimumProgress=0.0
+birddog simple rest birddog_1_up RightFoot=False/0.0/0.0 LeftHand=False/0.0/0.0
+birddog simple rest birddog_2_up LeftFoot=False/0.0/0.0 RightHand=False/0.0/0.0
+birddog simple rest birddog_3_up RightFoot=False/0.0/0.0 LeftHand=False/0.0/0.0
+birddog simple rest birddog_4_up LeftFoot=False/0.0/0.0 RightHand=False/0.0/0.0
+TOTAL birddog simple rest hits=0/8 minimumQuality=0.0 minimumProgress=0.0
+birddog simple leg15 birddog_1_up RightFoot=True/100.0/100.0 LeftHand=True/100.0/100.0
+birddog simple leg15 birddog_2_up LeftFoot=True/100.0/100.0 RightHand=True/100.0/100.0
+birddog simple leg15 birddog_3_up RightFoot=True/100.0/100.0 LeftHand=True/100.0/100.0
+birddog simple leg15 birddog_4_up LeftFoot=True/100.0/100.0 RightHand=True/100.0/100.0
+TOTAL birddog simple leg15 hits=8/8 minimumQuality=100.0 minimumProgress=100.0
+birddog simple calibration15 birddog_1_up RightFoot=True/84.6/84.6 LeftHand=True/100.0/100.0
+birddog simple calibration15 birddog_2_up LeftFoot=True/55.8/55.8 RightHand=True/100.0/100.0
+birddog simple calibration15 birddog_3_up RightFoot=True/99.1/99.1 LeftHand=True/100.0/100.0
+birddog simple calibration15 birddog_4_up LeftFoot=True/50.1/50.1 RightHand=True/100.0/100.0
+TOTAL birddog simple calibration15 hits=8/8 minimumQuality=50.1 minimumProgress=50.1
+birddog simple calibration_ready_pose birddog_1_up RightFoot=True/100.0/100.0 LeftHand=True/100.0/100.0
+birddog simple calibration_ready_pose birddog_2_up LeftFoot=True/100.0/100.0 RightHand=True/100.0/100.0
+birddog simple calibration_ready_pose birddog_3_up RightFoot=True/100.0/100.0 LeftHand=True/100.0/100.0
+birddog simple calibration_ready_pose birddog_4_up LeftFoot=True/100.0/100.0 RightHand=True/100.0/100.0
+TOTAL birddog simple calibration_ready_pose hits=8/8 minimumQuality=100.0 minimumProgress=100.0
+birddog simple foot45 birddog_1_up RightFoot=True/100.0/100.0 LeftHand=True/100.0/100.0
+birddog simple foot45 birddog_2_up LeftFoot=True/100.0/100.0 RightHand=True/100.0/100.0
+birddog simple foot45 birddog_3_up RightFoot=True/100.0/100.0 LeftHand=True/100.0/100.0
+birddog simple foot45 birddog_4_up LeftFoot=True/100.0/100.0 RightHand=True/100.0/100.0
+TOTAL birddog simple foot45 hits=8/8 minimumQuality=100.0 minimumProgress=100.0
+birddog simple delay500 birddog_1_up RightFoot=True/100.0/100.0 LeftHand=True/100.0/100.0
+birddog simple delay500 birddog_2_up LeftFoot=True/100.0/100.0 RightHand=True/100.0/100.0
+birddog simple delay500 birddog_3_up RightFoot=True/100.0/100.0 LeftHand=True/100.0/100.0
+birddog simple delay500 birddog_4_up LeftFoot=True/100.0/100.0 RightHand=True/100.0/100.0
+TOTAL birddog simple delay500 hits=8/8 minimumQuality=100.0 minimumProgress=100.0
+birddog simple delay800 birddog_1_up RightFoot=True/100.0/100.0 LeftHand=True/100.0/100.0
+birddog simple delay800 birddog_2_up LeftFoot=True/100.0/100.0 RightHand=True/100.0/100.0
+birddog simple delay800 birddog_3_up RightFoot=True/100.0/100.0 LeftHand=True/100.0/100.0
+birddog simple delay800 birddog_4_up LeftFoot=True/100.0/100.0 RightHand=True/100.0/100.0
+TOTAL birddog simple delay800 hits=8/8 minimumQuality=100.0 minimumProgress=100.0
+birddog simple wrong_pair birddog_1_up RightFoot=False/0.0/0.0 LeftHand=False/0.0/0.0
+birddog simple wrong_pair birddog_2_up LeftFoot=False/0.0/0.0 RightHand=False/0.0/0.0
+birddog simple wrong_pair birddog_3_up RightFoot=False/0.0/0.0 LeftHand=False/0.0/0.0
+birddog simple wrong_pair birddog_4_up LeftFoot=False/0.0/0.0 RightHand=False/0.0/0.0
+TOTAL birddog simple wrong_pair hits=0/8 minimumQuality=0.0 minimumProgress=0.0
+birddog simple wrong_floor birddog_1_up RightFoot=False/0.0/100.0 LeftHand=False/0.0/100.0
+birddog simple wrong_floor birddog_2_up LeftFoot=False/0.0/100.0 RightHand=False/0.0/100.0
+birddog simple wrong_floor birddog_3_up RightFoot=False/0.0/100.0 LeftHand=False/0.0/100.0
+birddog simple wrong_floor birddog_4_up LeftFoot=False/0.0/100.0 RightHand=False/0.0/100.0
+TOTAL birddog simple wrong_floor hits=0/8 minimumQuality=0.0 minimumProgress=100.0
+birddog simple no_input birddog_1_up RightFoot=False/0.0/100.0 LeftHand=False/0.0/100.0
+birddog simple no_input birddog_2_up LeftFoot=False/0.0/100.0 RightHand=False/0.0/100.0
+birddog simple no_input birddog_3_up RightFoot=False/0.0/100.0 LeftHand=False/0.0/100.0
+birddog simple no_input birddog_4_up LeftFoot=False/0.0/100.0 RightHand=False/0.0/100.0
+TOTAL birddog simple no_input hits=0/8 minimumQuality=0.0 minimumProgress=100.0
+birddog standard exact birddog_1_up RightFoot=True/100.0/100.0 LeftHand=True/100.0/100.0
+birddog standard exact birddog_2_up LeftFoot=True/100.0/100.0 RightHand=True/100.0/100.0
+birddog standard exact birddog_3_up RightFoot=True/100.0/100.0 LeftHand=True/100.0/100.0
+birddog standard exact birddog_4_up LeftFoot=True/100.0/100.0 RightHand=True/100.0/100.0
+TOTAL birddog standard exact hits=8/8 minimumQuality=100.0 minimumProgress=100.0
+birddog standard range80 birddog_1_up RightFoot=True/100.0/100.0 LeftHand=True/69.2/69.2
+birddog standard range80 birddog_2_up LeftFoot=True/100.0/100.0 RightHand=True/63.5/63.5
+birddog standard range80 birddog_3_up RightFoot=True/100.0/100.0 LeftHand=True/67.5/67.5
+birddog standard range80 birddog_4_up LeftFoot=True/100.0/100.0 RightHand=True/65.7/65.7
+TOTAL birddog standard range80 hits=8/8 minimumQuality=63.5 minimumProgress=63.5
+birddog standard range70 birddog_1_up RightFoot=True/68.4/68.4 LeftHand=False/11.0/11.0
+birddog standard range70 birddog_2_up LeftFoot=True/67.9/67.9 RightHand=False/5.6/5.6
+birddog standard range70 birddog_3_up RightFoot=True/68.5/68.5 LeftHand=False/9.3/9.3
+birddog standard range70 birddog_4_up LeftFoot=True/64.3/64.3 RightHand=False/9.7/9.7
+TOTAL birddog standard range70 hits=4/8 minimumQuality=5.6 minimumProgress=5.6
+birddog standard half birddog_1_up RightFoot=False/0.0/0.0 LeftHand=False/0.0/0.0
+birddog standard half birddog_2_up LeftFoot=False/0.0/0.0 RightHand=False/0.0/0.0
+birddog standard half birddog_3_up RightFoot=False/0.0/0.0 LeftHand=False/0.0/0.0
+birddog standard half birddog_4_up LeftFoot=False/0.0/0.0 RightHand=False/0.0/0.0
+TOTAL birddog standard half hits=0/8 minimumQuality=0.0 minimumProgress=0.0
+birddog standard rest birddog_1_up RightFoot=False/0.0/0.0 LeftHand=False/0.0/0.0
+birddog standard rest birddog_2_up LeftFoot=False/0.0/0.0 RightHand=False/0.0/0.0
+birddog standard rest birddog_3_up RightFoot=False/0.0/0.0 LeftHand=False/0.0/0.0
+birddog standard rest birddog_4_up LeftFoot=False/0.0/0.0 RightHand=False/0.0/0.0
+TOTAL birddog standard rest hits=0/8 minimumQuality=0.0 minimumProgress=0.0
+birddog standard leg15 birddog_1_up RightFoot=True/100.0/100.0 LeftHand=True/100.0/100.0
+birddog standard leg15 birddog_2_up LeftFoot=True/100.0/100.0 RightHand=True/100.0/100.0
+birddog standard leg15 birddog_3_up RightFoot=True/100.0/100.0 LeftHand=True/100.0/100.0
+birddog standard leg15 birddog_4_up LeftFoot=True/100.0/100.0 RightHand=True/100.0/100.0
+TOTAL birddog standard leg15 hits=8/8 minimumQuality=100.0 minimumProgress=100.0
+birddog standard calibration15 birddog_1_up RightFoot=True/84.7/84.7 LeftHand=True/100.0/100.0
+birddog standard calibration15 birddog_2_up LeftFoot=True/55.8/55.8 RightHand=True/100.0/100.0
+birddog standard calibration15 birddog_3_up RightFoot=True/99.1/99.1 LeftHand=True/100.0/100.0
+birddog standard calibration15 birddog_4_up LeftFoot=True/50.1/50.1 RightHand=True/100.0/100.0
+TOTAL birddog standard calibration15 hits=8/8 minimumQuality=50.1 minimumProgress=50.1
+birddog standard calibration_ready_pose birddog_1_up RightFoot=True/100.0/100.0 LeftHand=True/100.0/100.0
+birddog standard calibration_ready_pose birddog_2_up LeftFoot=True/100.0/100.0 RightHand=True/100.0/100.0
+birddog standard calibration_ready_pose birddog_3_up RightFoot=True/100.0/100.0 LeftHand=True/100.0/100.0
+birddog standard calibration_ready_pose birddog_4_up LeftFoot=True/100.0/100.0 RightHand=True/100.0/100.0
+TOTAL birddog standard calibration_ready_pose hits=8/8 minimumQuality=100.0 minimumProgress=100.0
+birddog standard foot45 birddog_1_up RightFoot=True/100.0/100.0 LeftHand=True/100.0/100.0
+birddog standard foot45 birddog_2_up LeftFoot=True/100.0/100.0 RightHand=True/100.0/100.0
+birddog standard foot45 birddog_3_up RightFoot=True/100.0/100.0 LeftHand=True/100.0/100.0
+birddog standard foot45 birddog_4_up LeftFoot=True/100.0/100.0 RightHand=True/100.0/100.0
+TOTAL birddog standard foot45 hits=8/8 minimumQuality=100.0 minimumProgress=100.0
+birddog standard delay500 birddog_1_up RightFoot=True/100.0/100.0 LeftHand=True/100.0/100.0
+birddog standard delay500 birddog_2_up LeftFoot=True/100.0/100.0 RightHand=True/100.0/100.0
+birddog standard delay500 birddog_3_up RightFoot=True/100.0/100.0 LeftHand=True/100.0/100.0
+birddog standard delay500 birddog_4_up LeftFoot=True/100.0/100.0 RightHand=True/100.0/100.0
+TOTAL birddog standard delay500 hits=8/8 minimumQuality=100.0 minimumProgress=100.0
+birddog standard delay800 birddog_1_up RightFoot=True/100.0/100.0 LeftHand=True/100.0/100.0
+birddog standard delay800 birddog_2_up LeftFoot=True/100.0/100.0 RightHand=True/100.0/100.0
+birddog standard delay800 birddog_3_up RightFoot=True/100.0/100.0 LeftHand=True/100.0/100.0
+birddog standard delay800 birddog_4_up LeftFoot=True/100.0/100.0 RightHand=True/100.0/100.0
+TOTAL birddog standard delay800 hits=8/8 minimumQuality=100.0 minimumProgress=100.0
+birddog standard wrong_pair birddog_1_up RightFoot=False/0.0/0.0 LeftHand=False/0.0/0.0
+birddog standard wrong_pair birddog_2_up LeftFoot=False/0.0/0.0 RightHand=False/0.0/0.0
+birddog standard wrong_pair birddog_3_up RightFoot=False/0.0/0.0 LeftHand=False/0.0/0.0
+birddog standard wrong_pair birddog_4_up LeftFoot=False/0.0/0.0 RightHand=False/0.0/0.0
+TOTAL birddog standard wrong_pair hits=0/8 minimumQuality=0.0 minimumProgress=0.0
+birddog standard wrong_floor birddog_1_up RightFoot=False/0.0/100.0 LeftHand=False/0.0/100.0
+birddog standard wrong_floor birddog_2_up LeftFoot=False/0.0/100.0 RightHand=False/0.0/100.0
+birddog standard wrong_floor birddog_3_up RightFoot=False/0.0/100.0 LeftHand=False/0.0/100.0
+birddog standard wrong_floor birddog_4_up LeftFoot=False/0.0/100.0 RightHand=False/0.0/100.0
+TOTAL birddog standard wrong_floor hits=0/8 minimumQuality=0.0 minimumProgress=100.0
+birddog standard no_input birddog_1_up RightFoot=False/0.0/100.0 LeftHand=False/0.0/100.0
+birddog standard no_input birddog_2_up LeftFoot=False/0.0/100.0 RightHand=False/0.0/100.0
+birddog standard no_input birddog_3_up RightFoot=False/0.0/100.0 LeftHand=False/0.0/100.0
+birddog standard no_input birddog_4_up LeftFoot=False/0.0/100.0 RightHand=False/0.0/100.0
+TOTAL birddog standard no_input hits=0/8 minimumQuality=0.0 minimumProgress=100.0
+birddog hard exact birddog_1_up RightFoot=True/100.0/100.0 LeftHand=True/100.0/100.0
+birddog hard exact birddog_2_up LeftFoot=True/100.0/100.0 RightHand=True/100.0/100.0
+birddog hard exact birddog_3_up RightFoot=True/100.0/100.0 LeftHand=True/100.0/100.0
+birddog hard exact birddog_4_up LeftFoot=True/100.0/100.0 RightHand=True/100.0/100.0
+TOTAL birddog hard exact hits=8/8 minimumQuality=100.0 minimumProgress=100.0
+birddog hard range80 birddog_1_up RightFoot=True/100.0/100.0 LeftHand=True/69.2/69.2
+birddog hard range80 birddog_2_up LeftFoot=True/100.0/100.0 RightHand=True/63.5/63.5
+birddog hard range80 birddog_3_up RightFoot=True/100.0/100.0 LeftHand=True/67.5/67.5
+birddog hard range80 birddog_4_up LeftFoot=True/100.0/100.0 RightHand=True/65.7/65.7
+TOTAL birddog hard range80 hits=8/8 minimumQuality=63.5 minimumProgress=63.5
+birddog hard range70 birddog_1_up RightFoot=True/68.4/68.4 LeftHand=False/11.0/11.0
+birddog hard range70 birddog_2_up LeftFoot=True/67.9/67.9 RightHand=False/5.6/5.6
+birddog hard range70 birddog_3_up RightFoot=True/68.5/68.5 LeftHand=False/9.3/9.3
+birddog hard range70 birddog_4_up LeftFoot=True/64.3/64.3 RightHand=False/9.7/9.7
+TOTAL birddog hard range70 hits=4/8 minimumQuality=5.6 minimumProgress=5.6
+birddog hard half birddog_1_up RightFoot=False/0.0/0.0 LeftHand=False/0.0/0.0
+birddog hard half birddog_2_up LeftFoot=False/0.0/0.0 RightHand=False/0.0/0.0
+birddog hard half birddog_3_up RightFoot=False/0.0/0.0 LeftHand=False/0.0/0.0
+birddog hard half birddog_4_up LeftFoot=False/0.0/0.0 RightHand=False/0.0/0.0
+TOTAL birddog hard half hits=0/8 minimumQuality=0.0 minimumProgress=0.0
+birddog hard rest birddog_1_up RightFoot=False/0.0/0.0 LeftHand=False/0.0/0.0
+birddog hard rest birddog_2_up LeftFoot=False/0.0/0.0 RightHand=False/0.0/0.0
+birddog hard rest birddog_3_up RightFoot=False/0.0/0.0 LeftHand=False/0.0/0.0
+birddog hard rest birddog_4_up LeftFoot=False/0.0/0.0 RightHand=False/0.0/0.0
+TOTAL birddog hard rest hits=0/8 minimumQuality=0.0 minimumProgress=0.0
+birddog hard leg15 birddog_1_up RightFoot=True/100.0/100.0 LeftHand=True/100.0/100.0
+birddog hard leg15 birddog_2_up LeftFoot=True/100.0/100.0 RightHand=True/100.0/100.0
+birddog hard leg15 birddog_3_up RightFoot=True/100.0/100.0 LeftHand=True/100.0/100.0
+birddog hard leg15 birddog_4_up LeftFoot=True/100.0/100.0 RightHand=True/100.0/100.0
+TOTAL birddog hard leg15 hits=8/8 minimumQuality=100.0 minimumProgress=100.0
+birddog hard calibration15 birddog_1_up RightFoot=True/84.7/84.7 LeftHand=True/100.0/100.0
+birddog hard calibration15 birddog_2_up LeftFoot=True/55.8/55.8 RightHand=True/100.0/100.0
+birddog hard calibration15 birddog_3_up RightFoot=True/99.1/99.1 LeftHand=True/100.0/100.0
+birddog hard calibration15 birddog_4_up LeftFoot=True/50.1/50.1 RightHand=True/100.0/100.0
+TOTAL birddog hard calibration15 hits=8/8 minimumQuality=50.1 minimumProgress=50.1
+birddog hard calibration_ready_pose birddog_1_up RightFoot=True/100.0/100.0 LeftHand=True/100.0/100.0
+birddog hard calibration_ready_pose birddog_2_up LeftFoot=True/100.0/100.0 RightHand=True/100.0/100.0
+birddog hard calibration_ready_pose birddog_3_up RightFoot=True/100.0/100.0 LeftHand=True/100.0/100.0
+birddog hard calibration_ready_pose birddog_4_up LeftFoot=True/100.0/100.0 RightHand=True/100.0/100.0
+TOTAL birddog hard calibration_ready_pose hits=8/8 minimumQuality=100.0 minimumProgress=100.0
+birddog hard foot45 birddog_1_up RightFoot=True/100.0/100.0 LeftHand=True/100.0/100.0
+birddog hard foot45 birddog_2_up LeftFoot=True/100.0/100.0 RightHand=True/100.0/100.0
+birddog hard foot45 birddog_3_up RightFoot=True/100.0/100.0 LeftHand=True/100.0/100.0
+birddog hard foot45 birddog_4_up LeftFoot=True/100.0/100.0 RightHand=True/100.0/100.0
+TOTAL birddog hard foot45 hits=8/8 minimumQuality=100.0 minimumProgress=100.0
+birddog hard delay500 birddog_1_up RightFoot=True/100.0/100.0 LeftHand=True/100.0/100.0
+birddog hard delay500 birddog_2_up LeftFoot=True/100.0/100.0 RightHand=True/100.0/100.0
+birddog hard delay500 birddog_3_up RightFoot=True/100.0/100.0 LeftHand=True/100.0/100.0
+birddog hard delay500 birddog_4_up LeftFoot=True/100.0/100.0 RightHand=True/100.0/100.0
+TOTAL birddog hard delay500 hits=8/8 minimumQuality=100.0 minimumProgress=100.0
+birddog hard delay800 birddog_1_up RightFoot=True/100.0/100.0 LeftHand=True/100.0/100.0
+birddog hard delay800 birddog_2_up LeftFoot=True/100.0/100.0 RightHand=True/100.0/100.0
+birddog hard delay800 birddog_3_up RightFoot=True/100.0/100.0 LeftHand=True/100.0/100.0
+birddog hard delay800 birddog_4_up LeftFoot=True/100.0/100.0 RightHand=True/100.0/100.0
+TOTAL birddog hard delay800 hits=8/8 minimumQuality=100.0 minimumProgress=100.0
+birddog hard wrong_pair birddog_1_up RightFoot=False/0.0/0.0 LeftHand=False/0.0/0.0
+birddog hard wrong_pair birddog_2_up LeftFoot=False/0.0/0.0 RightHand=False/0.0/0.0
+birddog hard wrong_pair birddog_3_up RightFoot=False/0.0/0.0 LeftHand=False/0.0/0.0
+birddog hard wrong_pair birddog_4_up LeftFoot=False/0.0/0.0 RightHand=False/0.0/0.0
+TOTAL birddog hard wrong_pair hits=0/8 minimumQuality=0.0 minimumProgress=0.0
+birddog hard wrong_floor birddog_1_up RightFoot=False/0.0/100.0 LeftHand=False/0.0/100.0
+birddog hard wrong_floor birddog_2_up LeftFoot=False/0.0/100.0 RightHand=False/0.0/100.0
+birddog hard wrong_floor birddog_3_up RightFoot=False/0.0/100.0 LeftHand=False/0.0/100.0
+birddog hard wrong_floor birddog_4_up LeftFoot=False/0.0/100.0 RightHand=False/0.0/100.0
+TOTAL birddog hard wrong_floor hits=0/8 minimumQuality=0.0 minimumProgress=100.0
+birddog hard no_input birddog_1_up RightFoot=False/0.0/100.0 LeftHand=False/0.0/100.0
+birddog hard no_input birddog_2_up LeftFoot=False/0.0/100.0 RightHand=False/0.0/100.0
+birddog hard no_input birddog_3_up RightFoot=False/0.0/100.0 LeftHand=False/0.0/100.0
+birddog hard no_input birddog_4_up LeftFoot=False/0.0/100.0 RightHand=False/0.0/100.0
+TOTAL birddog hard no_input hits=0/8 minimumQuality=0.0 minimumProgress=100.0
+deadbug simple exact deadbug_1_up RightFoot=True/100.0/100.0 LeftHand=True/100.0/100.0
+deadbug simple exact deadbug_2_up LeftFoot=True/100.0/100.0 RightHand=True/100.0/100.0
+deadbug simple exact deadbug_3_up RightFoot=True/100.0/100.0 LeftHand=True/100.0/100.0
+deadbug simple exact deadbug_4_up LeftFoot=True/100.0/100.0 RightHand=True/100.0/100.0
+TOTAL deadbug simple exact hits=8/8 minimumQuality=100.0 minimumProgress=100.0
+deadbug simple range80 deadbug_1_up RightFoot=True/93.7/93.7 LeftHand=True/76.6/76.6
+deadbug simple range80 deadbug_2_up LeftFoot=True/100.0/100.0 RightHand=True/68.4/68.4
+deadbug simple range80 deadbug_3_up RightFoot=True/100.0/100.0 LeftHand=True/76.8/76.8
+deadbug simple range80 deadbug_4_up LeftFoot=True/78.9/78.9 RightHand=True/68.3/68.3
+TOTAL deadbug simple range80 hits=8/8 minimumQuality=68.3 minimumProgress=68.3
+deadbug simple range70 deadbug_1_up RightFoot=True/41.9/41.9 LeftHand=False/23.2/23.2
+deadbug simple range70 deadbug_2_up LeftFoot=True/65.4/65.4 RightHand=False/10.1/10.1
+deadbug simple range70 deadbug_3_up RightFoot=True/58.6/58.6 LeftHand=False/18.2/18.2
+deadbug simple range70 deadbug_4_up LeftFoot=False/28.4/28.4 RightHand=False/9.8/9.8
+TOTAL deadbug simple range70 hits=3/8 minimumQuality=9.8 minimumProgress=9.8
+deadbug simple half deadbug_1_up RightFoot=False/0.0/0.0 LeftHand=False/0.0/0.0
+deadbug simple half deadbug_2_up LeftFoot=False/0.0/0.0 RightHand=False/0.0/0.0
+deadbug simple half deadbug_3_up RightFoot=False/0.0/0.0 LeftHand=False/0.0/0.0
+deadbug simple half deadbug_4_up LeftFoot=False/0.0/0.0 RightHand=False/0.0/0.0
+TOTAL deadbug simple half hits=0/8 minimumQuality=0.0 minimumProgress=0.0
+deadbug simple rest deadbug_1_up RightFoot=False/0.0/0.0 LeftHand=False/0.0/0.0
+deadbug simple rest deadbug_2_up LeftFoot=False/0.0/0.0 RightHand=False/0.0/0.0
+deadbug simple rest deadbug_3_up RightFoot=False/0.0/0.0 LeftHand=False/0.0/0.0
+deadbug simple rest deadbug_4_up LeftFoot=False/0.0/0.0 RightHand=False/0.0/0.0
+TOTAL deadbug simple rest hits=0/8 minimumQuality=0.0 minimumProgress=0.0
+deadbug simple leg15 deadbug_1_up RightFoot=True/100.0/100.0 LeftHand=True/100.0/100.0
+deadbug simple leg15 deadbug_2_up LeftFoot=True/100.0/100.0 RightHand=True/100.0/100.0
+deadbug simple leg15 deadbug_3_up RightFoot=True/100.0/100.0 LeftHand=True/100.0/100.0
+deadbug simple leg15 deadbug_4_up LeftFoot=True/100.0/100.0 RightHand=True/100.0/100.0
+TOTAL deadbug simple leg15 hits=8/8 minimumQuality=100.0 minimumProgress=100.0
+deadbug simple calibration15 deadbug_1_up RightFoot=True/80.1/80.1 LeftHand=True/100.0/100.0
+deadbug simple calibration15 deadbug_2_up LeftFoot=True/81.8/81.8 RightHand=True/100.0/100.0
+deadbug simple calibration15 deadbug_3_up RightFoot=True/99.7/99.7 LeftHand=True/100.0/100.0
+deadbug simple calibration15 deadbug_4_up LeftFoot=False/35.3/35.3 RightHand=True/100.0/100.0
+TOTAL deadbug simple calibration15 hits=7/8 minimumQuality=35.3 minimumProgress=35.3
+deadbug simple calibration_ready_pose deadbug_1_up RightFoot=False/0.0/0.0 LeftHand=False/0.0/0.0
+deadbug simple calibration_ready_pose deadbug_2_up LeftFoot=False/0.0/0.0 RightHand=False/0.0/0.0
+deadbug simple calibration_ready_pose deadbug_3_up RightFoot=False/0.0/0.0 LeftHand=False/0.0/0.0
+deadbug simple calibration_ready_pose deadbug_4_up LeftFoot=False/0.0/0.0 RightHand=False/0.0/0.0
+TOTAL deadbug simple calibration_ready_pose hits=0/8 minimumQuality=0.0 minimumProgress=0.0
+deadbug simple foot45 deadbug_1_up RightFoot=True/100.0/100.0 LeftHand=True/100.0/100.0
+deadbug simple foot45 deadbug_2_up LeftFoot=True/100.0/100.0 RightHand=True/100.0/100.0
+deadbug simple foot45 deadbug_3_up RightFoot=True/100.0/100.0 LeftHand=True/100.0/100.0
+deadbug simple foot45 deadbug_4_up LeftFoot=True/100.0/100.0 RightHand=True/100.0/100.0
+TOTAL deadbug simple foot45 hits=8/8 minimumQuality=100.0 minimumProgress=100.0
+deadbug simple delay500 deadbug_1_up RightFoot=True/100.0/100.0 LeftHand=True/100.0/100.0
+deadbug simple delay500 deadbug_2_up LeftFoot=True/100.0/100.0 RightHand=True/100.0/100.0
+deadbug simple delay500 deadbug_3_up RightFoot=True/100.0/100.0 LeftHand=True/100.0/100.0
+deadbug simple delay500 deadbug_4_up LeftFoot=True/100.0/100.0 RightHand=True/100.0/100.0
+TOTAL deadbug simple delay500 hits=8/8 minimumQuality=100.0 minimumProgress=100.0
+deadbug simple delay800 deadbug_1_up RightFoot=True/100.0/100.0 LeftHand=True/100.0/100.0
+deadbug simple delay800 deadbug_2_up LeftFoot=True/100.0/100.0 RightHand=True/100.0/100.0
+deadbug simple delay800 deadbug_3_up RightFoot=True/100.0/100.0 LeftHand=True/100.0/100.0
+deadbug simple delay800 deadbug_4_up LeftFoot=True/100.0/100.0 RightHand=True/100.0/100.0
+TOTAL deadbug simple delay800 hits=8/8 minimumQuality=100.0 minimumProgress=100.0
+deadbug simple wrong_pair deadbug_1_up RightFoot=False/0.0/0.0 LeftHand=False/0.0/0.0
+deadbug simple wrong_pair deadbug_2_up LeftFoot=False/0.0/0.0 RightHand=False/0.0/0.0
+deadbug simple wrong_pair deadbug_3_up RightFoot=False/0.0/0.0 LeftHand=False/0.0/0.0
+deadbug simple wrong_pair deadbug_4_up LeftFoot=False/0.0/0.0 RightHand=False/0.0/0.0
+TOTAL deadbug simple wrong_pair hits=0/8 minimumQuality=0.0 minimumProgress=0.0
+deadbug simple wrong_floor deadbug_1_up RightFoot=False/0.0/100.0 LeftHand=False/0.0/100.0
+deadbug simple wrong_floor deadbug_2_up LeftFoot=False/0.0/100.0 RightHand=False/0.0/100.0
+deadbug simple wrong_floor deadbug_3_up RightFoot=False/0.0/100.0 LeftHand=False/0.0/100.0
+deadbug simple wrong_floor deadbug_4_up LeftFoot=False/0.0/100.0 RightHand=False/0.0/100.0
+TOTAL deadbug simple wrong_floor hits=0/8 minimumQuality=0.0 minimumProgress=100.0
+deadbug simple no_input deadbug_1_up RightFoot=False/0.0/100.0 LeftHand=False/0.0/100.0
+deadbug simple no_input deadbug_2_up LeftFoot=False/0.0/100.0 RightHand=False/0.0/100.0
+deadbug simple no_input deadbug_3_up RightFoot=False/0.0/100.0 LeftHand=False/0.0/100.0
+deadbug simple no_input deadbug_4_up LeftFoot=False/0.0/100.0 RightHand=False/0.0/100.0
+TOTAL deadbug simple no_input hits=0/8 minimumQuality=0.0 minimumProgress=100.0
+deadbug standard exact deadbug_1_up RightFoot=True/100.0/100.0 LeftHand=True/100.0/100.0
+deadbug standard exact deadbug_2_up LeftFoot=True/100.0/100.0 RightHand=True/100.0/100.0
+deadbug standard exact deadbug_3_up RightFoot=True/100.0/100.0 LeftHand=True/100.0/100.0
+deadbug standard exact deadbug_4_up LeftFoot=True/100.0/100.0 RightHand=True/100.0/100.0
+TOTAL deadbug standard exact hits=8/8 minimumQuality=100.0 minimumProgress=100.0
+deadbug standard range80 deadbug_1_up RightFoot=True/95.8/95.8 LeftHand=True/78.8/78.8
+deadbug standard range80 deadbug_2_up LeftFoot=True/100.0/100.0 RightHand=True/68.4/68.4
+deadbug standard range80 deadbug_3_up RightFoot=True/100.0/100.0 LeftHand=True/76.9/76.9
+deadbug standard range80 deadbug_4_up LeftFoot=True/79.0/79.0 RightHand=True/68.5/68.5
+TOTAL deadbug standard range80 hits=8/8 minimumQuality=68.4 minimumProgress=68.4
+deadbug standard range70 deadbug_1_up RightFoot=True/43.8/43.8 LeftHand=False/25.2/25.2
+deadbug standard range70 deadbug_2_up LeftFoot=True/65.6/65.6 RightHand=False/10.1/10.1
+deadbug standard range70 deadbug_3_up RightFoot=True/58.7/58.7 LeftHand=False/18.3/18.3
+deadbug standard range70 deadbug_4_up LeftFoot=False/28.5/28.5 RightHand=False/10.0/10.0
+TOTAL deadbug standard range70 hits=3/8 minimumQuality=10.0 minimumProgress=10.0
+deadbug standard half deadbug_1_up RightFoot=False/0.0/0.0 LeftHand=False/0.0/0.0
+deadbug standard half deadbug_2_up LeftFoot=False/0.0/0.0 RightHand=False/0.0/0.0
+deadbug standard half deadbug_3_up RightFoot=False/0.0/0.0 LeftHand=False/0.0/0.0
+deadbug standard half deadbug_4_up LeftFoot=False/0.0/0.0 RightHand=False/0.0/0.0
+TOTAL deadbug standard half hits=0/8 minimumQuality=0.0 minimumProgress=0.0
+deadbug standard rest deadbug_1_up RightFoot=False/0.0/0.0 LeftHand=False/0.0/0.0
+deadbug standard rest deadbug_2_up LeftFoot=False/0.0/0.0 RightHand=False/0.0/0.0
+deadbug standard rest deadbug_3_up RightFoot=False/0.0/0.0 LeftHand=False/0.0/0.0
+deadbug standard rest deadbug_4_up LeftFoot=False/0.0/0.0 RightHand=False/0.0/0.0
+TOTAL deadbug standard rest hits=0/8 minimumQuality=0.0 minimumProgress=0.0
+deadbug standard leg15 deadbug_1_up RightFoot=True/100.0/100.0 LeftHand=True/100.0/100.0
+deadbug standard leg15 deadbug_2_up LeftFoot=True/100.0/100.0 RightHand=True/100.0/100.0
+deadbug standard leg15 deadbug_3_up RightFoot=True/100.0/100.0 LeftHand=True/100.0/100.0
+deadbug standard leg15 deadbug_4_up LeftFoot=True/100.0/100.0 RightHand=True/100.0/100.0
+TOTAL deadbug standard leg15 hits=8/8 minimumQuality=100.0 minimumProgress=100.0
+deadbug standard calibration15 deadbug_1_up RightFoot=True/81.6/81.6 LeftHand=True/100.0/100.0
+deadbug standard calibration15 deadbug_2_up LeftFoot=True/82.0/82.0 RightHand=True/100.0/100.0
+deadbug standard calibration15 deadbug_3_up RightFoot=True/99.8/99.8 LeftHand=True/100.0/100.0
+deadbug standard calibration15 deadbug_4_up LeftFoot=False/35.4/35.4 RightHand=True/100.0/100.0
+TOTAL deadbug standard calibration15 hits=7/8 minimumQuality=35.4 minimumProgress=35.4
+deadbug standard calibration_ready_pose deadbug_1_up RightFoot=False/0.0/0.0 LeftHand=False/0.0/0.0
+deadbug standard calibration_ready_pose deadbug_2_up LeftFoot=False/0.0/0.0 RightHand=False/0.0/0.0
+deadbug standard calibration_ready_pose deadbug_3_up RightFoot=False/0.0/0.0 LeftHand=False/0.0/0.0
+deadbug standard calibration_ready_pose deadbug_4_up LeftFoot=False/0.0/0.0 RightHand=False/0.0/0.0
+TOTAL deadbug standard calibration_ready_pose hits=0/8 minimumQuality=0.0 minimumProgress=0.0
+deadbug standard foot45 deadbug_1_up RightFoot=True/100.0/100.0 LeftHand=True/100.0/100.0
+deadbug standard foot45 deadbug_2_up LeftFoot=True/100.0/100.0 RightHand=True/100.0/100.0
+deadbug standard foot45 deadbug_3_up RightFoot=True/100.0/100.0 LeftHand=True/100.0/100.0
+deadbug standard foot45 deadbug_4_up LeftFoot=True/100.0/100.0 RightHand=True/100.0/100.0
+TOTAL deadbug standard foot45 hits=8/8 minimumQuality=100.0 minimumProgress=100.0
+deadbug standard delay500 deadbug_1_up RightFoot=True/100.0/100.0 LeftHand=True/100.0/100.0
+deadbug standard delay500 deadbug_2_up LeftFoot=True/100.0/100.0 RightHand=True/100.0/100.0
+deadbug standard delay500 deadbug_3_up RightFoot=True/100.0/100.0 LeftHand=True/100.0/100.0
+deadbug standard delay500 deadbug_4_up LeftFoot=True/100.0/100.0 RightHand=True/100.0/100.0
+TOTAL deadbug standard delay500 hits=8/8 minimumQuality=100.0 minimumProgress=100.0
+deadbug standard delay800 deadbug_1_up RightFoot=True/100.0/100.0 LeftHand=True/100.0/100.0
+deadbug standard delay800 deadbug_2_up LeftFoot=True/100.0/100.0 RightHand=True/100.0/100.0
+deadbug standard delay800 deadbug_3_up RightFoot=True/100.0/100.0 LeftHand=True/100.0/100.0
+deadbug standard delay800 deadbug_4_up LeftFoot=True/100.0/100.0 RightHand=True/100.0/100.0
+TOTAL deadbug standard delay800 hits=8/8 minimumQuality=100.0 minimumProgress=100.0
+deadbug standard wrong_pair deadbug_1_up RightFoot=False/0.0/0.0 LeftHand=False/0.0/0.0
+deadbug standard wrong_pair deadbug_2_up LeftFoot=False/0.0/0.0 RightHand=False/0.0/0.0
+deadbug standard wrong_pair deadbug_3_up RightFoot=False/0.0/0.0 LeftHand=False/0.0/0.0
+deadbug standard wrong_pair deadbug_4_up LeftFoot=False/0.0/0.0 RightHand=False/0.0/0.0
+TOTAL deadbug standard wrong_pair hits=0/8 minimumQuality=0.0 minimumProgress=0.0
+deadbug standard wrong_floor deadbug_1_up RightFoot=False/0.0/100.0 LeftHand=False/0.0/100.0
+deadbug standard wrong_floor deadbug_2_up LeftFoot=False/0.0/100.0 RightHand=False/0.0/100.0
+deadbug standard wrong_floor deadbug_3_up RightFoot=False/0.0/100.0 LeftHand=False/0.0/100.0
+deadbug standard wrong_floor deadbug_4_up LeftFoot=False/0.0/100.0 RightHand=False/0.0/100.0
+TOTAL deadbug standard wrong_floor hits=0/8 minimumQuality=0.0 minimumProgress=100.0
+deadbug standard no_input deadbug_1_up RightFoot=False/0.0/100.0 LeftHand=False/0.0/100.0
+deadbug standard no_input deadbug_2_up LeftFoot=False/0.0/100.0 RightHand=False/0.0/100.0
+deadbug standard no_input deadbug_3_up RightFoot=False/0.0/100.0 LeftHand=False/0.0/100.0
+deadbug standard no_input deadbug_4_up LeftFoot=False/0.0/100.0 RightHand=False/0.0/100.0
+TOTAL deadbug standard no_input hits=0/8 minimumQuality=0.0 minimumProgress=100.0
+deadbug hard exact deadbug_1_up RightFoot=True/100.0/100.0 LeftHand=True/100.0/100.0
+deadbug hard exact deadbug_2_up LeftFoot=True/100.0/100.0 RightHand=True/100.0/100.0
+deadbug hard exact deadbug_3_up RightFoot=True/100.0/100.0 LeftHand=True/100.0/100.0
+deadbug hard exact deadbug_4_up LeftFoot=True/100.0/100.0 RightHand=True/100.0/100.0
+TOTAL deadbug hard exact hits=8/8 minimumQuality=100.0 minimumProgress=100.0
+deadbug hard range80 deadbug_1_up RightFoot=True/95.8/95.8 LeftHand=True/78.8/78.8
+deadbug hard range80 deadbug_2_up LeftFoot=True/100.0/100.0 RightHand=True/68.4/68.4
+deadbug hard range80 deadbug_3_up RightFoot=True/100.0/100.0 LeftHand=True/76.9/76.9
+deadbug hard range80 deadbug_4_up LeftFoot=True/78.8/78.8 RightHand=True/68.1/68.1
+TOTAL deadbug hard range80 hits=8/8 minimumQuality=68.1 minimumProgress=68.1
+deadbug hard range70 deadbug_1_up RightFoot=True/43.8/43.8 LeftHand=False/25.2/25.2
+deadbug hard range70 deadbug_2_up LeftFoot=True/65.6/65.6 RightHand=False/10.1/10.1
+deadbug hard range70 deadbug_3_up RightFoot=True/58.7/58.7 LeftHand=False/18.3/18.3
+deadbug hard range70 deadbug_4_up LeftFoot=False/28.4/28.4 RightHand=False/9.6/9.6
+TOTAL deadbug hard range70 hits=3/8 minimumQuality=9.6 minimumProgress=9.6
+deadbug hard half deadbug_1_up RightFoot=False/0.0/0.0 LeftHand=False/0.0/0.0
+deadbug hard half deadbug_2_up LeftFoot=False/0.0/0.0 RightHand=False/0.0/0.0
+deadbug hard half deadbug_3_up RightFoot=False/0.0/0.0 LeftHand=False/0.0/0.0
+deadbug hard half deadbug_4_up LeftFoot=False/0.0/0.0 RightHand=False/0.0/0.0
+TOTAL deadbug hard half hits=0/8 minimumQuality=0.0 minimumProgress=0.0
+deadbug hard rest deadbug_1_up RightFoot=False/0.0/0.0 LeftHand=False/0.0/0.0
+deadbug hard rest deadbug_2_up LeftFoot=False/0.0/0.0 RightHand=False/0.0/0.0
+deadbug hard rest deadbug_3_up RightFoot=False/0.0/0.0 LeftHand=False/0.0/0.0
+deadbug hard rest deadbug_4_up LeftFoot=False/0.0/0.0 RightHand=False/0.0/0.0
+TOTAL deadbug hard rest hits=0/8 minimumQuality=0.0 minimumProgress=0.0
+deadbug hard leg15 deadbug_1_up RightFoot=True/100.0/100.0 LeftHand=True/100.0/100.0
+deadbug hard leg15 deadbug_2_up LeftFoot=True/100.0/100.0 RightHand=True/100.0/100.0
+deadbug hard leg15 deadbug_3_up RightFoot=True/100.0/100.0 LeftHand=True/100.0/100.0
+deadbug hard leg15 deadbug_4_up LeftFoot=True/100.0/100.0 RightHand=True/100.0/100.0
+TOTAL deadbug hard leg15 hits=8/8 minimumQuality=100.0 minimumProgress=100.0
+deadbug hard calibration15 deadbug_1_up RightFoot=True/81.6/81.6 LeftHand=True/100.0/100.0
+deadbug hard calibration15 deadbug_2_up LeftFoot=True/82.0/82.0 RightHand=True/100.0/100.0
+deadbug hard calibration15 deadbug_3_up RightFoot=True/99.8/99.8 LeftHand=True/100.0/100.0
+deadbug hard calibration15 deadbug_4_up LeftFoot=False/35.1/35.1 RightHand=True/100.0/100.0
+TOTAL deadbug hard calibration15 hits=7/8 minimumQuality=35.1 minimumProgress=35.1
+deadbug hard calibration_ready_pose deadbug_1_up RightFoot=False/0.0/0.0 LeftHand=False/0.0/0.0
+deadbug hard calibration_ready_pose deadbug_2_up LeftFoot=False/0.0/0.0 RightHand=False/0.0/0.0
+deadbug hard calibration_ready_pose deadbug_3_up RightFoot=False/0.0/0.0 LeftHand=False/0.0/0.0
+deadbug hard calibration_ready_pose deadbug_4_up LeftFoot=False/0.0/0.0 RightHand=False/0.0/0.0
+TOTAL deadbug hard calibration_ready_pose hits=0/8 minimumQuality=0.0 minimumProgress=0.0
+deadbug hard foot45 deadbug_1_up RightFoot=True/100.0/100.0 LeftHand=True/100.0/100.0
+deadbug hard foot45 deadbug_2_up LeftFoot=True/100.0/100.0 RightHand=True/100.0/100.0
+deadbug hard foot45 deadbug_3_up RightFoot=True/100.0/100.0 LeftHand=True/100.0/100.0
+deadbug hard foot45 deadbug_4_up LeftFoot=True/100.0/100.0 RightHand=True/100.0/100.0
+TOTAL deadbug hard foot45 hits=8/8 minimumQuality=100.0 minimumProgress=100.0
+deadbug hard delay500 deadbug_1_up RightFoot=True/100.0/100.0 LeftHand=True/100.0/100.0
+deadbug hard delay500 deadbug_2_up LeftFoot=True/100.0/100.0 RightHand=True/100.0/100.0
+deadbug hard delay500 deadbug_3_up RightFoot=True/100.0/100.0 LeftHand=True/100.0/100.0
+deadbug hard delay500 deadbug_4_up LeftFoot=True/100.0/100.0 RightHand=True/100.0/100.0
+TOTAL deadbug hard delay500 hits=8/8 minimumQuality=100.0 minimumProgress=100.0
+deadbug hard delay800 deadbug_1_up RightFoot=True/100.0/100.0 LeftHand=True/100.0/100.0
+deadbug hard delay800 deadbug_2_up LeftFoot=True/100.0/100.0 RightHand=True/100.0/100.0
+deadbug hard delay800 deadbug_3_up RightFoot=True/100.0/100.0 LeftHand=True/100.0/100.0
+deadbug hard delay800 deadbug_4_up LeftFoot=True/100.0/100.0 RightHand=True/100.0/100.0
+TOTAL deadbug hard delay800 hits=8/8 minimumQuality=100.0 minimumProgress=100.0
+deadbug hard wrong_pair deadbug_1_up RightFoot=False/0.0/0.0 LeftHand=False/0.0/0.0
+deadbug hard wrong_pair deadbug_2_up LeftFoot=False/0.0/0.0 RightHand=False/0.0/0.0
+deadbug hard wrong_pair deadbug_3_up RightFoot=False/0.0/0.0 LeftHand=False/0.0/0.0
+deadbug hard wrong_pair deadbug_4_up LeftFoot=False/0.0/0.0 RightHand=False/0.0/0.0
+TOTAL deadbug hard wrong_pair hits=0/8 minimumQuality=0.0 minimumProgress=0.0
+deadbug hard wrong_floor deadbug_1_up RightFoot=False/0.0/100.0 LeftHand=False/0.0/100.0
+deadbug hard wrong_floor deadbug_2_up LeftFoot=False/0.0/100.0 RightHand=False/0.0/100.0
+deadbug hard wrong_floor deadbug_3_up RightFoot=False/0.0/100.0 LeftHand=False/0.0/100.0
+deadbug hard wrong_floor deadbug_4_up LeftFoot=False/0.0/100.0 RightHand=False/0.0/100.0
+TOTAL deadbug hard wrong_floor hits=0/8 minimumQuality=0.0 minimumProgress=100.0
+deadbug hard no_input deadbug_1_up RightFoot=False/0.0/100.0 LeftHand=False/0.0/100.0
+deadbug hard no_input deadbug_2_up LeftFoot=False/0.0/100.0 RightHand=False/0.0/100.0
+deadbug hard no_input deadbug_3_up RightFoot=False/0.0/100.0 LeftHand=False/0.0/100.0
+deadbug hard no_input deadbug_4_up LeftFoot=False/0.0/100.0 RightHand=False/0.0/100.0
+TOTAL deadbug hard no_input hits=0/8 minimumQuality=0.0 minimumProgress=100.0

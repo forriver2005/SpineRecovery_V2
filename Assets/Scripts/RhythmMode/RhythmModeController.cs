@@ -105,6 +105,7 @@ public sealed class RhythmModeController : MonoBehaviour
     private bool running;
     private Material fallbackRuntimeMaterial;
     private RhythmJudgement? tutorialJudgementOverride;
+    private RhythmMovementRange spawningReference;
 
     public event Action<RhythmNoteResult> NoteResolved;
 
@@ -242,7 +243,7 @@ public sealed class RhythmModeController : MonoBehaviour
                 note.HitLocalPosition);
         }
 
-        bool success = poseJudge.TryHit(note.Target, out float poseScore);
+        bool success = poseJudge.TryHit(note.Target,note.JudgementReference,out float poseScore);
         return new RhythmNoteResult(
             note.Target,
             success ? RhythmJudgement.Perfect : RhythmJudgement.Miss,
@@ -298,6 +299,7 @@ public sealed class RhythmModeController : MonoBehaviour
         }
 
         float segmentDuration = GetSegmentDuration(info.stateName, info.playbackSpeed);
+        spawningReference = poseJudge.CaptureTarget(info.stateName);
         double hitTime = SongTime + segmentDuration;
         if (activeNotes.Count < maximumActiveNotes && CanSpawnLane(firstTarget, hitTime))
         {
@@ -370,6 +372,7 @@ public sealed class RhythmModeController : MonoBehaviour
             indicator,
             noteRadius,
             resultPosition);
+        view.SetJudgementReference(spawningReference);
         if (UsesRingArcTarget)
         {
             float radialAngle = Mathf.Atan2(targetDirection.y, targetDirection.x) * Mathf.Rad2Deg;

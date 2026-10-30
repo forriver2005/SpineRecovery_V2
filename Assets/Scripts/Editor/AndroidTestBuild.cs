@@ -22,8 +22,8 @@ public static class AndroidTestBuild
         PlayerSettings.companyName = "MetaSpine";
         PlayerSettings.productName = "脊柱康复·六项测试";
         PlayerSettings.SetApplicationIdentifier(BuildTargetGroup.Android, "com.metaspine.recovery.gamingtest");
-        PlayerSettings.bundleVersion = "0.2.0-test.20261030";
-        PlayerSettings.Android.bundleVersionCode = 2026103001;
+        PlayerSettings.bundleVersion = "0.2.1-test.20261030";
+        PlayerSettings.Android.bundleVersionCode = 2026103002;
         PlayerSettings.Android.minSdkVersion = AndroidSdkVersions.AndroidApiLevel26;
         PlayerSettings.Android.targetSdkVersion = (AndroidSdkVersions)35;
         PlayerSettings.Android.targetArchitectures = AndroidArchitecture.ARM64 | AndroidArchitecture.ARMv7;
@@ -44,7 +44,7 @@ public static class AndroidTestBuild
         if (input == null) throw new Exception("Active input setting unavailable");
         input.intValue = 0; // Existing touch UI uses StandaloneInputModule; Both is unsupported on Android.
         serialized.ApplyModifiedPropertiesWithoutUndo();
-        string apk = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory), "SpineRecovery_六项游戏测试_20261030.apk");
+        string apk = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory), "SpineRecovery_六项游戏测试_评分修正版_20261030.apk");
         var result = BuildPipeline.BuildPlayer(new BuildPlayerOptions {
             scenes = scenes, target = BuildTarget.Android, locationPathName = apk,
             extraScriptingDefines = new[] { "SPINE_TEST_BUILD" },

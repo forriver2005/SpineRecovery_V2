@@ -24,14 +24,17 @@ public sealed class GameTrainingAssessment : MonoBehaviour
     sealed class PendingEndpoint
     {
         public int phase;public RhythmMovementRange reference;public RhythmBodyTarget first,second;
-        public bool up;public float minimum;public double elapsed,good;
+        public bool up;public Vector2 minimum;public double elapsed,good;
     }
     RhythmBodyTarget first,second;
     bool hasTargets;
     RhythmMovementRange movementRange;
     Vector2[] minimumMotion,maximumMotion;
     public float EndpointQuality(RhythmBodyTarget target)=>movementRange!=null?movementRange.EndpointQuality(Entry.scorer,target):0;
-    float Threshold => Entry.menu.SelectedDifficultyKey=="simple"?60:Entry.menu.SelectedDifficultyKey=="hard"?80:70;
+    public RhythmMovementRange CaptureHitReference()=>movementRange?.CaptureReference();
+    float Threshold => GameDifficultyPolicy.FollowingThreshold(Entry.menu.SelectedDifficultyKey);
+    Vector2 EndpointMinimums => new Vector2(GameDifficultyPolicy.MinimumExtension(Entry.menu.SelectedDifficultyKey,first),
+        GameDifficultyPolicy.MinimumExtension(Entry.menu.SelectedDifficultyKey,second));
 
     public void Initialize(GameWorkoutScene entry)
     {
@@ -152,7 +155,7 @@ public sealed class GameTrainingAssessment : MonoBehaviour
         double delay=Summary.IsContinuous?0:rules.MatchedDelay;
         double hold=Math.Max(0,Math.Min(now-delay,p.lower)-Math.Max(before-delay,p.top));
         float low=Entry.menu.SelectedDifficultyKey=="simple"?.10f:Entry.menu.SelectedDifficultyKey=="hard"?.18f:.15f;
-        bool good=usable&&quality>=Threshold&&Mathf.Abs(rules.Progress-rules.CoachProgress)<=.16f;
+        bool good=usable&&quality>=Threshold&&Mathf.Abs(rules.Progress-rules.CoachProgress)<=GameDifficultyPolicy.BridgeProgressTolerance(Entry.menu.SelectedDifficultyKey);
         attempt.Step(dt,hold,usable,rules.Quality>0&&rules.Progress<=low,good,now>=p.lower);
         double achieved=Summary.IsContinuous?attempt.LongestHold:attempt.TotalHold;
         Summary.RecordDose(index,achieved,attempt.LongestHold,attempt.Completed,
@@ -206,9 +209,7 @@ public sealed class GameTrainingAssessment : MonoBehaviour
         bool good=tracked&&quality>=Threshold;
         double dt=Math.Min(Math.Max(0,seconds),Math.Max(0,segmentDuration-segmentObserved));
         segmentObserved+=dt;if(good)segmentQualified+=dt;
-        Vector2 progress=tracked?movementRange.CurrentProgress(Entry.scorer,first,second):Vector2.zero;
-        float endpoint=Entry.menu.SelectedDifficultyKey=="hard"?.80f:Entry.menu.SelectedDifficultyKey=="simple"?.72f:.76f;
-        bool atEndpoint=segmentUp?Mathf.Min(progress.x,progress.y)>=endpoint:Mathf.Max(progress.x,progress.y)<=1-endpoint;
+        bool atEndpoint=tracked&&movementRange.AtEndpoint(Entry.scorer,first,second,segmentUp,EndpointMinimums);
         endpointGood=good&&atEndpoint?endpointGood+dt:0;
         if(endpointGood+.00001>=.08)endpointConfirmedAt=segmentObserved;
         Summary.Observe(segmentIndex/2,dt,tracked,quality,good);
@@ -218,11 +219,12 @@ public sealed class GameTrainingAssessment : MonoBehaviour
         if(!IsCollecting||segmentIndex<0)return;
         double remaining=segmentDuration-segmentObserved;
         if(remaining>0&&remaining<=.1)SampleRhythm(remaining);
-        bool success=segmentDuration>0 && segmentQualified/segmentDuration>=.8 && segmentDuration-endpointConfirmedAt<=.3;
+        float fraction=GameDifficultyPolicy.QualifiedPhaseFraction(Entry.menu.SelectedDifficultyKey);
+        bool success=segmentDuration>0 && segmentQualified/segmentDuration>=fraction && segmentDuration-endpointConfirmedAt<=.3;
         if(success)ConfirmPhase(segmentIndex);
-        else if(segmentDuration>0&&segmentQualified/segmentDuration>=.8&&hasTargets)
+        else if(segmentDuration>0&&segmentQualified/segmentDuration>=fraction&&hasTargets)
             pendingEndpoints.Add(new PendingEndpoint{phase=segmentIndex,reference=movementRange.CaptureReference(),first=first,second=second,
-                up=info.isUp,minimum=Entry.menu.SelectedDifficultyKey=="hard"?.80f:Entry.menu.SelectedDifficultyKey=="simple"?.72f:.76f});
+                up=info.isUp,minimum=EndpointMinimums});
     }
     void ConfirmPhase(int phase)
     {

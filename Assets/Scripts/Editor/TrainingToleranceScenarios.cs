@@ -72,7 +72,7 @@ public static class TrainingToleranceScenarios
         var motion=UnityEngine.Object.FindObjectOfType<AvatarMotionSource>();var judge=UnityEngine.Object.FindObjectOfType<RhythmPoseJudge>();
         Set(source,"userAnimator",patient);Set(source,"calibrated",true);Set(source,"sessionActive",true);
         var ups=(string[])Get(entry.coach,"upSegmentStates");var downs=(string[])Get(entry.coach,"downSegmentStates");
-        var profile=Get(entry.coach,entry.menu.SelectedDifficultyKey+"Difficulty");float upSpeed=(float)profile.GetType().GetField("upSpeed").GetValue(profile),downSpeed=(float)profile.GetType().GetField("downSpeed").GetValue(profile);
+        var profile=Call(entry.coach,"GetSelectedDifficultyProfile");float upSpeed=(float)profile.GetType().GetField("upSpeed").GetValue(profile),downSpeed=(float)profile.GetType().GetField("downSpeed").GetValue(profile);
         int loops=(int)profile.GetType().GetField("loopCount").GetValue(profile);
         var durations=new double[ups.Length*loops];
         for(int i=0;i<durations.Length;i++)durations[i]=entry.coach.SegmentSeconds(ups[i%ups.Length],upSpeed)+entry.coach.SegmentSeconds(downs[i%ups.Length],downSpeed);
@@ -80,7 +80,7 @@ public static class TrainingToleranceScenarios
         Quaternion rotation=patient.transform.rotation;
         using(var coachHandler=new HumanPoseHandler(coach.avatar,coach.transform))
         using(var patientHandler=new HumanPoseHandler(patient.avatar,patient.transform))
-        foreach(string scenario in new[]{"follow","range_90","range_80","delay_350ms","delay_500ms","jitter_3deg","jitter_5deg","gap_1frame_mid","gap_1frame_end","gap_100ms_mid","spike_100ms_mid","gap_300ms_mid","rest","half_range","wrong_orientation","disconnect","heartbeat_only","wrong_arm"})
+        foreach(string scenario in new[]{"follow","range_90","range_80","delay_350ms","delay_500ms","jitter_3deg","jitter_5deg","gap_1frame_mid","gap_1frame_end","gap_100ms_mid","spike_100ms_mid","gap_300ms_mid","rest","half_range","wrong_orientation","disconnect","heartbeat_only","wrong_arm","wrong_leg_direction","wrong_knee"})
         {
             if(SkipProbe(scenario))continue;
             patient.transform.rotation=rotation;
@@ -139,7 +139,7 @@ public static class TrainingToleranceScenarios
             assessment.Finish();var s=assessment.Summary;
             File.AppendAllText(Output,$"{entry.gameObject.scene.name} | {entry.menu.SelectedDifficultyKey} | {scenario} | score={s.Score} quality={s.Quality:F1} following={s.CreditedSeconds:F2}/{s.TargetSeconds:F2} qualified={s.Qualified}/{s.Planned} invalid_hits={invalidHits}\n");
             if(invalidHits>0)throw new Exception("Rhythm HIT without input");
-            if((scenario=="rest"||scenario=="wrong_arm"||scenario=="half_range"||scenario=="wrong_orientation")&&s.Qualified>0)throw new Exception("Incorrect limb movement earned repetitions");
+            if((scenario=="rest"||scenario=="wrong_arm"||scenario=="half_range"||scenario=="wrong_orientation"||scenario=="wrong_leg_direction"||scenario=="wrong_knee")&&s.Qualified>0)throw new Exception("Incorrect limb movement earned repetitions");
             CheckResult(s,scenario);
         }
         patient.transform.rotation=rotation;Set(source,"userAnimator",coach);
@@ -174,6 +174,10 @@ public static class TrainingToleranceScenarios
         scenario!="follow"&&scenario!="delay_350ms"&&scenario!="delay_500ms"&&scenario!="jitter_3deg"&&scenario!="jitter_5deg"&&scenario!="spike_100ms_mid";
     static void Jitter(Animator patient,string scenario,int frame)
     {
+        if(scenario=="wrong_leg_direction")foreach(var bone in new[]{HumanBodyBones.LeftUpperLeg,HumanBodyBones.RightUpperLeg})
+            patient.GetBoneTransform(bone).localRotation*=Quaternion.Euler(0,0,90);
+        if(scenario=="wrong_knee")foreach(var bone in new[]{HumanBodyBones.LeftLowerLeg,HumanBodyBones.RightLowerLeg})
+            patient.GetBoneTransform(bone).localRotation*=Quaternion.Euler(100,0,0);
         float degrees=scenario=="jitter_3deg"?3:scenario=="jitter_5deg"?5:0;
         if(degrees==0)return;
         int i=0;
@@ -195,6 +199,7 @@ public static class TrainingToleranceScenarios
         if(scenario=="gap_300ms_mid"&&s.IsContinuous&&s.Qualified>0)throw new Exception("Long interrupted hold qualified");
         if(scenario=="heartbeat_only"&&s.HasAssessment)throw new Exception("Heartbeat invented measurements");
         if(scenario=="half_range"&&s.Score>=60)throw new Exception("Half range earned a passing session score");
+        if((scenario=="wrong_leg_direction"||scenario=="wrong_knee")&&s.Score>=60)throw new Exception("Gross leg error earned a passing session score");
     }
     static void Set(object o,string n,object value)=>o.GetType().GetField(n,Private).SetValue(o,value);
     static object Call(object o,string n,params object[] args)=>o.GetType().GetMethod(n,Private).Invoke(o,args);

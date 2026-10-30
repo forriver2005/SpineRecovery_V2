@@ -996,6 +996,7 @@ public class DeadBugStartMenuController : MonoBehaviour
 
     private string GetSelectedActionStateName()
     {
+        if (!IsPracticeCoachMode) return standardActionStateName;
         switch (selectedDifficulty)
         {
             case Difficulty.Simple:
@@ -1186,6 +1187,7 @@ public class DeadBugStartMenuController : MonoBehaviour
 
     private int GetSelectedFallbackRepetitions()
     {
+        if (!IsPracticeCoachMode) return Mathf.Max(1, standardTimes);
         switch (selectedDifficulty)
         {
             case Difficulty.Simple:

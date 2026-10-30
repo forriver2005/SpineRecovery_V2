@@ -1,0 +1,5 @@
+Result: Succeeded
+APK: C:\Users\23548\Desktop\SpineRecovery_六项游戏测试_评分修正版_20261030.apk
+Size: 729103958
+Errors: 0
+Duration: 00:02:19.1751156

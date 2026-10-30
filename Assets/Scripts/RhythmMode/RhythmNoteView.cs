@@ -20,6 +20,8 @@ public sealed class RhythmNoteView : MonoBehaviour
     private bool resolved;
 
     public RhythmBodyTarget Target => target;
+    public RhythmMovementRange JudgementReference { get; private set; }
+    public void SetJudgementReference(RhythmMovementRange reference) { JudgementReference=reference; }
     public double HitTime => hitTime;
     public Vector3 HitLocalPosition => resultLocalPosition;
 

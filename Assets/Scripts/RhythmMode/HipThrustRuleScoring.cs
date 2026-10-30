@@ -38,11 +38,13 @@ public sealed class HipThrustRuleScoring : MonoBehaviour
     int lastCounter;
     float lastFrameAt = float.NegativeInfinity;
     float minimumTrackingQuality;
+    float progressTolerance;
 
     public void Begin(string difficulty)
     {
         Rule.Reset(difficulty); Progress=Quality=MatchedDelay=0; InputFresh=false;coachHistory.Clear();
-        minimumTrackingQuality=difficulty=="simple"?60:difficulty=="hard"?80:70;
+        minimumTrackingQuality=GameDifficultyPolicy.FollowingThreshold(difficulty);
+        progressTolerance=GameDifficultyPolicy.BridgeProgressTolerance(difficulty);
         if(sideBridge!=null) sideBridge.Begin(difficulty);
         bool continuous=transport.Hold30Timeline!=null&&!transport.Hold30Timeline.UsesRecordedTiming;
         Rule.ContinuousHold=continuous;if(continuous)Rule.SetFullScoreSeconds(30);
@@ -150,14 +152,14 @@ public sealed class HipThrustRuleScoring : MonoBehaviour
             }
             // The forgiving A/B entry thresholds must not turn a sustained half
             // lift into a high live score while the settlement correctly rejects it.
-            float holdQuality=Mathf.Abs(Progress-CoachProgress)<=.16f&&TrackingQuality>=minimumTrackingQuality
+            float holdQuality=Mathf.Abs(Progress-CoachProgress)<=progressTolerance&&TrackingQuality>=minimumTrackingQuality
                 ?Mathf.Min(Quality,TrackingQuality):0;
             Rule.Step(Progress,holdQuality,deltaTime,valid,eligible);
         }
     }
     public void BreakContinuity(){Rule.BreakContinuity();if(sideBridge!=null)sideBridge.Rule.BreakContinuity();}
     public bool MatchesHipCoach() => sideBridge==null&&TargetsReady&&InputFresh&&HasMeasurement&&calibration!=null&&calibration.IsCalibrated&&
-        TrackingQuality>=65&&Mathf.Abs(Progress-CoachProgress)<=.16f;
+        TrackingQuality>=minimumTrackingQuality&&Mathf.Abs(Progress-CoachProgress)<=progressTolerance;
 
     public bool MatchesSideBridgeCoach() => sideBridge!=null && TargetsReady && InputFresh && HasMeasurement && calibration!=null && calibration.IsCalibrated &&
         sideBridge.Matches(calibration.UserAnimator,transport.CoachAnimator);

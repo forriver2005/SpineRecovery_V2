@@ -157,6 +157,7 @@ public class DeadBugGamingPoseScorer : MonoBehaviour
     public IReadOnlyList<DeadBugCheckpointScore> SessionScores => sessionScores;
     public float LastSessionAverage => lastSessionAverage;
     public bool IsSessionActive => sessionActive;
+    public string SelectedDifficultyKey => coachController!=null?coachController.SelectedDifficultyKey:"standard";
     AvatarMotionSource assessmentMotion;
     public bool HasFreshInput
     {
@@ -172,12 +173,16 @@ public class DeadBugGamingPoseScorer : MonoBehaviour
     public static bool FloorOrientation(Animator avatar,out float front,out float tilt)
     {
         front=tilt=0;if(avatar==null||!avatar.isHuman)return false;
-        var hip=avatar.GetBoneTransform(HumanBodyBones.Hips);var chest=avatar.GetBoneTransform(HumanBodyBones.Chest)??avatar.GetBoneTransform(HumanBodyBones.Spine);
-        var left=avatar.GetBoneTransform(HumanBodyBones.LeftUpperArm);var right=avatar.GetBoneTransform(HumanBodyBones.RightUpperArm);
-        if(hip==null||chest==null||left==null||right==null)return false;
-        var torso=chest.position-hip.position;tilt=Vector3.Dot(torso.normalized,Vector3.up);
-        front=Vector3.Dot(Vector3.Cross(right.position-left.position,torso).normalized,Vector3.up);return true;
+        if(!AnatomicalMotionScoringEngine.TryGetBodyFrame(avatar,out var frame))return false;
+        tilt=Vector3.Dot(frame*Vector3.up,Vector3.up);
+        front=Vector3.Dot(frame*Vector3.forward,Vector3.up);return true;
     }
+    // Segment directions already remove rig axes and room heading. A different
+    // knee/arm bend during calibration must not rotate the whole exercise target
+    // by 40-90 degrees and make correctly performed dead bugs impossible to hit.
+    public void ApplyGameCalibration(IReadOnlyDictionary<HumanBodyBones,Vector3> user,
+        IReadOnlyDictionary<HumanBodyBones,Vector3> coach)
+        => scoringEngine.SetStandingCalibration(user,coach,6f);
     public AnatomicalPoseScore LastFrameScore => lastFrameResult;
     public AnatomicalLimbScores LastLimbScores => lastLimbScores;
     public bool IsCalibrated => calibrated;
@@ -357,7 +362,7 @@ public class DeadBugGamingPoseScorer : MonoBehaviour
         yield return CollectStandingCalibration();
         if (supine != null) supine.Release();
 
-        scoringEngine.SetStandingCalibration(
+        ApplyGameCalibration(
             userCalibrationDirections,
             coachCalibrationDirections);
         calibrated = scoringEngine.CalibratedSegmentCount >= 6;
@@ -778,7 +783,7 @@ public class DeadBugGamingPoseScorer : MonoBehaviour
         if (scoringEngine == null)
         {
             scoringEngine = new AnatomicalMotionScoringEngine(anatomicalScoring);
-            scoringEngine.SetStandingCalibration(
+            ApplyGameCalibration(
                 userCalibrationDirections,
                 coachCalibrationDirections);
         }

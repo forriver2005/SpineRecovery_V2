@@ -216,7 +216,7 @@ public sealed class HipThrustTaikoController : MonoBehaviour
         if (endMenuRoot != null) endMenuRoot.SetActive(false);
         BuildChart();
         if (Assessment != null) Assessment.BeginBridge();
-        if (difficultyLabel != null) difficultyLabel.text = hold30Dose != null ? GameWorkoutPlan.DifficultyName(startMenu.SelectedDifficultyKey) : passes == 1 ? "简单" : passes == 2 ? "标准" : "进阶";
+        if (difficultyLabel != null) difficultyLabel.text = GameWorkoutPlan.DifficultyName(startMenu.SelectedDifficultyKey);
         if (songClock != null) songClock.StartMusicImmediately();
         UpdateScore();
         RenderTimeline();

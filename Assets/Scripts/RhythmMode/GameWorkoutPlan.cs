@@ -7,7 +7,7 @@ public sealed class GameWorkoutAction
     public string action;
     public string difficulty = "standard";
     public int sets = 1;
-    // Required only by hipthrust_hold30; legacy entries retain their original difficulty dose.
+    // Exact-dose variants use prescription reps; other games use their standard scene dose.
     public int reps;
 }
 
@@ -56,7 +56,7 @@ public sealed class GameWorkoutPlan
         }
     }
 
-    public static string DifficultyName(string difficulty) => difficulty == "simple" ? "简单" : difficulty == "hard" ? "进阶" : "标准";
+    public static string DifficultyName(string difficulty) => difficulty == "simple" ? "简单" : difficulty == "hard" ? "困难" : "标准";
 
     public GameWorkoutPlan ValidatedCopy()
     {

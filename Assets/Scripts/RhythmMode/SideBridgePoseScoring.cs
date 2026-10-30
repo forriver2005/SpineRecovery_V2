@@ -146,6 +146,7 @@ public sealed class SideBridgePoseScoring : MonoBehaviour
         return Geometry!=null&&SideBridgePoseGeometry.TryMeasure(user,out var actual)&&
             SideBridgePoseGeometry.TryMeasure(coach,out var expected)&&expected.IsLeftSupport&&
             SideBridgePoseGeometry.HasStableSupport(actual,expected)&&
-            Mathf.Abs(Geometry.Progress(actual)-coachReferences[activeCycle].Progress(expected))<=.16f&&Geometry.Quality(actual,expected)>=65;
+            Mathf.Abs(Geometry.Progress(actual)-coachReferences[activeCycle].Progress(expected))<=GameDifficultyPolicy.BridgeProgressTolerance(difficulty)&&
+            Geometry.Quality(actual,expected)>=GameDifficultyPolicy.FollowingThreshold(difficulty);
     }
 }

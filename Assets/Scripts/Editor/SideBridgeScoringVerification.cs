@@ -47,8 +47,8 @@ public static class SideBridgeScoringVerification
             Feed(rule,.3f,1,0);Check(rule.LiveScore==0&&rule.ContinuousHoldSeconds==0,"Poor quality preserved current full score/continuous timer");
             Feed(rule,20,1);Feed(rule,.3f,0);
             Check(rule.CompletedRounds==1&&rule.QualifiedRounds==0,"Two interrupted short holds were merged into 30 seconds");
-            rule.BeginRepetition(30,rule.DefaultScoreSeconds);Feed(rule,.1f,0);Feed(rule,29.9f,1);Feed(rule,.3f,0);
-            Check(rule.QualifiedRounds==0,"29.9 seconds counted as a full 30-second hold");
+            rule.BeginRepetition(30,rule.DefaultScoreSeconds);Feed(rule,.1f,0);Feed(rule,28.9f,1);Feed(rule,.3f,0);
+            Check(rule.QualifiedRounds==0,"28.9 seconds bypassed the bounded 30-second qualification tolerance");
             rule.BeginRepetition(30,rule.DefaultScoreSeconds);Feed(rule,.1f,0);Feed(rule,30,1);
             Check(rule.QualifiedRounds==0,"High position counted before returning low");
             Feed(rule,.3f,0);Check(rule.QualifiedRounds==1,"True 30-second hold and full return did not count");
@@ -63,11 +63,11 @@ public static class SideBridgeScoringVerification
         Feed(partial,.01f,0);Check(partial.CompletedRounds==1,"True low return not counted");
         partial.Reset("standard");Feed(partial,.1f,0);Feed(partial,1,1);float held=partial.ContinuousHoldSeconds;
         Feed(partial,.1f,.6f);Check(partial.LiveScore==0&&Mathf.Abs(partial.ContinuousHoldSeconds-held)<.001,"Sub-threshold height added hold seconds");
-        Feed(partial,.1f,.6f);Check(partial.ContinuousHoldSeconds==0,"Sustained height sag did not reset continuity");
+        Feed(partial,.15f,.6f);Check(partial.ContinuousHoldSeconds==0,"Sustained height sag did not reset continuity");
         partial.Reset("standard");partial.BeginRepetition(30,5);Feed(partial,.1f,0);
         for(int i=0;i<1000;i++)partial.Step(1,100,.01f,true,0);
         Check(partial.ContinuousHoldSeconds==0,"Raised time outside the prescribed hold filled its goal");
-        Feed(partial,29.9f,1);Feed(partial,.3f,0);Check(partial.QualifiedRounds==0,"Pre-hold time topped up an insufficient hold");
+        Feed(partial,28.9f,1);Feed(partial,.3f,0);Check(partial.QualifiedRounds==0,"Pre-hold time topped up an insufficient hold");
         var hip=new HipThrustHoldRule();hip.Reset("simple");for(int i=0;i<10;i++)hip.Step(0,100,.01f,true);for(int i=0;i<360;i++)hip.Step(.25f,100,.01f,true);
         Check(hip.LiveScore==100,"Original hip scoring changed");
         report.AppendLine("PASS low-position arming, strict return, duplicate prevention, 30-second dose, bad-quality/height reset, lost input, and original hip score.");
@@ -101,7 +101,7 @@ public static class SideBridgeScoringVerification
                         if(timeline.TryGetWrapProgress(time,out float wrap))avatar.Play("sidebridge_wrap",0,wrap);
                         else avatar.Play("sidebridge_routine",0,frame/transport.PhaseTimeline.sourceClip.frameRate/transport.PhaseTimeline.sourceClip.length);
                         avatar.Update(0);policy.UpdateReference();
-                        bool valid=policy.Evaluate(avatar,out float progress,out float quality);
+                        bool valid=policy.Evaluate(avatar,out float progress,out float quality,1f/fps);
                         policy.Step(progress,quality,dt,valid);
                         if(policy.Rule.CompletedRounds>lastCompleted)
                         {

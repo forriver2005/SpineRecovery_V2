@@ -24,7 +24,7 @@ public static class TrainingUsageScenarios
                 var bones=patient.GetComponentsInChildren<Transform>(true);var beforePosition=new Vector3[bones.Length];var beforeRotation=new Quaternion[bones.Length];
                 for(int b=0;b<bones.Length;b++){beforePosition[b]=bones[b].localPosition;beforeRotation[b]=bones[b].localRotation;}
                 game.StartMode();
-                for(int b=0;b<bones.Length;b++)if(!bones[b].localPosition.Equals(beforePosition[b])||!bones[b].localRotation.Equals(beforeRotation[b]))throw new Exception("Reference capture changed patient bone: "+bones[b].name);
+                AssertRestored(bones,beforePosition,beforeRotation);
                 var plan=game.AssessmentRepetitions();Seek(plan[0].start);var rest=new HumanPose();coachHandler.GetHumanPose(ref rest);
                 int invalidHits=0,earlyFullScores=0;double validSamples=0;
                 for(int sample=1;sample<=Math.Ceiling(game.Duration*30);sample++)
@@ -117,6 +117,20 @@ public static class TrainingUsageScenarios
         patient.transform.rotation=rotation;Set(source,"userAnimator",coach);
     }
     static object Get(object o,string n)=>o.GetType().GetField(n,Private).GetValue(o);
+    public static void AssertRestored(Transform[] bones,Vector3[] positions,Quaternion[] rotations)
+    {
+        for(int b=0;b<bones.Length;b++)
+        {
+            var q=bones[b].localRotation;var r=rotations[b];
+            var actual=new Vector4(q.x,q.y,q.z,q.w);var expected=new Vector4(r.x,r.y,r.z,r.w);
+            // Unity normalizes rotations on assignment. Component round-off (and
+            // equivalent q/-q signs) is not a change to the skeleton's pose.
+            float rotationError=Mathf.Min(Vector4.Distance(actual,expected),Vector4.Distance(actual,-expected));
+            float positionError=Vector3.Distance(bones[b].localPosition,positions[b]);
+            if(positionError>1e-6f||rotationError>1e-5f)
+                throw new Exception($"Reference capture changed patient bone {bones[b].name}: position={positionError}, quaternion={rotationError}");
+        }
+    }
     static void CheckResult(TrainingQualitySummary s,string scenario)
     {
         if(scenario=="rest"&&s.Score!=0)throw new Exception("Stationary rest earned training points");

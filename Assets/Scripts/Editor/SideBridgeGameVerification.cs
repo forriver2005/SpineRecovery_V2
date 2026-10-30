@@ -238,6 +238,9 @@ public static class SideBridgeGameVerification
             animator.Play(game.RoutineStateName,0,game.PhaseTimeline.cycles[0].liftStartFrame/30f/game.PhaseTimeline.sourceClip.length);animator.Update(0);
             for(int i=0;i<15;i++){motion.ReportFrame(i*.01f,55);rule.Tick(.01f);}
             animator.Play(game.RoutineStateName,0,peak/30f/game.PhaseTimeline.sourceClip.length);animator.Update(0);
+            // Settle the short measurement filter before the instructed hold opens.
+            typeof(HipThrustTaikoController).GetField("elapsed",Private).SetValue(game,game.Hold30Timeline.Repetitions[0].top-.1);
+            for(int i=0;i<30;i++){motion.ReportFrame(i*.01f,55);rule.Tick(.01f);}
             for(int i=0;i<(rule.sideBridge.Rule.RequiresContinuousHold?3000:1000);i++)
             {
                 typeof(HipThrustTaikoController).GetField("elapsed",Private).SetValue(game,game.Hold30Timeline.Repetitions[0].top+(i+1)*.01);
@@ -245,7 +248,7 @@ public static class SideBridgeGameVerification
             }
             Check(rule.LiveScore==100&&rule.MatchesSideBridgeCoach(),"Good live pose not scored/HIT");
             typeof(HipThrustRuleScoring).GetField("lastFrameAt",Private).SetValue(rule,Time.unscaledTime-1);rule.Tick(.01f);
-            Check(rule.LiveScore==0&&rule.sideBridge.Rule.ContinuousHoldSeconds==0&&!rule.MatchesSideBridgeCoach(),"Stale input scored or HIT");
+            Check(rule.LiveScore==0&&!rule.MatchesSideBridgeCoach(),"Stale input scored or HIT");
             motion.SetAvailable(false);rule.Tick(.01f);Check(rule.LiveScore==0&&!rule.MatchesSideBridgeCoach(),"Disconnected input HIT");
             rule.Begin("simple");var rep=game.Hold30Timeline.Repetitions[0];
             for(int i=0;i<=(rep.end+.3)*30;i++)

@@ -25,6 +25,7 @@ public sealed class SideBridgeHoldRule
     public float LiveScore => InputValid && HoldingCorrectly && Phase == Stage.Holding && !RoundFinished
         ? Mathf.Lerp(entryScore,100,Mathf.Clamp01((RequiresContinuousHold?ContinuousHoldSeconds:RoundValidHoldSeconds)/scoreSeconds)) : 0;
     public float EnterProgress { get; private set; }
+    public float SustainProgress => EnterProgress-.05f;
     public float EnterQuality { get; private set; }
     public float ValidQuality { get; private set; }
     public float DefaultScoreSeconds { get; private set; }
@@ -58,11 +59,13 @@ public sealed class SideBridgeHoldRule
     {
         float dt=float.IsNaN(deltaTime)||float.IsInfinity(deltaTime)?0:Mathf.Clamp(deltaTime,0,.1f);
         float holdDt=float.IsNaN(eligibleHoldDelta)||float.IsInfinity(eligibleHoldDelta)?0:eligibleHoldDelta<0?dt:Mathf.Clamp(eligibleHoldDelta,0,dt);
-        InputValid=validInput&&!float.IsNaN(progress)&&!float.IsInfinity(progress)&&!float.IsNaN(quality)&&!float.IsInfinity(quality);
+        InputValid=validInput&&deltaTime<=.1001f&&!float.IsNaN(progress)&&!float.IsInfinity(progress)&&!float.IsNaN(quality)&&!float.IsInfinity(quality);
         HoldingCorrectly=false;
         if(!InputValid)
         {
-            confirmation=0;continuousHold=pendingHold=0;missingSeconds+=dt;
+            float missingDt=float.IsNaN(deltaTime)||float.IsInfinity(deltaTime)?0:Mathf.Max(0,deltaTime);
+            confirmation=0;pendingHold=0;missingSeconds+=missingDt;badSeconds+=missingDt;
+            if(TrainingScoringTolerance.GapExpired(badSeconds))continuousHold=0;
             // A long tracking loss cannot bridge two unrelated poses into a repetition.
             if(missingSeconds>=.5f&&!RoundFinished)ResetAttempt();
             return;
@@ -82,13 +85,13 @@ public sealed class SideBridgeHoldRule
                 break;
             case Stage.Raising: StepRaising(progress,quality,dt,holdDt);break;
             case Stage.Holding:
-                HoldingCorrectly=progress>=EnterProgress&&quality>=ValidQuality;
+                HoldingCorrectly=progress>=SustainProgress&&quality>=ValidQuality;
                 if(HoldingCorrectly){badSeconds=0;AddHold(holdDt);}
                 else
                 {
                     badSeconds+=dt;
                     // Reject isolated noisy samples without counting them as valid time.
-                    if(badSeconds>.15f)continuousHold=0;
+                    if(TrainingScoringTolerance.GapExpired(badSeconds))continuousHold=0;
                 }
                 if(progress<=exit)
                 {
@@ -104,7 +107,7 @@ public sealed class SideBridgeHoldRule
                     if(confirmation+.00001f>=.08f)
                     {
                         float achieved=RequiresContinuousHold?BestContinuousSeconds:RoundValidHoldSeconds;
-                        CompletedRounds++;if(achieved+.0001f>=TargetHoldSeconds)QualifiedRounds++;
+                        CompletedRounds++;if(TrainingScoringTolerance.HoldQualified(achieved,TargetHoldSeconds,RequiresContinuousHold))QualifiedRounds++;
                         LastRoundBest=RoundBest;LastRoundHoldSeconds=achieved;
                         RoundFinished=true;Phase=Stage.Rest;continuousHold=0;
                     }
@@ -119,7 +122,7 @@ public sealed class SideBridgeHoldRule
     {
         if(progress>=EnterProgress&&quality>=EnterQuality)
         {
-            confirmation+=dt;pendingHold+=holdDt;
+            badSeconds=0;confirmation+=dt;pendingHold+=holdDt;
             if(confirmation+.00001f>=.3f)
             {
                 Phase=Stage.Holding;HoldingCorrectly=true;
@@ -129,8 +132,11 @@ public sealed class SideBridgeHoldRule
         }
         else
         {
-            confirmation=0;pendingHold=0;
-            if(progress<=rest){Phase=Stage.Rest;LowConfirmed=true;}
+            // A brief dip near the entry boundary does not erase all preceding
+            // stable samples. Only actually good entry samples add hold time.
+            badSeconds+=dt;
+            if(badSeconds>.1f||progress<SustainProgress||quality<ValidQuality){confirmation=0;pendingHold=0;}
+            if(progress<=rest){Phase=Stage.Rest;LowConfirmed=true;badSeconds=0;}
         }
     }
 

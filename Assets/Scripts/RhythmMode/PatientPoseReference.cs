@@ -3,7 +3,7 @@ using UnityEngine;
 
 /// <summary>Samples a recording on the patient's avatar proportions during synchronous
 /// reference capture. Every original transform (including wrists/ankles) is restored
-/// exactly before control returns; no patient pose is changed during gameplay.</summary>
+/// before control returns; no patient pose is changed during gameplay.</summary>
 public sealed class PatientPoseReference : IDisposable
 {
     public Animator Animator { get; }

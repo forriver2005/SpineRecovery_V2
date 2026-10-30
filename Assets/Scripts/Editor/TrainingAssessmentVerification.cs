@@ -54,7 +54,7 @@ public static class TrainingAssessmentVerification
             s.RecordDose(0,0,0,true,true);Check(s.Score==90&&Math.Abs(s.TrackedSeconds-10)<.0001,"Frame-rate-dependent score");
             var attempt=new TrainingBridgeAttempt();attempt.Step(.1,0,true,true,false,false);
             for(int f=0;f<15*fps;f++)attempt.Step(1d/fps,1d/fps,true,false,true,false);
-            attempt.Step(.2,.2,true,false,false,false);
+            attempt.Step(.3,.3,true,false,false,false);
             for(int f=0;f<15*fps;f++)attempt.Step(1d/fps,1d/fps,true,false,true,false);
             attempt.Step(.1,0,true,true,false,true);
             Check(attempt.Completed&&attempt.TotalHold>29.99&&attempt.LongestHold<15.01,"Split hold counted as continuous 30 seconds");

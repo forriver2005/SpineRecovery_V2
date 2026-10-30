@@ -76,6 +76,11 @@ public sealed class TrainingQualitySummary
         var r=Repetitions[index];r.qualityIntegral=r.qualifiedSeconds=r.followingQualifiedSeconds=r.creditedSeconds=r.longestHold=0;
         r.completed=r.qualified=false;
     }
+    public void CapMovementQuality(int index,float maximumQuality)
+    {
+        var r=Repetitions[index];
+        r.qualityIntegral=Math.Min(r.qualityIntegral,Mathf.Clamp(maximumQuality,0,100)*r.expectedSeconds);
+    }
     double Sum(Func<Repetition,double> value){double n=0;foreach(var r in Repetitions)n+=value(r);return n;}
     static double Safe(double n)=>double.IsNaN(n)||double.IsInfinity(n)?0:Math.Max(0,n);
     static float Ratio(double n,double d)=>d>0?Mathf.Clamp01((float)(n/d)):0;
@@ -97,7 +102,8 @@ public sealed class TrainingBridgeAttempt
         if(dt<=0||double.IsNaN(dt)||double.IsInfinity(dt)||Completed)return;
         if(!tracked)
         {
-            continuous=0;lowSeconds=0;missingSeconds+=dt;
+            lowSeconds=0;missingSeconds+=dt;badSeconds+=dt;
+            if(TrainingScoringTolerance.GapExpired(badSeconds))continuous=0;
             if(missingSeconds>=.5){Armed=raised=false;TotalHold=LongestHold=0;}
             return;
         }
@@ -108,6 +114,6 @@ public sealed class TrainingBridgeAttempt
         if(high && holdDelta>0)
         {raised=true;badSeconds=0;TotalHold+=holdDelta;continuous+=holdDelta;LongestHold=Math.Max(LongestHold,continuous);}
         else if(holdDelta>0)
-        {badSeconds+=holdDelta;if(badSeconds>.15)continuous=0;}
+        {badSeconds+=holdDelta;if(TrainingScoringTolerance.GapExpired(badSeconds))continuous=0;}
     }
 }

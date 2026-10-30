@@ -22,7 +22,8 @@ public sealed class SideBridgePoseGeometry
             Finite(restLift) && Finite(topLift) && topLift-restLift>.015f;
     }
 
-    public float Progress(Pose pose) => Mathf.Clamp01((pose.lift-RestLift)/(TopLift-RestLift));
+    public float RawProgress(Pose pose) => (pose.lift-RestLift)/(TopLift-RestLift);
+    public float Progress(Pose pose) => Mathf.Clamp01(RawProgress(pose));
 
     public static bool HasStableSupport(Pose pose,Pose target) => pose!=null&&target!=null&&pose.IsLeftSupport&&
         pose.shoulderAxis.sqrMagnitude>.5f&&pose.pelvisAxis.sqrMagnitude>.5f&&

@@ -169,7 +169,7 @@ public class DeadBugGamingPoseScorer : MonoBehaviour
     public bool HasMatchingFloorPosture => FloorOrientation(userAnimator,out float actualFront,out float actualTilt)&&
         FloorOrientation(coachAnimator,out float expectedFront,out float expectedTilt)&&
         (Mathf.Abs(expectedTilt)>.7f || (Mathf.Abs(actualTilt)<.7f&&Mathf.Abs(actualFront)>.35f&&actualFront*expectedFront>0));
-    static bool FloorOrientation(Animator avatar,out float front,out float tilt)
+    public static bool FloorOrientation(Animator avatar,out float front,out float tilt)
     {
         front=tilt=0;if(avatar==null||!avatar.isHuman)return false;
         var hip=avatar.GetBoneTransform(HumanBodyBones.Hips);var chest=avatar.GetBoneTransform(HumanBodyBones.Chest)??avatar.GetBoneTransform(HumanBodyBones.Spine);

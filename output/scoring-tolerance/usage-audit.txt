@@ -1,0 +1,16 @@
+Synthetic adversaries for real-use failure modes.
+PASS simple: already raised at start must not create a repetition/hold score
+PASS simple: bad posture must not retain full live score
+PASS simple: partial return must not complete a repetition
+PASS standard: already raised at start must not create a repetition/hold score
+PASS standard: bad posture must not retain full live score
+PASS standard: partial return must not complete a repetition
+PASS hard: already raised at start must not create a repetition/hold score
+PASS hard: bad posture must not retain full live score
+PASS hard: partial return must not complete a repetition
+PASS LeftHand: cached 100 without calibrated fresh input must not HIT
+PASS RightHand: cached 100 without calibrated fresh input must not HIT
+PASS LeftFoot: cached 100 without calibrated fresh input must not HIT
+PASS RightFoot: cached 100 without calibrated fresh input must not HIT
+PASS Frozen receiver must not replay last bone packet as fresh data
+Checks: 14; failures: 0

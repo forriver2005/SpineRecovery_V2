@@ -1,0 +1,199 @@
+Separate humanoid patient replay, synthetic packet transport; no physical IMU validation.
+BirdDog_RingSkinC_Recorded | simple | follow | score=100 quality=100.0 following=24.64/24.64 qualified=4/4 invalid_hits=0
+BirdDog_RingSkinC_Recorded | simple | range_90 | score=100 quality=100.0 following=24.64/24.64 qualified=4/4 invalid_hits=0
+BirdDog_RingSkinC_Recorded | simple | range_80 | score=96 quality=91.5 following=24.64/24.64 qualified=4/4 invalid_hits=0
+BirdDog_RingSkinC_Recorded | simple | delay_350ms | score=72 quality=83.7 following=20.37/24.64 qualified=1/4 invalid_hits=0
+BirdDog_RingSkinC_Recorded | simple | delay_500ms | score=56 quality=71.7 following=16.37/24.64 qualified=0/4 invalid_hits=0
+BirdDog_RingSkinC_Recorded | simple | jitter_3deg | score=100 quality=100.0 following=24.64/24.64 qualified=4/4 invalid_hits=0
+BirdDog_RingSkinC_Recorded | simple | jitter_5deg | score=100 quality=100.0 following=24.64/24.64 qualified=4/4 invalid_hits=0
+BirdDog_RingSkinC_Recorded | simple | gap_1frame_mid | score=99 quality=98.9 following=24.37/24.64 qualified=4/4 invalid_hits=0
+BirdDog_RingSkinC_Recorded | simple | gap_1frame_end | score=79 quality=98.6 following=24.30/24.64 qualified=0/4 invalid_hits=0
+BirdDog_RingSkinC_Recorded | simple | gap_100ms_mid | score=97 quality=96.8 following=23.84/24.64 qualified=4/4 invalid_hits=0
+BirdDog_RingSkinC_Recorded | simple | spike_100ms_mid | score=98 quality=97.5 following=24.01/24.64 qualified=4/4 invalid_hits=0
+BirdDog_RingSkinC_Recorded | standard | follow | score=100 quality=100.0 following=24.64/24.64 qualified=4/4 invalid_hits=0
+BirdDog_RingSkinC_Recorded | standard | range_90 | score=100 quality=100.0 following=24.64/24.64 qualified=4/4 invalid_hits=0
+BirdDog_RingSkinC_Recorded | standard | range_80 | score=95 quality=89.4 following=24.64/24.64 qualified=4/4 invalid_hits=0
+BirdDog_RingSkinC_Recorded | standard | delay_350ms | score=73 quality=87.0 following=20.07/24.64 qualified=1/4 invalid_hits=0
+BirdDog_RingSkinC_Recorded | standard | delay_500ms | score=57 quality=75.2 following=15.57/24.64 qualified=0/4 invalid_hits=0
+BirdDog_RingSkinC_Recorded | standard | jitter_3deg | score=100 quality=100.0 following=24.64/24.64 qualified=4/4 invalid_hits=0
+BirdDog_RingSkinC_Recorded | standard | jitter_5deg | score=100 quality=100.0 following=24.64/24.64 qualified=4/4 invalid_hits=0
+BirdDog_RingSkinC_Recorded | standard | gap_1frame_mid | score=99 quality=98.9 following=24.37/24.64 qualified=4/4 invalid_hits=0
+BirdDog_RingSkinC_Recorded | standard | gap_1frame_end | score=80 quality=99.5 following=24.51/24.64 qualified=0/4 invalid_hits=0
+BirdDog_RingSkinC_Recorded | standard | gap_100ms_mid | score=97 quality=96.8 following=23.84/24.64 qualified=4/4 invalid_hits=0
+BirdDog_RingSkinC_Recorded | standard | spike_100ms_mid | score=98 quality=97.5 following=23.94/24.64 qualified=4/4 invalid_hits=0
+BirdDog_RingSkinC_Recorded | hard | follow | score=100 quality=100.0 following=24.64/24.64 qualified=4/4 invalid_hits=0
+BirdDog_RingSkinC_Recorded | hard | range_90 | score=100 quality=100.0 following=24.64/24.64 qualified=4/4 invalid_hits=0
+BirdDog_RingSkinC_Recorded | hard | range_80 | score=68 quality=86.8 following=16.24/24.64 qualified=1/4 invalid_hits=0
+BirdDog_RingSkinC_Recorded | hard | delay_350ms | score=90 quality=95.9 following=22.47/24.64 qualified=3/4 invalid_hits=0
+BirdDog_RingSkinC_Recorded | hard | delay_500ms | score=69 quality=89.8 following=20.11/24.64 qualified=0/4 invalid_hits=0
+BirdDog_RingSkinC_Recorded | hard | jitter_3deg | score=100 quality=100.0 following=24.64/24.64 qualified=4/4 invalid_hits=0
+BirdDog_RingSkinC_Recorded | hard | jitter_5deg | score=100 quality=100.0 following=24.64/24.64 qualified=4/4 invalid_hits=0
+BirdDog_RingSkinC_Recorded | hard | gap_1frame_mid | score=99 quality=99.5 following=24.51/24.64 qualified=4/4 invalid_hits=0
+BirdDog_RingSkinC_Recorded | hard | gap_1frame_end | score=79 quality=99.3 following=24.47/24.64 qualified=0/4 invalid_hits=0
+BirdDog_RingSkinC_Recorded | hard | gap_100ms_mid | score=99 quality=98.4 following=24.24/24.64 qualified=4/4 invalid_hits=0
+BirdDog_RingSkinC_Recorded | hard | spike_100ms_mid | score=99 quality=98.4 following=24.24/24.64 qualified=4/4 invalid_hits=0
+DeadBug_RingSkinC_Recorded | simple | follow | score=100 quality=100.0 following=13.76/13.76 qualified=4/4 invalid_hits=0
+DeadBug_RingSkinC_Recorded | simple | range_90 | score=100 quality=100.0 following=13.76/13.76 qualified=4/4 invalid_hits=0
+DeadBug_RingSkinC_Recorded | simple | range_80 | score=97 quality=94.5 following=13.76/13.76 qualified=4/4 invalid_hits=0
+DeadBug_RingSkinC_Recorded | simple | delay_350ms | score=52 quality=68.9 following=7.96/13.76 qualified=0/4 invalid_hits=0
+DeadBug_RingSkinC_Recorded | simple | delay_500ms | score=38 quality=50.6 following=5.64/13.76 qualified=0/4 invalid_hits=0
+DeadBug_RingSkinC_Recorded | simple | jitter_3deg | score=100 quality=100.0 following=13.76/13.76 qualified=4/4 invalid_hits=0
+DeadBug_RingSkinC_Recorded | simple | jitter_5deg | score=100 quality=100.0 following=13.76/13.76 qualified=4/4 invalid_hits=0
+DeadBug_RingSkinC_Recorded | simple | gap_1frame_mid | score=98 quality=98.1 following=13.49/13.76 qualified=4/4 invalid_hits=0
+DeadBug_RingSkinC_Recorded | simple | gap_1frame_end | score=78 quality=97.4 following=13.40/13.76 qualified=0/4 invalid_hits=0
+DeadBug_RingSkinC_Recorded | simple | gap_100ms_mid | score=95 quality=94.2 following=12.96/13.76 qualified=4/4 invalid_hits=0
+DeadBug_RingSkinC_Recorded | simple | spike_100ms_mid | score=96 quality=95.2 following=12.99/13.76 qualified=4/4 invalid_hits=0
+DeadBug_RingSkinC_Recorded | standard | follow | score=100 quality=100.0 following=13.76/13.76 qualified=4/4 invalid_hits=0
+DeadBug_RingSkinC_Recorded | standard | range_90 | score=100 quality=100.0 following=13.76/13.76 qualified=4/4 invalid_hits=0
+DeadBug_RingSkinC_Recorded | standard | range_80 | score=97 quality=93.2 following=13.76/13.76 qualified=4/4 invalid_hits=0
+DeadBug_RingSkinC_Recorded | standard | delay_350ms | score=61 quality=81.1 following=9.47/13.76 qualified=0/4 invalid_hits=0
+DeadBug_RingSkinC_Recorded | standard | delay_500ms | score=48 quality=67.2 following=6.77/13.76 qualified=0/4 invalid_hits=0
+DeadBug_RingSkinC_Recorded | standard | jitter_3deg | score=100 quality=100.0 following=13.76/13.76 qualified=4/4 invalid_hits=0
+DeadBug_RingSkinC_Recorded | standard | jitter_5deg | score=100 quality=100.0 following=13.76/13.76 qualified=4/4 invalid_hits=0
+DeadBug_RingSkinC_Recorded | standard | gap_1frame_mid | score=99 quality=98.3 following=13.53/13.76 qualified=4/4 invalid_hits=0
+DeadBug_RingSkinC_Recorded | standard | gap_1frame_end | score=79 quality=98.5 following=13.56/13.76 qualified=0/4 invalid_hits=0
+DeadBug_RingSkinC_Recorded | standard | gap_100ms_mid | score=96 quality=94.9 following=13.06/13.76 qualified=4/4 invalid_hits=0
+DeadBug_RingSkinC_Recorded | standard | spike_100ms_mid | score=96 quality=95.7 following=13.06/13.76 qualified=4/4 invalid_hits=0
+DeadBug_RingSkinC_Recorded | hard | follow | score=100 quality=100.0 following=13.76/13.76 qualified=4/4 invalid_hits=0
+DeadBug_RingSkinC_Recorded | hard | range_90 | score=100 quality=100.0 following=13.76/13.76 qualified=4/4 invalid_hits=0
+DeadBug_RingSkinC_Recorded | hard | range_80 | score=91 quality=94.2 following=13.02/13.76 qualified=3/4 invalid_hits=0
+DeadBug_RingSkinC_Recorded | hard | delay_350ms | score=71 quality=91.3 following=11.43/13.76 qualified=0/4 invalid_hits=0
+DeadBug_RingSkinC_Recorded | hard | delay_500ms | score=56 quality=79.8 following=7.29/13.76 qualified=0/4 invalid_hits=0
+DeadBug_RingSkinC_Recorded | hard | jitter_3deg | score=100 quality=100.0 following=13.76/13.76 qualified=4/4 invalid_hits=0
+DeadBug_RingSkinC_Recorded | hard | jitter_5deg | score=100 quality=100.0 following=13.76/13.76 qualified=4/4 invalid_hits=0
+DeadBug_RingSkinC_Recorded | hard | gap_1frame_mid | score=99 quality=99.0 following=13.63/13.76 qualified=4/4 invalid_hits=0
+DeadBug_RingSkinC_Recorded | hard | gap_1frame_end | score=79 quality=98.8 following=13.59/13.76 qualified=0/4 invalid_hits=0
+DeadBug_RingSkinC_Recorded | hard | gap_100ms_mid | score=98 quality=97.1 following=13.36/13.76 qualified=4/4 invalid_hits=0
+DeadBug_RingSkinC_Recorded | hard | spike_100ms_mid | score=98 quality=97.7 following=13.36/13.76 qualified=4/4 invalid_hits=0
+HipThrust_RingBridge_NewScoring | simple | follow | score=100 quality=100.0 hold=5.70/5.70 qualified=4/4 live_frames=426 invalid_hits=0
+HipThrust_RingBridge_NewScoring | simple | range_90 | score=100 quality=99.9 hold=5.70/5.70 qualified=4/4 live_frames=414 invalid_hits=0
+HipThrust_RingBridge_NewScoring | simple | range_80 | score=54 quality=92.4 hold=1.50/5.70 qualified=0/4 live_frames=400 invalid_hits=0
+HipThrust_RingBridge_NewScoring | simple | delay_350ms | score=72 quality=91.1 hold=4.93/5.70 qualified=0/4 live_frames=419 invalid_hits=0
+HipThrust_RingBridge_NewScoring | simple | delay_500ms | score=64 quality=84.0 hold=4.13/5.70 qualified=0/4 live_frames=383 invalid_hits=0
+HipThrust_RingBridge_NewScoring | simple | jitter_3deg | score=100 quality=100.0 hold=5.70/5.70 qualified=4/4 live_frames=424 invalid_hits=0
+HipThrust_RingBridge_NewScoring | simple | jitter_5deg | score=100 quality=100.0 hold=5.70/5.70 qualified=4/4 live_frames=424 invalid_hits=0
+HipThrust_RingBridge_NewScoring | simple | gap_1frame_mid | score=79 quality=99.4 hold=5.57/5.70 qualified=0/4 live_frames=422 invalid_hits=0
+HipThrust_RingBridge_NewScoring | simple | gap_1frame_end | score=79 quality=99.2 hold=5.50/5.70 qualified=0/4 live_frames=420 invalid_hits=0
+HipThrust_RingBridge_NewScoring | simple | gap_100ms_mid | score=77 quality=98.3 hold=5.30/5.70 qualified=0/4 live_frames=414 invalid_hits=0
+HipThrust_RingBridge_NewScoring | simple | spike_100ms_mid | score=77 quality=98.3 hold=5.30/5.70 qualified=0/4 live_frames=414 invalid_hits=0
+HipThrust_RingBridge_NewScoring | standard | follow | score=100 quality=100.0 hold=11.40/11.40 qualified=8/8 live_frames=696 invalid_hits=0
+HipThrust_RingBridge_NewScoring | standard | range_90 | score=100 quality=99.9 hold=11.40/11.40 qualified=8/8 live_frames=656 invalid_hits=0
+HipThrust_RingBridge_NewScoring | standard | range_80 | score=54 quality=92.4 hold=3.00/11.40 qualified=0/8 live_frames=602 invalid_hits=0
+HipThrust_RingBridge_NewScoring | standard | delay_350ms | score=72 quality=91.1 hold=9.87/11.40 qualified=0/8 live_frames=674 invalid_hits=0
+HipThrust_RingBridge_NewScoring | standard | delay_500ms | score=64 quality=84.0 hold=8.27/11.40 qualified=0/8 live_frames=656 invalid_hits=0
+HipThrust_RingBridge_NewScoring | standard | jitter_3deg | score=100 quality=100.0 hold=11.40/11.40 qualified=8/8 live_frames=694 invalid_hits=0
+HipThrust_RingBridge_NewScoring | standard | jitter_5deg | score=100 quality=100.0 hold=11.40/11.40 qualified=8/8 live_frames=694 invalid_hits=0
+HipThrust_RingBridge_NewScoring | standard | gap_1frame_mid | score=79 quality=99.4 hold=11.13/11.40 qualified=0/8 live_frames=688 invalid_hits=0
+HipThrust_RingBridge_NewScoring | standard | gap_1frame_end | score=79 quality=99.3 hold=11.07/11.40 qualified=0/8 live_frames=686 invalid_hits=0
+HipThrust_RingBridge_NewScoring | standard | gap_100ms_mid | score=77 quality=98.3 hold=10.60/11.40 qualified=0/8 live_frames=672 invalid_hits=0
+HipThrust_RingBridge_NewScoring | standard | spike_100ms_mid | score=77 quality=98.3 hold=10.60/11.40 qualified=0/8 live_frames=672 invalid_hits=0
+HipThrust_RingBridge_NewScoring | hard | follow | score=100 quality=100.0 hold=17.10/17.10 qualified=12/12 live_frames=861 invalid_hits=0
+HipThrust_RingBridge_NewScoring | hard | range_90 | score=100 quality=99.9 hold=17.10/17.10 qualified=12/12 live_frames=792 invalid_hits=0
+HipThrust_RingBridge_NewScoring | hard | range_80 | score=54 quality=92.4 hold=4.50/17.10 qualified=0/12 live_frames=696 invalid_hits=0
+HipThrust_RingBridge_NewScoring | hard | delay_350ms | score=72 quality=91.1 hold=14.80/17.10 qualified=0/12 live_frames=837 invalid_hits=0
+HipThrust_RingBridge_NewScoring | hard | delay_500ms | score=64 quality=84.0 hold=12.40/17.10 qualified=0/12 live_frames=816 invalid_hits=0
+HipThrust_RingBridge_NewScoring | hard | jitter_3deg | score=100 quality=100.0 hold=17.10/17.10 qualified=12/12 live_frames=868 invalid_hits=0
+HipThrust_RingBridge_NewScoring | hard | jitter_5deg | score=100 quality=100.0 hold=17.10/17.10 qualified=12/12 live_frames=868 invalid_hits=0
+HipThrust_RingBridge_NewScoring | hard | gap_1frame_mid | score=79 quality=99.4 hold=16.70/17.10 qualified=0/12 live_frames=849 invalid_hits=0
+HipThrust_RingBridge_NewScoring | hard | gap_1frame_end | score=81 quality=99.4 hold=16.67/17.10 qualified=1/12 live_frames=848 invalid_hits=0
+HipThrust_RingBridge_NewScoring | hard | gap_100ms_mid | score=77 quality=98.4 hold=15.93/17.10 qualified=0/12 live_frames=826 invalid_hits=0
+HipThrust_RingBridge_NewScoring | hard | spike_100ms_mid | score=77 quality=98.4 hold=15.93/17.10 qualified=0/12 live_frames=826 invalid_hits=0
+HipThrust_RingBridge_Hold30 | simple | follow | score=100 quality=100.0 hold=120.00/120.00 qualified=4/4 live_frames=4026 invalid_hits=0
+HipThrust_RingBridge_Hold30 | simple | range_90 | score=100 quality=99.7 hold=120.00/120.00 qualified=4/4 live_frames=4014 invalid_hits=0
+HipThrust_RingBridge_Hold30 | simple | range_80 | score=69 quality=87.7 hold=60.00/120.00 qualified=2/4 live_frames=4000 invalid_hits=0
+HipThrust_RingBridge_Hold30 | simple | delay_350ms | score=99 quality=98.5 hold=120.00/120.00 qualified=4/4 live_frames=4019 invalid_hits=0
+HipThrust_RingBridge_Hold30 | simple | delay_500ms | score=99 quality=97.3 hold=120.00/120.00 qualified=4/4 live_frames=3983 invalid_hits=0
+HipThrust_RingBridge_Hold30 | simple | jitter_3deg | score=100 quality=100.0 hold=120.00/120.00 qualified=4/4 live_frames=4027 invalid_hits=0
+HipThrust_RingBridge_Hold30 | simple | jitter_5deg | score=100 quality=100.0 hold=120.00/120.00 qualified=4/4 live_frames=4028 invalid_hits=0
+HipThrust_RingBridge_Hold30 | simple | gap_1frame_mid | score=65 quality=99.9 hold=60.00/120.00 qualified=0/4 live_frames=4022 invalid_hits=0
+HipThrust_RingBridge_Hold30 | simple | gap_1frame_end | score=80 quality=99.9 hold=119.87/120.00 qualified=0/4 live_frames=4022 invalid_hits=0
+HipThrust_RingBridge_Hold30 | simple | gap_100ms_mid | score=65 quality=99.7 hold=59.93/120.00 qualified=0/4 live_frames=4015 invalid_hits=0
+HipThrust_RingBridge_Hold30 | simple | spike_100ms_mid | score=80 quality=99.7 hold=119.63/120.00 qualified=0/4 live_frames=4015 invalid_hits=0
+HipThrust_RingBridge_Hold30 | standard | follow | score=100 quality=100.0 hold=120.00/120.00 qualified=4/4 live_frames=3948 invalid_hits=0
+HipThrust_RingBridge_Hold30 | standard | range_90 | score=100 quality=99.7 hold=120.00/120.00 qualified=4/4 live_frames=3928 invalid_hits=0
+HipThrust_RingBridge_Hold30 | standard | range_80 | score=69 quality=87.7 hold=60.00/120.00 qualified=2/4 live_frames=3901 invalid_hits=0
+HipThrust_RingBridge_Hold30 | standard | delay_350ms | score=99 quality=98.5 hold=120.00/120.00 qualified=4/4 live_frames=3937 invalid_hits=0
+HipThrust_RingBridge_Hold30 | standard | delay_500ms | score=99 quality=97.3 hold=120.00/120.00 qualified=4/4 live_frames=3928 invalid_hits=0
+HipThrust_RingBridge_Hold30 | standard | jitter_3deg | score=100 quality=100.0 hold=120.00/120.00 qualified=4/4 live_frames=3948 invalid_hits=0
+HipThrust_RingBridge_Hold30 | standard | jitter_5deg | score=100 quality=100.0 hold=120.00/120.00 qualified=4/4 live_frames=3947 invalid_hits=0
+HipThrust_RingBridge_Hold30 | standard | gap_1frame_mid | score=65 quality=99.9 hold=60.00/120.00 qualified=0/4 live_frames=3944 invalid_hits=0
+HipThrust_RingBridge_Hold30 | standard | gap_1frame_end | score=80 quality=99.9 hold=119.87/120.00 qualified=0/4 live_frames=3944 invalid_hits=0
+HipThrust_RingBridge_Hold30 | standard | gap_100ms_mid | score=65 quality=99.7 hold=59.93/120.00 qualified=0/4 live_frames=3937 invalid_hits=0
+HipThrust_RingBridge_Hold30 | standard | spike_100ms_mid | score=80 quality=99.7 hold=119.63/120.00 qualified=0/4 live_frames=3937 invalid_hits=0
+HipThrust_RingBridge_Hold30 | hard | follow | score=100 quality=100.0 hold=120.00/120.00 qualified=4/4 live_frames=3887 invalid_hits=0
+HipThrust_RingBridge_Hold30 | hard | range_90 | score=100 quality=99.7 hold=120.00/120.00 qualified=4/4 live_frames=3864 invalid_hits=0
+HipThrust_RingBridge_Hold30 | hard | range_80 | score=69 quality=87.7 hold=60.00/120.00 qualified=2/4 live_frames=3832 invalid_hits=0
+HipThrust_RingBridge_Hold30 | hard | delay_350ms | score=99 quality=98.5 hold=120.00/120.00 qualified=4/4 live_frames=3879 invalid_hits=0
+HipThrust_RingBridge_Hold30 | hard | delay_500ms | score=99 quality=97.3 hold=120.00/120.00 qualified=4/4 live_frames=3872 invalid_hits=0
+HipThrust_RingBridge_Hold30 | hard | jitter_3deg | score=100 quality=100.0 hold=120.00/120.00 qualified=4/4 live_frames=3889 invalid_hits=0
+HipThrust_RingBridge_Hold30 | hard | jitter_5deg | score=100 quality=100.0 hold=120.00/120.00 qualified=4/4 live_frames=3889 invalid_hits=0
+HipThrust_RingBridge_Hold30 | hard | gap_1frame_mid | score=65 quality=99.9 hold=60.00/120.00 qualified=0/4 live_frames=3883 invalid_hits=0
+HipThrust_RingBridge_Hold30 | hard | gap_1frame_end | score=80 quality=99.9 hold=119.87/120.00 qualified=0/4 live_frames=3883 invalid_hits=0
+HipThrust_RingBridge_Hold30 | hard | gap_100ms_mid | score=65 quality=99.7 hold=59.93/120.00 qualified=0/4 live_frames=3876 invalid_hits=0
+HipThrust_RingBridge_Hold30 | hard | spike_100ms_mid | score=80 quality=99.7 hold=119.63/120.00 qualified=0/4 live_frames=3876 invalid_hits=0
+SideBridge_RingBridge_Dynamic | simple | follow | score=100 quality=100.0 hold=21.12/21.12 qualified=3/3 live_frames=616 invalid_hits=0
+SideBridge_RingBridge_Dynamic | simple | range_90 | score=79 quality=99.8 hold=20.80/21.12 qualified=0/3 live_frames=600 invalid_hits=0
+SideBridge_RingBridge_Dynamic | simple | range_80 | score=74 quality=92.5 hold=19.53/21.12 qualified=0/3 live_frames=562 invalid_hits=0
+SideBridge_RingBridge_Dynamic | simple | delay_350ms | score=96 quality=91.2 hold=21.12/21.12 qualified=3/3 live_frames=617 invalid_hits=0
+SideBridge_RingBridge_Dynamic | simple | delay_500ms | score=93 quality=86.0 hold=21.12/21.12 qualified=3/3 live_frames=616 invalid_hits=0
+SideBridge_RingBridge_Dynamic | simple | jitter_3deg | score=83 quality=95.2 hold=19.92/21.12 qualified=1/3 live_frames=576 invalid_hits=0
+SideBridge_RingBridge_Dynamic | simple | jitter_5deg | score=66 quality=83.8 hold=17.10/21.12 qualified=0/3 live_frames=489 invalid_hits=0
+SideBridge_RingBridge_Dynamic | simple | gap_1frame_mid | score=99 quality=99.6 hold=21.12/21.12 qualified=3/3 live_frames=613 invalid_hits=0
+SideBridge_RingBridge_Dynamic | simple | gap_1frame_end | score=99 quality=99.6 hold=21.12/21.12 qualified=3/3 live_frames=613 invalid_hits=0
+SideBridge_RingBridge_Dynamic | simple | gap_100ms_mid | score=79 quality=98.9 hold=21.03/21.12 qualified=0/3 live_frames=607 invalid_hits=0
+SideBridge_RingBridge_Dynamic | simple | spike_100ms_mid | score=79 quality=98.9 hold=21.03/21.12 qualified=0/3 live_frames=607 invalid_hits=0
+SideBridge_RingBridge_Dynamic | standard | follow | score=100 quality=100.0 hold=20.13/20.13 qualified=3/3 live_frames=586 invalid_hits=0
+SideBridge_RingBridge_Dynamic | standard | range_90 | score=79 quality=99.8 hold=19.23/20.13 qualified=0/3 live_frames=553 invalid_hits=0
+SideBridge_RingBridge_Dynamic | standard | range_80 | score=72 quality=92.5 hold=17.57/20.13 qualified=0/3 live_frames=503 invalid_hits=0
+SideBridge_RingBridge_Dynamic | standard | delay_350ms | score=96 quality=91.2 hold=20.13/20.13 qualified=3/3 live_frames=589 invalid_hits=0
+SideBridge_RingBridge_Dynamic | standard | delay_500ms | score=93 quality=86.0 hold=20.13/20.13 qualified=3/3 live_frames=586 invalid_hits=0
+SideBridge_RingBridge_Dynamic | standard | jitter_3deg | score=75 quality=95.2 hold=18.63/20.13 qualified=0/3 live_frames=535 invalid_hits=0
+SideBridge_RingBridge_Dynamic | standard | jitter_5deg | score=53 quality=83.8 hold=7.30/20.13 qualified=0/3 live_frames=203 invalid_hits=0
+SideBridge_RingBridge_Dynamic | standard | gap_1frame_mid | score=99 quality=99.6 hold=20.13/20.13 qualified=3/3 live_frames=583 invalid_hits=0
+SideBridge_RingBridge_Dynamic | standard | gap_1frame_end | score=99 quality=99.6 hold=20.13/20.13 qualified=3/3 live_frames=583 invalid_hits=0
+SideBridge_RingBridge_Dynamic | standard | gap_100ms_mid | score=79 quality=98.9 hold=20.03/20.13 qualified=0/3 live_frames=577 invalid_hits=0
+SideBridge_RingBridge_Dynamic | standard | spike_100ms_mid | score=79 quality=98.9 hold=20.03/20.13 qualified=0/3 live_frames=577 invalid_hits=0
+SideBridge_RingBridge_Dynamic | hard | follow | score=100 quality=100.0 hold=18.47/18.47 qualified=3/3 live_frames=536 invalid_hits=0
+SideBridge_RingBridge_Dynamic | hard | range_90 | score=77 quality=99.8 hold=16.93/18.47 qualified=0/3 live_frames=484 invalid_hits=0
+SideBridge_RingBridge_Dynamic | hard | range_80 | score=55 quality=92.5 hold=5.27/18.47 qualified=0/3 live_frames=142 invalid_hits=0
+SideBridge_RingBridge_Dynamic | hard | delay_350ms | score=96 quality=91.2 hold=18.47/18.47 qualified=3/3 live_frames=538 invalid_hits=0
+SideBridge_RingBridge_Dynamic | hard | delay_500ms | score=93 quality=86.0 hold=18.47/18.47 qualified=3/3 live_frames=536 invalid_hits=0
+SideBridge_RingBridge_Dynamic | hard | jitter_3deg | score=65 quality=95.2 hold=10.43/18.47 qualified=0/3 live_frames=297 invalid_hits=0
+SideBridge_RingBridge_Dynamic | hard | jitter_5deg | score=51 quality=83.8 hold=5.33/18.47 qualified=0/3 live_frames=152 invalid_hits=0
+SideBridge_RingBridge_Dynamic | hard | gap_1frame_mid | score=99 quality=99.6 hold=18.47/18.47 qualified=3/3 live_frames=533 invalid_hits=0
+SideBridge_RingBridge_Dynamic | hard | gap_1frame_end | score=99 quality=99.6 hold=18.47/18.47 qualified=3/3 live_frames=533 invalid_hits=0
+SideBridge_RingBridge_Dynamic | hard | gap_100ms_mid | score=79 quality=98.9 hold=18.37/18.47 qualified=0/3 live_frames=527 invalid_hits=0
+SideBridge_RingBridge_Dynamic | hard | spike_100ms_mid | score=79 quality=98.9 hold=18.37/18.47 qualified=0/3 live_frames=527 invalid_hits=0
+SideBridge_RingBridge_Hold30 | simple | follow | score=100 quality=100.0 hold=90.00/90.00 qualified=3/3 live_frames=2855 invalid_hits=0
+SideBridge_RingBridge_Hold30 | simple | range_90 | score=100 quality=99.9 hold=90.00/90.00 qualified=3/3 live_frames=2839 invalid_hits=0
+SideBridge_RingBridge_Hold30 | simple | range_80 | score=95 quality=89.2 hold=90.00/90.00 qualified=3/3 live_frames=2801 invalid_hits=0
+SideBridge_RingBridge_Hold30 | simple | delay_350ms | score=99 quality=97.5 hold=90.00/90.00 qualified=3/3 live_frames=2856 invalid_hits=0
+SideBridge_RingBridge_Hold30 | simple | delay_500ms | score=91 quality=95.9 hold=89.90/90.00 qualified=2/3 live_frames=2855 invalid_hits=0
+SideBridge_RingBridge_Hold30 | simple | jitter_3deg | score=99 quality=98.3 hold=90.00/90.00 qualified=3/3 live_frames=2815 invalid_hits=0
+SideBridge_RingBridge_Hold30 | simple | jitter_5deg | score=88 quality=91.1 hold=88.37/90.00 qualified=2/3 live_frames=2715 invalid_hits=0
+SideBridge_RingBridge_Hold30 | simple | gap_1frame_mid | score=65 quality=99.9 hold=45.00/90.00 qualified=0/3 live_frames=2852 invalid_hits=0
+SideBridge_RingBridge_Hold30 | simple | gap_1frame_end | score=80 quality=99.9 hold=89.90/90.00 qualified=0/3 live_frames=2852 invalid_hits=0
+SideBridge_RingBridge_Hold30 | simple | gap_100ms_mid | score=65 quality=99.7 hold=44.97/90.00 qualified=0/3 live_frames=2846 invalid_hits=0
+SideBridge_RingBridge_Hold30 | simple | spike_100ms_mid | score=80 quality=99.7 hold=89.70/90.00 qualified=0/3 live_frames=2846 invalid_hits=0
+SideBridge_RingBridge_Hold30 | standard | follow | score=100 quality=100.0 hold=90.00/90.00 qualified=3/3 live_frames=2825 invalid_hits=0
+SideBridge_RingBridge_Hold30 | standard | range_90 | score=100 quality=99.9 hold=90.00/90.00 qualified=3/3 live_frames=2792 invalid_hits=0
+SideBridge_RingBridge_Hold30 | standard | range_80 | score=95 quality=89.2 hold=90.00/90.00 qualified=3/3 live_frames=2760 invalid_hits=0
+SideBridge_RingBridge_Hold30 | standard | delay_350ms | score=92 quality=97.5 hold=89.87/90.00 qualified=2/3 live_frames=2828 invalid_hits=0
+SideBridge_RingBridge_Hold30 | standard | delay_500ms | score=91 quality=95.9 hold=89.70/90.00 qualified=2/3 live_frames=2825 invalid_hits=0
+SideBridge_RingBridge_Hold30 | standard | jitter_3deg | score=99 quality=98.3 hold=90.00/90.00 qualified=3/3 live_frames=2783 invalid_hits=0
+SideBridge_RingBridge_Hold30 | standard | jitter_5deg | score=79 quality=91.1 hold=80.57/90.00 qualified=1/3 live_frames=1757 invalid_hits=0
+SideBridge_RingBridge_Hold30 | standard | gap_1frame_mid | score=65 quality=99.9 hold=45.00/90.00 qualified=0/3 live_frames=2822 invalid_hits=0
+SideBridge_RingBridge_Hold30 | standard | gap_1frame_end | score=80 quality=99.9 hold=89.90/90.00 qualified=0/3 live_frames=2822 invalid_hits=0
+SideBridge_RingBridge_Hold30 | standard | gap_100ms_mid | score=65 quality=99.7 hold=44.97/90.00 qualified=0/3 live_frames=2816 invalid_hits=0
+SideBridge_RingBridge_Hold30 | standard | spike_100ms_mid | score=80 quality=99.7 hold=89.70/90.00 qualified=0/3 live_frames=2816 invalid_hits=0
+SideBridge_RingBridge_Hold30 | hard | follow | score=100 quality=100.0 hold=90.00/90.00 qualified=3/3 live_frames=2781 invalid_hits=0
+SideBridge_RingBridge_Hold30 | hard | range_90 | score=100 quality=99.9 hold=90.00/90.00 qualified=3/3 live_frames=2757 invalid_hits=0
+SideBridge_RingBridge_Hold30 | hard | range_80 | score=61 quality=89.2 hold=30.00/90.00 qualified=1/3 live_frames=907 invalid_hits=0
+SideBridge_RingBridge_Hold30 | hard | delay_350ms | score=92 quality=97.5 hold=89.80/90.00 qualified=2/3 live_frames=2781 invalid_hits=0
+SideBridge_RingBridge_Hold30 | hard | delay_500ms | score=91 quality=95.9 hold=89.63/90.00 qualified=2/3 live_frames=2781 invalid_hits=0
+SideBridge_RingBridge_Hold30 | hard | jitter_3deg | score=91 quality=98.3 hold=84.30/90.00 qualified=2/3 live_frames=1823 invalid_hits=0
+SideBridge_RingBridge_Hold30 | hard | jitter_5deg | score=76 quality=91.1 hold=71.90/90.00 qualified=1/3 live_frames=913 invalid_hits=0
+SideBridge_RingBridge_Hold30 | hard | gap_1frame_mid | score=65 quality=99.9 hold=45.00/90.00 qualified=0/3 live_frames=2778 invalid_hits=0
+SideBridge_RingBridge_Hold30 | hard | gap_1frame_end | score=80 quality=99.9 hold=89.90/90.00 qualified=0/3 live_frames=2778 invalid_hits=0
+SideBridge_RingBridge_Hold30 | hard | gap_100ms_mid | score=65 quality=99.7 hold=44.97/90.00 qualified=0/3 live_frames=2772 invalid_hits=0
+SideBridge_RingBridge_Hold30 | hard | spike_100ms_mid | score=80 quality=99.7 hold=89.70/90.00 qualified=0/3 live_frames=2772 invalid_hits=0

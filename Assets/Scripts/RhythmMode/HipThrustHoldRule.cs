@@ -37,14 +37,16 @@ public sealed class HipThrustHoldRule
 
     public void Step(float progress, float quality, float deltaTime, bool validInput,float eligibleHoldDelta=-1)
     {
-        InputValid = validInput && !float.IsNaN(progress) && !float.IsInfinity(progress)
+        InputValid = validInput && deltaTime<=.1001f && !float.IsNaN(progress) && !float.IsInfinity(progress)
             && !float.IsNaN(quality) && !float.IsInfinity(quality);
         HoldingCorrectly=false;
         float dt = float.IsNaN(deltaTime)||float.IsInfinity(deltaTime)?0:Mathf.Clamp(deltaTime, 0, .1f);
         float holdDt=float.IsNaN(eligibleHoldDelta)||float.IsInfinity(eligibleHoldDelta)?0:eligibleHoldDelta<0?dt:Mathf.Clamp(eligibleHoldDelta,0,dt);
         if (!InputValid)
         {
-            confirmation=pendingHold=0;missingSeconds+=dt;if(ContinuousHold)ValidHoldSeconds=0;
+            float missingDt=float.IsNaN(deltaTime)||float.IsInfinity(deltaTime)?0:Mathf.Max(0,deltaTime);
+            confirmation=pendingHold=0;missingSeconds+=missingDt;badSeconds+=missingDt;
+            if(ContinuousHold&&TrainingScoringTolerance.GapExpired(badSeconds))ValidHoldSeconds=0;
             if(missingSeconds>=.5f){LowConfirmed=false;ValidHoldSeconds=RoundBest=0;Change(Stage.Rest);}
             return;
         }
@@ -73,7 +75,7 @@ public sealed class HipThrustHoldRule
             case Stage.Holding:
                 HoldingCorrectly=quality>=validQuality&&progress>=enter;
                 if(HoldingCorrectly){badSeconds=0;ValidHoldSeconds+=holdDt;}
-                else {badSeconds+=dt;if(ContinuousHold&&badSeconds>.15f)ValidHoldSeconds=0;}
+                else {badSeconds+=dt;if(ContinuousHold&&TrainingScoringTolerance.GapExpired(badSeconds))ValidHoldSeconds=0;}
                 RoundBest = Mathf.Max(RoundBest, LiveScore);
                 if (progress <= exit)
                 {

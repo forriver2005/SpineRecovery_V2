@@ -14,11 +14,14 @@ public sealed class SideBridgePoseScoring : MonoBehaviour
     HipThrustTaikoController transport;
     int activeRepetition=-1,activeCycle;
     string difficulty;
+    float filteredProgress;
+    bool hasFilteredProgress;
 
     public void Begin(string selectedDifficulty)
     {
         difficulty=selectedDifficulty;Rule.Reset(difficulty);activeRepetition=-1;activeCycle=0;
         PostureReady=SupportReady=false;TrackingQuality=0;
+        hasFilteredProgress=false;
     }
 
     public bool CaptureTargets(HipThrustTaikoController source)
@@ -94,15 +97,25 @@ public sealed class SideBridgePoseScoring : MonoBehaviour
         bool dynamic=transport.PrescriptionDose!=null&&transport.PrescriptionDose.preserveRecordedTiming;
         float goal=dynamic?RecordedHoldTargets[activeCycle]:30;
         Rule.BeginRepetition(goal,goal,!dynamic);
+        hasFilteredProgress=false;
     }
 
-    public bool Evaluate(Animator animator,out float progress,out float quality)
+    public bool Evaluate(Animator animator,out float progress,out float quality,float deltaTime=.0333333f)
     {
         progress=quality=TrackingQuality=0;PostureReady=SupportReady=false;
         if(Geometry==null||!SideBridgePoseGeometry.TryMeasure(animator,out var pose))return false;
         PostureReady=pose.IsLeftSupport;
-        if(!PostureReady)return false;
-        progress=Geometry.Progress(pose);quality=Geometry.Quality(pose,Geometry.Top);
+        if(!PostureReady){hasFilteredProgress=false;return false;}
+        // Filter before clamping: clipping peaks first turns symmetric sensor
+        // noise into a downward bias and unfairly fails a correct high hold.
+        float rawProgress=Geometry.RawProgress(pose);
+        // A short filter removes normalized-height amplification of sensor jitter.
+        // A genuine low return bypasses smoothing; it can never extend a hold.
+        float alpha=1-Mathf.Exp(-Mathf.Clamp(deltaTime,0,.1f)/.08f);
+        filteredProgress=!hasFilteredProgress||rawProgress<.3f||(filteredProgress<.3f&&rawProgress>.65f)
+            ?rawProgress:Mathf.Lerp(filteredProgress,rawProgress,alpha);
+        hasFilteredProgress=true;
+        progress=Mathf.Clamp01(filteredProgress);quality=Geometry.Quality(pose,Geometry.Top);
         SupportReady=SideBridgePoseGeometry.HasStableSupport(pose,Geometry.Top);
         if(SupportReady&&SideBridgePoseGeometry.TryMeasure(transport.CoachAnimator,out var expected))
         {
@@ -112,7 +125,7 @@ public sealed class SideBridgePoseScoring : MonoBehaviour
         return SupportReady;
     }
 
-    public void InvalidateInput(){TrackingQuality=0;PostureReady=SupportReady=false;}
+    public void InvalidateInput(){TrackingQuality=0;PostureReady=SupportReady=false;hasFilteredProgress=false;}
 
     public void Step(float progress,float quality,float deltaTime,bool valid)
     {

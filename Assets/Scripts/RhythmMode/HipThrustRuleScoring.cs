@@ -1,4 +1,5 @@
 using UnityEngine;
+using System.Collections.Generic;
 
 /// <summary>Opt-in scoring for the two new scenes. The legacy menu/calibration and transport remain in charge.</summary>
 public sealed class HipThrustRuleScoring : MonoBehaviour
@@ -14,6 +15,9 @@ public sealed class HipThrustRuleScoring : MonoBehaviour
     public bool HasMeasurement { get; private set; }
     public float TrackingQuality { get; private set; }
     public float CoachProgress { get; private set; }
+    public float MatchedDelay { get; private set; }
+    sealed class CoachPoseSample {public double time;public HipThrustHoldGeometry.TargetPose pose;public float progress;}
+    readonly List<CoachPoseSample> coachHistory=new List<CoachPoseSample>();
     public float LiveScore => sideBridge!=null?sideBridge.Rule.LiveScore:Rule.LiveScore;
     public float LastRoundBest => sideBridge!=null?sideBridge.Rule.LastRoundBest:Rule.LastRoundBest;
     public string Status => !TargetsReady ? "动作参考不可用" :
@@ -29,13 +33,16 @@ public sealed class HipThrustRuleScoring : MonoBehaviour
         sideBridge.Rule.HoldingCorrectly?"姿势达标 · 有效保持中":
         sideBridge.Rule.Phase==SideBridgeHoldRule.Stage.Lowering?"请完全放下后计次":"请按教练调整抬起幅度和姿势";
     readonly HipThrustHoldGeometry geometry = new HipThrustHoldGeometry();
+    readonly HipThrustHoldGeometry coachGeometry = new HipThrustHoldGeometry();
     AvatarMotionSource motion;
     int lastCounter;
     float lastFrameAt = float.NegativeInfinity;
+    float minimumTrackingQuality;
 
     public void Begin(string difficulty)
     {
-        Rule.Reset(difficulty); Progress=Quality=0; InputFresh=false;
+        Rule.Reset(difficulty); Progress=Quality=MatchedDelay=0; InputFresh=false;coachHistory.Clear();
+        minimumTrackingQuality=difficulty=="simple"?60:difficulty=="hard"?80:70;
         if(sideBridge!=null) sideBridge.Begin(difficulty);
         bool continuous=transport.Hold30Timeline!=null&&!transport.Hold30Timeline.UsesRecordedTiming;
         Rule.ContinuousHold=continuous;if(continuous)Rule.SetFullScoreSeconds(30);
@@ -54,14 +61,19 @@ public sealed class HipThrustRuleScoring : MonoBehaviour
         try
         {
             if(sideBridge!=null) return sideBridge.CaptureTargets(transport);
+            using(var patient=new PatientPoseReference(animator,calibration!=null?calibration.UserAnimator:null))
+            {
             Sample(timeline.cycles[0].liftStartFrame);
-            if(!geometry.TryMeasurePose(animator,out geometry.restTarget)) return false;
+            patient.Apply();
+            if(!geometry.TryMeasurePose(patient.Animator,out geometry.restTarget)||!coachGeometry.TryMeasurePose(animator,out coachGeometry.restTarget)) return false;
             Sample(HipThrustHold30Timeline.PeakFrame(timeline,0));
-            if(!geometry.TryMeasurePose(animator,out geometry.holdTarget)) return false;
+            patient.Apply();
+            if(!geometry.TryMeasurePose(patient.Animator,out geometry.holdTarget)||!coachGeometry.TryMeasurePose(animator,out coachGeometry.holdTarget)) return false;
             if(geometry.restTarget.hasBridgeLift && geometry.holdTarget.hasBridgeLift &&
                geometry.restTarget.bridgeLiftRatio>geometry.holdTarget.bridgeLiftRatio)
             { var swap=geometry.restTarget; geometry.restTarget=geometry.holdTarget; geometry.holdTarget=swap; }
             return true;
+            }
         }
         finally { animator.Play(state.fullPathHash,0,state.normalizedTime); animator.Update(0); animator.speed=speed; }
         void Sample(int frame)
@@ -83,7 +95,7 @@ public sealed class HipThrustRuleScoring : MonoBehaviour
     {
         ObserveInput();
         InputFresh=motion!=null && motion.HasFreshFrame && Time.unscaledTime-lastFrameAt<=.5f;
-        bool valid=TargetsReady && InputFresh && calibration!=null && calibration.IsCalibrated;
+        bool valid=TargetsReady && InputFresh && deltaTime>0 && deltaTime<=.1001f && calibration!=null && calibration.IsCalibrated;
         if(sideBridge!=null&&TargetsReady)sideBridge.UpdateReference();
         Progress=Quality=TrackingQuality=CoachProgress=0;HasMeasurement=false;
         if(valid)
@@ -91,7 +103,7 @@ public sealed class HipThrustRuleScoring : MonoBehaviour
             if(sideBridge!=null)
             {
                 HasMeasurement=SideBridgePoseGeometry.TryMeasure(calibration.UserAnimator,out _);
-                valid=sideBridge.Evaluate(calibration.UserAnimator,out float progress,out float quality);
+                valid=sideBridge.Evaluate(calibration.UserAnimator,out float progress,out float quality,deltaTime);
                 Progress=progress;Quality=quality;
                 TrackingQuality=sideBridge.TrackingQuality;
             }
@@ -105,16 +117,25 @@ public sealed class HipThrustRuleScoring : MonoBehaviour
                     Progress=geometry.CalculateProgress(pose); Quality=geometry.CalculatePoseQuality(pose,geometry.holdTarget,true);
                     if(geometry.TryMeasurePose(transport.CoachAnimator,out var expected))
                     {
-                        CoachProgress=geometry.CalculateProgress(expected);
-                        float amplitude=100*(1-Mathf.InverseLerp(.12f,.5f,Mathf.Abs(Progress-CoachProgress)));
-                        TrackingQuality=Mathf.Min(amplitude,geometry.CalculatePoseQuality(pose,expected,false));
+                        double now=transport.Elapsed;
+                        coachHistory.Add(new CoachPoseSample{time=now,pose=expected,progress=coachGeometry.CalculateProgress(expected)});
+                        while(coachHistory.Count>1&&(coachHistory[0].time<now-TrainingScoringTolerance.MaximumResponseDelay||coachHistory.Count>160))coachHistory.RemoveAt(0);
+                        float bestObjective=float.NegativeInfinity,previousDelay=MatchedDelay;
+                        foreach(var sample in coachHistory)
+                        {
+                            float difference=Mathf.Abs(Progress-sample.progress),delay=(float)(now-sample.time);
+                            if(delay<0||delay>TrainingScoringTolerance.MaximumResponseDelay)continue;
+                            float quality=Mathf.Min(100*(1-Mathf.InverseLerp(.12f,.5f,difference)),geometry.CalculatePoseQuality(pose,sample.pose,false));
+                            float objective=quality-100*Mathf.Max(0,difference-.05f)-2*Mathf.Abs(delay-previousDelay);
+                            if(objective>bestObjective){bestObjective=objective;TrackingQuality=quality;CoachProgress=sample.progress;MatchedDelay=delay;}
+                        }
                     }
                 }
             }
         }
         if(sideBridge!=null)
         {
-            if(!TargetsReady||!InputFresh||calibration==null||!calibration.IsCalibrated)sideBridge.InvalidateInput();
+            if(!HasMeasurement||!TargetsReady||!InputFresh||calibration==null||!calibration.IsCalibrated)sideBridge.InvalidateInput();
             sideBridge.Step(Progress,Quality,deltaTime,valid);
         }
         else
@@ -127,14 +148,18 @@ public sealed class HipThrustRuleScoring : MonoBehaviour
                 var rep=reps[index];
                 eligible=(float)System.Math.Max(0,System.Math.Min(transport.Elapsed,rep.lower)-System.Math.Max(transport.Elapsed-deltaTime,rep.top));
             }
-            Rule.Step(Progress,Mathf.Min(Quality,TrackingQuality),deltaTime,valid,eligible);
+            // The forgiving A/B entry thresholds must not turn a sustained half
+            // lift into a high live score while the settlement correctly rejects it.
+            float holdQuality=Mathf.Abs(Progress-CoachProgress)<=.16f&&TrackingQuality>=minimumTrackingQuality
+                ?Mathf.Min(Quality,TrackingQuality):0;
+            Rule.Step(Progress,holdQuality,deltaTime,valid,eligible);
         }
     }
     public void BreakContinuity(){Rule.BreakContinuity();if(sideBridge!=null)sideBridge.Rule.BreakContinuity();}
     public bool MatchesHipCoach() => sideBridge==null&&TargetsReady&&InputFresh&&HasMeasurement&&calibration!=null&&calibration.IsCalibrated&&
         TrackingQuality>=65&&Mathf.Abs(Progress-CoachProgress)<=.16f;
 
-    public bool MatchesSideBridgeCoach() => sideBridge!=null && TargetsReady && InputFresh && calibration!=null && calibration.IsCalibrated &&
+    public bool MatchesSideBridgeCoach() => sideBridge!=null && TargetsReady && InputFresh && HasMeasurement && calibration!=null && calibration.IsCalibrated &&
         sideBridge.Matches(calibration.UserAnimator,transport.CoachAnimator);
 
     public string Result(int demonstrated) => sideBridge!=null

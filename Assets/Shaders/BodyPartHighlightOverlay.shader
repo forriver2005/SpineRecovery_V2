@@ -17,7 +17,7 @@ Shader "SpineRecovery/BodyPartHighlightOverlay"
 
         Pass
         {
-            Blend SrcAlpha One
+            Blend SrcAlpha OneMinusSrcAlpha
             Cull Back
             ZWrite Off
             ZTest LEqual

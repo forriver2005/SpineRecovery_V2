@@ -42,6 +42,7 @@ public sealed class SpineFlowTrainingSession : MonoBehaviour
     private const string ResultMessage = "SESSION_RESULT";
     private const string MeasuredOrigin = "ar_pose_measurement_v2";
     private const string ScoreSummaryOrigin = "ar_score_summary_v1";
+    private const string CoachOrigin = "ar_coach_session_v2";
     private const string MeasuredDetail = "MEASURED_AR_RESULT";
     private const string ScoreSummaryDetail = "MEASURED_AR_SCORE_SUMMARY";
     private const string MissingDetail = "AR_DETAILS_UNAVAILABLE";
@@ -153,6 +154,8 @@ public sealed class SpineFlowTrainingSession : MonoBehaviour
         public int bestScore;
         public int rawBestScore;
         public int scoreSampleCount;
+        public string trackingQuality;
+        public string timelineStatus;
         public string scoreMappingVersion;
         public float minimumUserMotionDegrees;
         public float minimumCoachMotionDegrees;
@@ -195,6 +198,8 @@ public sealed class SpineFlowTrainingSession : MonoBehaviour
         public string sourceApp = "ar_app";
         public string detailStatus;
         public string dataOrigin;
+        public string timelineStatus;
+        public string trackingQuality;
         public bool simulated;
         public bool completed;
         public int durationSeconds;
@@ -218,6 +223,7 @@ public sealed class SpineFlowTrainingSession : MonoBehaviour
         public float coachMotionDegrees;
         public int durationSeconds;
         public string level;
+        public string trackingQuality;
 
         public bool IsAcceptable =>
             HasScoreSummary &&
@@ -237,8 +243,13 @@ public sealed class SpineFlowTrainingSession : MonoBehaviour
     private ModeMeasurement coachMeasurement;
     private ModeMeasurement gameMeasurement;
     private float coachStartedAt;
+    private float coachPausedSecondsAtStart;
     private float gameStartedAt;
+    private float gamePausedSecondsAtStart;
     private bool coachTiming;
+    private CoachTimelineStatus coachTimelineStatus = CoachTimelineStatus.Interrupted;
+    private CoachEndReason coachEndReason = CoachEndReason.TechnicalError;
+    private bool coachOutcomeSet;
     private bool gameTiming;
     private bool resultSent;
     private string pendingGameLevel = "standard";
@@ -587,7 +598,11 @@ public sealed class SpineFlowTrainingSession : MonoBehaviour
 
         instance.coachMeasurement = null;
         instance.coachStartedAt = Time.realtimeSinceStartup;
+        instance.coachPausedSecondsAtStart = MobileCoachControls.TotalPausedSeconds;
         instance.coachTiming = true;
+        instance.coachOutcomeSet = false;
+        instance.coachTimelineStatus = CoachTimelineStatus.Interrupted;
+        instance.coachEndReason = CoachEndReason.TechnicalError;
     }
 
     public static void CompleteCoachTraining(
@@ -595,6 +610,23 @@ public sealed class SpineFlowTrainingSession : MonoBehaviour
         float userMotionDegrees,
         float coachMotionDegrees,
         int completedRepetitions)
+    {
+        EndCoachTraining(
+            scores,
+            userMotionDegrees,
+            coachMotionDegrees,
+            completedRepetitions,
+            CoachTimelineStatus.Completed,
+            CoachEndReason.NormalCompletion);
+    }
+
+    public static void EndCoachTraining(
+        IReadOnlyList<SegmentScore> scores,
+        float userMotionDegrees,
+        float coachMotionDegrees,
+        int completedRepetitions,
+        CoachTimelineStatus timelineStatus,
+        CoachEndReason endReason)
     {
         if (instance == null)
         {
@@ -605,10 +637,16 @@ public sealed class SpineFlowTrainingSession : MonoBehaviour
             scores,
             userMotionDegrees,
             coachMotionDegrees,
-            instance.ElapsedSeconds(instance.coachStartedAt, instance.coachTiming),
+            instance.ElapsedSeconds(
+                instance.coachStartedAt,
+                instance.coachTiming,
+                instance.coachPausedSecondsAtStart),
             "coach",
             completedRepetitions);
         instance.coachTiming = false;
+        instance.coachTimelineStatus = timelineStatus;
+        instance.coachEndReason = endReason;
+        instance.coachOutcomeSet = true;
     }
 
     public static void BeginGameTraining(string level)
@@ -622,6 +660,7 @@ public sealed class SpineFlowTrainingSession : MonoBehaviour
         // measurement remains part of this phone-launched training session.
         instance.gameMeasurement = null;
         instance.gameStartedAt = Time.realtimeSinceStartup;
+        instance.gamePausedSecondsAtStart = MobileCoachControls.TotalPausedSeconds;
         instance.gameTiming = true;
         instance.pendingGameLevel = string.IsNullOrWhiteSpace(level) ? "standard" : level;
     }
@@ -640,7 +679,10 @@ public sealed class SpineFlowTrainingSession : MonoBehaviour
             scores,
             userMotionDegrees,
             coachMotionDegrees,
-            instance.ElapsedSeconds(instance.gameStartedAt, instance.gameTiming),
+            instance.ElapsedSeconds(
+                instance.gameStartedAt,
+                instance.gameTiming,
+                instance.gamePausedSecondsAtStart),
             instance.pendingGameLevel);
         instance.gameTiming = false;
     }
@@ -657,14 +699,22 @@ public sealed class SpineFlowTrainingSession : MonoBehaviour
         return TryLaunchMobileApp();
     }
 
-    private int ElapsedSeconds(float startedAt, bool timing)
+    private int ElapsedSeconds(
+        float startedAt,
+        bool timing,
+        float pausedSecondsAtStart = 0f)
     {
         if (!timing)
         {
             return 0;
         }
 
-        return Mathf.Max(0, Mathf.CeilToInt(Time.realtimeSinceStartup - startedAt));
+        float pausedSeconds = Mathf.Max(
+            0f,
+            MobileCoachControls.TotalPausedSeconds - pausedSecondsAtStart);
+        return Mathf.Max(
+            0,
+            Mathf.CeilToInt(Time.realtimeSinceStartup - startedAt - pausedSeconds));
     }
 
     private static ModeMeasurement BuildPracticeMeasurement(
@@ -726,8 +776,43 @@ public sealed class SpineFlowTrainingSession : MonoBehaviour
             userMotionDegrees = Mathf.Max(0f, userMotionDegrees),
             coachMotionDegrees = Mathf.Max(0f, coachMotionDegrees),
             durationSeconds = Mathf.Max(0, durationSeconds),
-            level = level
+            level = level,
+            trackingQuality = ResolveTrackingQuality(scores)
         };
+    }
+
+    private static string ResolveTrackingQuality(IReadOnlyList<SegmentScore> scores)
+    {
+        if (scores == null || scores.Count == 0)
+        {
+            return "unavailable";
+        }
+
+        bool hasSamples = false;
+        bool hasPartial = false;
+        bool hasUnavailable = false;
+        foreach (SegmentScore score in scores)
+        {
+            if (score.trackingQuality == CoachTrackingQuality.Measured)
+            {
+                hasSamples = true;
+            }
+            else if (score.trackingQuality == CoachTrackingQuality.Partial)
+            {
+                hasSamples = true;
+                hasPartial = true;
+            }
+            else
+            {
+                hasUnavailable = true;
+            }
+        }
+
+        return !hasSamples
+            ? "unavailable"
+            : hasPartial || hasUnavailable
+                ? "partial"
+                : "measured";
     }
 
     private static ModeMeasurement BuildGameMeasurement(
@@ -833,7 +918,7 @@ public sealed class SpineFlowTrainingSession : MonoBehaviour
     {
         if (resultSent)
         {
-            return TryLaunchMobileApp();
+            return true;
         }
 
         if (!HasValidStartPayload())
@@ -913,6 +998,11 @@ public sealed class SpineFlowTrainingSession : MonoBehaviour
 
     private string BuildResultJson()
     {
+        if (coachOutcomeSet && coachMeasurement != null)
+        {
+            return BuildCoachResultJson();
+        }
+
         bool hasCompleteScoreSummary =
             coachMeasurement != null && coachMeasurement.HasScoreSummary &&
             gameMeasurement != null && gameMeasurement.HasScoreSummary;
@@ -980,6 +1070,118 @@ public sealed class SpineFlowTrainingSession : MonoBehaviour
         return JsonUtility.ToJson(result);
     }
 
+    private string BuildCoachResultJson()
+    {
+        bool hasGameMeasurement = gameMeasurement != null;
+        bool hasCompletePoseEvidence =
+            coachMeasurement.IsAcceptable &&
+            (!hasGameMeasurement || gameMeasurement.IsAcceptable);
+        List<ActionResultPayload> actions = new List<ActionResultPayload>();
+        List<GameResultPayload> games = new List<GameResultPayload>();
+        foreach (PlannedAction action in startPayload.trainingPlan.recommendedActions)
+        {
+            string mode = ResolveMode(action);
+            ModeMeasurement measurement = mode == "coach"
+                ? coachMeasurement
+                : gameMeasurement ?? CreateUnavailableMeasurement("game");
+            actions.Add(BuildActionResult(action, mode, measurement));
+            if (mode == "game" && gameMeasurement != null)
+            {
+                games.Add(BuildGameResult(action, measurement));
+            }
+        }
+
+        int overallScore = coachMeasurement.averageScore;
+        int rawOverallScore = coachMeasurement.rawAverageScore;
+        if (hasGameMeasurement)
+        {
+            overallScore = CombineModeScores(
+                coachMeasurement.averageScore,
+                gameMeasurement.averageScore);
+            rawOverallScore = CombineModeScores(
+                coachMeasurement.rawAverageScore,
+                gameMeasurement.rawAverageScore);
+        }
+
+        ResultPayload result = new ResultPayload
+        {
+            sessionId = startPayload.sessionId,
+            userId = startPayload.userId,
+            requestToken = startPayload.requestToken,
+            createdAt = DateTimeOffset.Now.ToString("o", CultureInfo.InvariantCulture),
+            // The envelope carries a usable result record. timelineStatus carries
+            // whether the playback itself completed or was stopped early.
+            status = CoachTimelineStatusToWire(coachTimelineStatus),
+            endReason = CoachEndReasonToWire(coachEndReason),
+            detailStatus = hasCompletePoseEvidence
+                ? MeasuredDetail
+                : coachMeasurement.trackingQuality == "unavailable"
+                    ? MissingDetail
+                    : ScoreSummaryDetail,
+            dataOrigin = CoachOrigin,
+            timelineStatus = CoachTimelineStatusToWire(coachTimelineStatus),
+            trackingQuality = coachMeasurement.trackingQuality,
+            completed = coachTimelineStatus == CoachTimelineStatus.Completed,
+            simulated = false,
+            durationSeconds = TotalMeasuredDuration(),
+            overallScore = overallScore,
+            rawOverallScore = rawOverallScore,
+            scoreMappingVersion = ScoreMappingVersion,
+            actionResults = actions.ToArray(),
+            gameResults = games.ToArray(),
+            abnormalEvents = new string[0]
+        };
+        return JsonUtility.ToJson(result);
+    }
+
+    private static ModeMeasurement CreateUnavailableMeasurement(string level)
+    {
+        return new ModeMeasurement
+        {
+            level = level,
+            trackingQuality = "unavailable",
+            durationSeconds = 0,
+            scoreSampleCount = 0,
+            completedRepetitions = 0,
+            averageScore = 0,
+            rawAverageScore = 0,
+            bestScore = 0,
+            rawBestScore = 0
+        };
+    }
+
+    private static string CoachTimelineStatusToWire(CoachTimelineStatus status)
+    {
+        switch (status)
+        {
+            case CoachTimelineStatus.Completed:
+                return "completed";
+            case CoachTimelineStatus.EndedEarly:
+                return "ended_early";
+            case CoachTimelineStatus.SafetyStopped:
+                return "safety_stopped";
+            default:
+                return "interrupted";
+        }
+    }
+
+    private static string CoachEndReasonToWire(CoachEndReason reason)
+    {
+        switch (reason)
+        {
+            case CoachEndReason.NormalCompletion:
+                return "NORMAL_COMPLETION";
+            case CoachEndReason.UserEnded:
+                return "USER_ENDED";
+            case CoachEndReason.HeadsetDisconnected:
+                return "HEADSET_DISCONNECTED";
+            case CoachEndReason.SafetyStop:
+                return "SAFETY_STOP";
+            default:
+                return "TECHNICAL_ERROR";
+        }
+    }
+
     private ActionResultPayload BuildActionResult(
         PlannedAction action,
         string mode,
@@ -1000,6 +1202,10 @@ public sealed class SpineFlowTrainingSession : MonoBehaviour
             bestScore = measurement.bestScore,
             rawBestScore = measurement.rawBestScore,
             scoreSampleCount = measurement.scoreSampleCount,
+            trackingQuality = measurement.trackingQuality,
+            timelineStatus = coachOutcomeSet
+                ? CoachTimelineStatusToWire(coachTimelineStatus)
+                : string.Empty,
             scoreMappingVersion = ScoreMappingVersion,
             minimumUserMotionDegrees = measurement.userMotionDegrees,
             minimumCoachMotionDegrees = measurement.coachMotionDegrees,
@@ -1268,7 +1474,7 @@ public sealed class SpineFlowTrainingSession : MonoBehaviour
 
     private static bool IsSupportedPracticeScene(string sceneName)
     {
-        return LumbarCoachMode.ForScene(sceneName) != null ||
+        return RecordedAlternatingCoachMode.IsRecordedScene(sceneName) || LumbarCoachMode.ForScene(sceneName) != null ||
             string.Equals(sceneName, ActionLibrarySceneName, StringComparison.Ordinal) ||
             string.Equals(sceneName, DeadBugPracticeSceneName, StringComparison.Ordinal) ||
             string.Equals(sceneName, MaleDeadBugPracticeSceneName, StringComparison.Ordinal) ||
@@ -1281,7 +1487,7 @@ public sealed class SpineFlowTrainingSession : MonoBehaviour
 
     private static bool IsBuiltInCoachScene(string sceneName)
     {
-        return LumbarCoachMode.ForScene(sceneName) != null ||
+        return RecordedAlternatingCoachMode.IsRecordedScene(sceneName) || LumbarCoachMode.ForScene(sceneName) != null ||
             string.Equals(sceneName, ActionLibrarySceneName, StringComparison.Ordinal) ||
             string.Equals(sceneName, DeadBugPracticeSceneName, StringComparison.Ordinal) ||
             string.Equals(sceneName, MaleDeadBugPracticeSceneName, StringComparison.Ordinal) ||

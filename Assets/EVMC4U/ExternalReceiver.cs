@@ -1,4 +1,4 @@
-﻿/*
+/*
  * ExternalReceiver
  * https://sabowl.sakura.ne.jp/gpsnmeajp/
  *
@@ -386,6 +386,14 @@ namespace EVMC4U
         //ボーン情報テーブル
         Dictionary<HumanBodyBones, Vector3> HumanBodyBonesPositionTable = new Dictionary<HumanBodyBones, Vector3>();
         Dictionary<HumanBodyBones, Quaternion> HumanBodyBonesRotationTable = new Dictionary<HumanBodyBones, Quaternion>();
+        private readonly Dictionary<HumanBodyBones, float> guidanceBoneReceivedAt = new Dictionary<HumanBodyBones, float>();
+
+        public bool HasFreshGuidanceBone(HumanBodyBones bone, float timeoutSeconds)
+        {
+            return isActiveAndEnabled && guidanceBoneReceivedAt.TryGetValue(bone, out float receivedAt) &&
+                Time.realtimeSinceStartup - receivedAt <= timeoutSeconds;
+        }
+
 
         //ブレンドシェイプ変換テーブル(VRM0)
         Dictionary<string, VRM.BlendShapeKey> StringToBlendShapeKeyDictionaryV0 = new Dictionary<string, VRM.BlendShapeKey>();
@@ -939,6 +947,14 @@ namespace EVMC4U
                 if (HumanBodyBonesTryParse(ref boneName, out bone))
                 {
                     BonePacketCounterInFrame++;
+                    if (!float.IsNaN(rot.x) && !float.IsInfinity(rot.x) &&
+                        !float.IsNaN(rot.y) && !float.IsInfinity(rot.y) &&
+                        !float.IsNaN(rot.z) && !float.IsInfinity(rot.z) &&
+                        !float.IsNaN(rot.w) && !float.IsInfinity(rot.w) &&
+                        rot.x * rot.x + rot.y * rot.y + rot.z * rot.z + rot.w * rot.w > 0.000001f)
+                        guidanceBoneReceivedAt[bone] = Time.realtimeSinceStartup;
+                    else
+                        guidanceBoneReceivedAt.Remove(bone);
 
                     //あれば位置と回転をキャッシュする
                     if (HumanBodyBonesPositionTable.ContainsKey(bone))

@@ -1,4 +1,4 @@
-using UnityEngine;
+﻿using UnityEngine;
 using UnityEngine.SceneManagement;
 
 public sealed class HipThrustCoachMode : MonoBehaviour
@@ -23,7 +23,7 @@ public sealed class HipThrustCoachMode : MonoBehaviour
 
         CoachMotionPackage package = SpineFlowTrainingSession.CachedMotionPackage;
         if (package == null || !IsHipThrust(package.actionId) ||
-            package.packageId == "clip_26_coach")
+            package.packageId != "clip_26_teaching")
         {
             TextAsset source = Resources.Load<TextAsset>(MotionResource);
             if (source == null) return;

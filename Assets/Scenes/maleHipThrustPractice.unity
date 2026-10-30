@@ -1533,7 +1533,7 @@ PrefabInstance:
     - target: {fileID: 4870552773557632513, guid: 92fdc8607e571ee448d17397903ecb70, type: 3}
       propertyPath: m_Controller
       value: 
-      objectReference: {fileID: 9100000, guid: 1147a74b7d942664a8abe2d90bc9ec15, type: 2}
+      objectReference: {fileID: 9100000, guid: 2e528835aa1d99b40a1b81b9ab77052a, type: 2}
     - target: {fileID: 5159078012444724336, guid: 92fdc8607e571ee448d17397903ecb70, type: 3}
       propertyPath: m_LocalScale.x
       value: 0.3
@@ -9141,7 +9141,7 @@ MonoBehaviour:
   idleStateName: Idle
   segments:
   - label: "\u5F00\u59CB"
-    clipStateName: deadbug_start
+    clipStateName: hipthrust_start
     repeatCount: 1
     voiceClip: {fileID: 0}
     scoreLeniency: 4
@@ -9153,7 +9153,7 @@ MonoBehaviour:
       stabilizerRegions: 0
     applyFormalActionScoreMapping: 0
   - label: "\u62AC\u8D771"
-    clipStateName: deadbug_1_up
+    clipStateName: animation_pose
     repeatCount: 1
     voiceClip: {fileID: 0}
     scoreLeniency: 3
@@ -9165,7 +9165,7 @@ MonoBehaviour:
       stabilizerRegions: 16
     applyFormalActionScoreMapping: 0
   - label: "\u653E\u4E0B1"
-    clipStateName: deadbug_1_down
+    clipStateName: hipthrust_hold
     repeatCount: 1
     voiceClip: {fileID: 0}
     scoreLeniency: 4
@@ -9177,7 +9177,7 @@ MonoBehaviour:
       stabilizerRegions: 0
     applyFormalActionScoreMapping: 0
   - label: "\u62AC\u8D772"
-    clipStateName: deadbug_2_up
+    clipStateName: animation_pose
     repeatCount: 1
     voiceClip: {fileID: 0}
     scoreLeniency: 3
@@ -9189,7 +9189,7 @@ MonoBehaviour:
       stabilizerRegions: 16
     applyFormalActionScoreMapping: 0
   - label: "\u653E\u4E0B2"
-    clipStateName: deadbug_2_down
+    clipStateName: hipthrust_down
     repeatCount: 1
     voiceClip: {fileID: 0}
     scoreLeniency: 4
@@ -9201,7 +9201,7 @@ MonoBehaviour:
       stabilizerRegions: 0
     applyFormalActionScoreMapping: 0
   - label: "\u62AC\u8D773"
-    clipStateName: deadbug_3_up
+    clipStateName: animation_pose
     repeatCount: 1
     voiceClip: {fileID: 0}
     scoreLeniency: 3
@@ -9213,7 +9213,7 @@ MonoBehaviour:
       stabilizerRegions: 16
     applyFormalActionScoreMapping: 0
   - label: "\u653E\u4E0B3"
-    clipStateName: deadbug_3_down
+    clipStateName: hipthrust_down
     repeatCount: 1
     voiceClip: {fileID: 0}
     scoreLeniency: 4
@@ -9225,7 +9225,7 @@ MonoBehaviour:
       stabilizerRegions: 0
     applyFormalActionScoreMapping: 0
   - label: "\u62AC\u8D774"
-    clipStateName: deadbug_4_up
+    clipStateName: animation_pose
     repeatCount: 1
     voiceClip: {fileID: 0}
     scoreLeniency: 3
@@ -9237,7 +9237,7 @@ MonoBehaviour:
       stabilizerRegions: 16
     applyFormalActionScoreMapping: 0
   - label: "\u653E\u4E0B4"
-    clipStateName: deadbug_4_down
+    clipStateName: hipthrust_down
     repeatCount: 1
     voiceClip: {fileID: 0}
     scoreLeniency: 4
@@ -9249,7 +9249,7 @@ MonoBehaviour:
       stabilizerRegions: 0
     applyFormalActionScoreMapping: 0
   - label: "\u7ED3\u675F"
-    clipStateName: deadbug_end
+    clipStateName: hipthrust_down
     repeatCount: 1
     voiceClip: {fileID: 0}
     scoreLeniency: 4
@@ -10473,8 +10473,8 @@ MonoBehaviour:
   progressText: {fileID: 0}
   anchoredPosition: {x: 0, y: 420}
   size: {x: 450, y: 96}
-  fontSize: 63
-  backgroundColor: {r: 0, g: 0, b: 0, a: 0}
+  fontSize: 34
+  backgroundColor: {r: 0, g: 0, b: 0, a: 0.22}
 --- !u!114 &1900000007
 MonoBehaviour:
   m_ObjectHideFlags: 0

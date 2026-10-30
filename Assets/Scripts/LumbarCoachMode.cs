@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.SceneManagement;
@@ -48,7 +48,7 @@ public static class LumbarCoachMode
             actionId = "cat_camel", displayName = "卧位猫", sceneName = "CatCamelPractice", clip = 23,
             from = 10f, peak = 14.5f, returnFrom = 16f, to = 20f,
             preparation = "舒适四点支撑准备",
-            instruction = "按示范缓慢活动背部，小幅跟做，正常呼吸",
+            instruction = "按示范缓慢向上拱背，小幅跟做，正常呼吸",
             recovery = "缓慢回到舒适支撑位，放松休息",
             active = PoseGuidanceRegionMask.Torso, support = BothLegs | BothArms,
             targetHapticLocations = new[] { TrackerWearLocation.Abdomen },

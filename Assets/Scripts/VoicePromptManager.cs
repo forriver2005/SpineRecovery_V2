@@ -1,5 +1,6 @@
-using System;
+﻿using System;
 using System.Collections;
+using System.Collections.Generic;
 using UnityEngine;
 
 /// <summary>
@@ -20,7 +21,9 @@ public class VoicePromptManager : MonoBehaviour
         ScoringBeats,
         ScoreFinished,
         NextAction,
-        FollowCoach
+        FollowCoach,
+        FollowingGuidance,
+        PhaseCue
     }
 
     [Header("语音文件路径 (Resources目录相对路径)")]
@@ -74,8 +77,18 @@ public class VoicePromptManager : MonoBehaviour
     private float lastPromptStartedAt = float.NegativeInfinity;
     private PromptKind lastEndedPrompt;
     private float lastPromptEndedAt = float.NegativeInfinity;
+    private bool followCoachAnnounced;
+    private bool audioPaused;
+    private bool phasePlaybackActive;
+    private bool activePhase;
+    private CoachVoicePhaseRequest activePhaseRequest;
+    private bool phaseCancelRequested;
+    private int lastGuidanceSegmentId = -1;
+    private readonly Queue<CoachVoicePhaseRequest> phaseQueue =
+        new Queue<CoachVoicePhaseRequest>();
 
     public bool IsBusy => activePrompt != PromptKind.None;
+    public bool IsPhasePlaybackActive => phasePlaybackActive;
     public bool IsPlayingPracticeIntroduction =>
         activePrompt == PromptKind.PracticeIntroduction;
     public bool IsPlayingStabilityCountdown => activePrompt == PromptKind.StabilityCountdown;
@@ -96,6 +109,50 @@ public class VoicePromptManager : MonoBehaviour
     {
         voiceSource = CreateAudioSource();
         beatSource = CreateAudioSource();
+    }
+
+    private void OnEnable()
+    {
+        CoachEventBus.CoachVoicePhaseRequested += HandleVoicePhaseRequested;
+        CoachEventBus.CoachVoicePhaseCancelRequested += HandleVoicePhaseCancelRequested;
+        CoachEventBus.CoachHardStopRequested += HandleCoachHardStopRequested;
+        CoachEventBus.CoachSessionCompleted += HandleCoachSessionCompleted;
+    }
+
+    private void HandleCoachHardStopRequested(CoachEndReason reason)
+    {
+        StopAll();
+    }
+
+    private void HandleCoachSessionCompleted(
+        CoachTimelineStatus status,
+        CoachEndReason reason)
+    {
+        if (status != CoachTimelineStatus.Completed)
+        {
+            StopAll();
+        }
+    }
+
+    private void Update()
+    {
+        bool shouldPause = MobileCoachControls.IsPaused;
+        if (shouldPause == audioPaused)
+        {
+            return;
+        }
+
+        audioPaused = shouldPause;
+        if (audioPaused)
+        {
+            voiceSource?.Pause();
+            beatSource?.Pause();
+        }
+        else
+        {
+            voiceSource?.UnPause();
+            beatSource?.UnPause();
+        }
     }
 
     /// <summary>
@@ -199,6 +256,15 @@ public class VoicePromptManager : MonoBehaviour
 
     public bool PlayAdjustPose()
     {
+        if (GetPracticeActionKey() != null) return false;
+        // During formal playback the phase cue owns the voice channel. Pose
+        // observation can still drive red/green feedback, but a generic
+        // correction sentence must not jump in between action cues.
+        if (phasePlaybackActive)
+        {
+            return false;
+        }
+
         return PlayFollowCoach();
     }
 
@@ -208,12 +274,234 @@ public class VoicePromptManager : MonoBehaviour
     /// </summary>
     public bool PlayFollowCoach()
     {
-        return PlaySinglePrompt(PromptKind.FollowCoach, adjustPose, voiceVolume);
+        AudioClip practiceAdjust = GetPracticeActionKey() == null
+            ? null
+            : LoadCoachClip($"Coach_{GetPracticeActionKey()}_adjust");
+        bool started = PlaySinglePrompt(
+            PromptKind.FollowCoach,
+            practiceAdjust != null ? practiceAdjust : adjustPose,
+            voiceVolume);
+        followCoachAnnounced |= started;
+        return started;
+    }
+
+    /// <summary>
+    /// Preserved full guidance sequence used by the playback phase adapter.
+    /// The original adjust/hold/countdown/start prompts are played in order and
+    /// completion is reported only after the last clip has finished.
+    /// </summary>
+    public bool PlayFollowingGuidance(bool includeFollowPrompt)
+    {
+        if (activePrompt != PromptKind.None)
+        {
+            return false;
+        }
+
+        followCoachAnnounced |= includeFollowPrompt;
+        BeginSequence(
+            PromptKind.FollowingGuidance,
+            FollowingGuidanceSequence(includeFollowPrompt));
+        return true;
     }
 
     public void StopAll()
     {
+        phaseQueue.Clear();
+        phaseCancelRequested = false;
+        pendingCorrection = null;
+        correctionCandidate = null;
+        correctionStableSeconds = 0f;
+        phasePlaybackActive = false;
+        lastGuidanceSegmentId = -1;
         StopCurrentSequence(true);
+        followCoachAnnounced = false;
+    }
+
+    private string correctionCandidate;
+    private float correctionStableSeconds;
+    private AudioClip pendingCorrection;
+    public float LessonRestDuration => (nextAction != null ? nextAction.length : 0f) +
+        (pendingCorrection != null ? pendingCorrection.length : 0f) + 0.1f;
+
+    public void ClearLessonCorrection()
+    {
+        pendingCorrection = null;
+        correctionCandidate = null;
+        correctionStableSeconds = 0f;
+    }
+
+    public void ObserveLessonCorrection(string part, bool valid)
+    {
+        var coach = FindObjectOfType<SegmentedCoachController>();
+        if (!valid || coach == null || !coach.HasStarted || coach.IsPreparingRepetition ||
+            coach.CurrentSegmentKind != TrainingSegmentKind.CoreAction)
+        {
+            if (coach != null && coach.CurrentSegmentKind == TrainingSegmentKind.CoreAction)
+                pendingCorrection = null;
+            correctionCandidate = null;
+            correctionStableSeconds = 0f;
+            return;
+        }
+        if (correctionCandidate != part) { correctionCandidate = part; correctionStableSeconds = 0f; pendingCorrection = null; }
+        correctionStableSeconds += Time.deltaTime;
+        if (correctionStableSeconds >= 1f)
+        {
+            string action = GetPracticeActionKey();
+            string suffix = action == "deadbug" || action == "birddog" ? "adjust_" + part : "adjust";
+            pendingCorrection = LoadPracticeLessonClip(suffix);
+        }
+    }
+
+    private void HandleVoicePhaseRequested(CoachVoicePhaseRequest request)
+    {
+        phasePlaybackActive = true;
+        // A phase request is tied to the current animation node. If playback
+        // advances before the channel is free, an old FIFO queue makes stale
+        // instructions speak during the next action. Keep only the newest
+        // pending phase instead.
+        phaseQueue.Clear();
+        phaseQueue.Enqueue(request);
+        StartNextPhaseIfIdle();
+    }
+
+    private void HandleVoicePhaseCancelRequested(int requestId)
+    {
+        if (activePhase && activePhaseRequest.requestId == requestId)
+        {
+            // Finish the sentence already in the listener's ear. The caller
+            // has advanced the playback timeline, so discard the remainder of
+            // this phase and any queued stale phase without cutting audio.
+            phaseCancelRequested = true;
+            phaseQueue.Clear();
+            return;
+        }
+
+        if (phaseQueue.Count == 0)
+        {
+            return;
+        }
+
+        Queue<CoachVoicePhaseRequest> retained =
+            new Queue<CoachVoicePhaseRequest>(phaseQueue.Count);
+        while (phaseQueue.Count > 0)
+        {
+            CoachVoicePhaseRequest queued = phaseQueue.Dequeue();
+            if (queued.requestId != requestId)
+            {
+                retained.Enqueue(queued);
+            }
+        }
+
+        while (retained.Count > 0)
+        {
+            phaseQueue.Enqueue(retained.Dequeue());
+        }
+    }
+
+    private void StartNextPhaseIfIdle()
+    {
+        if (activePrompt != PromptKind.None || phaseQueue.Count == 0)
+        {
+            return;
+        }
+
+        activePhaseRequest = phaseQueue.Dequeue();
+        activePhase = true;
+        phaseCancelRequested = false;
+        StopCurrentSequence(true);
+        activePhase = true;
+        activePrompt = PromptKind.PhaseCue;
+        lastStartedPrompt = PromptKind.PhaseCue;
+        lastPromptStartedAt = Time.unscaledTime;
+        Debug.Log("[CoachVoice] start=PhaseCue", this);
+        currentSequence = StartCoroutine(PhaseSequence(activePhaseRequest));
+    }
+
+    private IEnumerator PhaseSequence(CoachVoicePhaseRequest request)
+    {
+        switch (request.phase)
+        {
+            case CoachVoicePhase.SegmentCue:
+                AudioClip segmentClip = ResolveRequestedClip(request);
+                if (segmentClip == null)
+                {
+                    string cueName = request.clip != null
+                        ? request.clip.name
+                        : request.clipName;
+                    Debug.LogWarning(
+                        $"[CoachVoice] Missing segment cue audio '{cueName}'. " +
+                        "Check the motion package reference or Resources/Audio/VoicePrompts.",
+                        this);
+                    break;
+                }
+                yield return PlayAndWait(
+                    voiceSource,
+                    segmentClip,
+                    voiceVolume);
+                break;
+            case CoachVoicePhase.HoldGuidance:
+                yield return HoldGuidanceSequenceBody(request);
+                break;
+            case CoachVoicePhase.RestGuidance:
+                AudioClip correction = pendingCorrection;
+                pendingCorrection = null;
+                yield return PlayAndWait(voiceSource, nextAction, voiceVolume);
+                if (!phaseCancelRequested) yield return PlayAndWait(voiceSource, correction, voiceVolume);
+                break;
+            case CoachVoicePhase.FinishCue:
+                yield return PlayAndWait(beatSource, beatDing, beatVolume);
+                break;
+        }
+
+        CompleteSequence(null);
+    }
+
+    private AudioClip ResolveRequestedClip(CoachVoicePhaseRequest request)
+    {
+        if (request.clip != null)
+        {
+            return request.clip;
+        }
+
+        if (string.IsNullOrWhiteSpace(request.clipName))
+        {
+            return null;
+        }
+
+        AudioClip clip = Resources.Load<AudioClip>(
+            $"{voiceFolder.TrimEnd('/')}/{request.clipName}");
+        clip ??= Resources.Load<AudioClip>(request.clipName);
+        if (clip != null)
+        {
+            return clip;
+        }
+
+        AudioClip[] serializedClips =
+        {
+            keepStill,
+            count2,
+            count1,
+            start,
+            nextAction,
+            adjustPose,
+            coachIntroduction,
+            userModelIntroduction,
+            readyCountdown,
+            beatDeng,
+            beatDing
+        };
+        foreach (AudioClip serializedClip in serializedClips)
+        {
+            if (serializedClip != null && string.Equals(
+                    serializedClip.name,
+                    request.clipName,
+                    StringComparison.OrdinalIgnoreCase))
+            {
+                return serializedClip;
+            }
+        }
+
+        return null;
     }
 
     private AudioSource CreateAudioSource()
@@ -274,6 +562,7 @@ public class VoicePromptManager : MonoBehaviour
         }
 
         activePrompt = PromptKind.None;
+        activePhase = false;
 
         if (!stopAudio)
         {
@@ -305,28 +594,28 @@ public class VoicePromptManager : MonoBehaviour
         if (keepStill != null)
         {
             yield return PlayAndWait(voiceSource, keepStill, voiceVolume);
-            yield return new WaitForSeconds(StabilityPromptGapSeconds);
+            yield return WaitRealtime(StabilityPromptGapSeconds);
         }
 
         if (count2 != null)
         {
             yield return PlayAndWait(voiceSource, count2, voiceVolume);
-            yield return new WaitForSeconds(StabilityNumberGapSeconds);
+            yield return WaitRealtime(StabilityNumberGapSeconds);
         }
         else
         {
-            yield return new WaitForSeconds(
+            yield return WaitRealtime(
                 StabilityMissingNumberStepSeconds);
         }
 
         if (count1 != null)
         {
             yield return PlayAndWait(voiceSource, count1, voiceVolume);
-            yield return new WaitForSeconds(StabilityNumberGapSeconds);
+            yield return WaitRealtime(StabilityNumberGapSeconds);
         }
         else
         {
-            yield return new WaitForSeconds(
+            yield return WaitRealtime(
                 StabilityMissingNumberStepSeconds);
         }
 
@@ -346,6 +635,12 @@ public class VoicePromptManager : MonoBehaviour
     {
         showCoach?.Invoke();
         yield return WaitRealtime(introductionVisualLeadSeconds);
+        AudioClip lessonSetup = LoadPracticeLessonClip("lesson");
+        if (lessonSetup != null)
+        {
+            yield return PlayIntroductionClipOrFallback(lessonSetup);
+            yield return WaitRealtime(introductionStageGapSeconds);
+        }
         yield return PlayIntroductionClipOrFallback(coachIntroduction);
         yield return WaitRealtime(introductionStageGapSeconds);
 
@@ -356,9 +651,28 @@ public class VoicePromptManager : MonoBehaviour
 
         showBoth?.Invoke();
         yield return WaitRealtime(introductionVisualLeadSeconds);
-        yield return PlayIntroductionClipOrFallback(readyCountdown);
+        // Countdown belongs after the complete demonstration.
 
         CompleteSequence(onComplete);
+    }
+
+    public void PlayLessonCountdown(Action completed)
+    {
+        BeginSequence(PromptKind.PracticeIntroduction, LessonCountdownSequence(completed));
+    }
+
+    private IEnumerator LessonCountdownSequence(Action completed)
+    {
+        yield return PlayIntroductionClipOrFallback(readyCountdown);
+        yield return StabilityCountdownSequence(completed);
+    }
+
+    private static AudioClip LoadPracticeLessonClip(string phase)
+    {
+        string action = GetPracticeActionKey();
+        return string.IsNullOrEmpty(action)
+            ? null
+            : LoadCoachClip($"Coach_{action}_{phase}");
     }
 
     private IEnumerator PlayIntroductionClipOrFallback(AudioClip clip)
@@ -371,6 +685,97 @@ public class VoicePromptManager : MonoBehaviour
 
         PlayClip(voiceSource, clip, voiceVolume);
         yield return WaitRealtime(clip.length);
+    }
+
+    private IEnumerator FollowingGuidanceSequence(bool includeFollowPrompt)
+    {
+        yield return FollowingGuidanceSequenceBody(includeFollowPrompt);
+        CompleteSequence(null);
+    }
+
+    private IEnumerator FollowingGuidanceSequenceBody(bool includeFollowPrompt)
+    {
+        AudioClip practiceAdjust = GetPracticeActionKey() == null
+            ? null
+            : LoadCoachClip($"Coach_{GetPracticeActionKey()}_adjust");
+        AudioClip guidanceClip = practiceAdjust != null ? practiceAdjust : adjustPose;
+        if (includeFollowPrompt && guidanceClip != null)
+        {
+            followCoachAnnounced = true;
+            yield return PlayAndWait(voiceSource, guidanceClip, voiceVolume);
+        }
+
+        if (keepStill != null)
+        {
+            yield return PlayAndWait(voiceSource, keepStill, voiceVolume);
+            yield return WaitRealtime(StabilityPromptGapSeconds);
+        }
+        if (count2 != null)
+        {
+            yield return PlayAndWait(voiceSource, count2, voiceVolume);
+            yield return WaitRealtime(StabilityNumberGapSeconds);
+        }
+        if (count1 != null)
+        {
+            yield return PlayAndWait(voiceSource, count1, voiceVolume);
+            yield return WaitRealtime(StabilityNumberGapSeconds);
+        }
+        if (start != null)
+        {
+            yield return PlayAndWait(voiceSource, start, voiceVolume);
+        }
+    }
+
+    private IEnumerator HoldGuidanceSequenceBody(CoachVoicePhaseRequest request)
+    {
+        if (request.segment.segmentKind != TrainingSegmentKind.CoreAction)
+        {
+            yield break;
+        }
+
+        string action = GetPracticeActionKey();
+        int index = request.segment.segmentId;
+        if (action != null && (index & 1) == 1)
+        {
+            string holdKey = "hold";
+            AudioClip lessonHold = LoadCoachClip($"Coach_{action}_{holdKey}");
+            if (lessonHold != null)
+            {
+                yield return PlayAndWait(voiceSource, lessonHold, voiceVolume);
+                yield break;
+            }
+        }
+
+        if (action == null && keepStill != null)
+        {
+            yield return PlayAndWait(voiceSource, keepStill, voiceVolume);
+        }
+    }
+
+    public static AudioClip LoadCoachClip(string clipName)
+    {
+        string scene = UnityEngine.SceneManagement.SceneManager.GetActiveScene().name;
+        if (RecordedAlternatingCoachMode.IsRecordedScene(scene))
+        {
+            string variant = clipName.Replace("Coach_deadbug_", "Coach_deadbug_recorded_")
+                .Replace("Coach_birddog_", "Coach_birddog_recorded_");
+            var clip = Resources.Load<AudioClip>("CoachLessons/" + variant);
+            if (clip != null) return clip;
+        }
+        return Resources.Load<AudioClip>("CoachLessons/" + clipName);
+    }
+
+    public static string GetPracticeActionKey()
+    {
+        string scene = UnityEngine.SceneManagement.SceneManager
+            .GetActiveScene().name.ToLowerInvariant();
+        if (scene.Contains("deadbug")) return "deadbug";
+        if (scene.Contains("birddog")) return "birddog";
+        if (scene.Contains("hipthrust")) return "hipthrust";
+        if (scene.Contains("catcamel")) return "catcamel";
+        if (scene.Contains("sidebridge")) return "sidebridge";
+        if (scene.Contains("curlup")) return "curlup";
+        return null;
     }
 
     private static IEnumerator WaitRealtime(float seconds)
@@ -399,7 +804,7 @@ public class VoicePromptManager : MonoBehaviour
                 PlayClip(beatSource, beatDeng, beatVolume);
             }
             onBeat?.Invoke();
-            yield return new WaitForSeconds(interval);
+            yield return WaitRealtime(interval);
         }
 
         CompleteSequence(onComplete);
@@ -436,7 +841,7 @@ public class VoicePromptManager : MonoBehaviour
         }
 
         PlayClip(source, clip, volume);
-        yield return new WaitForSeconds(clip.length);
+        yield return WaitRealtime(clip.length);
     }
 
     private static void PlayClip(AudioSource source, AudioClip clip, float volume)
@@ -445,21 +850,39 @@ public class VoicePromptManager : MonoBehaviour
         source.clip = clip;
         source.volume = volume;
         source.Play();
+        Debug.Log($"[CoachAudio] clip={clip.name} seconds={clip.length:F3} pitch={source.pitch:F1}");
     }
 
     private void CompleteSequence(Action onComplete)
     {
         PromptKind completedPrompt = activePrompt;
+        bool completedPhase = activePhase;
+        bool cancelledPhase = completedPhase && phaseCancelRequested;
+        int completedPhaseId = activePhaseRequest.requestId;
         currentSequence = null;
         activePrompt = PromptKind.None;
+        activePhase = false;
+        phaseCancelRequested = false;
         lastEndedPrompt = completedPrompt;
         lastPromptEndedAt = Time.unscaledTime;
         Debug.Log($"[CoachVoice] complete={completedPrompt}", this);
         onComplete?.Invoke();
+        if (completedPhase && !cancelledPhase)
+        {
+            CoachEventBus.PublishVoicePhaseCompleted(completedPhaseId);
+        }
+        // Phase requests queue behind any legacy follow/correction prompt so
+        // the current sentence is never cut off. Start the next phase after
+        // every sequence, regardless of which sequence released the channel.
+        StartNextPhaseIfIdle();
     }
 
     private void OnDisable()
     {
+        CoachEventBus.CoachVoicePhaseRequested -= HandleVoicePhaseRequested;
+        CoachEventBus.CoachVoicePhaseCancelRequested -= HandleVoicePhaseCancelRequested;
+        CoachEventBus.CoachHardStopRequested -= HandleCoachHardStopRequested;
+        CoachEventBus.CoachSessionCompleted -= HandleCoachSessionCompleted;
         StopAll();
     }
 }

@@ -1,4 +1,4 @@
-using TMPro;
+﻿using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
 
@@ -12,9 +12,9 @@ public class CoachSetProgressUI : MonoBehaviour
 
     [Header("Layout")]
     [SerializeField] private Vector2 anchoredPosition = new Vector2(0f, 180f);
-    [SerializeField] private Vector2 size = new Vector2(300f, 64f);
-    [SerializeField] private float fontSize = 42f;
-    [SerializeField] private Color backgroundColor = new Color(0f, 0f, 0f, 0f);
+    [SerializeField] private Vector2 size = new Vector2(450f, 96f);
+    [SerializeField] private float fontSize = 34f;
+    [SerializeField] private Color backgroundColor = new Color(0f, 0f, 0f, 0.22f);
 
     private void Awake()
     {
@@ -60,6 +60,8 @@ public class CoachSetProgressUI : MonoBehaviour
 
         coachController.OnSetProgressChanged -= HandleSetProgressChanged;
         coachController.OnSetProgressChanged += HandleSetProgressChanged;
+        coachController.OnSegmentStarted -= HandleSegmentStarted;
+        coachController.OnSegmentStarted += HandleSegmentStarted;
         coachController.OnAllComplete -= HideProgress;
         coachController.OnAllComplete += HideProgress;
     }
@@ -72,7 +74,29 @@ public class CoachSetProgressUI : MonoBehaviour
         }
 
         coachController.OnSetProgressChanged -= HandleSetProgressChanged;
+        coachController.OnSegmentStarted -= HandleSegmentStarted;
         coachController.OnAllComplete -= HideProgress;
+    }
+
+    private string previousPhase;
+    private void Update()
+    {
+        if (coachController == null || !coachController.HasStarted || coachController.IsComplete) return;
+        string phase = $"{coachController.CurrentRepeat}:{coachController.CompletedSets}:{coachController.CurrentSegmentKind}:{coachController.IsHoldingAtSegment}:{coachController.IsPreparingRepetition}";
+        if (phase == previousPhase) return;
+        previousPhase = phase;
+        ShowProgress(coachController.CompletedSets, coachController.TotalSets, coachController.CurrentRepetitionTarget);
+    }
+
+    public void ShowLessonStage(string stage)
+    {
+        EnsureVisuals();
+        string action = VoicePromptManager.GetPracticeActionKey();
+        string name = action == "deadbug" ? "死虫" : action == "birddog" ? "鸟狗" :
+            action == "hipthrust" ? "臀桥" : action == "catcamel" ? "卧位猫式" :
+            action == "sidebridge" ? "侧桥" : action == "curlup" ? "卷腹" : "动作课程";
+        progressText.text = $"{name} · {stage}";
+        progressRoot.gameObject.SetActive(true);
     }
 
     private void HandleSetProgressChanged(int completedSets, int totalSets)
@@ -89,15 +113,72 @@ public class CoachSetProgressUI : MonoBehaviour
         ShowProgress(completedSets, totalSets);
     }
 
-    private void ShowProgress(int completedSets, int totalSets)
+    private void HandleSegmentStarted(PracticeSegmentPlaybackInfo info)
+    {
+        if (coachController == null || !coachController.HasStarted ||
+            coachController.IsComplete)
+        {
+            HideProgress();
+            return;
+        }
+
+        ShowProgress(
+            coachController.CompletedSets,
+            coachController.TotalSets,
+            info.guidanceLimbs);
+    }
+
+    private void ShowProgress(
+        int completedSets,
+        int totalSets,
+        CoachGuidanceLimb guidanceLimbs = CoachGuidanceLimb.None)
     {
         EnsureVisuals();
 
         int safeTotal = Mathf.Max(1, totalSets);
         int safeCompleted = Mathf.Clamp(completedSets, 0, safeTotal);
         int currentSet = Mathf.Min(safeCompleted + 1, safeTotal);
-        progressText.text = $"当前组数：{currentSet}/{safeTotal}";
+        int safeRepetitions = Mathf.Max(1, coachController.RepetitionsPerSet);
+        int currentRepetition = Mathf.Clamp(
+            coachController.CurrentRepeat + 1,
+            1,
+            safeRepetitions);
+        string phaseLabel = coachController.IsPreparingRepetition ? "准备" :
+            coachController.CurrentSegmentKind == TrainingSegmentKind.Finish ? "完成" :
+            coachController.CurrentSegmentKind == TrainingSegmentKind.Preparation ? "准备" :
+            coachController.CurrentSegmentKind == TrainingSegmentKind.ReturnTransition ? "回位" :
+            coachController.IsHoldingAtSegment ? "保持" :
+            gameObject.scene.name == "DeadBugRecordedPractice" ? "放下" :
+            VoicePromptManager.GetPracticeActionKey() == "catcamel" ? "向上拱背" :
+            VoicePromptManager.GetPracticeActionKey() == "curlup" ? "卷起" :
+            VoicePromptManager.GetPracticeActionKey() == "birddog" ? "伸展" : "抬起";
+        if (guidanceLimbs == CoachGuidanceLimb.None) guidanceLimbs = coachController.CurrentRepetitionTarget;
+        string target = FormatTarget(guidanceLimbs);
+        progressText.text = safeTotal > 1
+            ? $"第{currentSet}/{safeTotal}组 · 第{currentRepetition}/{safeRepetitions}次\n{phaseLabel}{target}"
+            : $"第{currentRepetition}/{safeRepetitions}次\n{phaseLabel}{target}";
         progressRoot.gameObject.SetActive(true);
+    }
+
+    private static string FormatTarget(CoachGuidanceLimb limbs)
+    {
+        if (limbs == CoachGuidanceLimb.None)
+        {
+            switch (VoicePromptManager.GetPracticeActionKey())
+            {
+                case "hipthrust": return " · 臀部";
+                case "catcamel": return " · 背部";
+                case "sidebridge": return " · 左侧支撑 · 躯干";
+                case "curlup": return " · 上背";
+                default: return string.Empty;
+            }
+        }
+        var parts = new System.Collections.Generic.List<string>(2);
+        if ((limbs & CoachGuidanceLimb.LeftArm) != 0) parts.Add("左臂");
+        if ((limbs & CoachGuidanceLimb.RightArm) != 0) parts.Add("右臂");
+        if ((limbs & CoachGuidanceLimb.LeftLeg) != 0) parts.Add("左腿");
+        if ((limbs & CoachGuidanceLimb.RightLeg) != 0) parts.Add("右腿");
+        return parts.Count == 0 ? string.Empty : $" · {string.Join(" + ", parts)}";
     }
 
     private void HideProgress()
@@ -186,7 +267,7 @@ public class CoachSetProgressUI : MonoBehaviour
         progressText.fontStyle = FontStyles.Bold;
         progressText.color = Color.white;
         progressText.raycastTarget = false;
-        progressText.text = "当前组数：0/1";
+        progressText.text = "准备开始";
 
     }
 

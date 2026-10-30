@@ -1,4 +1,4 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Rendering;
 
@@ -451,7 +451,9 @@ public sealed class AvatarBodyPartHighlighter : MonoBehaviour
         }
 
         Transform bone = bones[index];
-        bool pelvisBone = IsExactHumanoidBone(bone, HumanBodyBones.Hips) ||
+        // Skin around the pelvis can be weighted to lower torso bones too;
+        // the spatial pelvis mask above keeps this out of the upper trunk.
+        bool pelvisBone = ClassifyBone(bone) == BodyPart.Torso ||
             IsInBranch(bone, HumanBodyBones.LeftUpperLeg) ||
             IsInBranch(bone, HumanBodyBones.RightUpperLeg) ||
             ContainsAny(bone.name.ToLowerInvariant(), "pelvis", "glute", "butt");
@@ -499,8 +501,12 @@ public sealed class AvatarBodyPartHighlighter : MonoBehaviour
             float alongTorso = Vector3.Dot(offset, torsoAxis) / torsoLength;
             float acrossPelvis = Mathf.Abs(Vector3.Dot(offset, lateralAxis)) / pelvisWidth;
             float depth = Mathf.Abs(Vector3.Dot(offset, depthAxis)) / torsoLength;
-            region[index] = alongTorso >= -0.38f && alongTorso <= 0.18f &&
-                acrossPelvis <= 0.78f && depth <= 0.32f;
+            // Hips is the skeletal pivot, above the visible gluteal surface.
+            // A bone-sized box selected mostly internal pelvis geometry and
+            // only 78 skin triangles on the formal avatar. Cover the outer
+            // pelvic skin as well, still excluding abdomen and distal thighs.
+            region[index] = alongTorso >= -0.9f && alongTorso <= 0.35f &&
+                acrossPelvis <= 1.15f && depth <= 0.65f;
         }
         Destroy(posedMesh);
         return region;
@@ -685,6 +691,17 @@ public sealed class AvatarBodyPartHighlighter : MonoBehaviour
                         (vertexWeights[a] +
                          vertexWeights[b] +
                          vertexWeights[c]) / 3f;
+                    // Pelvis is a subregion of torso/legs, not a competing body
+                    // part. Equal bone weights must not discard its surface.
+                    if (part == BodyPart.HipPelvis)
+                    {
+                        if (averageWeight >= Mathf.Max(minimumTriangleWeight, 0.45f))
+                        {
+                            var pelvis = trianglesByPart[BodyPart.HipPelvis];
+                            pelvis.Add(a); pelvis.Add(b); pelvis.Add(c);
+                        }
+                        continue;
+                    }
                     if (averageWeight > dominantWeight)
                     {
                         dominantWeight = averageWeight;

@@ -116,7 +116,12 @@ public sealed class AvatarJointLimitFilter : MonoBehaviour
                 Vector3 direction = distal.position - bone.position;
                 if (direction.sqrMagnitude > 0.000001f)
                 {
-                    neutralDirections[envelope.bone] = direction.normalized;
+                    // A joint envelope is relative to its parent, not gravity.
+                    // World-space baselines misclassify lying down/turning as
+                    // extra hip excursion even when the joint pose is unchanged.
+                    neutralDirections[envelope.bone] = bone.parent != null
+                        ? bone.parent.InverseTransformDirection(direction.normalized)
+                        : direction.normalized;
                 }
             }
             previousRawRotations[envelope.bone] = bone.localRotation;
@@ -349,6 +354,9 @@ public sealed class AvatarJointLimitFilter : MonoBehaviour
         {
             return;
         }
+
+        if (bone.parent != null)
+            neutralDirection = bone.parent.TransformDirection(neutralDirection);
 
         Vector3 currentDirection = distal.position - bone.position;
         if (currentDirection.sqrMagnitude < 0.000001f)

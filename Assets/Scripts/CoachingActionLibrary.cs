@@ -72,7 +72,7 @@ public sealed class CoachingActionLibrary : MonoBehaviour
 
     private static bool IsPracticeScene(string sceneName)
     {
-        return LumbarCoachMode.ForScene(sceneName) != null ||
+        return RecordedAlternatingCoachMode.IsRecordedScene(sceneName) || LumbarCoachMode.ForScene(sceneName) != null ||
             sceneName == "DeadBugPractice" ||
             sceneName == "BirdDogPractice" ||
             sceneName == "maleDeadBugPractice" ||
@@ -275,8 +275,8 @@ public sealed class CoachingActionLibrary : MonoBehaviour
             case "clip_10":
             case "clip_11":
             case "clip_13": return LumbarCoachMode.ForAction("side_bridge")?.sceneName;
-            case "clip_29": return "DeadBugPractice";
-            case "clip_30": return "BirdDogPractice";
+            case "clip_29": return "DeadBugRecordedPractice";
+            case "clip_30": return "BirdDogRecordedPractice";
             default: return null;
         }
     }
@@ -327,7 +327,7 @@ public sealed class CoachingActionLibrary : MonoBehaviour
         retainedPracticeScene = default;
         retainedPracticeRoots = null;
         retainedRootActiveStates = null;
-        DeadBugStartMenuController.ShowPracticeControlsOnNextLoad();
+        DeadBugStartMenuController.ShowPracticeStartOnNextLoad();
         SceneManager.LoadScene(destination, LoadSceneMode.Single);
     }
 

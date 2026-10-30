@@ -1,4 +1,4 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using UnityEngine;
 
 public partial class PoseScorer
@@ -60,6 +60,8 @@ public partial class PoseScorer
             !lumbarTeachingProfile.positiveHighlightAtTarget ||
             currentSegmentInfo.segmentKind != TrainingSegmentKind.CoreAction ||
             !guidanceInputIsFresh ||
+            !HasPositiveTargetTracking(BodyPart.Torso) ||
+            HasHardPoseConstraint() ||
             !torsoDiagnostic.isValid ||
             !torsoDiagnostic.shouldClear ||
             !lumbarTeachingEvidence.TryGetProgress(userAnimator, out float progress))
@@ -69,7 +71,7 @@ public partial class PoseScorer
         }
 
         bool isInsideEnterBand = progress >= 0.88f && progress <= 1.12f;
-        bool remainsInsideExitBand = progress >= 0.78f && progress <= 1.22f;
+
         if (!lumbarPositiveHighlightCandidateActive)
         {
             if (!isInsideEnterBand)
@@ -79,7 +81,7 @@ public partial class PoseScorer
 
             lumbarPositiveHighlightCandidateActive = true;
         }
-        else if (!remainsInsideExitBand)
+        else if (!isInsideEnterBand)
         {
             ResetLumbarPositiveHighlightCandidate();
             return false;
@@ -252,9 +254,13 @@ public partial class PoseScorer
     private void CaptureTeachingPreparation()
     {
         if (!UsesShortTeaching ||
+            (UsesLumbarTeaching && lumbarTeachingEvidence.HasBaseline) ||
+            (UsesHipThrustTeaching && hasHipThrustRestPose) ||
             currentSegmentInfo.segmentKind != TrainingSegmentKind.Preparation ||
+            !guidanceInputIsFresh || !HasPositiveTargetTracking(BodyPart.Torso) ||
             !IsTeachingPoseReady()) return;
-        // A timeout bypasses readiness but must not calibrate an incorrect pose.
+        // Capture once from valid preparation. Repeated capture would follow the
+        // patient into movement and continuously erase the measured progress.
         if (UsesHipThrustTeaching)
         {
             if (HipThrustPoseGuidance.TryCapture(userAnimator, out HipThrustPoseGeometry pose))
@@ -266,45 +272,4 @@ public partial class PoseScorer
         else lumbarTeachingEvidence.CaptureBaseline();
     }
 
-    private bool ShouldAnnounceNextAfterScore => coachController != null &&
-        coachController.HasNextAfterCurrentHold &&
-        !(UsesShortTeaching && currentSegmentInfo.segmentKind == TrainingSegmentKind.ReturnTransition);
-
-    private void CompleteScoringCheckpoint()
-    {
-        if (UsesShortTeaching && currentSegmentInfo.segmentKind == TrainingSegmentKind.ReturnTransition)
-        {
-            // Rest follows the full shared confirmation/countdown/scoring flow.
-            // Defer the next-action announcement until rest has finished.
-            stateTimer = UsesHipThrustTeaching ? Mathf.Max(0f, hipThrustRestSeconds) : 4f;
-            TransitionTo(State.Resting, "return scored; starting full rest");
-            ResetVisualGuidanceEvidence();
-            modelBodyPartHighlighter?.Hide();
-        }
-        else coachController?.AdvanceToNext();
-    }
-
-    private void UpdateTeachingRest()
-    {
-        // A real return can establish a missing baseline on later repetitions.
-        if (IsTeachingPoseReady())
-        {
-            if (UsesHipThrustTeaching && !hasHipThrustRestPose &&
-                HipThrustPoseGuidance.TryCapture(userAnimator, out HipThrustPoseGeometry pose))
-            {
-                hipThrustRestPose = pose;
-                hasHipThrustRestPose = true;
-            }
-            else if (UsesLumbarTeaching && !lumbarTeachingEvidence.HasBaseline)
-                lumbarTeachingEvidence.CaptureBaseline();
-        }
-        stateTimer -= Time.deltaTime;
-        UpdateStatusText((UsesHipThrustTeaching ? "回落后放松休息" : lumbarTeachingProfile.recovery) +
-            $"（休息 {Mathf.CeilToInt(Mathf.Max(0f, stateTimer))} 秒）");
-        if (stateTimer > 0f) return;
-        if (coachController != null && coachController.HasNextAfterCurrentHold)
-            voiceManager?.PlayNextAction();
-        TransitionTo(State.Idle, "teaching rest complete");
-        coachController?.AdvanceToNext();
-    }
 }

@@ -1,4 +1,4 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using System.IO;
 using UnityEngine;
 using UnityEngine.UI;
@@ -140,9 +140,6 @@ public class PracticeSceneInitializer : MonoBehaviour
         PendingActionId = null;
     }
 
-    /// <summary>
-    /// 从本地路径或 content URI 加载服务器下发的动作包，切换到关键帧播放后端。
-    /// </summary>
     private void LoadMotionPackageFromUri(string uri)
     {
         try
@@ -330,7 +327,8 @@ public class PracticeSceneInitializer : MonoBehaviour
     private void BindJsonStartButtons()
     {
         // JSON 模式下，PracticeSessionController 会处理整个流程（包括介绍和倒数）
-        // 只需要绑定 Next/Continue 按钮用于推进动作段
+        // Next/Continue remains an explicit user skip; normal phases advance
+        // automatically from the playback clock.
         foreach (Button button in FindObjectsOfType<Button>(true))
         {
             string buttonName = button.gameObject.name;

@@ -137,6 +137,13 @@
       "viewAngle": 70
     },
     {
+      "id": "cat_camel",
+      "displayName": "卧位猫式",
+      "motionPath": "ActionLibrary/Motions/clip_23",
+      "source": "clip_23.json（1_卧位猫）",
+      "viewAngle": 90
+    },
+    {
       "id": "clip_29",
       "displayName": "死虫",
       "motionPath": "ActionLibrary/Motions/clip_29",

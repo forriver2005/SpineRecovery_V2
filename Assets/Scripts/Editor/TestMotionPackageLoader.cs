@@ -69,7 +69,7 @@ public class TestMotionPackageLoader : EditorWindow
             {
                 GUILayout.BeginVertical(EditorStyles.helpBox);
                 GUILayout.Label($"• {segment.label} ({segment.sourceStateName})");
-                GUILayout.Label($"  帧数: {segment.frames.Length}, 重复: {segment.repeatCount}, 评分时长: {segment.scoringDuration}s");
+                GUILayout.Label($"  帧数: {segment.frames.Length}, 重复: {segment.repeatCount}, 保持阶段: {segment.scoringDuration}s");
                 totalFrames += segment.frames.Length;
                 GUILayout.EndVertical();
             }

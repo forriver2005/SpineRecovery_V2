@@ -9,10 +9,17 @@ public sealed class MobileCoachControls : MonoBehaviour
     [SerializeField] private AvatarMotionSource input;
     [SerializeField] private TMP_Text pauseLabel;
     private static MobileCoachControls pausedOwner;
+    private static float pausedStartedAt = -1f;
+    private static float accumulatedPauseSeconds;
     private float previousTimeScale;
     private bool previousAudioPause;
     private bool previousInputFreeze;
     public static bool IsPaused => pausedOwner != null;
+    public static float TotalPausedSeconds =>
+        accumulatedPauseSeconds +
+        (pausedOwner != null && pausedStartedAt >= 0f
+            ? Time.realtimeSinceStartup - pausedStartedAt
+            : 0f);
 
     public void TogglePause()
     {
@@ -28,13 +35,20 @@ public sealed class MobileCoachControls : MonoBehaviour
             previousAudioPause = AudioListener.pause;
             previousInputFreeze = input != null && input.Freeze;
             pausedOwner = this;
+            pausedStartedAt = Time.realtimeSinceStartup;
             Time.timeScale = 0f;
             AudioListener.pause = true;
             if (input != null) input.Freeze = true;
         }
         else
         {
+            if (pausedOwner == this && pausedStartedAt >= 0f)
+            {
+                accumulatedPauseSeconds +=
+                    Mathf.Max(0f, Time.realtimeSinceStartup - pausedStartedAt);
+            }
             pausedOwner = null;
+            pausedStartedAt = -1f;
             Time.timeScale = previousTimeScale;
             AudioListener.pause = previousAudioPause;
             if (input != null) input.Freeze = previousInputFreeze;

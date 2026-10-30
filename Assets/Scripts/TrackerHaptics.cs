@@ -66,7 +66,6 @@ public sealed class CoachHapticFeedbackController : MonoBehaviour
     [Header("演示设置")]
     [SerializeField] private bool enabledForDemo = true;
     [SerializeField, Min(1)] private int pulseDurationMs = 100;
-    [SerializeField, Min(0.1f)] private float repeatIntervalSeconds = 4f;
     [SerializeField, Min(1)] private int requestTimeoutSeconds = 1;
     [SerializeField] private TrackerMotorEndpoint[] endpoints =
     {
@@ -94,11 +93,15 @@ public sealed class CoachHapticFeedbackController : MonoBehaviour
         new Dictionary<TrackerWearLocation, UnityWebRequest>();
     private readonly HashSet<TrackerWearLocation> activeLocations =
         new HashSet<TrackerWearLocation>();
+    // Device status is independent of motor request success. Fresh VMC bones
+    // alone may be synthesized by the solver after an IMU disconnects.
+    private readonly HashSet<TrackerWearLocation> trackedLocations =
+        new HashSet<TrackerWearLocation>();
+    private float trackingStatusReceivedAt = float.NegativeInfinity;
     private string lastLoggedDiscoveryStatus;
 
     private bool phaseWasEnabled;
     private bool hasGuidanceGroupPulse;
-    private float lastGuidanceGroupPulseAt;
     private Coroutine discoveryCoroutine;
 
     public string DiscoveryStatus { get; private set; } = "等待连接修改版 SlimeVR";
@@ -132,6 +135,17 @@ public sealed class CoachHapticFeedbackController : MonoBehaviour
         TrackerWearLocation.Chest,
         TrackerWearLocation.Abdomen
     };
+
+    public bool HasValidTracking(BodyPart part)
+    {
+        if (!isActiveAndEnabled || Time.realtimeSinceStartup - trackingStatusReceivedAt >
+            Mathf.Max(0.5f, discoveryIntervalSeconds) + 0.5f) return false;
+        TrackerWearLocation[] locations = GetMapping(part);
+        if (locations.Length == 0) return false;
+        foreach (TrackerWearLocation location in locations)
+            if (!trackedLocations.Contains(location)) return false;
+        return true;
+    }
 
     private void Awake()
     {
@@ -234,7 +248,8 @@ public sealed class CoachHapticFeedbackController : MonoBehaviour
     /// <summary>Starts one pulse and reports whether a tracker accepted it.</summary>
     public bool TryPulseOnce(TrackerWearLocation location)
     {
-        if (!enabledForDemo || !isActiveAndEnabled || applicationPaused)
+        if (!enabledForDemo || !isActiveAndEnabled || applicationPaused ||
+            MobileCoachControls.IsPaused)
         {
             return false;
         }
@@ -320,16 +335,7 @@ public sealed class CoachHapticFeedbackController : MonoBehaviour
         {
             foreach (TrackerWearLocation location in selectedLocations)
             {
-                if (requestedLocations.Count == 2)
-                {
-                    break;
-                }
-
-                if (endpointAddresses.TryGetValue(location, out string address) &&
-                    !string.IsNullOrWhiteSpace(address))
-                {
-                    requestedLocations.Add(location);
-                }
+                requestedLocations.Add(location);
             }
         }
 
@@ -341,7 +347,8 @@ public sealed class CoachHapticFeedbackController : MonoBehaviour
         bool guidanceInputIsFresh,
         bool coachIsPaused)
     {
-        bool canPulse = isActiveAndEnabled && !applicationPaused && enabledForDemo &&
+        bool canPulse = isActiveAndEnabled && !applicationPaused &&
+            !MobileCoachControls.IsPaused && enabledForDemo &&
             guidancePhaseEnabled && guidanceInputIsFresh && !coachIsPaused;
         if (!canPulse)
         {
@@ -380,20 +387,16 @@ public sealed class CoachHapticFeedbackController : MonoBehaviour
 
         if (requestedLocations.Count == 0)
         {
-            hasGuidanceGroupPulse = false;
             return;
         }
 
-        float now = Time.unscaledTime;
-        if (hasGuidanceGroupPulse &&
-            now - lastGuidanceGroupPulseAt < repeatIntervalSeconds)
+        if (hasGuidanceGroupPulse)
         {
             return;
         }
 
         if (SendGuidancePulseGroup(requestedLocations))
         {
-            lastGuidanceGroupPulseAt = now;
             hasGuidanceGroupPulse = true;
         }
     }
@@ -409,11 +412,10 @@ public sealed class CoachHapticFeedbackController : MonoBehaviour
                 return false;
             }
 
-            if (endpointAddresses.TryGetValue(location, out string address) &&
-                !string.IsNullOrWhiteSpace(address))
-            {
-                pulseLocations.Add(location);
-            }
+            if (!endpointAddresses.TryGetValue(location, out string address) ||
+                string.IsNullOrWhiteSpace(address))
+                return false;
+            pulseLocations.Add(location);
         }
 
         foreach (TrackerWearLocation location in pulseLocations)
@@ -453,8 +455,12 @@ public sealed class CoachHapticFeedbackController : MonoBehaviour
 
         inFlightRequests.Clear();
         activeLocations.Clear();
-        hasGuidanceGroupPulse = false;
         phaseWasEnabled = false;
+    }
+
+    public void ResetGuidancePulse()
+    {
+        hasGuidanceGroupPulse = false;
     }
 
     private void RebuildEndpointMap()
@@ -592,6 +598,8 @@ public sealed class CoachHapticFeedbackController : MonoBehaviour
 
     private void ApplyDiscoveredTrackers(SlimeVrHapticTrackerSnapshot[] trackers)
     {
+        trackedLocations.Clear();
+        trackingStatusReceivedAt = Time.realtimeSinceStartup;
         var discovered = new Dictionary<TrackerWearLocation, string>();
         int unassignedCount = 0;
 
@@ -610,6 +618,9 @@ public sealed class CoachHapticFeedbackController : MonoBehaviour
                 }
                 continue;
             }
+
+            if (string.Equals(tracker.status, "OK", StringComparison.OrdinalIgnoreCase))
+                trackedLocations.Add(location);
 
             if (!discovered.ContainsKey(location))
             {
@@ -643,6 +654,8 @@ public sealed class CoachHapticFeedbackController : MonoBehaviour
 
     private void ClearAutomaticallyDiscoveredEndpoints()
     {
+        trackedLocations.Clear();
+        trackingStatusReceivedAt = float.NegativeInfinity;
         automaticallyDiscoveredLocations.Clear();
         endpointAddresses.Clear();
         foreach (KeyValuePair<TrackerWearLocation, string> fallback in fallbackEndpointAddresses)

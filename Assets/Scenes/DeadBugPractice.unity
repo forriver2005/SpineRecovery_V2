@@ -4229,6 +4229,9 @@ MonoBehaviour:
   scenePlayButton: {fileID: 0}
   voicePromptManager: {fileID: 205128393}
   coachLabel: {fileID: 1049115813}
+  orientationMode: 0
+  coachFollowRotationSpeed: 5
+  orientationFont: {fileID: 11400000, guid: c51d6bd242c90b6409817346d886d3ef, type: 2}
   alignUserDirectionToCoachOnStart: 1
   requirePreparationPoseBeforeDirectionLock: 1
   preparationMaximumTorsoTiltDegrees: 45
@@ -4239,7 +4242,7 @@ MonoBehaviour:
   userTrackerReceiver: {fileID: 199749593}
   trackerDataTimeoutSeconds: 0.35
   maximumLyingPlaneAlignmentOffset: 0.1
-  requireUprightPoseForCompletionControls: 1
+  requireUprightPoseForCompletionControls: 0
   completionMaximumTorsoTiltDegrees: 35
   completionUprightHoldSeconds: 0.4
 --- !u!114 &648710575
@@ -7343,7 +7346,7 @@ MonoBehaviour:
   m_FallbackScreenDPI: 96
   m_DefaultSpriteDPI: 96
   m_DynamicPixelsPerUnit: 1
-  m_PresetInfoIsWorld: 1
+  m_PresetInfoIsWorld: 0
 --- !u!223 &1053307356
 Canvas:
   m_ObjectHideFlags: 0
@@ -11857,7 +11860,7 @@ Avatar:
     2145239631: Biological_thorax.001
     3338512124: SKEL_Root/pelvis/femur_l
     1022532511: SKEL_Root/pelvis/femur_r
-    564356174: SKEL_Root/pelvis
+    1102612636: SKEL_Root/pelvis/femur_l/tibia_l/talus_l/calcn_l
     984416271: SKEL_Root/pelvis/femur_r/tibia_r
     1407844594: SKEL_Root/pelvis/lumbar_body/thorax/scapula_l/humerus_l
     1432736348: SKEL_Root/pelvis/lumbar_body/thorax/scapula_r/humerus_r
@@ -11882,8 +11885,8 @@ Avatar:
     2761991311: SKEL_Root/pelvis/femur_l/tibia_l
     3071336697: SKEL_Root/pelvis/lumbar_body/thorax/scapula_l
     1293933978: SKEL_Root/pelvis/lumbar_body/thorax/scapula_r
-    1102612636: SKEL_Root/pelvis/femur_l/tibia_l/talus_l/calcn_l
     2270844135: SKEL_Root/pelvis/lumbar_body/thorax/scapula_l/humerus_l/ulna_l/radius_l/hand_l
+    564356174: SKEL_Root/pelvis
     712440062: SKEL_Root/pelvis/femur_r/tibia_r/talus_r/calcn_r/toes_r
   m_HumanDescription:
     serializedVersion: 3
@@ -12872,10 +12875,10 @@ MonoBehaviour:
   m_OnClick:
     m_PersistentCalls:
       m_Calls:
-      - m_Target: {fileID: 1723679892}
-        m_TargetAssemblyTypeName: CoachActionController, Assembly-CSharp
+      - m_Target: {fileID: 1724809542}
+        m_TargetAssemblyTypeName: MobileCoachControls, Assembly-CSharp
         m_MethodName: TogglePause
-        m_Mode: 1
+        m_Mode: 0
         m_Arguments:
           m_ObjectArgument: {fileID: 0}
           m_ObjectArgumentAssemblyTypeName: UnityEngine.Object, UnityEngine
@@ -15693,7 +15696,7 @@ MonoBehaviour:
   m_FallbackScreenDPI: 96
   m_DefaultSpriteDPI: 96
   m_DynamicPixelsPerUnit: 1
-  m_PresetInfoIsWorld: 1
+  m_PresetInfoIsWorld: 0
 --- !u!223 &1723679890
 Canvas:
   m_ObjectHideFlags: 0
@@ -15969,12 +15972,12 @@ MonoBehaviour:
   repetitionsPerSet: 4
   repeatBoundarySegmentsPerSet: 0
   segmentTransitionBlendSeconds: 0.12
+  restAfterReturnSeconds: 4
   enableSegmentPausing: 1
   composeDeadBugPreparationArms: 1
   deadBugPreparationStateName: deadbug_start
   deadBugRightArmExtensionStateName: deadbug_1_down
   deadBugLeftArmExtensionStateName: deadbug_2_down
-  voiceVolume: 1
 --- !u!1 &1724809541
 GameObject:
   m_ObjectHideFlags: 0
@@ -17139,7 +17142,7 @@ MonoBehaviour:
   m_FallbackScreenDPI: 96
   m_DefaultSpriteDPI: 96
   m_DynamicPixelsPerUnit: 10
-  m_PresetInfoIsWorld: 1
+  m_PresetInfoIsWorld: 0
 --- !u!114 &1900000005
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -17178,8 +17181,8 @@ MonoBehaviour:
   progressText: {fileID: 0}
   anchoredPosition: {x: 0, y: 420}
   size: {x: 450, y: 96}
-  fontSize: 63
-  backgroundColor: {r: 0, g: 0, b: 0, a: 0}
+  fontSize: 34
+  backgroundColor: {r: 0, g: 0, b: 0, a: 0.22}
 --- !u!114 &1900000007
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -18236,7 +18239,7 @@ MonoBehaviour:
   m_FallbackScreenDPI: 96
   m_DefaultSpriteDPI: 96
   m_DynamicPixelsPerUnit: 10
-  m_PresetInfoIsWorld: 1
+  m_PresetInfoIsWorld: 0
 --- !u!223 &1981949450
 Canvas:
   m_ObjectHideFlags: 0
@@ -18451,8 +18454,15 @@ MonoBehaviour:
   scorePopup: {fileID: 2086319596}
   bodyPartFeedback: {fileID: 1736610178}
   modelBodyPartHighlighter: {fileID: 0}
+  hapticFeedback: {fileID: 0}
   enableModelSurfaceHighlight: 1
   guidanceExercise: 1
+  hipThrustObservationSeconds: 2
+  hipThrustRestSeconds: 4
+  hipThrustHeightEnterTolerance: 0.08
+  hipThrustHeightExitTolerance: 0.12
+  hipThrustHapticHeightTolerance: 0.05
+  hipThrustHapticConfirmationSeconds: 0.18
   targetedExerciseGuidance:
     requiredLiftActivationBelowDegrees: 35
     requiredLiftClearAtOrAboveDegrees: 45

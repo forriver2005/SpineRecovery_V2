@@ -1,0 +1,8 @@
+Real six-scene navigation and OSC UDP receiver test. Synthetic poses, no physical trackers.
+PASS BirdDog_RingSkinC_Recorded: selection, calibration gate, countdown, pause/resume, clean menu; real UDP drives torso/left-right hands and feet, preserves bone lengths, expires on disconnect.
+PASS DeadBug_RingSkinC_Recorded: selection, calibration gate, countdown, pause/resume, clean menu; real UDP drives torso/left-right hands and feet, preserves bone lengths, expires on disconnect.
+PASS HipThrust_RingBridge_NewScoring: selection, calibration gate, countdown, pause/resume, clean menu; real UDP drives torso/left-right hands and feet, preserves bone lengths, expires on disconnect.
+PASS HipThrust_RingBridge_Hold30: selection, calibration gate, countdown, pause/resume, clean menu; real UDP drives torso/left-right hands and feet, preserves bone lengths, expires on disconnect.
+PASS SideBridge_RingBridge_Dynamic: selection, calibration gate, countdown, pause/resume, clean menu; real UDP drives torso/left-right hands and feet, preserves bone lengths, expires on disconnect.
+PASS SideBridge_RingBridge_Hold30: selection, calibration gate, countdown, pause/resume, clean menu; real UDP drives torso/left-right hands and feet, preserves bone lengths, expires on disconnect.
+Assertions: 33916

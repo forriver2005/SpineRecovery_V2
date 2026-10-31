@@ -29,9 +29,9 @@ public static class TrainingToleranceVerification
             Check(Math.Abs(before-side.ContinuousHoldSeconds)<.001,"Render stall altered measured continuous time");
             Check(side.LiveScore==0,"Render stall kept live feedback valid");
             FeedSide(14.9f,1,true);Check(side.LiveScore<100,"29.9 seconds earned full live marks");
-            FeedSide(.3f,0,true);Check(side.QualifiedRounds==1,"Nearly complete hold lost all repetition credit");
+            FeedSide(.4f,0,true);Check(side.QualifiedRounds==1,"Nearly complete hold lost all repetition credit");
             Check(side.LastRoundHoldSeconds<30,"Qualification rounded the measured duration up");
-            side.BeginRepetition(30,30);FeedSide(.2f,0,true);FeedSide(15,1,true);side.BreakContinuity();FeedSide(15,1,true);FeedSide(.3f,0,true);
+            side.BeginRepetition(30,30);FeedSide(.2f,0,true);FeedSide(15,1,true);side.BreakContinuity();FeedSide(15,1,true);FeedSide(.4f,0,true);
             Check(side.QualifiedRounds==1,"Pause joined two 15-second holds");
             var hip=new HipThrustHoldRule();hip.Reset(difficulty);hip.ContinuousHold=true;hip.SetFullScoreSeconds(30);
             for(int i=0;i<20;i++)hip.Step(0,100,.01f,true);

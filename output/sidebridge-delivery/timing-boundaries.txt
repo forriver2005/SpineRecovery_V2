@@ -1,0 +1,1 @@
+PASS 92 checks: short/long/mixed timing, actual evidence duration, qualification versus full marks, render stalls, pause, all difficulties and 30/60/120 fps.

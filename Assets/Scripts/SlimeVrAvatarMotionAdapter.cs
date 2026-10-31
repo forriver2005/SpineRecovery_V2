@@ -21,6 +21,9 @@ public sealed class SlimeVrAvatarMotionAdapter : MonoBehaviour
         foreach (ExternalReceiver externalReceiver in
                  FindObjectsOfType<ExternalReceiver>(true))
         {
+            // Gaming already owns this receiver's freshness boundary. Two
+            // adapters would overwrite its sequence counter each LateUpdate.
+            if (externalReceiver.GetComponent<VmcGameModeSourceBridge>() != null) continue;
             SlimeVrAvatarMotionAdapter adapter =
                 externalReceiver.GetComponent<SlimeVrAvatarMotionAdapter>();
             if (adapter == null)
@@ -64,6 +67,7 @@ public sealed class SlimeVrAvatarMotionAdapter : MonoBehaviour
 
     private void LateUpdate()
     {
+        if (GetComponent<VmcGameModeSourceBridge>() != null) return;
         if (receiver == null || motionSource == null)
         {
             return;

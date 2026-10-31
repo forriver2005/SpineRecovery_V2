@@ -46,6 +46,7 @@ public sealed class AvatarMotionSource : MonoBehaviour
     // Exact telemetry for the SlimeVR bridge; other input producers retain ReportFrame.
     public void SetReceiverFrame(float remoteTime, int framePackets, int bonePackets, bool available)
     {
+        if (available && bonePackets > 0) LastFrameReceivedAt = Time.unscaledTime;
         RemoteTime = remoteTime;
         LastPacketframeCounterInFrame = Mathf.Max(0, framePackets);
         LastBonePacketCounterInFrame = Mathf.Max(0, bonePackets);

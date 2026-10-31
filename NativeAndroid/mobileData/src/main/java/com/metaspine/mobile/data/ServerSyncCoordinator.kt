@@ -3,6 +3,9 @@ package com.metaspine.mobile.data
 import android.content.Context
 import android.net.ConnectivityManager
 import android.net.Network
+import android.net.NetworkCapabilities
+import android.net.NetworkRequest
+import android.net.LinkProperties
 import kotlinx.coroutines.*
 import org.json.JSONArray
 import org.json.JSONObject
@@ -23,11 +26,16 @@ class ServerSyncCoordinator(
     private val connectivity = context.getSystemService(Context.CONNECTIVITY_SERVICE) as? ConnectivityManager
     private val callback = object : ConnectivityManager.NetworkCallback() {
         override fun onAvailable(network: Network) { onForeground() }
+        override fun onLinkPropertiesChanged(network: Network, properties: LinkProperties) { onForeground() }
     }
     var onCredentialsRejected: ((String) -> Unit)? = null
 
     init {
-        connectivity?.registerDefaultNetworkCallback(callback)
+        // Also observe hospital Wi-Fi when mobile data remains the default internet network.
+        connectivity?.registerNetworkCallback(NetworkRequest.Builder()
+            .addTransportType(NetworkCapabilities.TRANSPORT_WIFI)
+            .removeCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
+            .build(), callback)
         scope.launch { recover(); flush() }
     }
 

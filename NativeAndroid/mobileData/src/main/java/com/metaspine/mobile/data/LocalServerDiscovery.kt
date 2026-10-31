@@ -33,41 +33,42 @@ import javax.net.ssl.X509TrustManager
  */
 object LocalServerDiscovery {
     @Volatile private var resolver: Resolver? = null
-    val isEnabled: Boolean get() = BuildConfig.LOCAL_DISCOVERY_CERT_SHA256.isNotBlank()
 
-    private fun configuredResolver(): Resolver? = if (!isEnabled) null else
+    private fun configuredResolver(): Resolver =
         checkNotNull(resolver) { "本地服务器连接尚未初始化，请重启应用" }
 
     @Synchronized fun initialize(context: Context) {
-        if (resolver != null || BuildConfig.LOCAL_DISCOVERY_CERT_SHA256.isBlank()) return
+        if (resolver != null) return
         resolver = Resolver(context.applicationContext, LocalServerTrust(
             BuildConfig.LOCAL_DISCOVERY_CERT_SHA256,
             BuildConfig.LOCAL_DISCOVERY_SERVICE_ID,
             BuildConfig.LOCAL_DISCOVERY_HOSPITAL_KEY))
     }
 
-    fun registerBinding(binding: BindingScope): Boolean = configuredResolver()?.register(binding) ?: true
+    fun registerBinding(binding: BindingScope): Boolean = configuredResolver().register(binding)
 
     fun matchesBinding(binding: BindingScope, origin: String, patientId: String): Boolean =
-        configuredResolver()?.let { it.register(binding) && binding.patientId == patientId }
-            ?: binding.matchesOriginAndPatient(origin, patientId)
+        configuredResolver().let { it.register(binding) &&
+            it.acceptOrigin(origin, binding.serviceId, binding.hospitalKey) && binding.patientId == patientId }
 
     fun acceptsOrigin(origin: String, serviceId: String, hospitalKey: String): Boolean =
-        configuredResolver()?.acceptOrigin(origin, serviceId, hospitalKey) ?: (origin == SpineFlowServerConfig.BASE_URL)
+        configuredResolver().acceptOrigin(origin, serviceId, hospitalKey)
 
     fun openConnection(url: URL): HttpURLConnection =
-        configuredResolver()?.open(url) ?: (url.openConnection() as HttpURLConnection)
+        configuredResolver().open(url)
 
-    fun validateConnection(connection: HttpURLConnection) { configuredResolver()?.validate(connection) }
-    fun invalidateConnection(connection: HttpURLConnection) { configuredResolver()?.invalidate(connection) }
+    fun validateConnection(connection: HttpURLConnection) { resolver?.validate(connection) }
+    fun invalidateConnection(connection: HttpURLConnection) { resolver?.invalidate(connection) }
 
     suspend fun prepareOperation(origin: String = SpineFlowServerConfig.BASE_URL): Long =
-        withContext(Dispatchers.IO) { configuredResolver()?.prepare(origin) ?: 0L }
+        withContext(Dispatchers.IO) { configuredResolver().prepare(origin) }
 
-    fun operationEpoch(): Long = configuredResolver()?.currentEpoch() ?: 0L
-    fun isCurrentOperation(epoch: Long): Boolean = configuredResolver()?.let { it.currentEpoch() == epoch } ?: true
-    fun hasVerifiedBinding(binding: BindingScope): Boolean = configuredResolver()?.hasVerified(binding) ?: true
-    fun markBindingVerified(binding: BindingScope) { configuredResolver()?.markVerified(binding) }
+    fun operationEpoch(): Long = configuredResolver().currentEpoch()
+    fun isCurrentOperation(epoch: Long): Boolean = configuredResolver().currentEpoch() == epoch
+    fun hasVerifiedBinding(binding: BindingScope): Boolean = configuredResolver().hasVerified(binding)
+    fun markBindingVerified(binding: BindingScope) { configuredResolver().markVerified(binding) }
+
+    fun hasLocalNetwork(): Boolean = configuredResolver().hasLocalNetwork()
 
     private data class WifiSnapshot(val network: Network, val host: String, val prefix: Int) {
         val key: String get() = "${network.networkHandle}|$host/$prefix"
@@ -105,6 +106,7 @@ object LocalServerDiscovery {
 
         fun acceptOrigin(origin: String, serviceId: String, hospitalKey: String): Boolean {
             if (serviceId != trust.serviceId || hospitalKey != trust.hospitalKey) return false
+            if (ServerOriginPolicy.normalize(origin) != origin) return false
             return runCatching { origins.add(LocalServerProtocol.normalizeOrigin(origin)); true }.getOrDefault(false)
         }
 
@@ -152,8 +154,11 @@ object LocalServerDiscovery {
             return synchronized(lock) { epoch }
         }
 
+        fun hasLocalNetwork(): Boolean = observe() != null
+
         private fun pinnedConnection(url: URL, wifi: WifiSnapshot): HttpsURLConnection {
             check(url.protocol == "https" && url.port == LocalServerProtocol.PORT)
+            check(LocalServerProtocol.sameSubnet(wifi.host, url.host, wifi.prefix))
             return (wifi.network.openConnection(url) as HttpsURLConnection).apply {
                 sslSocketFactory = ssl.socketFactory
                 hostnameVerifier = javax.net.ssl.HostnameVerifier { _, session ->
@@ -223,6 +228,7 @@ object LocalServerDiscovery {
         }
 
         private fun resolve(origin: String): Endpoint = synchronized(discoveryLock) {
+            check(ServerOriginPolicy.normalize(origin) == origin) { "仅支持医院局域网服务器地址" }
             check(origins.contains(LocalServerProtocol.normalizeOrigin(origin))) { "当前账号未授权连接此医院" }
             val current = observe() ?: throw IOException("请先连接服务器所在的 Wi-Fi")
             val old = synchronized(lock) { endpoint }

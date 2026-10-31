@@ -1,7 +1,6 @@
 package com.metaspine.mobile.data
 
 import android.content.Context
-import com.metaspine.mobile.unified.BuildConfig
 import org.json.JSONObject
 import java.util.UUID
 
@@ -277,7 +276,7 @@ object PatientCredentials {
 
     fun saveServerUrlOverride(context: Context, url: String?) {
         val normalized = url?.takeIf(String::isNotBlank)?.let {
-            ServerOriginPolicy.normalize(it, BuildConfig.SERVER_BASE_URL, BuildConfig.DEBUG)
+            ServerOriginPolicy.normalize(it)
                 ?: throw IllegalArgumentException("服务器地址必须是受信 Origin")
         }
         prefs(context).edit().apply {
@@ -292,7 +291,7 @@ object PatientCredentials {
     fun serverUrlOverride(context: Context): String? {
         val preferences = prefs(context)
         val old = preferences.getString(KEY_SERVER_URL, null)?.takeIf(String::isNotBlank) ?: return null
-        val normalized = ServerOriginPolicy.normalize(old, BuildConfig.SERVER_BASE_URL, BuildConfig.DEBUG)
+        val normalized = ServerOriginPolicy.normalize(old)
         if (normalized == null) {
             preferences.edit().remove(KEY_SERVER_URL).commit()
             return null

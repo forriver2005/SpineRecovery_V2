@@ -13,6 +13,10 @@ namespace SpineRecovery.Editor
     {
         public static void PerformBuild()
         {
+            string configuration = Environment.GetEnvironmentVariable("SPINE_BUILD_CONFIGURATION") ?? "Debug";
+            bool release = string.Equals(configuration, "Release", StringComparison.OrdinalIgnoreCase);
+            if (!release && !string.Equals(configuration, "Debug", StringComparison.OrdinalIgnoreCase))
+                throw new Exception("SPINE_BUILD_CONFIGURATION must be Debug or Release.");
             PlayerSettings.SetScriptingBackend(BuildTargetGroup.Android, ScriptingImplementation.IL2CPP);
             PlayerSettings.Android.targetArchitectures = AndroidArchitecture.ARM64;
             PlayerSettings.SetApplicationIdentifier(BuildTargetGroup.Android, "com.metaspine.mobile");
@@ -38,17 +42,17 @@ namespace SpineRecovery.Editor
                 scenes = scenes,
                 locationPathName = fullOutput,
                 target = BuildTarget.Android,
-                options = BuildOptions.Development | BuildOptions.AllowDebugging,
+                options = release ? BuildOptions.None : BuildOptions.Development | BuildOptions.AllowDebugging,
             };
 
             if (string.Equals(Environment.GetEnvironmentVariable("SPINE_GRADLE_EXPORT"), "1", StringComparison.OrdinalIgnoreCase))
             {
                 EditorUserBuildSettings.exportAsGoogleAndroidProject = true;
-                options.options = BuildOptions.Development;
+                options.options = release ? BuildOptions.None : BuildOptions.Development;
                 Debug.Log("[BuildAndroidApk] Exporting Gradle project " + fullOutput);
             }
 
-            Debug.Log("[BuildAndroidApk] Building " + fullOutput);
+            Debug.Log("[BuildAndroidApk] Building " + configuration + " " + fullOutput);
             BuildReport report = BuildPipeline.BuildPlayer(options);
             if (report.summary.result != BuildResult.Succeeded)
                 throw new Exception("Android build failed: " + report.summary.result + "; errors=" + report.summary.totalErrors);

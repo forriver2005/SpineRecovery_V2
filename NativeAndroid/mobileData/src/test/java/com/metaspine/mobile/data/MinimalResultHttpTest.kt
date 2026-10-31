@@ -8,6 +8,7 @@ import org.junit.Assume.assumeTrue
 import org.junit.Test
 import java.io.File
 
+/** Loopback fixture adapter preserves business assertions without enabling direct transport in the app. */
 class MinimalResultHttpTest {
     @Test fun unityProductionProjectionRevisionsReachKotlinAndHospital() = runBlocking {
         val path = System.getenv("SPINEFLOW_BRIDGE_FIXTURE")
@@ -17,11 +18,12 @@ class MinimalResultHttpTest {
         assumeTrue(files.all { it.isFile })
         val fixture = JSONObject(File(path).readText())
         val origin = fixture.getString("baseUrl")
+        val api = FixturePatientApi(origin)
         require(origin.startsWith("http://127.0.0.1:"))
         val row = fixture.getJSONObject("healthCase")
         val patient = row.getString("patientId")
         val token = row.getJSONObject("credential").getString("patientToken")
-        PatientSyncClient.sync(row.getJSONObject("syncBody"), token, origin).getOrThrow()
+        api.sync(row.getJSONObject("syncBody"), token).getOrThrow()
         var previous: ResultRecord? = null
         for (file in files) {
             val projection = JSONObject(file.readText())
@@ -29,15 +31,15 @@ class MinimalResultHttpTest {
             val frozen = result.freeze(patient)
             previous = ResultRevisionPolicy.next("isolated-unity-probe", result, frozen, previous)
             assertEquals(CanonicalJson.canonicalize(projection), CanonicalJson.canonicalize(JSONObject(frozen.body)))
-            val ack = TrainingSyncClient.uploadV2Sessions(JSONArray().put(JSONObject(frozen.body)),
-                listOf(frozen.receipt), token, origin).getOrThrow()
+            val ack = api.uploadV2(JSONArray().put(JSONObject(frozen.body)),
+                listOf(frozen.receipt), token).getOrThrow()
             assertEquals(listOf(frozen.receipt), ack)
         }
         assertEquals(3L, previous!!.resultRevision)
         // Repeating the terminal snapshot must keep the original revision and hash.
         val latest = previous!!
-        assertEquals(listOf(latest.receipt), TrainingSyncClient.uploadV2Sessions(
-            JSONArray().put(JSONObject(latest.body)), listOf(latest.receipt), token, origin).getOrThrow())
+        assertEquals(listOf(latest.receipt), api.uploadV2(
+            JSONArray().put(JSONObject(latest.body)), listOf(latest.receipt), token).getOrThrow())
     }
 
     @Test fun frozenTwoItemV2ResultAndExactReplayReachHospital() = runBlocking {
@@ -45,17 +47,18 @@ class MinimalResultHttpTest {
         assumeTrue(!path.isNullOrBlank() && File(path!!).isFile)
         val fixture = JSONObject(File(path!!).readText())
         val origin = fixture.getString("baseUrl")
+        val api = FixturePatientApi(origin)
         require(origin.startsWith("http://127.0.0.1:"))
         val row = fixture.getJSONObject("resultCase")
         val patient = row.getString("patientId")
         val token = row.getJSONObject("credential").getString("patientToken")
-        PatientSyncClient.sync(row.getJSONObject("syncBody"), token, origin).getOrThrow()
+        api.sync(row.getJSONObject("syncBody"), token).getOrThrow()
         val result = PrescriptionResultV2.parse(row.getJSONObject("resultSnapshot"), patient)
         val frozen = result.freeze(patient)
         assertEquals(row.getJSONObject("expectedReceipt").getString("resultContentSha256"), frozen.contentSha256)
         repeat(2) {
-            val replies = TrainingSyncClient.uploadV2Sessions(JSONArray().put(JSONObject(frozen.body)),
-                listOf(frozen.receipt), token, origin).getOrThrow()
+            val replies = api.uploadV2(JSONArray().put(JSONObject(frozen.body)),
+                listOf(frozen.receipt), token).getOrThrow()
             assertEquals(listOf(frozen.receipt), replies)
         }
     }

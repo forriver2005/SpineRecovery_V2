@@ -1,13 +1,12 @@
 package com.metaspine.mobile.data
 
-import com.metaspine.mobile.unified.BuildConfig
 import com.sun.net.httpserver.HttpServer
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.*
-import org.junit.Assume.assumeTrue
 import org.junit.Test
 import java.net.InetSocketAddress
 import java.net.URL
+import java.util.concurrent.atomic.AtomicInteger
 
 class LocalServerCompatibilityTest {
     private fun binding(origin: String) = BindingScope(
@@ -35,21 +34,41 @@ class LocalServerCompatibilityTest {
         assertFalse(trust.matches(legacy.copy(hospitalKey = "hospital-b")))
     }
 
-    @Test fun unconfiguredDiscoveryPreservesStrictOriginAndExistingDeletionPolicy() = runBlocking {
-        assumeTrue(BuildConfig.LOCAL_DISCOVERY_CERT_SHA256.isBlank())
-        val legacy = binding("https://hospital.example.org")
-        assertFalse(LocalServerDiscovery.isEnabled)
-        assertTrue(LocalServerDiscovery.registerBinding(legacy))
-        assertTrue(LocalServerDiscovery.matchesBinding(legacy, legacy.origin, legacy.patientId))
-        assertFalse(LocalServerDiscovery.matchesBinding(legacy, "https://other.example.org", legacy.patientId))
-        assertFalse(LocalServerDiscovery.matchesBinding(legacy, legacy.origin, "another-patient"))
-        assertEquals(0L, LocalServerDiscovery.prepareOperation(legacy.origin))
-        assertTrue(LocalServerDiscovery.isCurrentOperation(0L))
-        assertTrue(LocalServerDiscovery.hasVerifiedBinding(legacy))
+    @Test fun uninitializedDiscoveryNeverTreatsAnOldBindingAsVerified() {
+        val legacy = binding("http://192.168.3.16:33101")
+        val before = legacy.toJson().toString()
+        assertThrows(IllegalStateException::class.java) { LocalServerDiscovery.registerBinding(legacy) }
+        assertThrows(IllegalStateException::class.java) {
+            LocalServerDiscovery.matchesBinding(legacy, legacy.origin, legacy.patientId)
+        }
+        assertThrows(IllegalStateException::class.java) { LocalServerDiscovery.hasVerifiedBinding(legacy) }
+        assertThrows(IllegalStateException::class.java) {
+            runBlocking { LocalServerDiscovery.prepareOperation(legacy.origin) }
+        }
+        assertEquals(before, legacy.toJson().toString())
     }
 
-    @Test fun unconfiguredTransportKeepsExplicitOriginAndSendsPostOnlyOnce() = runBlocking {
-        assumeTrue(BuildConfig.LOCAL_DISCOVERY_CERT_SHA256.isBlank())
+    @Test fun applicationDefaultNeverFallsBackToDirectHttpWhenDiscoveryIsUnavailable() {
+        val calls = AtomicInteger()
+        val server = HttpServer.create(InetSocketAddress("127.0.0.1", 0), 0)
+        server.createContext("/api/patient/sync") { exchange ->
+            calls.incrementAndGet()
+            exchange.sendResponseHeaders(200, -1)
+            exchange.close()
+        }
+        server.start()
+        try {
+            assertThrows(IllegalStateException::class.java) {
+                runBlocking {
+                    PatientHttpTransport(origin = { "http://127.0.0.1:${server.address.port}" })
+                        .request("/api/patient/sync", "POST", "test-token", "{}")
+                }
+            }
+            assertEquals(0, calls.get())
+        } finally { server.stop(0) }
+    }
+
+    @Test fun explicitlyInjectedTestTransportKeepsPostBodyAndSendsOnlyOnce() = runBlocking {
         var calls = 0
         var method = ""
         var authorization = ""
@@ -67,7 +86,9 @@ class LocalServerCompatibilityTest {
         }
         server.start()
         try {
-            val response = PatientHttpTransport(origin = { "http://127.0.0.1:${server.address.port}" })
+            val response = PatientHttpTransport(
+                origin = { "http://127.0.0.1:${server.address.port}" },
+                openConnection = ::openLoopbackTestConnection)
                 .request("/api/patient/sync", "POST", "test-token", "{\"requestId\":\"unchanged\"}")
             assertEquals(200, response.status)
             assertEquals(1, calls)

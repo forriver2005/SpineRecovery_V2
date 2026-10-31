@@ -6,29 +6,31 @@ plugins {
 def localServerPin = providers.gradleProperty('spineflowLocalCertificateSha256').orElse('').get().trim().toLowerCase()
 def localServiceId = providers.gradleProperty('spineflowLocalServiceId').orElse('hospital-a').get().trim()
 def localHospitalKey = providers.gradleProperty('spineflowLocalHospitalKey').orElse('hospital-a').get().trim()
-if (localServerPin && !(localServerPin ==~ /[0-9a-f]{64}/)) {
-    throw new GradleException('spineflowLocalCertificateSha256 must be a SHA-256 certificate fingerprint')
+if (!(localServerPin ==~ /[0-9a-f]{64}/)) {
+    throw new GradleException('LAN-only builds require spineflowLocalCertificateSha256 (SHA-256 certificate fingerprint)')
 }
-def debugOrigin = providers.gradleProperty('spineflowServerUrl')
-    .orElse(localServerPin ? 'http://spineflow.local:3001' : 'http://10.0.2.2:3101').get().trim()
+if (!localServiceId || !localHospitalKey) {
+    throw new GradleException('LAN-only builds require a hospital and service identity')
+}
+if (providers.gradleProperty('spineflowServerUrl').isPresent()) {
+    throw new GradleException('spineflowServerUrl is no longer supported; all builds use pinned LAN discovery')
+}
 
 android {
     namespace 'com.metaspine.mobile.unified'
     compileSdk 36
     defaultConfig {
         minSdk 29
+        // Scope alias only; the transport uses same-subnet discovery and pinned TLS.
+        buildConfigField 'String', 'SERVER_BASE_URL', '"https://spineflow.local:3001"'
         buildConfigField 'String', 'LOCAL_DISCOVERY_CERT_SHA256', groovy.json.JsonOutput.toJson(localServerPin)
         buildConfigField 'String', 'LOCAL_DISCOVERY_SERVICE_ID', groovy.json.JsonOutput.toJson(localServiceId)
         buildConfigField 'String', 'LOCAL_DISCOVERY_HOSPITAL_KEY', groovy.json.JsonOutput.toJson(localHospitalKey)
     }
     buildFeatures { buildConfig true }
     buildTypes {
-        debug { buildConfigField 'String', 'SERVER_BASE_URL', groovy.json.JsonOutput.toJson(debugOrigin) }
-        release {
-            buildConfigField 'String', 'SERVER_BASE_URL', '"https://api.metaspine.cn"'
-            // Production HTTPS keeps its existing trust policy and does not scan the LAN.
-            buildConfigField 'String', 'LOCAL_DISCOVERY_CERT_SHA256', '""'
-        }
+        debug { }
+        release { }
     }
     compileOptions {
         sourceCompatibility JavaVersion.VERSION_17

@@ -1,8 +1,6 @@
 package com.metaspine.mobile.data
 
 import android.content.Context
-import android.net.ConnectivityManager
-import android.net.NetworkCapabilities
 import org.json.JSONArray
 import org.json.JSONObject
 
@@ -16,13 +14,10 @@ object TrainingSyncClient {
 
     private const val UPLOAD_PATH = "/api/training/upload"
 
-    /** 当前是否有可用网络（需要 ACCESS_NETWORK_STATE 权限）。 */
+    /** Hospital Wi-Fi need not advertise internet access; discovery verifies reachability. */
     fun isOnline(context: Context): Boolean {
-        val cm = context.getSystemService(Context.CONNECTIVITY_SERVICE) as? ConnectivityManager
-            ?: return false
-        val network = cm.activeNetwork ?: return false
-        val caps = cm.getNetworkCapabilities(network) ?: return false
-        return caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
+        LocalServerDiscovery.initialize(context)
+        return LocalServerDiscovery.hasLocalNetwork()
     }
 
     /**

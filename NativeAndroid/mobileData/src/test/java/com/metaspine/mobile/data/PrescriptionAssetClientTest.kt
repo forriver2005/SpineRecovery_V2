@@ -70,6 +70,7 @@ class PrescriptionAssetClientTest {
             expectedSha256 = expectedSha,
             expectedFileSize = expectedSize,
             origin = ::origin,
+            openConnection = ::openLoopbackTestConnection,
             expectedLease = expectedLease,
             expectedActionId = "dead_bug",
             expectedVersionId = 317,

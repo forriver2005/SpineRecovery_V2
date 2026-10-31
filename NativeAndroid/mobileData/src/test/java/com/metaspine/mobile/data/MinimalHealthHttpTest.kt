@@ -14,11 +14,12 @@ import java.time.LocalDate
 import java.time.ZoneId
 import java.util.UUID
 
-/** Real HTTP against disposable hospitals. Synthetic answers do not validate the Unity monthly form. */
+/** Loopback business-contract HTTP only; does not validate Android LAN discovery or the Unity form. */
 class MinimalHealthHttpTest {
     @Test fun immutableHealthEventsReachDoctorAndReplayWithoutDuplicates() = runBlocking {
         val fixture = fixture()
         val origin = fixture.getString("baseUrl")
+        val api = FixturePatientApi(origin)
         val item = fixture.getJSONObject("healthCase")
         val credential = credential(item)
         val body = JSONObject(item.getJSONObject("syncBody").toString())
@@ -28,9 +29,9 @@ class MinimalHealthHttpTest {
         try {
             assertFalse(body.getJSONObject("preTrainingQuestionnaire").has("symptomChange"))
             assertFalse(body.getJSONObject("preTrainingQuestionnaire").has("painLocationChanged"))
-            PatientSyncClient.sync(body, credential.patientToken, origin).getOrThrow()
+            api.sync(body, credential.patientToken).getOrThrow()
             val first = doctor(fixture, "/api/doctor/patients/${credential.patientId}/questionnaires?size=100")
-            PatientSyncClient.sync(body, credential.patientToken, origin).getOrThrow()
+            api.sync(body, credential.patientToken).getOrThrow()
             val replay = doctor(fixture, "/api/doctor/patients/${credential.patientId}/questionnaires?size=100")
             assertEquals(first.getInt("total"), replay.getInt("total"))
             val payloads = replay.getJSONArray("items").objects().map { JSONObject(it.getString("payloadJson")) }
@@ -63,7 +64,7 @@ class MinimalHealthHttpTest {
         SpineFlowServerConfig.baseUrlOverride = fixture.getString("otherHospitalBaseUrl")
         val file = File.createTempFile("routine-http-", ".json").apply { deleteOnExit() }
         val store = FileRoutineStore(file)
-        val real = PatientQuestionnaireClient.atOrigin(origin)
+        val real = FixturePatientApi(origin)
         var firstSubmission: String? = null
         var serverReceipt: JSONObject? = null
         val loseResponse = object : RoutineQuestionnaireApi by real {
@@ -161,7 +162,7 @@ class MinimalHealthHttpTest {
             .put("expectedPlanId", previous?.getLong("planId") ?: JSONObject.NULL)
             .put("items", JSONArray().put(JSONObject().put("templateId", template.getLong("templateId"))
                 .put("frequency", "monthly").put("dayOfMonth", date.dayOfMonth).put("startDate", date.toString()).put("endDate", JSONObject.NULL))))
-        val listed = PatientQuestionnaireClient.atOrigin(fixture.getString("baseUrl")).open(credential(item).patientToken)
+        val listed = FixturePatientApi(fixture.getString("baseUrl")).open(credential(item).patientToken)
         return listed.getJSONArray("items").objects().single().getLong("taskId")
     }
     private fun doctor(fixture: JSONObject, path: String, method: String = "GET", body: JSONObject? = null): JSONObject =

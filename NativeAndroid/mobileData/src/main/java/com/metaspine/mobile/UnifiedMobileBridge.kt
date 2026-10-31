@@ -37,8 +37,7 @@ object UnifiedMobileBridge {
         LocalServerDiscovery.initialize(context)
         users = DemoUserStore(context)
         // A LAN route never rewrites the user's saved logical origin or credential preferences.
-        SpineFlowServerConfig.baseUrlOverride = if (LocalServerDiscovery.isEnabled) null
-            else PatientCredentials.serverUrlOverride(context)
+        SpineFlowServerConfig.baseUrlOverride = null
         sync = ServerSyncCoordinator(context, scope) { accountId ->
             // P2.4 启动重算：按账号加载可同步状态（过滤 LEGACY_IMPORT / imported / 种子数据）。
             runCatching { syncable(users.loadUser(accountId)) }.getOrNull()
@@ -230,7 +229,6 @@ object UnifiedMobileBridge {
 
     private fun activationOrigin(account: String): String {
         val configured = SpineFlowServerConfig.BASE_URL
-        if (!LocalServerDiscovery.isEnabled) return configured
         val binding = BindingScopeStore.load(context, account)
         require(binding == null || LocalServerDiscovery.registerBinding(binding)) {
             "当前服务器不是账号绑定医院，本地数据已保留"

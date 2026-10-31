@@ -2,10 +2,22 @@ param(
     [Parameter(Mandatory = $true)] [string]$GradleProject,
     [Parameter(Mandatory = $true)] [string]$OutputApk,
     [string]$JavaHome = $env:JAVA_HOME,
-    [ValidateSet('Debug', 'Release')] [string]$Configuration = 'Debug'
+    [ValidateSet('Debug', 'Release')] [string]$Configuration = 'Debug',
+    [string]$CertificateSha256,
+    [string]$ServiceId = 'hospital-a',
+    [string]$HospitalKey = 'hospital-a',
+    [switch]$AllowTestSigning,
+    [switch]$Offline
 )
 
 $ErrorActionPreference = 'Stop'
+$CertificateSha256 = "$CertificateSha256".Trim().ToLowerInvariant()
+if ($CertificateSha256 -notmatch '^[0-9a-f]{64}$') {
+    throw 'Every LAN build requires -CertificateSha256 with the trusted server certificate SHA-256 fingerprint.'
+}
+if ([string]::IsNullOrWhiteSpace($ServiceId) -or [string]::IsNullOrWhiteSpace($HospitalKey)) {
+    throw 'ServiceId and HospitalKey must identify the local hospital server.'
+}
 $projectPath = (Resolve-Path -LiteralPath $GradleProject).Path
 $wrapperPath = Join-Path $PSScriptRoot 'GradleWrapper'
 $nativeSource = Join-Path (Split-Path $PSScriptRoot -Parent) 'NativeAndroid\mobileData'
@@ -28,6 +40,14 @@ $text = [regex]::Replace($text, 'compileSdkVersion\s+\d+', 'compileSdkVersion 36
 $text = [regex]::Replace($text, 'targetSdkVersion\s+\d+', 'targetSdkVersion 36')
 $text = [regex]::Replace($text, 'buildToolsVersion\s+["''][^"'']+["'']', "buildToolsVersion '36.0.0'")
 $text = $text.Replace('proguard-android.txt', 'proguard-android-optimize.txt')
+$releaseBlock = [regex]::Match($text, '(?s)\brelease\s*\{(.*?)\}').Groups[1].Value
+$releaseUsesTestSigning = $releaseBlock -match 'signingConfig\s+signingConfigs\.debug\b'
+if ($Configuration -eq 'Release' -and $releaseUsesTestSigning) {
+    if (!$AllowTestSigning) {
+        throw 'The exported Release variant uses the Android debug certificate. Configure production signing, or pass -AllowTestSigning for an explicitly labelled test APK.'
+    }
+    Write-Warning 'Release TEST APK: using the Android debug certificate. This is not a production-signed release.'
+}
 [IO.File]::WriteAllText($launcherGradle, $text, (New-Object Text.UTF8Encoding($false)))
 # Adapt Unity 2022's IL2CPP task to the Gradle 9 / AGP 9 public APIs.
 $unityGradle = Join-Path $projectPath 'unityLibrary\build.gradle'
@@ -63,7 +83,11 @@ $env:JAVA_HOME = $JavaHome
 $env:Path = "$JavaHome\bin;$env:Path"
 Push-Location $projectPath
 try {
-    & .\gradlew.bat "assemble$Configuration" --no-daemon --console=plain
+    $gradleArguments = @("assemble$Configuration", '--no-daemon', '--console=plain', '--max-workers=2',
+        "-PspineflowLocalCertificateSha256=$CertificateSha256",
+        "-PspineflowLocalServiceId=$ServiceId", "-PspineflowLocalHospitalKey=$HospitalKey")
+    if ($Offline) { $gradleArguments += '--offline' }
+    & .\gradlew.bat @gradleArguments
     if ($LASTEXITCODE -ne 0) { throw "Gradle failed with exit code $LASTEXITCODE" }
 } finally {
     Pop-Location
@@ -72,7 +96,11 @@ try {
 }
 $variant = $Configuration.ToLowerInvariant()
 $builtApk = Join-Path $projectPath "launcher\build\outputs\apk\$variant\launcher-$variant.apk"
-if (!(Test-Path -LiteralPath $builtApk)) { throw "APK not found: $builtApk. For unsigned Release output, configure signing in Unity before export." }
+if (!(Test-Path -LiteralPath $builtApk) -and $Configuration -eq 'Release') {
+    $builtApk = Join-Path $projectPath 'launcher\build\outputs\apk\release\launcher-release-unsigned.apk'
+    if (Test-Path -LiteralPath $builtApk) { Write-Warning 'Unsigned Release APK: signing is required before installation.' }
+}
+if (!(Test-Path -LiteralPath $builtApk)) { throw "APK not found: $builtApk" }
 $apkDestination = [IO.Path]::GetFullPath($OutputApk)
 New-Item -ItemType Directory -Path (Split-Path $apkDestination -Parent) -Force | Out-Null
 Copy-Item -LiteralPath $builtApk -Destination $apkDestination -Force

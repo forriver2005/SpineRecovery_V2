@@ -7,7 +7,7 @@ import org.junit.Assume.assumeTrue
 import org.junit.Test
 import java.io.File
 
-/** Opt-in HTTP integration against disposable hospitals, never a configured production service. */
+/** Opt-in loopback business-contract integration; Android pinned LAN transport is tested separately. */
 class MinimalBridgeHttpTest {
     @Test fun doctorPrescriptionOneItemReachesMobile() = roundTrip(1)
     @Test fun doctorPrescriptionTwoItemsReachMobile() = roundTrip(2)
@@ -22,13 +22,12 @@ class MinimalBridgeHttpTest {
             .single { it.getInt("itemCount") == count }
         val origin = fixture.getString("baseUrl")
         require(origin.startsWith("http://127.0.0.1:"))
-        val previousOrigin = SpineFlowServerConfig.baseUrlOverride
-        SpineFlowServerConfig.baseUrlOverride = origin
-        try {
-            val identity = ServiceIdentityClient.requireHospital(ServiceIdentityClient.fetch().getOrThrow())
+        val api = FixturePatientApi(origin)
+        run {
+            val identity = ServiceIdentityClient.requireHospital(api.identity().getOrThrow())
             val request = case.getJSONObject("activationBody")
-            val first = PatientActivationClient.redeem(request).getOrThrow()
-            val replay = PatientActivationClient.redeem(request).getOrThrow()
+            val first = api.redeem(request).getOrThrow()
+            val replay = api.redeem(request).getOrThrow()
             assertEquals(first, replay)
             assertEquals(count, first.prescriptionV2.items.size)
             assertTrue(first.prescriptionV2.items.all { it.asset.downloadPath.isEmpty() })
@@ -37,13 +36,13 @@ class MinimalBridgeHttpTest {
                 first.patientId, request.getString("accountId"), 1)
             val doctorToken = fixture.getJSONObject("doctor").getString("token")
             suspend fun doctorPost(path: String, body: JSONObject): JSONObject {
-                val response = PatientHttpTransport.shared.request(path, "POST", doctorToken, body.toString(),
+                val response = api.transport.request(path, "POST", doctorToken, body.toString(),
                     readErrorStatuses = setOf(400, 409))
                 response.requireSuccess("Disposable doctor request failed")
                 return JSONObject(response.text).getJSONObject("data")
             }
             // Re-running the test replaces only its own disposable patient's orders.
-            val before = PatientDirectiveClient.fetch(credential.patientToken).getOrThrow()
+            val before = api.directive(credential.patientToken).getOrThrow()
             for (field in listOf("activeStopOrder", "activePrescription")) {
                 before.optJSONObject(field)?.let { order ->
                     doctorPost("/api/doctor/orders/${order.getLong("orderId")}/revoke",
@@ -51,7 +50,7 @@ class MinimalBridgeHttpTest {
                 }
             }
             // A stopped directive hides the old prescription; read again after revoking stop.
-            PatientDirectiveClient.fetch(credential.patientToken).getOrThrow()
+            api.directive(credential.patientToken).getOrThrow()
                 .optJSONObject("activePrescription")?.let { order ->
                     doctorPost("/api/doctor/orders/${order.getLong("orderId")}/revoke",
                         JSONObject().put("reason", "Isolated mobile integration replacement"))
@@ -74,7 +73,9 @@ class MinimalBridgeHttpTest {
                 override fun read(scope: BindingScope, orderId: Long) = pending[orderId]
                 override fun write(scope: BindingScope, task: PrescriptionReceiptTask) { pending[task.orderId] = task }
             }
-            val coordinator = TrainingDirectiveCoordinator(storage = storage, receipts = receipts)
+            val coordinator = TrainingDirectiveCoordinator(storage = storage, receipts = receipts,
+                fetchDirective = api::directive, sendStopReceipt = api::stopReceipt,
+                sendPrescriptionReceipt = api::prescriptionReceipt)
             val received = coordinator.receiveOnly(binding.accountId, credential, binding) as DirectiveRefreshResult.Received
             assertFalse(received.receiptPending)
             assertFalse(received.canStartTraining)
@@ -83,12 +84,12 @@ class MinimalBridgeHttpTest {
             assertTrue(order.items.all { it.asset.downloadPath.startsWith("/api/patient/training-directive/") })
             assertEquals(order.resourceManifestSha256, order.prescription.computeManifestSha256())
             assertEquals(count, storage.read(binding.accountId, first.patientId)!!.prescription!!.items.size)
-            val saved = PatientDirectiveClient.fetch(credential.patientToken).getOrThrow().getJSONObject("activePrescription")
+            val saved = api.directive(credential.patientToken).getOrThrow().getJSONObject("activePrescription")
             assertFalse(saved.getString("receivedAt").isBlank())
             assertTrue(saved.isNull("assetsReadyAt"))
             val receiptTime = saved.getString("receivedAt")
             coordinator.receiveOnly(binding.accountId, credential, binding)
-            assertEquals(receiptTime, PatientDirectiveClient.fetch(credential.patientToken).getOrThrow()
+            assertEquals(receiptTime, api.directive(credential.patientToken).getOrThrow()
                 .getJSONObject("activePrescription").getString("receivedAt"))
 
             doctorPost("/api/doctor/patients/${first.patientId}/orders",
@@ -98,8 +99,6 @@ class MinimalBridgeHttpTest {
             assertFalse(stopped.receiptPending)
             assertNull(stopped.snapshot.prescription)
             assertFalse(stopped.snapshot.stopOrder!!.receivedAt.isNullOrBlank())
-        } finally {
-            SpineFlowServerConfig.baseUrlOverride = previousOrigin
         }
     }
 }

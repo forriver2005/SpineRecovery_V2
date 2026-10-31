@@ -409,7 +409,15 @@ public sealed class CoachHapticFeedbackController : MonoBehaviour
             yield break;
         }
 
-        UnityWebRequest request = UnityWebRequest.Get(discoveryUrl);
+        string trustedDiscoveryUrl;
+        if (!TrackerLanPolicy.TryDiscoveryUrl(discoveryUrl, out trustedDiscoveryUrl))
+        {
+            ClearAutomaticallyDiscoveredEndpoints();
+            DiscoveryStatus = "SlimeVR 地址必须是本机或局域网 IPv4 地址";
+            yield break;
+        }
+        UnityWebRequest request = UnityWebRequest.Get(trustedDiscoveryUrl);
+        request.redirectLimit = 0;
         request.timeout = Mathf.Max(1, requestTimeoutSeconds);
         yield return request.SendWebRequest();
 
@@ -705,21 +713,14 @@ public sealed class CoachHapticFeedbackController : MonoBehaviour
 
     private IEnumerator SendPulse(TrackerWearLocation location, string address, int durationMs)
     {
-        string normalizedAddress = address.Trim().TrimEnd('/');
-        if (normalizedAddress.StartsWith("http://", StringComparison.OrdinalIgnoreCase))
+        string uri;
+        if (!TrackerLanPolicy.TryCreateMotorUrl(address, durationMs, out uri))
         {
-            normalizedAddress = normalizedAddress.Substring("http://".Length);
+            Debug.LogWarning($"[Haptics] Tracker {location} 地址不属于允许的局域网 IPv4 地址", this);
+            yield break;
         }
-        else if (normalizedAddress.StartsWith("https://", StringComparison.OrdinalIgnoreCase))
-        {
-            normalizedAddress = normalizedAddress.Substring("https://".Length);
-        }
-
-        string uri = string.Format(
-            "http://{0}/motor?duration_ms={1}",
-            normalizedAddress,
-            Mathf.Clamp(durationMs, 1, 60000));
         UnityWebRequest request = UnityWebRequest.Get(uri);
+        request.redirectLimit = 0;
         request.timeout = Mathf.Max(1, requestTimeoutSeconds);
         inFlightRequests[location] = request;
 

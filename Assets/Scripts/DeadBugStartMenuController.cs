@@ -15,6 +15,10 @@ public class DeadBugStartMenuController : MonoBehaviour
     {
         showPracticeControlsOnNextLoad = true;
     }
+    public event Action TrainingStarted;
+    public Func<bool> TrainingStartAllowed { get; set; }
+    public string SelectedDifficultyKey => selectedDifficulty == Difficulty.Simple ? "simple" : selectedDifficulty == Difficulty.Hard ? "hard" : "standard";
+    public bool IsTrainingMenuVisible => menuRoot != null && menuRoot.activeSelf;
 
     private enum Difficulty
     {
@@ -427,7 +431,8 @@ public class DeadBugStartMenuController : MonoBehaviour
 
     public void StartTraining()
     {
-        if (!IsPracticeCoachMode && poseScorer != null && !poseScorer.IsCalibrated)
+        if (TrainingStartAllowed != null && !TrainingStartAllowed()) return;
+        if (!IsPracticeCoachMode && poseScorer != null && !poseScorer.CanStartTraining)
         {
             ApplyCalibrationGate();
             if (!poseScorer.IsCalibrating)
@@ -438,6 +443,7 @@ public class DeadBugStartMenuController : MonoBehaviour
         }
 
         string selectedActionStateName = GetSelectedActionStateName();
+        TrainingStarted?.Invoke();
         if (IsPracticeCoachMode)
         {
             SpineFlowTrainingSession.AcknowledgePracticeStartConfirmation();
@@ -536,7 +542,7 @@ public class DeadBugStartMenuController : MonoBehaviour
         if (startButton != null)
         {
             startButton.interactable =
-                IsPracticeCoachMode || poseScorer == null || poseScorer.IsCalibrated;
+                IsPracticeCoachMode || poseScorer == null || poseScorer.CanStartTraining;
         }
         ApplyCalibrationGate();
     }
@@ -1036,6 +1042,7 @@ public class DeadBugStartMenuController : MonoBehaviour
 
     private string GetSelectedActionStateName()
     {
+        if (!IsPracticeCoachMode) return standardActionStateName;
         switch (selectedDifficulty)
         {
             case Difficulty.Simple:
@@ -1227,6 +1234,7 @@ public class DeadBugStartMenuController : MonoBehaviour
 
     private int GetSelectedFallbackRepetitions()
     {
+        if (!IsPracticeCoachMode) return Mathf.Max(1, standardTimes);
         switch (selectedDifficulty)
         {
             case Difficulty.Simple:
@@ -1340,7 +1348,7 @@ public class DeadBugStartMenuController : MonoBehaviour
             return;
         }
 
-        if (poseScorer != null && poseScorer.IsCalibrated)
+        if (poseScorer != null && poseScorer.CanStartTraining)
         {
             RestoreStartButtonText();
             ApplyCalibrationGate();
@@ -1353,7 +1361,8 @@ public class DeadBugStartMenuController : MonoBehaviour
         }
 
         string status = string.IsNullOrEmpty(message)
-            ? "\u8bf7\u81ea\u7136\u7ad9\u7acb"
+            ? (poseScorer != null && poseScorer.GetComponent<SupineGameCalibration>() != null
+                ? poseScorer.CalibrationInstruction : "请自然站立")
             : message;
         ShowCalibrationStatus(status);
     }
@@ -1365,7 +1374,7 @@ public class DeadBugStartMenuController : MonoBehaviour
             return;
         }
 
-        bool ready = poseScorer.IsCalibrated;
+        bool ready = poseScorer.CanStartTraining;
         startButton.interactable = ready;
         if (ready)
         {
@@ -1373,7 +1382,7 @@ public class DeadBugStartMenuController : MonoBehaviour
         }
         else if (!poseScorer.IsCalibrating)
         {
-            ShowCalibrationStatus("\u8bf7\u81ea\u7136\u7ad9\u7acb\u8fdb\u884c\u6821\u51c6");
+            ShowCalibrationStatus(poseScorer.CalibrationInstruction);
         }
     }
 

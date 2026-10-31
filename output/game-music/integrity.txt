@@ -1,0 +1,6 @@
+PASS BirdDog_RingSkinC_Recorded: only the existing song reference changed; all other serialized fields identical.
+PASS DeadBug_RingSkinC_Recorded: only the existing song reference changed; all other serialized fields identical.
+PASS HipThrust_RingBridge_Recorded: only the existing song reference changed; all other serialized fields identical.
+PASS HipThrust_RingBridge_NewScoring: only the existing song reference changed; all other serialized fields identical.
+PASS HipThrust_RingBridge_Hold30: only the existing song reference changed; all other serialized fields identical.
+PASS gameplay, coach, scoring, hold progress and build settings have no tracked changes.

@@ -12,7 +12,20 @@ public class CoachActionController : MonoBehaviour
     public event System.Action ScoringSessionCompleted;
 
     public string StartSegmentStateName => startSegmentState;
+    // Read-only presentation state; the sequence and its existing hold coroutine remain authoritative.
+    public bool IsPlayingAction => hasStarted;
+    public bool IsActionPaused => isPaused;
+    public bool IsHoldingPose => isDifficultyHold;
+    public float HoldElapsedSeconds { get; private set; }
     public int CurrentTotalScoredSegments { get; private set; } = 1;
+    public double[] AssessmentDurations { get; private set; } = new double[0];
+    public float SegmentSeconds(string state,float speed)
+    {
+        if(coachAnimator!=null && coachAnimator.runtimeAnimatorController!=null)
+            foreach(var clip in coachAnimator.runtimeAnimatorController.animationClips)
+                if(clip!=null && clip.name==state)return clip.length/Mathf.Max(.05f,speed);
+        return 0;
+    }
 
     public struct ScoringCheckpointInfo
     {
@@ -127,6 +140,7 @@ public class CoachActionController : MonoBehaviour
     private Coroutine idleRoutine;
     private Coroutine actionDiagnosticsRoutine;
     private TrainingDifficulty selectedDifficulty = TrainingDifficulty.Standard;
+    public string SelectedDifficultyKey => selectedDifficulty==TrainingDifficulty.Simple?"simple":selectedDifficulty==TrainingDifficulty.Hard?"hard":"standard";
     private float activePlaybackSpeed = 1f;
     private bool isDifficultyHold;
 
@@ -319,6 +333,16 @@ public class CoachActionController : MonoBehaviour
         }
     }
 
+    public void CancelTraining()
+    {
+        StopActionRoutine();
+        StopIdleVariations();
+        if (actionDiagnosticsRoutine != null) StopCoroutine(actionDiagnosticsRoutine);
+        actionDiagnosticsRoutine = null;
+        StopAtCurrentPose();
+        if (sideFeedback != null) sideFeedback.EndFeedback();
+    }
+
     private IEnumerator ReturnIdleAfterActionCompletes()
     {
         yield return null;
@@ -506,6 +530,10 @@ public class CoachActionController : MonoBehaviour
         int safeLoopCount = Mathf.Max(1, profile.loopCount);
         int totalScoredSegments = Mathf.Max(1, safeLoopCount * pairCount * 2);
         CurrentTotalScoredSegments = totalScoredSegments;
+        AssessmentDurations=new double[safeLoopCount*pairCount];
+        for(int i=0;i<AssessmentDurations.Length;i++)
+            AssessmentDurations[i]=SegmentSeconds(upSegmentStates[i%pairCount],profile.upSpeed)+
+                SegmentSeconds(downSegmentStates[i%pairCount],profile.downSpeed);
         int completedScoredSegments = 0;
 
         ScoringSessionStarted?.Invoke();
@@ -524,7 +552,7 @@ public class CoachActionController : MonoBehaviour
                 ScoringCheckpointInfo upCheckpoint = new ScoringCheckpointInfo(
                     upSegmentStates[pair], loop, safeLoopCount, pair, true, profile.holdSeconds);
                 ScoringCheckpointStarted?.Invoke(upCheckpoint);
-                yield return HoldCurrentPose(profile.holdSeconds);
+                if (profile.holdSeconds > 0f) yield return HoldCurrentPose(profile.holdSeconds);
                 ScoringCheckpointEnded?.Invoke(upCheckpoint);
 
                 yield return PlaySegmentToEnd(
@@ -536,7 +564,7 @@ public class CoachActionController : MonoBehaviour
                 ScoringCheckpointInfo downCheckpoint = new ScoringCheckpointInfo(
                     downSegmentStates[pair], loop, safeLoopCount, pair, false, profile.holdSeconds);
                 ScoringCheckpointStarted?.Invoke(downCheckpoint);
-                yield return HoldCurrentPose(profile.holdSeconds);
+                if (profile.holdSeconds > 0f) yield return HoldCurrentPose(profile.holdSeconds);
                 ScoringCheckpointEnded?.Invoke(downCheckpoint);
             }
         }
@@ -632,9 +660,11 @@ public class CoachActionController : MonoBehaviour
         coachAnimator.speed = 0f;
 
         float elapsed = 0f;
+        HoldElapsedSeconds = 0f;
         while (elapsed < safeHoldSeconds && hasStarted)
         {
             elapsed += Time.deltaTime;
+            HoldElapsedSeconds = elapsed;
             yield return null;
         }
 
@@ -663,16 +693,9 @@ public class CoachActionController : MonoBehaviour
 
     private DifficultyProfile GetSelectedDifficultyProfile()
     {
-        switch (selectedDifficulty)
-        {
-            case TrainingDifficulty.Simple:
-                return simpleDifficulty;
-            case TrainingDifficulty.Hard:
-                return hardDifficulty;
-            case TrainingDifficulty.Standard:
-            default:
-                return standardDifficulty;
-        }
+        // Difficulty is a scoring choice. Preserve the scene's original standard
+        // speed, repetition count and phase timing for all three choices.
+        return standardDifficulty;
     }
 
     private bool HasAnimatorState(string stateName)

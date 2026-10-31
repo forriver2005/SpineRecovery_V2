@@ -1,0 +1,1 @@
+active=True enabled=True cull=False rect=(x:-932.26, y:-556.07, width:1864.53, height:1112.13) color=RGBA(1.000, 1.000, 1.000, 1.000) vertices=456

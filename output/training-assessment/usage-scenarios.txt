@@ -1,0 +1,55 @@
+Separate humanoid patient replay, synthetic packet transport; no physical IMU validation.
+BirdDog_RingSkinC_Recorded | follow | score=100 quality=100.0 following=24.64/24.64 qualified=4/4 invalid_hits=0
+BirdDog_RingSkinC_Recorded | rest | score=0 quality=0.0 following=0.00/24.64 qualified=0/4 invalid_hits=0
+BirdDog_RingSkinC_Recorded | wrong_arm | score=35 quality=44.5 following=10.74/24.64 qualified=0/4 invalid_hits=0
+BirdDog_RingSkinC_Recorded | half_range | score=39 quality=50.2 following=11.54/24.64 qualified=0/4 invalid_hits=0
+BirdDog_RingSkinC_Recorded | wrong_orientation | score=0 quality=0.0 following=0.00/24.64 qualified=0/4 invalid_hits=0
+BirdDog_RingSkinC_Recorded | disconnect | score=40 quality=49.6 following=12.23/24.64 qualified=0/4 invalid_hits=0
+BirdDog_RingSkinC_Recorded | heartbeat_only | score=0 quality=0.0 following=0.00/24.64 qualified=0/4 invalid_hits=0
+BirdDog_RingSkinC_Recorded | delay_200ms | score=97 quality=95.3 following=24.31/24.64 qualified=4/4 invalid_hits=0
+BirdDog_RingSkinC_Recorded | small_jitter | score=100 quality=100.0 following=24.64/24.64 qualified=4/4 invalid_hits=0
+DeadBug_RingSkinC_Recorded | follow | score=100 quality=100.0 following=13.76/13.76 qualified=4/4 invalid_hits=0
+DeadBug_RingSkinC_Recorded | rest | score=0 quality=0.0 following=0.00/13.76 qualified=0/4 invalid_hits=0
+DeadBug_RingSkinC_Recorded | wrong_arm | score=30 quality=37.8 following=4.96/13.76 qualified=0/4 invalid_hits=0
+DeadBug_RingSkinC_Recorded | half_range | score=42 quality=55.6 following=6.73/13.76 qualified=0/4 invalid_hits=0
+DeadBug_RingSkinC_Recorded | wrong_orientation | score=0 quality=0.0 following=0.00/13.76 qualified=0/4 invalid_hits=0
+DeadBug_RingSkinC_Recorded | disconnect | score=40 quality=49.4 following=6.80/13.76 qualified=0/4 invalid_hits=0
+DeadBug_RingSkinC_Recorded | heartbeat_only | score=0 quality=0.0 following=0.00/13.76 qualified=0/4 invalid_hits=0
+DeadBug_RingSkinC_Recorded | delay_200ms | score=95 quality=90.0 following=13.59/13.76 qualified=4/4 invalid_hits=0
+DeadBug_RingSkinC_Recorded | small_jitter | score=100 quality=100.0 following=13.76/13.76 qualified=4/4 invalid_hits=0
+HipThrust_RingBridge_NewScoring | follow | score=100 quality=100.0 hold=5.70/5.70 qualified=4/4 live_frames=426 invalid_hits=0
+HipThrust_RingBridge_NewScoring | rest | score=0 quality=0.0 hold=0.00/5.70 qualified=0/4 live_frames=0 invalid_hits=0
+HipThrust_RingBridge_NewScoring | half_range | score=28 quality=55.6 hold=0.00/5.70 qualified=0/4 live_frames=7 invalid_hits=0
+HipThrust_RingBridge_NewScoring | wrong_orientation | score=0 quality=0.0 hold=0.00/5.70 qualified=0/4 live_frames=0 invalid_hits=0
+HipThrust_RingBridge_NewScoring | early_lower | score=60 quality=88.6 hold=2.93/5.70 qualified=0/4 live_frames=307 invalid_hits=0
+HipThrust_RingBridge_NewScoring | disconnect | score=59 quality=88.6 hold=2.80/5.70 qualified=0/4 live_frames=155 invalid_hits=0
+HipThrust_RingBridge_NewScoring | heartbeat_only | score=0 quality=0.0 hold=0.00/5.70 qualified=0/4 live_frames=0 invalid_hits=0
+HipThrust_RingBridge_NewScoring | delay_200ms | score=93 quality=96.3 hold=5.67/5.70 qualified=3/4 live_frames=426 invalid_hits=0
+HipThrust_RingBridge_NewScoring | small_jitter | score=100 quality=100.0 hold=5.70/5.70 qualified=4/4 live_frames=426 invalid_hits=0
+HipThrust_RingBridge_Hold30 | follow | score=100 quality=100.0 hold=120.00/120.00 qualified=4/4 live_frames=4026 invalid_hits=0
+HipThrust_RingBridge_Hold30 | rest | score=0 quality=0.0 hold=0.00/120.00 qualified=0/4 live_frames=0 invalid_hits=0
+HipThrust_RingBridge_Hold30 | half_range | score=11 quality=22.8 hold=0.00/120.00 qualified=0/4 live_frames=7 invalid_hits=0
+HipThrust_RingBridge_Hold30 | wrong_orientation | score=0 quality=0.0 hold=0.00/120.00 qualified=0/4 live_frames=0 invalid_hits=0
+HipThrust_RingBridge_Hold30 | early_lower | score=44 quality=58.5 hold=60.00/120.00 qualified=0/4 live_frames=2194 invalid_hits=0
+HipThrust_RingBridge_Hold30 | disconnect | score=44 quality=58.5 hold=60.00/120.00 qualified=0/4 live_frames=1969 invalid_hits=0
+HipThrust_RingBridge_Hold30 | heartbeat_only | score=0 quality=0.0 hold=0.00/120.00 qualified=0/4 live_frames=0 invalid_hits=0
+HipThrust_RingBridge_Hold30 | delay_200ms | score=100 quality=99.4 hold=120.00/120.00 qualified=4/4 live_frames=4026 invalid_hits=0
+HipThrust_RingBridge_Hold30 | small_jitter | score=100 quality=100.0 hold=120.00/120.00 qualified=4/4 live_frames=4026 invalid_hits=0
+SideBridge_RingBridge_Dynamic | follow | score=100 quality=100.0 hold=21.12/21.12 qualified=3/3 live_frames=616 invalid_hits=0
+SideBridge_RingBridge_Dynamic | rest | score=0 quality=0.0 hold=0.00/21.12 qualified=0/3 live_frames=0 invalid_hits=0
+SideBridge_RingBridge_Dynamic | half_range | score=15 quality=29.9 hold=0.00/21.12 qualified=0/3 live_frames=0 invalid_hits=0
+SideBridge_RingBridge_Dynamic | wrong_orientation | score=0 quality=0.0 hold=0.00/21.12 qualified=0/3 live_frames=0 invalid_hits=0
+SideBridge_RingBridge_Dynamic | early_lower | score=51 quality=70.7 hold=10.73/21.12 qualified=0/3 live_frames=298 invalid_hits=0
+SideBridge_RingBridge_Dynamic | disconnect | score=51 quality=70.7 hold=10.73/21.12 qualified=0/3 live_frames=298 invalid_hits=0
+SideBridge_RingBridge_Dynamic | heartbeat_only | score=0 quality=0.0 hold=0.00/21.12 qualified=0/3 live_frames=0 invalid_hits=0
+SideBridge_RingBridge_Dynamic | delay_200ms | score=98 quality=96.5 hold=21.12/21.12 qualified=3/3 live_frames=616 invalid_hits=0
+SideBridge_RingBridge_Dynamic | small_jitter | score=100 quality=100.0 hold=21.12/21.12 qualified=3/3 live_frames=614 invalid_hits=0
+SideBridge_RingBridge_Hold30 | follow | score=100 quality=100.0 hold=90.00/90.00 qualified=3/3 live_frames=2855 invalid_hits=0
+SideBridge_RingBridge_Hold30 | rest | score=0 quality=0.0 hold=0.00/90.00 qualified=0/3 live_frames=0 invalid_hits=0
+SideBridge_RingBridge_Hold30 | half_range | score=9 quality=17.1 hold=0.00/90.00 qualified=0/3 live_frames=0 invalid_hits=0
+SideBridge_RingBridge_Hold30 | wrong_orientation | score=0 quality=0.0 hold=0.00/90.00 qualified=0/3 live_frames=0 invalid_hits=0
+SideBridge_RingBridge_Hold30 | early_lower | score=43 quality=56.4 hold=45.00/90.00 qualified=0/3 live_frames=1439 invalid_hits=0
+SideBridge_RingBridge_Hold30 | disconnect | score=43 quality=56.4 hold=45.00/90.00 qualified=0/3 live_frames=1439 invalid_hits=0
+SideBridge_RingBridge_Hold30 | heartbeat_only | score=0 quality=0.0 hold=0.00/90.00 qualified=0/3 live_frames=0 invalid_hits=0
+SideBridge_RingBridge_Hold30 | delay_200ms | score=100 quality=99.0 hold=90.00/90.00 qualified=3/3 live_frames=2855 invalid_hits=0
+SideBridge_RingBridge_Hold30 | small_jitter | score=100 quality=100.0 hold=90.00/90.00 qualified=3/3 live_frames=2852 invalid_hits=0

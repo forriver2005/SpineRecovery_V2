@@ -1,0 +1,7 @@
+Compare Animator output against original HumanPose on the same avatar, at every used source frame.
+BirdDog: 964 frames; maximum rotation 0.00000 deg, position 0.000001 m; LH/RH/LF/RF 0.00000, 0.00000, 0.00000, 0.00000 deg.
+PASS BirdDog: anatomically mirrored arm channels, original ankle rotations and leg timeline preserved.
+DeadBug: 544 frames; maximum rotation 0.00000 deg, position 0.000002 m; LH/RH/LF/RF 0.00000, 0.00000, 0.00000, 0.00000 deg.
+PASS DeadBug: original wrist/ankle rotations preserved.
+HipThrust: 775 frames; maximum rotation 0.00000 deg, position 0.000001 m; LH/RH/LF/RF 0.00000, 0.00000, 0.00000, 0.00000 deg.
+PASS HipThrust: original wrist/ankle rotations preserved.

@@ -1,0 +1,7 @@
+Actual start button + calibration + countdown.
+PASS: red latches over judge; ribbon stays outside ring and connects blue; simulated HIT emits unchanged ring and tail particles; transparent preview.
+Pair 1: red=7.9833s blue=9.1667s hip difference=0.1216m; alignment PASS.
+Pair 2: red=11.8500s blue=12.9167s hip difference=0.0949m; alignment PASS.
+Pair 3: red=16.1667s blue=17.3667s hip difference=0.1041m; alignment PASS.
+Pair 4: red=20.1833s blue=21.5167s hip difference=0.1215m; alignment PASS.
+PASS: pause; completion; return to menu; restart; 12-repetition chart and repeated animation clock.

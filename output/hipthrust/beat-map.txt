@@ -1,0 +1,6 @@
+Source: Assets/Movements/hipthrust.fbx / animation_pose; 60 fps; imported clip starts at FBX frame 170.
+Up = enter high plateau within 1 cm of local peak. Hold ends on leaving plateau. Down = enter low plateau within 1 cm of following minimum.
+Pair 1: red frame 479 (7.9833s), hold end 510 (8.5000s), blue frame 550 (9.1667s).
+Pair 2: red frame 711 (11.8500s), hold end 737 (12.2833s), blue frame 775 (12.9167s).
+Pair 3: red frame 970 (16.1667s), hold end 995 (16.5833s), blue frame 1042 (17.3667s).
+Pair 4: red frame 1211 (20.1833s), hold end 1251 (20.8500s), blue frame 1291 (21.5167s).

@@ -1,0 +1,584 @@
+[
+  {
+    "Before": "Assets/Scenes/BirdDogMinimal.unity",
+    "After": "Assets/Scenes/BirdDog_Classic.unity",
+    "Unchanged": true,
+    "Hash": "9FBE4815B6DFC8561F7D0F4B928A4E3384EE87A7EC2BA68F63F7C7C6D34B850A"
+  },
+  {
+    "Before": "Assets/Scenes/BirdDogMinimal.unity.meta",
+    "After": "Assets/Scenes/BirdDog_Classic.unity.meta",
+    "Unchanged": true,
+    "Hash": "5A50FB563BAE3EEEBABFC0480736CFB801C35DB0B3135783AC87794C8D417D8D"
+  },
+  {
+    "Before": "Assets/Scenes/DeadBugRhythmHapticsTest 1.unity",
+    "After": "Assets/Scenes/Tests/DeadBugRhythmHapticsTest 1.unity",
+    "Unchanged": true,
+    "Hash": "1EAB726E4EBA84F02A94E302A7711552E09D116C4E4C3652BD47ACFD33178BAB"
+  },
+  {
+    "Before": "Assets/Scenes/DeadBugRhythmHapticsTest 1.unity.meta",
+    "After": "Assets/Scenes/Tests/DeadBugRhythmHapticsTest 1.unity.meta",
+    "Unchanged": true,
+    "Hash": "F3BC1F9F4638AB9833CD5C7DCE28B3FB260B717D5304F97D4E90C595B04F3189"
+  },
+  {
+    "Before": "Assets/Scenes/DeadBugRhythmHapticsTest.unity",
+    "After": "Assets/Scenes/Tests/DeadBugRhythmHapticsTest.unity",
+    "Unchanged": true,
+    "Hash": "1EAB726E4EBA84F02A94E302A7711552E09D116C4E4C3652BD47ACFD33178BAB"
+  },
+  {
+    "Before": "Assets/Scenes/DeadBugRhythmHapticsTest.unity.meta",
+    "After": "Assets/Scenes/Tests/DeadBugRhythmHapticsTest.unity.meta",
+    "Unchanged": true,
+    "Hash": "18102D032CA043F984E27E3803C2BE3D9B15C0C38B6C64ED47E15BC0F3D79310"
+  },
+  {
+    "Before": "Assets/Scenes/DeadBugRingSkinC.unity",
+    "After": "Assets/Scenes/DeadBug_RingSkinC.unity",
+    "Unchanged": true,
+    "Hash": "A0C09B2C9430533835EC1610D3BE24DCC7F5969242FD47617EB9B5FFC8AE0B82"
+  },
+  {
+    "Before": "Assets/Scenes/DeadBugRingSkinC.unity.meta",
+    "After": "Assets/Scenes/DeadBug_RingSkinC.unity.meta",
+    "Unchanged": true,
+    "Hash": "35AF8E23BABF200FF0E9FA3203E6508FDC1F7A6A8BFF7027E6F973DB2A293E5B"
+  },
+  {
+    "Before": "Assets/Scenes/HipThrustMinimal.unity",
+    "After": "Assets/Scenes/HipThrust.unity",
+    "Unchanged": true,
+    "Hash": "66FA6F13173CB5BFF734E6EDE92565104545E298CB0F90DFFBB179863C3FC711"
+  },
+  {
+    "Before": "Assets/Scenes/HipThrustMinimal.unity.meta",
+    "After": "Assets/Scenes/HipThrust.unity.meta",
+    "Unchanged": true,
+    "Hash": "A8A4DC4CF99041971908AA784CD7A4EB2D392AF952969FCFF0AC5100FE34744D"
+  },
+  {
+    "Before": "Assets/Scenes/SpineV2Minimal.unity",
+    "After": "Assets/Scenes/DeadBug_Classic.unity",
+    "Unchanged": true,
+    "Hash": "D96D83943084736C054B2A013A77DC7C4BD03A4212E7792888C83FB5A05907B3"
+  },
+  {
+    "Before": "Assets/Scenes/SpineV2Minimal.unity.meta",
+    "After": "Assets/Scenes/DeadBug_Classic.unity.meta",
+    "Unchanged": true,
+    "Hash": "D07187DC2FC90B81993A15D7F5C50DAAF07466633BA5E40ACB3532611272BFFA"
+  },
+  {
+    "Before": "Assets/Scripts/ActionPreviewCard.cs",
+    "After": "Assets/Scripts/ActionPreviewCard.cs",
+    "Unchanged": true,
+    "Hash": "21EB2E5ED84E56394989CB0C75FBE618666639F0FA6059DDB08651DB5EFD009E"
+  },
+  {
+    "Before": "Assets/Scripts/AlwaysPreviewParticles.cs",
+    "After": "Assets/Scripts/AlwaysPreviewParticles.cs",
+    "Unchanged": true,
+    "Hash": "253C5D55D21960872F574E92B639DEFD2FA26A2DA37E129A3E4C38F4929CD2E3"
+  },
+  {
+    "Before": "Assets/Scripts/AnatomicalMotionScoring.cs",
+    "After": "Assets/Scripts/AnatomicalMotionScoring.cs",
+    "Unchanged": true,
+    "Hash": "15217CF459B990502E6919F488D99DAEA9A29F9B494AE2B9715A8CE71E71BDDD"
+  },
+  {
+    "Before": "Assets/Scripts/AnimatorCoachMotionBackend.cs",
+    "After": "Assets/Scripts/AnimatorCoachMotionBackend.cs",
+    "Unchanged": true,
+    "Hash": "C07A6464E6CFD3F77A859CD74556942A1CA7B2481953C8344EA6BC6E369072A3"
+  },
+  {
+    "Before": "Assets/Scripts/AnimatorMotionEvidence.cs",
+    "After": "Assets/Scripts/AnimatorMotionEvidence.cs",
+    "Unchanged": true,
+    "Hash": "8ACD2716719FBAD9189D28126878F75C36392C029FFF4ED137AA5C3099638717"
+  },
+  {
+    "Before": "Assets/Scripts/AvatarBodyPartHighlighter.cs",
+    "After": "Assets/Scripts/AvatarBodyPartHighlighter.cs",
+    "Unchanged": true,
+    "Hash": "48A1C28E337D0C4C73B525549F8453028713BF3D37E71F3E3D780825AE2B9F81"
+  },
+  {
+    "Before": "Assets/Scripts/AvatarMotionSource.cs",
+    "After": "Assets/Scripts/AvatarMotionSource.cs",
+    "Unchanged": true,
+    "Hash": "9D71D4677C11FED61F3CFC770426C1A5A19882C7D16CA97C187A052F0DBC68C3"
+  },
+  {
+    "Before": "Assets/Scripts/BodyPartFeedbackUI.cs",
+    "After": "Assets/Scripts/BodyPartFeedbackUI.cs",
+    "Unchanged": true,
+    "Hash": "3D16760A444F01355AFB684D76715DCF7C32B48DA8643ABFABFCA2C08ED9553C"
+  },
+  {
+    "Before": "Assets/Scripts/CoachActionController.cs",
+    "After": "Assets/Scripts/CoachActionController.cs",
+    "Unchanged": true,
+    "Hash": "A062375CCCD1D301E19DFCDBA67ECCABBD12525F59FE0207538A0E6F0F4D5111"
+  },
+  {
+    "Before": "Assets/Scripts/CoachKeyframeUI.cs",
+    "After": "Assets/Scripts/CoachKeyframeUI.cs",
+    "Unchanged": true,
+    "Hash": "3E978A8D967DB25B53E0F18E5DA5FFE9ABBC163E515FB11FC9F392565D071FE8"
+  },
+  {
+    "Before": "Assets/Scripts/CoachMotionFrame.cs",
+    "After": "Assets/Scripts/CoachMotionFrame.cs",
+    "Unchanged": true,
+    "Hash": "E57337FA0FE0916ACD01BED9A9D4EF5E353925181305F69575CDA9826B92E1A4"
+  },
+  {
+    "Before": "Assets/Scripts/CoachMotionPackage.cs",
+    "After": "Assets/Scripts/CoachMotionPackage.cs",
+    "Unchanged": true,
+    "Hash": "4F6D2B47DEA5871A54D87FF6EB42D6A85D0E4E47BA478C5EDC74818AADBC8511"
+  },
+  {
+    "Before": "Assets/Scripts/CoachMotionSegment.cs",
+    "After": "Assets/Scripts/CoachMotionSegment.cs",
+    "Unchanged": true,
+    "Hash": "8A54DC13452CE34B6FCC21C11D5126E57FA47618B60B6B8B633825983FC565DA"
+  },
+  {
+    "Before": "Assets/Scripts/CoachSetProgressUI.cs",
+    "After": "Assets/Scripts/CoachSetProgressUI.cs",
+    "Unchanged": true,
+    "Hash": "B6D4A1F690D9D55C855E54BE92CBF5D370D1E78B72BCE4542CCDE38E9544D329"
+  },
+  {
+    "Before": "Assets/Scripts/ContinuousPoseScorer.cs",
+    "After": "Assets/Scripts/ContinuousPoseScorer.cs",
+    "Unchanged": true,
+    "Hash": "563621086CBE0CE3DA63A7498D90A99660B78ACB003641956264590967215FA0"
+  },
+  {
+    "Before": "Assets/Scripts/DeadBugCountdownController.cs",
+    "After": "Assets/Scripts/DeadBugCountdownController.cs",
+    "Unchanged": true,
+    "Hash": "11F8FCE49DAED6D7ECF2E641F40F6165344F3C3C07F3B488ACD3410BA3DFAB81"
+  },
+  {
+    "Before": "Assets/Scripts/DeadBugGamingPoseScorer.cs",
+    "After": "Assets/Scripts/DeadBugGamingPoseScorer.cs",
+    "Unchanged": true,
+    "Hash": "3ABE6402997E59F1AF3AF757176162A95C170CE8093CDD0D5138F89127FDB705"
+  },
+  {
+    "Before": "Assets/Scripts/DeadBugGamingSideFeedback.cs",
+    "After": "Assets/Scripts/DeadBugGamingSideFeedback.cs",
+    "Unchanged": true,
+    "Hash": "4D4295E0858BF647A69B27525AFDF787A5003EF8FBC2D3645A4C626B222AC9B5"
+  },
+  {
+    "Before": "Assets/Scripts/DeadBugLimbScoreFeedback.cs",
+    "After": "Assets/Scripts/DeadBugLimbScoreFeedback.cs",
+    "Unchanged": true,
+    "Hash": "AE982589251E601940EC3799D3438B7718AD3C69C2F6E9989C2178D6AE4F498D"
+  },
+  {
+    "Before": "Assets/Scripts/DeadBugScoreRoadProgressBar.cs",
+    "After": "Assets/Scripts/DeadBugScoreRoadProgressBar.cs",
+    "Unchanged": true,
+    "Hash": "D2138FE15179972CE48F2BD36D6E4A80446ADBC35B10D43D34D68F5FB3BE80ED"
+  },
+  {
+    "Before": "Assets/Scripts/DeadBugScoreStarFeedback.cs",
+    "After": "Assets/Scripts/DeadBugScoreStarFeedback.cs",
+    "Unchanged": true,
+    "Hash": "4586E0734D400AEACD862AFE7D880A6FEFB8C6A2F3067B8B93547AB93BB98F2F"
+  },
+  {
+    "Before": "Assets/Scripts/DeadBugStartMenuController.cs",
+    "After": "Assets/Scripts/DeadBugStartMenuController.cs",
+    "Unchanged": true,
+    "Hash": "65AF432EC17599193BD240E8B83AE1473E2EBC7F1BA17729745EBD86DA69A8CF"
+  },
+  {
+    "Before": "Assets/Scripts/DifficultySelectionUI.cs",
+    "After": "Assets/Scripts/DifficultySelectionUI.cs",
+    "Unchanged": true,
+    "Hash": "1FA19304F0BDE77C63990C21982A93F4DBB1DC09DED3F7F83068457603DAE43D"
+  },
+  {
+    "Before": "Assets/Scripts/DifficultySettings.cs",
+    "After": "Assets/Scripts/DifficultySettings.cs",
+    "Unchanged": true,
+    "Hash": "13BF62AC3727A44621923D85826F9A53BEEFFF6C491F466314DBC3470D0C43EF"
+  },
+  {
+    "Before": "Assets/Scripts/DifficultyUICreator.cs",
+    "After": "Assets/Scripts/DifficultyUICreator.cs",
+    "Unchanged": true,
+    "Hash": "777F51BBE9EA6A202F9ADC9469EA12EF8891D08A783AF287A1B8887AF15DB820"
+  },
+  {
+    "Before": "Assets/Scripts/DoubleBrokenFourColorRing.cs",
+    "After": "Assets/Scripts/DoubleBrokenFourColorRing.cs",
+    "Unchanged": true,
+    "Hash": "2DB5343AD5579214ABD9BBCA39418CC86E2484C9F5D86D2E53F91296CA45B284"
+  },
+  {
+    "Before": "Assets/Scripts/EvaluationPoseScorer.cs",
+    "After": "Assets/Scripts/EvaluationPoseScorer.cs",
+    "Unchanged": true,
+    "Hash": "CD45AD91398683A5E1226A5144656858BF9D3110699890BCC202578BF580528D"
+  },
+  {
+    "Before": "Assets/Scripts/GamingGuideButtonController.cs",
+    "After": "Assets/Scripts/GamingGuideButtonController.cs",
+    "Unchanged": true,
+    "Hash": "647A44AA536DF16D25BAD11676D9A3006C60D6C5B68A2C9502781A25646BE79E"
+  },
+  {
+    "Before": "Assets/Scripts/GamingGuideController.cs",
+    "After": "Assets/Scripts/GamingGuideController.cs",
+    "Unchanged": true,
+    "Hash": "2F65EA69D5A5F48F6C52B0E9CF893B8A4E3F1ADE545A7CF8D89A1094C987E270"
+  },
+  {
+    "Before": "Assets/Scripts/ICoachMotionBackend.cs",
+    "After": "Assets/Scripts/ICoachMotionBackend.cs",
+    "Unchanged": true,
+    "Hash": "5073EC230C0B22E7D57BD752569B9E9149336D2C2B3F74A8FC0540B9983ECD27"
+  },
+  {
+    "Before": "Assets/Scripts/JsonCoachGamingController.cs",
+    "After": "Assets/Scripts/JsonCoachGamingController.cs",
+    "Unchanged": true,
+    "Hash": "D3E3D480534CB96C7033A1BBB09CCA1CF82A4753BB5688CCEA21F4465BA4F904"
+  },
+  {
+    "Before": "Assets/Scripts/JsonGamingCheckpointInfo.cs",
+    "After": "Assets/Scripts/JsonGamingCheckpointInfo.cs",
+    "Unchanged": true,
+    "Hash": "6F3C9374DD22B4A9587B96219FBA47561747FDBC7DE57DA02B4884356835AF09"
+  },
+  {
+    "Before": "Assets/Scripts/JsonGamingPoseScorer.cs",
+    "After": "Assets/Scripts/JsonGamingPoseScorer.cs",
+    "Unchanged": true,
+    "Hash": "61A1B731BF6D909F4B3DF7FDC74F53BA714169E81315E87A7F964EA96B84D35A"
+  },
+  {
+    "Before": "Assets/Scripts/JsonGamingSceneInitializer.cs",
+    "After": "Assets/Scripts/JsonGamingSceneInitializer.cs",
+    "Unchanged": true,
+    "Hash": "70CE728CF312AA3F9ABF49B3069131DA901DBB69212196D4331A3D155397BAE3"
+  },
+  {
+    "Before": "Assets/Scripts/JsonGamingUiController.cs",
+    "After": "Assets/Scripts/JsonGamingUiController.cs",
+    "Unchanged": true,
+    "Hash": "08D2E80431FDBB1502362A6876DEEC152AF8456530C10E7ED805172971FDAD63"
+  },
+  {
+    "Before": "Assets/Scripts/JsonPracticeCoachController.cs",
+    "After": "Assets/Scripts/JsonPracticeCoachController.cs",
+    "Unchanged": true,
+    "Hash": "3F71914C055B43E559590B3AB41F08E19D84026F34FB519B696C45611C09B251"
+  },
+  {
+    "Before": "Assets/Scripts/KeyframeCoachMotionBackend.cs",
+    "After": "Assets/Scripts/KeyframeCoachMotionBackend.cs",
+    "Unchanged": true,
+    "Hash": "618F9EC7AAF11BFBB4B8FD41340584CCD05670580D684C101F0A1AE7F4141E56"
+  },
+  {
+    "Before": "Assets/Scripts/MobileDisplayModeBootstrap.cs",
+    "After": "Assets/Scripts/MobileDisplayModeBootstrap.cs",
+    "Unchanged": true,
+    "Hash": "E97DB988CB7A4F984702A67425555D6A30B5B51158F05C4906E56B6C671FC2D8"
+  },
+  {
+    "Before": "Assets/Scripts/MotionPlaybackController.cs",
+    "After": "Assets/Scripts/MotionPlaybackController.cs",
+    "Unchanged": true,
+    "Hash": "43EFDCB1D1077AE70812548495BF4998B07462F725B493A655C5F577BD5EF80D"
+  },
+  {
+    "Before": "Assets/Scripts/MotionRecorder.cs",
+    "After": "Assets/Scripts/MotionRecorder.cs",
+    "Unchanged": true,
+    "Hash": "5EB2E1E7ED4A0CBBF178A10887E77C9D66D5423C81D23CCDF578F1B9645CF330"
+  },
+  {
+    "Before": "Assets/Scripts/PlaybackProgressSlider.cs",
+    "After": "Assets/Scripts/PlaybackProgressSlider.cs",
+    "Unchanged": true,
+    "Hash": "807061752AAD059D138AE5DB71296901CC037F4D08785A562143F5F0163C655A"
+  },
+  {
+    "Before": "Assets/Scripts/PoseGuidanceRuntime.cs",
+    "After": "Assets/Scripts/PoseGuidanceRuntime.cs",
+    "Unchanged": true,
+    "Hash": "957C2A74691556A9DB21B905E6D4F5EE5C1A499D484E181BFF35E7C4F878BA25"
+  },
+  {
+    "Before": "Assets/Scripts/PoseHighlightDiagnostics.cs",
+    "After": "Assets/Scripts/PoseHighlightDiagnostics.cs",
+    "Unchanged": true,
+    "Hash": "B086A114D97E0935B26C35B1A9675AAB37C8F531326DC5407F2080ABD87B114A"
+  },
+  {
+    "Before": "Assets/Scripts/PoseScorer.cs",
+    "After": "Assets/Scripts/PoseScorer.cs",
+    "Unchanged": true,
+    "Hash": "B9A851B0A91F394F16C5D38A28EEC0AEBE003815805A5487F390FF1F884BFB66"
+  },
+  {
+    "Before": "Assets/Scripts/PracticeActionConfig.cs",
+    "After": "Assets/Scripts/PracticeActionConfig.cs",
+    "Unchanged": true,
+    "Hash": "47D6A4D89B05D6D42F61E8D7DB52A9F9BBC73E1150E3A003566A1FB2E3371AC6"
+  },
+  {
+    "Before": "Assets/Scripts/PracticeActionLibrary.cs",
+    "After": "Assets/Scripts/PracticeActionLibrary.cs",
+    "Unchanged": true,
+    "Hash": "DA76D2548231AB1FFA199F05ACF42C265814CB5A2D2B81DDF22178C08090DC90"
+  },
+  {
+    "Before": "Assets/Scripts/PracticeSceneController.cs",
+    "After": "Assets/Scripts/PracticeSceneController.cs",
+    "Unchanged": true,
+    "Hash": "E8D304641FE6252D7A023E53DFB5FB6C5081596A8A1F933648A0833882EDAB0E"
+  },
+  {
+    "Before": "Assets/Scripts/PracticeSceneInitializer.cs",
+    "After": "Assets/Scripts/PracticeSceneInitializer.cs",
+    "Unchanged": true,
+    "Hash": "8D0785A8FE2045642B1DCEB6A8456C1C65E63844354634850D279B0652B3CB51"
+  },
+  {
+    "Before": "Assets/Scripts/PracticeSessionController.cs",
+    "After": "Assets/Scripts/PracticeSessionController.cs",
+    "Unchanged": true,
+    "Hash": "619DEBA4A40AE0E499540AED51382593822FE4B1E7C0AA94720B3BC2C658BCA6"
+  },
+  {
+    "Before": "Assets/Scripts/RecordedMotionClip.cs",
+    "After": "Assets/Scripts/RecordedMotionClip.cs",
+    "Unchanged": true,
+    "Hash": "94F0B9734E69C8729152A6E3F2BD5E96CF66AAD8B53AD1094ABBF53DC177A81E"
+  },
+  {
+    "Before": "Assets/Scripts/RobustPoseScoring.cs",
+    "After": "Assets/Scripts/RobustPoseScoring.cs",
+    "Unchanged": true,
+    "Hash": "990D168553062BA77999E4A5C46ACC6D657801F3CA2422607C3459A24EF2BBF6"
+  },
+  {
+    "Before": "Assets/Scripts/SceneSwitcher.cs",
+    "After": "Assets/Scripts/SceneSwitcher.cs",
+    "Unchanged": true,
+    "Hash": "12C13146DD7865317DF334F2CC62AE6A52D289382F0B307C3991742A79EFB88D"
+  },
+  {
+    "Before": "Assets/Scripts/ScoreDisplayUI.cs",
+    "After": "Assets/Scripts/ScoreDisplayUI.cs",
+    "Unchanged": true,
+    "Hash": "D9F93BC621AA4A950A1D87ED6E88E03407FBAE9BB12A14A1D730D7F311DD2282"
+  },
+  {
+    "Before": "Assets/Scripts/ScorePopup.cs",
+    "After": "Assets/Scripts/ScorePopup.cs",
+    "Unchanged": true,
+    "Hash": "C14168AFA4FC10C7642C1FF70A78773CC9915C7D6394671FDE077B35468958C2"
+  },
+  {
+    "Before": "Assets/Scripts/SegmentedCoachController.cs",
+    "After": "Assets/Scripts/SegmentedCoachController.cs",
+    "Unchanged": true,
+    "Hash": "FD90338CB5C75E0140C9BC0E4842EBB6CF6AE194A7FE8BD9BD7E5D9CB80F528A"
+  },
+  {
+    "Before": "Assets/Scripts/SpineFlowTrainingSession.cs",
+    "After": "Assets/Scripts/SpineFlowTrainingSession.cs",
+    "Unchanged": true,
+    "Hash": "F319F7D7D6DC9A81D5C5A16E501839F0D099C78214234A1F4F193AF4F898EE43"
+  },
+  {
+    "Before": "Assets/Scripts/TestJsonLoader.cs",
+    "After": "Assets/Scripts/TestJsonLoader.cs",
+    "Unchanged": true,
+    "Hash": "422C8235EA5B3F308A3D8F342C9A4B757B8045EBFA3C8A10483D218133BA5242"
+  },
+  {
+    "Before": "Assets/Scripts/TrackerHaptics.cs",
+    "After": "Assets/Scripts/TrackerHaptics.cs",
+    "Unchanged": true,
+    "Hash": "62ACA6D43580BD01691DE91CD9D93B1F1C7F0B3C949093559802245E5FC242DE"
+  },
+  {
+    "Before": "Assets/Scripts/VmcGameModeBootstrap.cs",
+    "After": "Assets/Scripts/VmcGameModeBootstrap.cs",
+    "Unchanged": true,
+    "Hash": "76E7C53337E43C2D570292CD8D1E91430EFCA3892F9B2AECDC25985CE9D7A74A"
+  },
+  {
+    "Before": "Assets/Scripts/VoicePromptManager.cs",
+    "After": "Assets/Scripts/VoicePromptManager.cs",
+    "Unchanged": true,
+    "Hash": "71DD49835B118D0FD067A852EB99D24035EF40606E15DA2C1D7C403DD41874CC"
+  },
+  {
+    "Before": "Assets/Scripts/Replay/Migration/LegacyReplayV2Migrator.cs",
+    "After": "Assets/Scripts/Replay/Migration/LegacyReplayV2Migrator.cs",
+    "Unchanged": true,
+    "Hash": "C4C57DE2D2C8EA95A67A15D938AD12374DD07F088A28D85636011AD9BF7C4F40"
+  },
+  {
+    "Before": "Assets/Scripts/Replay/Models/ReplayModels.cs",
+    "After": "Assets/Scripts/Replay/Models/ReplayModels.cs",
+    "Unchanged": true,
+    "Hash": "3A884792FFBD6B44CB23DDC2BFE91EF35140D7E0702C4BA10CE5C38D315EC89A"
+  },
+  {
+    "Before": "Assets/Scripts/Replay/Persistence/ReplayBinarySerializer.cs",
+    "After": "Assets/Scripts/Replay/Persistence/ReplayBinarySerializer.cs",
+    "Unchanged": true,
+    "Hash": "8FCB3677D6131D38601906D7D9FBDDD191BD5684518E28EC8B9D5C60FA86E3FB"
+  },
+  {
+    "Before": "Assets/Scripts/Replay/Persistence/ReplayRepository.cs",
+    "After": "Assets/Scripts/Replay/Persistence/ReplayRepository.cs",
+    "Unchanged": true,
+    "Hash": "27F82BB7DCF13D358E57A6CC9C6AFB177137D11649D53352A051F0E62E288710"
+  },
+  {
+    "Before": "Assets/Scripts/Replay/Runtime/ReplayPlacementController.cs",
+    "After": "Assets/Scripts/Replay/Runtime/ReplayPlacementController.cs",
+    "Unchanged": true,
+    "Hash": "605500DE03A1FA967F863C52AA4DB7BE6C1AF29BBB7D748E447CE691850554DE"
+  },
+  {
+    "Before": "Assets/Scripts/Replay/Runtime/ReplayPlayer.cs",
+    "After": "Assets/Scripts/Replay/Runtime/ReplayPlayer.cs",
+    "Unchanged": true,
+    "Hash": "1C8AF4040925B4113669EF9B0E0B68BD2C203567D7139B9F93F3AF04F2C9EBE8"
+  },
+  {
+    "Before": "Assets/Scripts/Replay/Runtime/ReplayRecorder.cs",
+    "After": "Assets/Scripts/Replay/Runtime/ReplayRecorder.cs",
+    "Unchanged": true,
+    "Hash": "F2FC1CD09A9C3B7D93EDD6CD7831C59244FB202277BD0FCEBEBCA018ECA064D5"
+  },
+  {
+    "Before": "Assets/Scripts/Replay/Runtime/ReplayRuntimeInstaller.cs",
+    "After": "Assets/Scripts/Replay/Runtime/ReplayRuntimeInstaller.cs",
+    "Unchanged": true,
+    "Hash": "19E0BB63448523E94A76DEFDC05B156112EA644F5BF864AE605280FDA549912B"
+  },
+  {
+    "Before": "Assets/Scripts/Replay/Runtime/ReplaySceneBootstrap.cs",
+    "After": "Assets/Scripts/Replay/Runtime/ReplaySceneBootstrap.cs",
+    "Unchanged": true,
+    "Hash": "BD9180ADB022554488D741140A193D8339CE18C8446BE11990FACD9AD5DAC7ED"
+  },
+  {
+    "Before": "Assets/Scripts/Replay/Runtime/ReplaySessionContext.cs",
+    "After": "Assets/Scripts/Replay/Runtime/ReplaySessionContext.cs",
+    "Unchanged": true,
+    "Hash": "73FAFAE8F87229EB168D017263051412F2848262E002652DE00B62D247941F0A"
+  },
+  {
+    "Before": "Assets/Scripts/Replay/Runtime/ReplayTimeline.cs",
+    "After": "Assets/Scripts/Replay/Runtime/ReplayTimeline.cs",
+    "Unchanged": true,
+    "Hash": "555FCD149AD231D0A32347E17CC730A932F8F437293774765EF3CB47FF555697"
+  },
+  {
+    "Before": "Assets/Scripts/Replay/Runtime/ReplayUIController.cs",
+    "After": "Assets/Scripts/Replay/Runtime/ReplayUIController.cs",
+    "Unchanged": true,
+    "Hash": "7B6AADEBBD23B34D632F7D6E7FC7396E5EB75981047F77BE50CF2A022AB71283"
+  },
+  {
+    "Before": "Assets/Scripts/RhythmMode/HipThrustTaikoController.cs",
+    "After": "Assets/Scripts/RhythmMode/HipThrustTaikoController.cs",
+    "Unchanged": true,
+    "Hash": "646E9528E199AFB84A2BCE3D3CC9990E57FB531E61A7C2C92A20B40FDF37F6EA"
+  },
+  {
+    "Before": "Assets/Scripts/RhythmMode/RhythmHitFeedback.cs",
+    "After": "Assets/Scripts/RhythmMode/RhythmHitFeedback.cs",
+    "Unchanged": true,
+    "Hash": "B4EA392AEFE0D64537E756705324B4B1BAF4DC809A4EAEC8E1CF4C79A2F245EC"
+  },
+  {
+    "Before": "Assets/Scripts/RhythmMode/RhythmHitHapticAdapter.cs",
+    "After": "Assets/Scripts/RhythmMode/RhythmHitHapticAdapter.cs",
+    "Unchanged": true,
+    "Hash": "A707EF7B4C3D6BA2A1C128DC444685C23F4C3BE085FA721DDD0200405AA24E08"
+  },
+  {
+    "Before": "Assets/Scripts/RhythmMode/RhythmModeController.cs",
+    "After": "Assets/Scripts/RhythmMode/RhythmModeController.cs",
+    "Unchanged": true,
+    "Hash": "9E4823FBE2D318747F9FC8A1951E50AF6EC5FD4AE9C03E20E08A81944C40740F"
+  },
+  {
+    "Before": "Assets/Scripts/RhythmMode/RhythmModeTypes.cs",
+    "After": "Assets/Scripts/RhythmMode/RhythmModeTypes.cs",
+    "Unchanged": true,
+    "Hash": "F14B38738FC950417917811308AFA01AB9047FFFF6E6C6A16A80C09E08D2E67A"
+  },
+  {
+    "Before": "Assets/Scripts/RhythmMode/RhythmNoteTargetIndicator.cs",
+    "After": "Assets/Scripts/RhythmMode/RhythmNoteTargetIndicator.cs",
+    "Unchanged": true,
+    "Hash": "39642CBE2F688C7C0AEC8B26B4CFBC5E60AEAE46930C387EC79901C3B564B91A"
+  },
+  {
+    "Before": "Assets/Scripts/RhythmMode/RhythmNoteView.cs",
+    "After": "Assets/Scripts/RhythmMode/RhythmNoteView.cs",
+    "Unchanged": true,
+    "Hash": "BE6A660E4E04D761A105BC3B3C6FE0456769221B5C9F07BAE6905145DCAE321C"
+  },
+  {
+    "Before": "Assets/Scripts/RhythmMode/RhythmPoseJudge.cs",
+    "After": "Assets/Scripts/RhythmMode/RhythmPoseJudge.cs",
+    "Unchanged": true,
+    "Hash": "443B79817E39853C3D6870DEA00D930C644F70A18F6916B9FB09588DB244395A"
+  },
+  {
+    "Before": "Assets/Scripts/RhythmMode/RhythmRingLayout.cs",
+    "After": "Assets/Scripts/RhythmMode/RhythmRingLayout.cs",
+    "Unchanged": true,
+    "Hash": "4F973A8C22B8B5A7CB236BA271B88D79FD8AAE80A666CD5221FC7B011425DA55"
+  },
+  {
+    "Before": "Assets/Scripts/RhythmMode/RhythmSkinCNoteVisual.cs",
+    "After": "Assets/Scripts/RhythmMode/RhythmSkinCNoteVisual.cs",
+    "Unchanged": true,
+    "Hash": "0F3C62BA873D8FFB62C79884B66D430848CABD27B4A40BD985B5CDEF9EBC8719"
+  },
+  {
+    "Before": "Assets/Scripts/RhythmMode/RhythmSkinCVisuals.cs",
+    "After": "Assets/Scripts/RhythmMode/RhythmSkinCVisuals.cs",
+    "Unchanged": true,
+    "Hash": "506D18D64C05F3ED90A27502A5317B31FCCC9884ACD8F332BDE6ABB9B70C70A9"
+  },
+  {
+    "Before": "Assets/Scripts/RhythmMode/RhythmSongClock.cs",
+    "After": "Assets/Scripts/RhythmMode/RhythmSongClock.cs",
+    "Unchanged": true,
+    "Hash": "2450E4D041870BC586CF519C671426FB7A3F401122B9B3F98795A3D39CC6C041"
+  },
+  {
+    "Before": "Assets/Scripts/RhythmMode/SkinnedMeshColorAnchorInstaller.cs",
+    "After": "Assets/Scripts/RhythmMode/SkinnedMeshColorAnchorInstaller.cs",
+    "Unchanged": true,
+    "Hash": "F588DBA33E3F955DB58EE1F8C303256AF3A4FD0857A6CD6B93C40DF06B60E0D6"
+  }
+]

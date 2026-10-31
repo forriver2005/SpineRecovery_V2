@@ -1,0 +1,5 @@
+hipthrust_start: 8.200001s @ 60fps
+hipthrust_up: 1.63333321s @ 60fps
+hipthrust_hold: 0.8166666s @ 60fps
+hipthrust_down: 0.9333334s @ 60fps
+animation_pose: 25.5s @ 60fps

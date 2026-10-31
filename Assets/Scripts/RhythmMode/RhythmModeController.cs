@@ -4,6 +4,17 @@ using UnityEngine;
 
 public sealed class RhythmModeController : MonoBehaviour
 {
+    [Serializable]
+    public sealed class RecordedSegmentTarget
+    {
+        public string stateName;
+        public RhythmBodyTarget first;
+        public RhythmBodyTarget second;
+    }
+
+    [Tooltip("Optional limb mapping for recorded animations; empty preserves the existing mapping.")]
+    [SerializeField] private RecordedSegmentTarget[] recordedSegmentTargets = new RecordedSegmentTarget[0];
+
     [Header("Session")]
     [SerializeField] private CoachActionController coachController;
     [SerializeField] private RhythmRingLayout layout;
@@ -12,6 +23,8 @@ public sealed class RhythmModeController : MonoBehaviour
     [SerializeField] private RhythmHitFeedback feedback;
     [SerializeField] private Transform noteContainer;
     [SerializeField] private GameObject visualEffectRoot;
+    [Tooltip("Optional Ring Skin C presentation. Does not change note timing, paths or judgement.")]
+    [SerializeField] private RhythmSkinCVisuals visualSkin;
     [SerializeField] private bool followCoachScoringSession = true;
     [SerializeField] private bool startAutomaticallyWithoutCoach;
 
@@ -92,6 +105,7 @@ public sealed class RhythmModeController : MonoBehaviour
     private bool running;
     private Material fallbackRuntimeMaterial;
     private RhythmJudgement? tutorialJudgementOverride;
+    private RhythmMovementRange spawningReference;
 
     public event Action<RhythmNoteResult> NoteResolved;
 
@@ -229,7 +243,7 @@ public sealed class RhythmModeController : MonoBehaviour
                 note.HitLocalPosition);
         }
 
-        bool success = poseJudge.TryHit(note.Target, out float poseScore);
+        bool success = poseJudge.TryHit(note.Target,note.JudgementReference,out float poseScore);
         return new RhythmNoteResult(
             note.Target,
             success ? RhythmJudgement.Perfect : RhythmJudgement.Miss,
@@ -285,6 +299,7 @@ public sealed class RhythmModeController : MonoBehaviour
         }
 
         float segmentDuration = GetSegmentDuration(info.stateName, info.playbackSpeed);
+        spawningReference = poseJudge.CaptureTarget(info.stateName);
         double hitTime = SongTime + segmentDuration;
         if (activeNotes.Count < maximumActiveNotes && CanSpawnLane(firstTarget, hitTime))
         {
@@ -317,13 +332,10 @@ public sealed class RhythmModeController : MonoBehaviour
         noteObject.name = $"Target_{target}_{hitTime:0.00}";
         noteObject.transform.SetParent(noteContainer != null ? noteContainer : transform, false);
         noteObject.transform.localScale = noteBaseScale;
-        if (UsesRingArcTarget)
+        if (visualSkin == null)
         {
-            ApplyTargetMaterialColors(noteObject);
-        }
-        else
-        {
-            ApplyRandomMaterial(noteObject, target);
+            if (UsesRingArcTarget) ApplyTargetMaterialColors(noteObject);
+            else ApplyRandomMaterial(noteObject, target);
         }
 
         float noteRadius = Mathf.Max(noteBaseScale.x, noteBaseScale.y) * 0.5f;
@@ -360,6 +372,7 @@ public sealed class RhythmModeController : MonoBehaviour
             indicator,
             noteRadius,
             resultPosition);
+        view.SetJudgementReference(spawningReference);
         if (UsesRingArcTarget)
         {
             float radialAngle = Mathf.Atan2(targetDirection.y, targetDirection.x) * Mathf.Rad2Deg;
@@ -370,6 +383,10 @@ public sealed class RhythmModeController : MonoBehaviour
 
     private GameObject CreateNoteObject(RhythmBodyTarget target)
     {
+        if (visualSkin != null)
+        {
+            return visualSkin.CreateNote(target, noteBaseScale);
+        }
         if (UsesRingArcTarget)
         {
             GameObject targetObject = CreatePrefabNote(
@@ -521,11 +538,22 @@ public sealed class RhythmModeController : MonoBehaviour
         return fallbackRuntimeMaterial;
     }
 
-    private bool TryGetSegmentTargets(
+    public bool TryGetSegmentTargets(
         string stateName,
         out RhythmBodyTarget first,
         out RhythmBodyTarget second)
     {
+        // Recorded clips may label a different limb pair. Empty in the original scenes.
+        if (recordedSegmentTargets != null)
+        foreach (var target in recordedSegmentTargets)
+        {
+            if (target != null && string.Equals(target.stateName, stateName, StringComparison.OrdinalIgnoreCase))
+            {
+                first = target.first;
+                second = target.second;
+                return true;
+            }
+        }
         if (ContainsState(leftFootRightHandLiftStates, stateName))
         {
             first = RhythmBodyTarget.LeftFoot;

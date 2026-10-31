@@ -1,0 +1,7 @@
+Visual probe of unchanged 30-second transport; preview calibration only.
+PASS hold progress 0%: shader reads current phase progress, 30-second clock.
+PASS hold progress 25%: shader reads current phase progress, 30-second clock.
+PASS hold progress 50%: shader reads current phase progress, 30-second clock.
+PASS hold progress 75%: shader reads current phase progress, 30-second clock.
+PASS hold progress 100%: shader reads current phase progress, 30-second clock.
+PASS pause freezes hold lightbar; lowering hides it; stars preserved.

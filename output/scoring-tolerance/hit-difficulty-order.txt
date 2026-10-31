@@ -1,0 +1,1 @@
+PASS: 336 distinct recorded pose/note cases across three difficulties; every Hard HIT is also Standard/Simple, every Standard HIT is also Simple.

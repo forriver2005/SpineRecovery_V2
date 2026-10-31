@@ -1,0 +1,13 @@
+Actual visible menu button/countdown/game transport; test calibration bypass, no wearable device.
+PASS visual-only adapter: no package state machine; exclusive fills and captions follow original samples; rendering never changes the game clock or score.
+PASS boundaries: 2900 quarter-frame samples; exact lift/hold/lower transitions and centre hold.
+PASS startup: start menu visible, artwork hidden; real Start button is top raycast hit; visible countdown and coach; no premature clock advance.
+PASS coach pose: head/hips/hands/feet in frame, preview rotations match the sampled coach, original texture aspect preserved.
+PASS coach pose: head/hips/hands/feet in frame, preview rotations match the sampled coach, original texture aspect preserved.
+PASS pause/resume: coach time and ring progress remain frozen together.
+PASS coach pose: head/hips/hands/feet in frame, preview rotations match the sampled coach, original texture aspect preserved.
+PASS simple: actual menu/countdown, four cycles, eight endpoint judgements, all three artwork phases, coach/preview/ring synchronization, completion.
+PASS result return: actual ReturnToSelection button receives the pointer; result canvas dismissed; start menu visible.
+PASS standard/hard: 8/12 cycles, no repeat-boundary phase drift; real score and combo HIT/MISS paths.
+PASS UI: pause/resume controls receive the first pointer hit; coach remains visible; HUD is in frame; 16:9, 4:3 and wide-phone artwork fits without stretching.
+PASS return to start menu; original calibration flag, clips, phase timeline, scoring and difficulty remain unchanged on disk.

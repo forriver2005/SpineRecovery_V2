@@ -1,0 +1,64 @@
+[
+  {
+    "file": "Assets/Audio/GameMusic/BirdDog_SpaceArp.ogg",
+    "title": "Space Arp",
+    "author": "Centurion_of_war",
+    "source": "https://opengameart.org/content/space-arp",
+    "license": "CC0-1.0",
+    "guid": "baca1ece3cf9497f931f9163d1817492",
+    "scenes": [
+      "BirdDog_RingSkinC_Recorded"
+    ],
+    "source_sha256": "ed43d21e11a7f71098cb1e26a5730667da6c8c1ab0fb560bea1f0431f96ad3be",
+    "output_sha256": "91c1783ce4e86f3e48cda421438103882122d9286bd0eafa6328543144941060",
+    "gain_db": -0.11,
+    "loop_overlap_seconds": 1.0,
+    "duration_seconds": 81.87768707482994,
+    "peak": 0.7028653621673584,
+    "seam_jump": 0.01274515688419342,
+    "integrated_lufs": -18.04,
+    "true_peak_db": -3.05
+  },
+  {
+    "file": "Assets/Audio/GameMusic/DeadBug_CrystalCave.ogg",
+    "title": "Crystal Cave (song18)",
+    "author": "The Cynic Project / cynicmusic",
+    "source": "https://opengameart.org/content/crystal-cave-song18",
+    "license": "CC0-1.0",
+    "guid": "f990d9ff410147719a067c89bd448d9d",
+    "scenes": [
+      "DeadBug_RingSkinC_Recorded"
+    ],
+    "source_sha256": "42349d7c615fe947866100a90289d61a1e64620e11f2d041b37166eaaa4e5840",
+    "output_sha256": "0bbae17c7d2203c2297e7529bc4a616eb042b86726f947154fb9fe5c13a51513",
+    "gain_db": -3.33,
+    "loop_overlap_seconds": 1.5,
+    "duration_seconds": 48.06251700680272,
+    "peak": 0.6782739162445068,
+    "seam_jump": 0.004374578595161438,
+    "integrated_lufs": -18.09,
+    "true_peak_db": -3.37
+  },
+  {
+    "file": "Assets/Audio/GameMusic/HipThrust_HeavenlyLoop.ogg",
+    "title": "Heavenly Loop",
+    "author": "isaiah658",
+    "source": "https://opengameart.org/content/heavenly-loop",
+    "license": "CC0-1.0",
+    "guid": "634ff55b0faf4a9fae3d1e66359d06c6",
+    "scenes": [
+      "HipThrust_RingBridge_Recorded",
+      "HipThrust_RingBridge_NewScoring",
+      "HipThrust_RingBridge_Hold30"
+    ],
+    "source_sha256": "1324464c995635ce1a7833c5b3f33eba7356b60e17e802ebbf286bd1abe0a5a4",
+    "output_sha256": "6f75a204ee77725acac85aa6037da93ae7e1e881eaf21321324a1c3557aff4eb",
+    "gain_db": 6.02,
+    "loop_overlap_seconds": 0.25,
+    "duration_seconds": 33.40249433106576,
+    "peak": 0.49787434935569763,
+    "seam_jump": 0.01598215103149414,
+    "integrated_lufs": -17.98,
+    "true_peak_db": -6.06
+  }
+]

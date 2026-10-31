@@ -1,0 +1,15 @@
+Synthetic adversaries for real-use failure modes.
+FAIL simple: already raised at start must not create a repetition/hold score
+FAIL simple: bad posture must not retain full live score
+FAIL simple: partial return must not complete a repetition
+FAIL standard: already raised at start must not create a repetition/hold score
+FAIL standard: bad posture must not retain full live score
+FAIL standard: partial return must not complete a repetition
+FAIL hard: already raised at start must not create a repetition/hold score
+FAIL hard: bad posture must not retain full live score
+FAIL hard: partial return must not complete a repetition
+FAIL LeftHand: cached 100 without calibrated fresh input must not HIT
+FAIL RightHand: cached 100 without calibrated fresh input must not HIT
+FAIL LeftFoot: cached 100 without calibrated fresh input must not HIT
+FAIL RightFoot: cached 100 without calibrated fresh input must not HIT
+Checks: 13; failures: 13

@@ -1,0 +1,65 @@
+Loopback motor HTTP verification. No physical trackers used.
+PASS birddog LeftHand Perfect -> /LeftForearm/motor?duration_ms=100
+PASS birddog LeftHand Great -> /LeftForearm/motor?duration_ms=100
+PASS birddog LeftHand Good -> /LeftForearm/motor?duration_ms=100
+PASS birddog LeftHand Miss -> no motor request
+PASS birddog LeftHand None -> no motor request
+PASS birddog RightHand Perfect -> /RightForearm/motor?duration_ms=100
+PASS birddog RightHand Great -> /RightForearm/motor?duration_ms=100
+PASS birddog RightHand Good -> /RightForearm/motor?duration_ms=100
+PASS birddog RightHand Miss -> no motor request
+PASS birddog RightHand None -> no motor request
+PASS birddog LeftFoot Perfect -> /LeftLowerLeg/motor?duration_ms=100
+PASS birddog LeftFoot Great -> /LeftLowerLeg/motor?duration_ms=100
+PASS birddog LeftFoot Good -> /LeftLowerLeg/motor?duration_ms=100
+PASS birddog LeftFoot Miss -> no motor request
+PASS birddog LeftFoot None -> no motor request
+PASS birddog RightFoot Perfect -> /RightLowerLeg/motor?duration_ms=100
+PASS birddog RightFoot Great -> /RightLowerLeg/motor?duration_ms=100
+PASS birddog RightFoot Good -> /RightLowerLeg/motor?duration_ms=100
+PASS birddog RightFoot Miss -> no motor request
+PASS birddog RightFoot None -> no motor request
+PASS birddog Waist Perfect -> /Abdomen/motor?duration_ms=100
+PASS birddog Waist Great -> /Abdomen/motor?duration_ms=100
+PASS birddog Waist Good -> /Abdomen/motor?duration_ms=100
+PASS birddog Waist Miss -> no motor request
+PASS birddog Waist None -> no motor request
+PASS birddog re-enable without duplicate subscription -> /RightForearm/motor?duration_ms=100
+PASS birddog idle is silent -> no motor request
+PASS deadbug LeftHand Perfect -> /LeftForearm/motor?duration_ms=100
+PASS deadbug LeftHand Great -> /LeftForearm/motor?duration_ms=100
+PASS deadbug LeftHand Good -> /LeftForearm/motor?duration_ms=100
+PASS deadbug LeftHand Miss -> no motor request
+PASS deadbug LeftHand None -> no motor request
+PASS deadbug RightHand Perfect -> /RightForearm/motor?duration_ms=100
+PASS deadbug RightHand Great -> /RightForearm/motor?duration_ms=100
+PASS deadbug RightHand Good -> /RightForearm/motor?duration_ms=100
+PASS deadbug RightHand Miss -> no motor request
+PASS deadbug RightHand None -> no motor request
+PASS deadbug LeftFoot Perfect -> /LeftLowerLeg/motor?duration_ms=100
+PASS deadbug LeftFoot Great -> /LeftLowerLeg/motor?duration_ms=100
+PASS deadbug LeftFoot Good -> /LeftLowerLeg/motor?duration_ms=100
+PASS deadbug LeftFoot Miss -> no motor request
+PASS deadbug LeftFoot None -> no motor request
+PASS deadbug RightFoot Perfect -> /RightLowerLeg/motor?duration_ms=100
+PASS deadbug RightFoot Great -> /RightLowerLeg/motor?duration_ms=100
+PASS deadbug RightFoot Good -> /RightLowerLeg/motor?duration_ms=100
+PASS deadbug RightFoot Miss -> no motor request
+PASS deadbug RightFoot None -> no motor request
+PASS deadbug Waist Perfect -> /Abdomen/motor?duration_ms=100
+PASS deadbug Waist Great -> /Abdomen/motor?duration_ms=100
+PASS deadbug Waist Good -> /Abdomen/motor?duration_ms=100
+PASS deadbug Waist Miss -> no motor request
+PASS deadbug Waist None -> no motor request
+PASS deadbug re-enable without duplicate subscription -> /RightForearm/motor?duration_ms=100
+PASS deadbug idle is silent -> no motor request
+PASS hipthrust up HIT -> /Abdomen/motor?duration_ms=100
+PASS hipthrust down HIT -> /Abdomen/motor?duration_ms=100
+PASS hipthrust MISS -> no motor request
+PASS hipthrust legacy LeftHand must be silent -> no motor request
+PASS hipthrust legacy RightHand must be silent -> no motor request
+PASS hipthrust legacy LeftFoot must be silent -> no motor request
+PASS hipthrust legacy RightFoot must be silent -> no motor request
+PASS hipthrust legacy Waist must be silent -> no motor request
+PASS hipthrust re-enable without duplicate subscription -> /Abdomen/motor?duration_ms=100
+PASS hipthrust idle is silent -> no motor request

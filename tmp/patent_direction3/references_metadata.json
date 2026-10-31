@@ -1,0 +1,618 @@
+[
+  {
+    "DOI": "10.1089/g4h.2012.0073",
+    "title": [
+      "Computational Intelligence and Game Design for Effective At-Home Stroke Rehabilitation"
+    ],
+    "author": [
+      {
+        "given": "Nunzio Alberto",
+        "family": "Borghese",
+        "sequence": "first",
+        "affiliation": [
+          {
+            "name": "University of Milan",
+            "place": [
+              "Italy"
+            ]
+          }
+        ],
+        "role": [
+          {
+            "vocabulary": "crossref",
+            "role": "author"
+          }
+        ]
+      },
+      {
+        "given": "Michele",
+        "family": "Pirovano",
+        "sequence": "additional",
+        "affiliation": [
+          {
+            "name": "University of Milan",
+            "place": [
+              "Italy"
+            ]
+          },
+          {
+            "name": "Informazione e Bioingegneria - Politecnico di Milano",
+            "place": [
+              "Italy"
+            ]
+          }
+        ],
+        "role": [
+          {
+            "vocabulary": "crossref",
+            "role": "author"
+          }
+        ]
+      },
+      {
+        "given": "Pier Luca",
+        "family": "Lanzi",
+        "sequence": "additional",
+        "affiliation": [
+          {
+            "name": "Informazione e Bioingegneria - Politecnico di Milano",
+            "place": [
+              "Italy"
+            ]
+          }
+        ],
+        "role": [
+          {
+            "vocabulary": "crossref",
+            "role": "author"
+          }
+        ]
+      },
+      {
+        "given": "Seline",
+        "family": "Wüest",
+        "sequence": "additional",
+        "affiliation": [
+          {
+            "name": "Institute of Human Movement Sciences and Sport",
+            "place": [
+              "Switzerland"
+            ]
+          }
+        ],
+        "role": [
+          {
+            "vocabulary": "crossref",
+            "role": "author"
+          }
+        ]
+      },
+      {
+        "given": "Eling D.",
+        "family": "de Bruin",
+        "sequence": "additional",
+        "affiliation": [
+          {
+            "name": "Institute of Human Movement Sciences and Sport",
+            "place": [
+              "Switzerland"
+            ]
+          }
+        ],
+        "role": [
+          {
+            "vocabulary": "crossref",
+            "role": "author"
+          }
+        ]
+      }
+    ],
+    "container-title": [
+      "Games for Health Journal"
+    ],
+    "published": {
+      "date-parts": [
+        [
+          2013,
+          4,
+          1
+        ]
+      ]
+    },
+    "volume": "2",
+    "issue": "2",
+    "page": "81-88",
+    "article-number": null,
+    "type": "journal-article",
+    "link": [
+      {
+        "URL": "https://journals.sagepub.com/doi/full-xml/10.1089/g4h.2012.0073",
+        "content-type": "application/xml",
+        "content-version": "vor",
+        "intended-application": "text-mining"
+      },
+      {
+        "URL": "https://journals.sagepub.com/doi/pdf/10.1089/g4h.2012.0073",
+        "content-type": "application/pdf",
+        "content-version": "vor",
+        "intended-application": "text-mining"
+      },
+      {
+        "URL": "https://journals.sagepub.com/doi/pdf/10.1089/g4h.2012.0073",
+        "content-type": "unspecified",
+        "content-version": "vor",
+        "intended-application": "similarity-checking"
+      }
+    ]
+  },
+  {
+    "DOI": "10.3390/app11135935",
+    "title": [
+      "Proteo: A Framework for Serious Games in Telerehabilitation"
+    ],
+    "author": [
+      {
+        "ORCID": "https://orcid.org/0000-0001-8024-1338",
+        "authenticated-orcid": false,
+        "given": "Giuseppe",
+        "family": "Bernava",
+        "sequence": "first",
+        "affiliation": [
+          {
+            "name": "Institute for Biomedical Research and Innovation (IRIB-CNR), Via Torre Bianca, Mortelle, Istituto Marino, 98164 Messina, Italy"
+          }
+        ],
+        "role": [
+          {
+            "vocabulary": "crossref",
+            "role": "author"
+          }
+        ]
+      },
+      {
+        "ORCID": "https://orcid.org/0000-0001-6257-5529",
+        "authenticated-orcid": false,
+        "given": "Andrea",
+        "family": "Nucita",
+        "sequence": "additional",
+        "affiliation": [
+          {
+            "name": "Department of Cognitive Sciences, Psychological, Educational and Cultural Studies, University of Messina, 98122 Messina, Italy"
+          }
+        ],
+        "role": [
+          {
+            "vocabulary": "crossref",
+            "role": "author"
+          }
+        ]
+      },
+      {
+        "ORCID": "https://orcid.org/0000-0003-1275-7433",
+        "authenticated-orcid": false,
+        "given": "Giancarlo",
+        "family": "Iannizzotto",
+        "sequence": "additional",
+        "affiliation": [
+          {
+            "name": "Department of Cognitive Sciences, Psychological, Educational and Cultural Studies, University of Messina, 98122 Messina, Italy"
+          }
+        ],
+        "role": [
+          {
+            "vocabulary": "crossref",
+            "role": "author"
+          }
+        ]
+      },
+      {
+        "given": "Tindara",
+        "family": "Caprì",
+        "sequence": "additional",
+        "affiliation": [
+          {
+            "name": "Department of Clinical and Experimental Medicine, University of Messina, 98121 Messina, Italy"
+          }
+        ],
+        "role": [
+          {
+            "vocabulary": "crossref",
+            "role": "author"
+          }
+        ]
+      },
+      {
+        "ORCID": "https://orcid.org/0000-0001-7065-1528",
+        "authenticated-orcid": false,
+        "given": "Rosa Angela",
+        "family": "Fabio",
+        "sequence": "additional",
+        "affiliation": [
+          {
+            "name": "Department of Clinical and Experimental Medicine, University of Messina, 98121 Messina, Italy"
+          }
+        ],
+        "role": [
+          {
+            "vocabulary": "crossref",
+            "role": "author"
+          }
+        ]
+      }
+    ],
+    "container-title": [
+      "Applied Sciences"
+    ],
+    "published": {
+      "date-parts": [
+        [
+          2021,
+          6,
+          25
+        ]
+      ]
+    },
+    "volume": "11",
+    "issue": "13",
+    "page": "5935",
+    "article-number": null,
+    "type": "journal-article",
+    "link": [
+      {
+        "URL": "https://www.mdpi.com/2076-3417/11/13/5935/pdf",
+        "content-type": "unspecified",
+        "content-version": "vor",
+        "intended-application": "similarity-checking"
+      }
+    ]
+  },
+  {
+    "DOI": "10.2196/40054",
+    "title": [
+      "A Software Engineering Framework for Reusable Design of Personalized Serious Games for Health: Development Study"
+    ],
+    "author": [
+      {
+        "ORCID": "https://orcid.org/0000-0001-6150-717X",
+        "authenticated-orcid": false,
+        "given": "Stéphanie",
+        "family": "Carlier",
+        "sequence": "first",
+        "affiliation": [],
+        "role": [
+          {
+            "vocabulary": "crossref",
+            "role": "author"
+          }
+        ]
+      },
+      {
+        "ORCID": "https://orcid.org/0000-0003-1630-4837",
+        "authenticated-orcid": false,
+        "given": "Vince",
+        "family": "Naessens",
+        "sequence": "additional",
+        "affiliation": [],
+        "role": [
+          {
+            "vocabulary": "crossref",
+            "role": "author"
+          }
+        ]
+      },
+      {
+        "ORCID": "https://orcid.org/0000-0002-0768-4949",
+        "authenticated-orcid": false,
+        "given": "Femke",
+        "family": "De Backere",
+        "sequence": "additional",
+        "affiliation": [],
+        "role": [
+          {
+            "vocabulary": "crossref",
+            "role": "author"
+          }
+        ]
+      },
+      {
+        "ORCID": "https://orcid.org/0000-0003-4824-1199",
+        "authenticated-orcid": false,
+        "given": "Filip",
+        "family": "De Turck",
+        "sequence": "additional",
+        "affiliation": [],
+        "role": [
+          {
+            "vocabulary": "crossref",
+            "role": "author"
+          }
+        ]
+      }
+    ],
+    "container-title": [
+      "JMIR Serious Games"
+    ],
+    "published": {
+      "date-parts": [
+        [
+          2023,
+          3,
+          6
+        ]
+      ]
+    },
+    "volume": "11",
+    "issue": null,
+    "page": "e40054",
+    "article-number": null,
+    "type": "journal-article",
+    "link": [
+      {
+        "URL": "https://games.jmir.org/2023/1/e40054",
+        "content-type": "unspecified",
+        "content-version": "vor",
+        "intended-application": "similarity-checking"
+      }
+    ]
+  },
+  {
+    "DOI": "10.1186/s12984-024-01373-2",
+    "title": [
+      "CFI: a VR motor rehabilitation serious game design framework integrating rehabilitation function and game design principles with an upper limb case"
+    ],
+    "author": [
+      {
+        "given": "Chengjie",
+        "family": "Zhang",
+        "sequence": "first",
+        "affiliation": [],
+        "role": [
+          {
+            "vocabulary": "crossref",
+            "role": "author"
+          }
+        ]
+      },
+      {
+        "given": "Suiran",
+        "family": "Yu",
+        "sequence": "additional",
+        "affiliation": [],
+        "role": [
+          {
+            "vocabulary": "crossref",
+            "role": "author"
+          }
+        ]
+      },
+      {
+        "given": "Jiancheng",
+        "family": "Ji",
+        "sequence": "additional",
+        "affiliation": [],
+        "role": [
+          {
+            "vocabulary": "crossref",
+            "role": "author"
+          }
+        ]
+      }
+    ],
+    "container-title": [
+      "Journal of NeuroEngineering and Rehabilitation"
+    ],
+    "published": {
+      "date-parts": [
+        [
+          2024,
+          7,
+          1
+        ]
+      ]
+    },
+    "volume": "21",
+    "issue": "1",
+    "page": null,
+    "article-number": "113",
+    "type": "journal-article",
+    "link": [
+      {
+        "URL": "https://link.springer.com/content/pdf/10.1186/s12984-024-01373-2.pdf",
+        "content-type": "application/pdf",
+        "content-version": "vor",
+        "intended-application": "text-mining"
+      },
+      {
+        "URL": "https://link.springer.com/article/10.1186/s12984-024-01373-2/fulltext.html",
+        "content-type": "text/html",
+        "content-version": "vor",
+        "intended-application": "text-mining"
+      },
+      {
+        "URL": "https://link.springer.com/content/pdf/10.1186/s12984-024-01373-2.pdf",
+        "content-type": "application/pdf",
+        "content-version": "vor",
+        "intended-application": "similarity-checking"
+      }
+    ]
+  },
+  {
+    "DOI": "10.1109/segah49190.2020.9201871",
+    "title": [
+      "Dynamic difficulty adjustment in exer-games for rehabilitation: a mixed approach"
+    ],
+    "author": [
+      {
+        "given": "Manuel",
+        "family": "Pezzera",
+        "sequence": "first",
+        "affiliation": [],
+        "role": [
+          {
+            "vocabulary": "crossref",
+            "role": "author"
+          }
+        ]
+      },
+      {
+        "given": "N. Alberto",
+        "family": "Borghese",
+        "sequence": "additional",
+        "affiliation": [],
+        "role": [
+          {
+            "vocabulary": "crossref",
+            "role": "author"
+          }
+        ]
+      }
+    ],
+    "container-title": [
+      "2020 IEEE 8th International Conference on Serious Games and Applications for Health (SeGAH)"
+    ],
+    "published": {
+      "date-parts": [
+        [
+          2020,
+          8
+        ]
+      ]
+    },
+    "volume": null,
+    "issue": null,
+    "page": "1-7",
+    "article-number": null,
+    "type": "proceedings-article",
+    "link": [
+      {
+        "URL": "http://xplorestaging.ieee.org/ielx7/9194225/9201620/09201871.pdf?arnumber=9201871",
+        "content-type": "unspecified",
+        "content-version": "vor",
+        "intended-application": "similarity-checking"
+      }
+    ]
+  },
+  {
+    "DOI": "10.1145/3772318.3790457",
+    "title": [
+      "“It Depends”: Re-Authoring Play Through Clinical Reasoning in Wearable AR Rehab Games"
+    ],
+    "author": [
+      {
+        "ORCID": "https://orcid.org/0009-0007-7387-2407",
+        "authenticated-orcid": false,
+        "given": "Binyan",
+        "family": "Xu",
+        "sequence": "first",
+        "affiliation": [
+          {
+            "name": "Bouvé College of Health Sciences, Northeastern University, Boston, Massachusetts, USA"
+          }
+        ],
+        "role": [
+          {
+            "vocabulary": "crossref",
+            "role": "author"
+          }
+        ]
+      },
+      {
+        "ORCID": "https://orcid.org/0009-0006-3847-983X",
+        "authenticated-orcid": false,
+        "given": "Wei",
+        "family": "Wu",
+        "sequence": "additional",
+        "affiliation": [
+          {
+            "name": "College of Arts, Media and Design, Northeastern University, Boston, Massachusetts, USA"
+          }
+        ],
+        "role": [
+          {
+            "vocabulary": "crossref",
+            "role": "author"
+          }
+        ]
+      },
+      {
+        "ORCID": "https://orcid.org/0009-0004-6238-1483",
+        "authenticated-orcid": false,
+        "given": "Soonhyeon",
+        "family": "Kweon",
+        "sequence": "additional",
+        "affiliation": [
+          {
+            "name": "Bouvé College of Health Sciences, Northeastern University, Boston, Massachusetts, USA"
+          }
+        ],
+        "role": [
+          {
+            "vocabulary": "crossref",
+            "role": "author"
+          }
+        ]
+      },
+      {
+        "ORCID": "https://orcid.org/0000-0002-8164-0303",
+        "authenticated-orcid": false,
+        "given": "Casper",
+        "family": "Harteveld",
+        "sequence": "additional",
+        "affiliation": [
+          {
+            "name": "College of Arts, Media and Design, Northeastern University, Boston, Massachusetts, USA"
+          }
+        ],
+        "role": [
+          {
+            "vocabulary": "crossref",
+            "role": "author"
+          }
+        ]
+      },
+      {
+        "ORCID": "https://orcid.org/0000-0003-4041-3646",
+        "authenticated-orcid": false,
+        "given": "Leanne",
+        "family": "Chukoskie",
+        "sequence": "additional",
+        "affiliation": [
+          {
+            "name": "Bouvé College of Health Sciences, Northeastern University, Boston, Massachusetts, USA and College of Arts, Media and Design, Northeastern University, Boston, Massachusetts, USA"
+          }
+        ],
+        "role": [
+          {
+            "vocabulary": "crossref",
+            "role": "author"
+          }
+        ]
+      }
+    ],
+    "container-title": [
+      "Proceedings of the 2026 CHI Conference on Human Factors in Computing Systems"
+    ],
+    "published": {
+      "date-parts": [
+        [
+          2026,
+          4,
+          13
+        ]
+      ]
+    },
+    "volume": null,
+    "issue": null,
+    "page": "1-26",
+    "article-number": null,
+    "type": "proceedings-article",
+    "link": [
+      {
+        "URL": "https://dl.acm.org/doi/pdf/10.1145/3772318.3790457",
+        "content-type": "unspecified",
+        "content-version": "vor",
+        "intended-application": "similarity-checking"
+      }
+    ]
+  }
+]

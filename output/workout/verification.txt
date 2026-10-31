@@ -1,0 +1,10 @@
+Synthetic tracking/completion integration test.
+PASS: standing pose rejected.
+PASS: lying without tracking rejected.
+PASS: stable lying pose calibrated.
+PASS: action 0, set 1; duplicate completion ignored.
+PASS: action 0, set 2; duplicate completion ignored.
+PASS: action 1, set 1; duplicate completion ignored.
+PASS: action 2, set 1; duplicate completion ignored.
+PASS: two hip sets, bird dog and dead bug transitions; all three difficulties; plan completion.
+PASS: restart and cancellation during countdown; no delayed start.

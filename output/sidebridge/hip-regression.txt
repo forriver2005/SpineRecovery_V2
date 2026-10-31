@@ -1,0 +1,10 @@
+Real Unity scenes/animations. Scoring inputs are synthetic; no patient or wearable validation.
+PASS score: all 3 exact profiles; 0.30/0.12/0.08 second hysteresis; linear valid holds; low quality freeze; lost input; live zero outside B; best retention; relaxed return.
+PASS exact doses 1/3/7/100/2000, every repetition peak, static 30-second hold, smooth source-time boundaries, exact completion without extra source cycles.
+PASS prescription plan route, exact sets/reps retention, invalid dose rejection, original route preserved.
+PASS measured geometry: identical pose 100, translation/rotation/scale invariant; synthetic fresh VMC telemetry + calibrated Animator reaches 100; unavailable telemetry clears live score.
+PASS new-score scene: original 4/8/12 dose/timing, menu/countdown/coach, calibrated scoring path, pause/result/return.
+PASS 30-second scene: D01 prescription, executor per-set dose, exact 3 repetitions, coach + preview bones frozen (including hands/feet), artwork progress/countdown, pause/resume, descent/completion, result/menu.
+PASS real-time playback: first prescription hold ran for 30 game seconds with unchanged coach bones before descending.
+PASS live GameWorkoutSession: 2 sets x 3 reps, real automatic set transition/countdown, exactly 2 completion events.
+Runtime assertions: 1412311

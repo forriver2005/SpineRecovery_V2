@@ -1,0 +1,15 @@
+{
+  "originalScenesAndTimelineUnchanged": {
+    "Assets/RingBridge/RecordedHipThrustTimeline.asset": true,
+    "Assets/Scenes/BirdDog_RingSkinC_Recorded.unity": true,
+    "Assets/Scenes/DeadBug_RingSkinC_Recorded.unity": true,
+    "Assets/Scenes/HipThrust_RingBridge_Recorded.unity": true
+  },
+  "recordedAssetFilesUnchanged": 30,
+  "validationCodeMatchesMain": true,
+  "buildSettingsScenes": 5,
+  "verifiedRealHoldGameSeconds": 30,
+  "liveExecutorDose": "2 sets x 3 reps",
+  "hardwareInputs": "synthetic only",
+  "pauseResumeRejectsStaleInput": true
+}

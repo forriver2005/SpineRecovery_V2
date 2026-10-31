@@ -1,0 +1,87 @@
+[
+  {
+    "key": "RX",
+    "latex": "\\mathcal{P}=(p,\\nu,\\{I_i\\}_{i=1}^{n},E_P,R_P),\\qquad I_i=(\\iota_i,A_i,D_i).",
+    "number": 1
+  },
+  {
+    "key": "TOTAL",
+    "latex": "q_j:\\mathcal{X}_{\\mathrm{val}}\\to\\Omega_j,\\qquad \\sum_{v\\in\\Omega_j}\\mathbf{1}[\\phi_{jv}(X)]=1.",
+    "number": 2
+  },
+  {
+    "key": "ENCODE",
+    "latex": "\\begin{aligned}a_{ij}&=q_j(A_i,D_i),\\quad z_{ijv}=\\mathbf{1}[a_{ij}=v],\\\\\\mathbf z_i&=\\bigoplus_{j=1}^{J}(z_{ijv})_{v\\in\\Omega_j}.\\end{aligned}",
+    "number": 3
+  },
+  {
+    "key": "CHECK",
+    "latex": "\\chi_i=\\prod_{\\ell=1}^{L}\\mathbf{1}[b_{\\ell}(\\mathbf z_i,A_i,D_i)],\\qquad \\chi_i=1.",
+    "number": 4
+  },
+  {
+    "key": "CLASS",
+    "latex": "\\begin{aligned}k_i^*&=\\min\\{k:\\rho_k(\\mathbf z_i)=1\\},\\quad c_i=C_{k_i^*},\\\\\\mathcal L_i&=\\bigcup_{j=1}^{J}\\lambda_j(a_{ij}).\\end{aligned}",
+    "number": 5
+  },
+  {
+    "key": "REQ",
+    "latex": "\\mathcal R_i=\\left(\\bigcup_{j=1}^{J}R_j(a_{ij})\\right)\\cup R_i^A\\cup R_i^D.",
+    "number": 6
+  },
+  {
+    "key": "GRAPH",
+    "latex": "\\mathcal G_i=\\Gamma(\\mathbf z_i,D_i)=\\operatorname{Repeat}_{N_i,G_i}\\!\\left(\\operatorname{Seq}(\\mathrm{READY},\\mathcal B_i,\\mathrm{COMMIT})\\right).",
+    "number": 7
+  },
+  {
+    "key": "BIND",
+    "latex": "\\sum_b X_{igab}=1,\\qquad \\sum_a X_{igab}\\leq1,\\qquad X_{igab}\\leq B_{igab},\\quad X_{igab}\\in\\{0,1\\}.",
+    "number": 8
+  },
+  {
+    "key": "ASSIGN",
+    "latex": "\\min_{x}\\ \\sum_{i,g}c_{ig}x_{ig}+\\lambda\\!\\sum_{(i,j)\\in E_P}\\sum_{g,h}s_{gh}x_{ig}x_{jh}.",
+    "number": 9
+  },
+  {
+    "key": "FEAS",
+    "latex": "\\sum_gx_{ig}=1,\\qquad x_{ig}\\leq K_{ig},\\qquad x_{ig}\\in\\{0,1\\}.",
+    "number": 10
+  },
+  {
+    "key": "DP",
+    "latex": "F_i(g)=c_{ig}+\\min_{h:K_{i-1,h}=1}\\{F_{i-1}(h)+\\lambda s_{hg}\\},\\qquad K_{ig}=1.",
+    "number": 11
+  },
+  {
+    "key": "NORM",
+    "latex": "\\begin{aligned}u_a(t)&=\\frac{x_a(t)-x_a^0}{x_a^\\star-x_a^0},\\quad |x_a^\\star-x_a^0|>\\epsilon_a,\\\\v_a(t)&=\\operatorname{clip}_{[0,1]}u_a(t).\\end{aligned}",
+    "number": 12
+  },
+  {
+    "key": "DISPLAY",
+    "latex": "\\mathbf y(t)=\\mathbf y_{\\min}+\\operatorname{diag}(\\mathbf y_{\\max}-\\mathbf y_{\\min})\\mathbf v(t).",
+    "number": 13
+  },
+  {
+    "key": "PATH",
+    "latex": "\\begin{aligned}\\hat s_k&=\\operatorname*{arg\\,min}_{s\\in\\mathcal W_k}\\|\\mathbf u_k-\\mathbf r(s)\\|_W^2,\\\\\\mathcal W_k&=[s_{k-1},\\min(1,s_{k-1}+\\Delta s_{\\max})].\\end{aligned}",
+    "number": 14
+  },
+  {
+    "key": "VIOLATION",
+    "latex": "\\begin{aligned}V_A(t)&=\\max_a\\left(\\frac{|x_a(t)-\\mu_a|}{\\tau_a}-1\\right),\\\\V_K(t)&=\\max_b\\left(\\frac{|w_b(t)-\\kappa_b|}{\\eta_b}-1\\right),\\\\V_S(t)&=\\frac{\\|B\\mathbf u(t)\\|_\\infty}{\\delta}-1,\\\\V(t)&=\\max\\{V_A(t),V_K(t),V_S(t)\\}.\\end{aligned}",
+    "number": 15
+  },
+  {
+    "key": "HOLD",
+    "latex": "h_k=\\begin{cases}h_{k-1}+\\Delta t_k,&b_kb_{k-1}d_kd_{k-1}=1,\\ 0<\\Delta t_k\\leq\\Delta t_{\\max},\\\\0,&\\text{otherwise}.\\end{cases}",
+    "number": 16
+  },
+  {
+    "key": "LEDGER",
+    "latex": "\\begin{aligned}\\mathbf n_{k+1}&=\\mathbf n_k+\\xi_k\\mathbf e_{r(k)},\\\\\\boldsymbol\\ell_{k+1}&=\\mathbf n^\\star-\\mathbf n_{k+1},\\quad 0\\leq\\mathbf n_{k+1}\\leq\\mathbf n^\\star.\\end{aligned}",
+    "number": 17
+  }
+]

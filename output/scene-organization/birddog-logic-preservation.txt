@@ -1,0 +1,59 @@
+All 431 original BirdDog objects retained.
+104 original script components byte-identical (normalized line endings); 3 have visual-only overrides.
+Component 2107000003, script 320914a73f83cc847be6f46a2d1da993:
+--- 
++++ 
+@@ -18,6 +18,7 @@
+   authoredGuideRingPrefab: {fileID: 866814056353705028, guid: 7a70269b138d22844951168c9a2f0a01, type: 3}
+   authoredGuideRingSourceRadius: 3
+   authoredGuideRingEulerAngles: {x: 0, y: 0, z: 0}
++  completeVisualRoot: {fileID: 782566651}
+   authoredInnerRingRadiusScale: 0.9667
+   authoredOuterRingRadiusScale: 1.03
+   limbSpawnRadiusMin: 1.65
+@@ -28,8 +29,8 @@
+   lineMaterialOverride: {fileID: 0}
+   ringColor: {r: 0.82, g: 0.92, b: 1, a: 0.88}
+   dividerColor: {r: 0.52, g: 0.68, b: 0.78, a: 0.62}
+-  leftHandColor: {r: 0.15, g: 0.82, b: 1, a: 1}
+-  rightHandColor: {r: 1, g: 0.3, b: 0.44, a: 1}
+-  leftFootColor: {r: 0.25, g: 0.92, b: 0.48, a: 1}
+-  rightFootColor: {r: 1, g: 0.72, b: 0.18, a: 1}
++  leftHandColor: {r: 1, g: 0.75686276, b: 0.8627451, a: 1}
++  rightHandColor: {r: 1, g: 0.9411765, b: 0.6509804, a: 1}
++  leftFootColor: {r: 0.72156864, g: 1, b: 0.94509804, a: 1}
++  rightFootColor: {r: 0.84313726, g: 0.8, b: 1, a: 1}
+   waistColor: {r: 0.78, g: 0.42, b: 1, a: 1}
+Component 2107000006, script 0cbc58e61a32eb047a96998f293f9c84:
+--- 
++++ 
+@@ -10,6 +10,7 @@
+   m_Script: {fileID: 11500000, guid: 0cbc58e61a32eb047a96998f293f9c84, type: 3}
+   m_Name: 
+   m_EditorClassIdentifier: 
++  visualSkin: {fileID: 2107000008}
+   successEffectPrefab: {fileID: 0}
+   missFeedbackPrefab: {fileID: 0}
+   hitAudioSource: {fileID: 0}
+Component 2107000007, script cfde81bd5fb618d42a44bde19aa60c4f:
+--- 
++++ 
+@@ -16,7 +16,8 @@
+   poseJudge: {fileID: 2107000005}
+   feedback: {fileID: 2107000006}
+   noteContainer: {fileID: 2107000051}
+-  visualEffectRoot: {fileID: 0}
++  visualEffectRoot: {fileID: 782566651}
++  visualSkin: {fileID: 2107000008}
+   followCoachScoringSession: 1
+   startAutomaticallyWithoutCoach: 0
+   worldVisualScale: 1.5
+@@ -47,7 +48,7 @@
+   fallbackMaterials: []
+   normalizePrefabNotes: 1
+   prefabEulerRotation: {x: 0, y: 90, z: 0}
+-  showArrivalIndicator: 1
++  showArrivalIndicator: 0
+   targetIndicatorPrefab: {fileID: 100006, guid: 1466ff6d61ef22e4aad9de21922c6b8b, type: 3}
+   targetIndicatorRadius: 0.13
+   targetIndicatorWidth: 0.018

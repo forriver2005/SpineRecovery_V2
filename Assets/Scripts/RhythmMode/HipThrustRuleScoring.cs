@@ -39,6 +39,22 @@ public sealed class HipThrustRuleScoring : MonoBehaviour
     float lastFrameAt = float.NegativeInfinity;
     float minimumTrackingQuality;
     float progressTolerance;
+    bool externalCoachingMode;
+    System.Func<bool> externalHipPredicate;
+    System.Func<bool> externalSideBridgePredicate;
+
+    /// <summary>
+    /// Lets Coaching use the same public target predicates without requiring
+    /// the Taiko transport and its game-scene timeline components.
+    /// </summary>
+    public void ConfigureExternalCoaching(
+        System.Func<bool> hipPredicate,
+        System.Func<bool> sideBridgePredicate)
+    {
+        externalCoachingMode = true;
+        externalHipPredicate = hipPredicate;
+        externalSideBridgePredicate = sideBridgePredicate;
+    }
 
     public void Begin(string difficulty)
     {
@@ -158,10 +174,14 @@ public sealed class HipThrustRuleScoring : MonoBehaviour
         }
     }
     public void BreakContinuity(){Rule.BreakContinuity();if(sideBridge!=null)sideBridge.Rule.BreakContinuity();}
-    public bool MatchesHipCoach() => sideBridge==null&&TargetsReady&&InputFresh&&HasMeasurement&&calibration!=null&&calibration.IsCalibrated&&
+    public bool MatchesHipCoach() => externalCoachingMode
+        ? externalHipPredicate != null && externalHipPredicate()
+        : sideBridge==null&&TargetsReady&&InputFresh&&HasMeasurement&&calibration!=null&&calibration.IsCalibrated&&
         TrackingQuality>=minimumTrackingQuality&&Mathf.Abs(Progress-CoachProgress)<=progressTolerance;
 
-    public bool MatchesSideBridgeCoach() => sideBridge!=null && TargetsReady && InputFresh && HasMeasurement && calibration!=null && calibration.IsCalibrated &&
+    public bool MatchesSideBridgeCoach() => externalCoachingMode
+        ? externalSideBridgePredicate != null && externalSideBridgePredicate()
+        : sideBridge!=null && TargetsReady && InputFresh && HasMeasurement && calibration!=null && calibration.IsCalibrated &&
         sideBridge.Matches(calibration.UserAnimator,transport.CoachAnimator);
 
     public string Result(int demonstrated) => sideBridge!=null

@@ -24,6 +24,30 @@ public sealed class RhythmMovementRange
         }
         finally{coach.Play(state.fullPathHash,0,state.normalizedTime);coach.Update(0);coach.speed=speed;}
     }
+
+    /// <summary>
+    /// Captures the same rest/top reference as Begin, but from the animator
+    /// state already selected by a coaching segment. Coaching playback does
+    /// not own the game state-name table, while the endpoint calculation is
+    /// still exactly the same game calculation.
+    /// </summary>
+    public void BeginAtState(DeadBugGamingPoseScorer scorer,int stateHash)
+    {
+        history.Clear();elapsed=0;
+        var coach=scorer!=null?scorer.CoachAnimator:null;
+        if(coach==null)return;
+        var state=coach.GetCurrentAnimatorStateInfo(0);float speed=coach.speed;
+        try
+        {
+            current=new Reference();
+            coach.Play(stateHash,0,0);coach.Update(0);
+            current.rest=scorer.CaptureAssessmentPose(false);
+            DeadBugGamingPoseScorer.FloorOrientation(coach,out current.front,out _);
+            coach.Play(stateHash,0,1);coach.Update(0);
+            current.top=scorer.CaptureAssessmentPose(false);
+        }
+        finally{coach.Play(state.fullPathHash,0,state.normalizedTime);coach.Update(0);coach.speed=speed;}
+    }
     public float FollowingQuality(DeadBugGamingPoseScorer scorer,RhythmBodyTarget a,RhythmBodyTarget b,double seconds=0,float delayHint=0)
     {
         if(current==null)return 0;

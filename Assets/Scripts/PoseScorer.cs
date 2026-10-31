@@ -777,6 +777,7 @@ public partial class PoseScorer : MonoBehaviour
         {
             SampleContinuousPose();
             UpdateContinuousObservation();
+            UpdateGameTargetFeedback();
             UpdateHapticFeedback();
 
             return;

@@ -121,6 +121,9 @@ public class DeadBugGamingPoseScorer : MonoBehaviour
     private bool sessionActive;
     private bool calibrated;
     private bool calibrating;
+    private bool externalCoachingMode;
+    private bool externalCoachingInputFresh;
+    private string externalCoachingDifficulty = "standard";
     private float lastSessionAverage;
     private float calibrationMotionSampleElapsed;
     private bool lastCalibrationStability = true;
@@ -158,14 +161,20 @@ public class DeadBugGamingPoseScorer : MonoBehaviour
     public float LastSessionAverage => lastSessionAverage;
     public bool IsSessionActive => sessionActive;
     public bool ScoreHoldFramesOnly => scoreHoldFramesOnly;
-    public string SelectedDifficultyKey => coachController!=null?coachController.SelectedDifficultyKey:"standard";
+    public string SelectedDifficultyKey => externalCoachingMode
+        ? externalCoachingDifficulty
+        : coachController!=null?coachController.SelectedDifficultyKey:"standard";
     AvatarMotionSource assessmentMotion;
     public bool HasFreshInput
     {
         get { if(assessmentMotion==null)assessmentMotion=FindObjectOfType<AvatarMotionSource>();
-            return calibrated && assessmentMotion!=null && assessmentMotion.HasFreshFrame; }
+            return externalCoachingMode
+                ? calibrated && externalCoachingInputFresh
+                : calibrated && assessmentMotion!=null && assessmentMotion.HasFreshFrame; }
     }
-    public bool IsScoringPaused => coachController!=null && coachController.IsActionPaused;
+    public bool IsScoringPaused => externalCoachingMode
+        ? false
+        : coachController!=null && coachController.IsActionPaused;
     public Dictionary<HumanBodyBones,Vector3> CaptureAssessmentPose(bool user) => user
         ? scoringEngine.CaptureAlignedPose(userAnimator):scoringEngine.CaptureRawPose(coachAnimator);
     public bool HasMatchingFloorPosture => FloorOrientation(userAnimator,out float actualFront,out float actualTilt)&&
@@ -195,6 +204,56 @@ public class DeadBugGamingPoseScorer : MonoBehaviour
     public Animator UserAnimator => userAnimator;
     public string CalibrationInstruction => GetComponent<SupineGameCalibration>() != null
         ? GetComponent<SupineGameCalibration>().PoseInstruction : "请自然站立进行校准";
+
+    /// <summary>
+    /// Supplies the same anatomical scorer to Coaching without requiring a
+    /// game scene's CoachActionController. The game target predicate can then
+    /// be sampled continuously by the coaching feedback bridge.
+    /// </summary>
+    public void ConfigureExternalCoaching(
+        Animator coach,
+        Animator user,
+        bool inputFresh,
+        string difficulty)
+    {
+        autoCalibrateOnStart = false;
+        coachAnimator = coach;
+        userAnimator = user;
+        coachController = null;
+        externalCoachingMode = true;
+        externalCoachingInputFresh = inputFresh;
+        externalCoachingDifficulty = string.IsNullOrEmpty(difficulty)
+            ? "standard" : difficulty;
+        calibrated = coachAnimator != null && userAnimator != null;
+        sessionActive = calibrated;
+        if (scoringEngine == null)
+            scoringEngine = new AnatomicalMotionScoringEngine(anatomicalScoring);
+    }
+
+    public void SetExternalCoachingInputFresh(bool inputFresh)
+    {
+        externalCoachingInputFresh = inputFresh;
+    }
+
+    public void EvaluateExternalCoachingFrame(float deltaTime)
+    {
+        if (!externalCoachingMode || !sessionActive || !calibrated ||
+            coachAnimator == null || userAnimator == null)
+        {
+            return;
+        }
+
+        if (HasFreshInput)
+        {
+            ScoreCurrentPose(deltaTime);
+            LimbScoresChanged?.Invoke(lastLimbScores);
+        }
+        else
+        {
+            lastFrameResult = default;
+            lastLimbScores = default;
+        }
+    }
 
     private void Awake()
     {
@@ -779,7 +838,7 @@ public class DeadBugGamingPoseScorer : MonoBehaviour
 
     // Body-relative segment directions remove room heading, avatar proportions
     // and local bone-axis differences. The engine also handles jitter and delay.
-    private float ScoreCurrentPose()
+    private float ScoreCurrentPose(float deltaTime = 0f)
     {
         if (scoringEngine == null)
         {
@@ -792,7 +851,7 @@ public class DeadBugGamingPoseScorer : MonoBehaviour
         lastFrameResult = scoringEngine.Evaluate(
             userAnimator,
             coachAnimator,
-            Time.deltaTime,
+            deltaTime > 0f ? deltaTime : Time.deltaTime,
             out lastLimbScores);
         if(!HasMatchingFloorPosture)
         {

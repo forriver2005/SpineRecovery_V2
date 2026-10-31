@@ -11154,7 +11154,7 @@ MonoBehaviour:
   bodyPartFeedback: {fileID: 1736610178}
   modelBodyPartHighlighter: {fileID: 0}
   enableModelSurfaceHighlight: 1
-  guidanceExercise: 0
+  guidanceExercise: 4
   hipThrustObservationSeconds: 2
   hipThrustRestSeconds: 4
   targetedExerciseGuidance:

@@ -18,6 +18,13 @@ public sealed class RhythmPoseJudge : MonoBehaviour
     public float SuccessThreshold => GameDifficultyPolicy.HitThreshold(Difficulty);
     public Animator CoachAnimator => poseScorer != null ? poseScorer.CoachAnimator : null;
 
+    public void ConfigurePoseScorer(DeadBugGamingPoseScorer scorer)
+    {
+        Unsubscribe();
+        poseScorer = scorer;
+        Subscribe();
+    }
+
     private void OnEnable()
     {
         ResolveReferences();
@@ -36,8 +43,18 @@ public sealed class RhythmPoseJudge : MonoBehaviour
 
     public bool TryHit(RhythmBodyTarget target, out float poseScore)
     {
+        return IsTargetReached(target, out poseScore);
+    }
+
+    /// <summary>
+    /// Evaluates whether the requested game target is currently reached.
+    /// This is the pose predicate used by both game hit sampling and any
+    /// continuous coaching feedback; it does not apply note timing.
+    /// </summary>
+    public bool IsTargetReached(RhythmBodyTarget target, out float poseScore)
+    {
         if(assessment==null)assessment=FindObjectOfType<GameTrainingAssessment>();
-        return TryHit(target,assessment!=null?assessment.CaptureHitReference():null,out poseScore);
+        return IsTargetReached(target,assessment!=null?assessment.CaptureHitReference():null,out poseScore);
     }
 
     public RhythmMovementRange CaptureTarget(string state)
@@ -47,6 +64,14 @@ public sealed class RhythmPoseJudge : MonoBehaviour
     }
 
     public bool TryHit(RhythmBodyTarget target,RhythmMovementRange reference,out float poseScore)
+    {
+        return IsTargetReached(target, reference, out poseScore);
+    }
+
+    /// <summary>
+    /// Evaluates the target pose without note timing or HIT resolution.
+    /// </summary>
+    public bool IsTargetReached(RhythmBodyTarget target,RhythmMovementRange reference,out float poseScore)
     {
         poseScore=0;
         if(!HasTracking(target))return false;

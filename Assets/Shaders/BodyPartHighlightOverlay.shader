@@ -2,7 +2,7 @@ Shader "SpineRecovery/BodyPartHighlightOverlay"
 {
     Properties
     {
-        _Color ("Highlight Color", Color) = (0.18, 0.82, 0.38, 0.72)
+        _Color ("Highlight Color", Color) = (0.14, 0.96, 0.34, 0.88)
         _Pulse ("Pulse", Range(0, 2)) = 1
     }
 
@@ -10,7 +10,7 @@ Shader "SpineRecovery/BodyPartHighlightOverlay"
     {
         Tags
         {
-            "Queue" = "Transparent+20"
+            "Queue" = "Transparent+50"
             "RenderType" = "Transparent"
             "IgnoreProjector" = "True"
         }
@@ -18,10 +18,10 @@ Shader "SpineRecovery/BodyPartHighlightOverlay"
         Pass
         {
             Blend SrcAlpha OneMinusSrcAlpha
-            Cull Back
+            Cull Off
             ZWrite Off
-            ZTest LEqual
-            Offset -2, -2
+            ZTest Always
+            Offset -1, -1
 
             CGPROGRAM
             #pragma vertex vert

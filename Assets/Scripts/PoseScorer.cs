@@ -275,10 +275,10 @@ public partial class PoseScorer : MonoBehaviour
     [Tooltip("Time the hip must remain in the haptic target band before one pulse.")]
     [SerializeField, Min(0f)] private float hipThrustHapticConfirmationSeconds = 0.18f;
     // Keep the positive feedback in the same translucent overlay style as the
-    // original red diagnostic highlight. The previous near-pure green was too
-    // saturated and opaque over the blue avatar.
+    // Keep the positive overlay clearly visible while retaining the translucent
+    // material treatment used by the original red diagnostic highlight.
     private static readonly Color GuidanceSuccessColor =
-        new Color(0.18f, 0.82f, 0.38f, 0.72f);
+        new Color(0.14f, 0.96f, 0.34f, 0.88f);
     private static readonly Color HipThrustHeightReadyColor = GuidanceSuccessColor;
     private HipThrustPoseGeometry hipThrustRestPose;
     private bool hasHipThrustRestPose;

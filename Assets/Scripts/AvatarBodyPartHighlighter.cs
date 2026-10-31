@@ -13,11 +13,11 @@ public sealed class AvatarBodyPartHighlighter : MonoBehaviour
 
     [SerializeField] private Animator targetAnimator;
     [SerializeField] private Material highlightMaterial;
-    [SerializeField] private Color highlightColor = new Color(0.18f, 0.82f, 0.38f, 0.72f);
-    [SerializeField, Range(0.05f, 0.9f)] private float minimumTriangleWeight = 0.35f;
+    [SerializeField] private Color highlightColor = new Color(0.14f, 0.96f, 0.34f, 0.88f);
+    [SerializeField, Range(0.05f, 0.9f)] private float minimumTriangleWeight = 0.22f;
     [Tooltip("Torso uses a stricter surface threshold so shoulder, neck, hip, " +
         "and clothing-edge triangles are not painted as one oversized block.")]
-    [SerializeField, Range(0.05f, 0.95f)] private float torsoMinimumTriangleWeight = 0.55f;
+    [SerializeField, Range(0.05f, 0.95f)] private float torsoMinimumTriangleWeight = 0.42f;
     [SerializeField] private bool pulse = true;
     [SerializeField, Min(0f)] private float pulseSpeed = 3f;
     [SerializeField] private Vector2 pulseRange = new Vector2(0.9f, 1.12f);
@@ -505,8 +505,8 @@ public sealed class AvatarBodyPartHighlighter : MonoBehaviour
             // A bone-sized box selected mostly internal pelvis geometry and
             // only 78 skin triangles on the formal avatar. Cover the outer
             // pelvic skin as well, still excluding abdomen and distal thighs.
-            region[index] = alongTorso >= -0.9f && alongTorso <= 0.35f &&
-                acrossPelvis <= 1.15f && depth <= 0.65f;
+            region[index] = alongTorso >= -1.0f && alongTorso <= 0.45f &&
+                acrossPelvis <= 1.25f && depth <= 0.75f;
         }
         Destroy(posedMesh);
         return region;
@@ -695,7 +695,7 @@ public sealed class AvatarBodyPartHighlighter : MonoBehaviour
                     // part. Equal bone weights must not discard its surface.
                     if (part == BodyPart.HipPelvis)
                     {
-                        if (averageWeight >= Mathf.Max(minimumTriangleWeight, 0.45f))
+                        if (averageWeight >= Mathf.Max(minimumTriangleWeight, 0.36f))
                         {
                             var pelvis = trianglesByPart[BodyPart.HipPelvis];
                             pelvis.Add(a); pelvis.Add(b); pelvis.Add(c);
@@ -712,7 +712,7 @@ public sealed class AvatarBodyPartHighlighter : MonoBehaviour
                 float requiredWeight = dominantPart == BodyPart.Torso
                     ? Mathf.Max(minimumTriangleWeight, torsoMinimumTriangleWeight)
                     : dominantPart == BodyPart.HipPelvis
-                        ? Mathf.Max(minimumTriangleWeight, 0.45f)
+                        ? Mathf.Max(minimumTriangleWeight, 0.36f)
                         : minimumTriangleWeight;
                 if (dominantPart == BodyPart.None ||
                     dominantWeight < requiredWeight)

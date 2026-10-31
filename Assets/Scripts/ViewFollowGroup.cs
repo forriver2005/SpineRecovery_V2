@@ -55,7 +55,7 @@ public class ViewFollowGroup : MonoBehaviour
             ResolvePracticeSession();
             float targetOverheadPitch =
                 practiceSession != null &&
-                practiceSession.IsLyingOverheadPresentationReady
+                practiceSession.IsLyingOverheadPresentationActive
                     ? Mathf.Max(0f, readyOverheadPitchDegrees)
                     : 0f;
             currentOverheadPitchDegrees = StepOverheadPitch(

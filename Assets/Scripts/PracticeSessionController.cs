@@ -167,6 +167,30 @@ public class PracticeSessionController : MonoBehaviour
             coachActionController != null
                 ? coachActionController.CurrentSegmentKind
                 : TrainingSegmentKind.Preparation);
+
+    /// <summary>
+    /// The lying presentation is a camera composition choice, not a readiness
+    /// gate. Start it with the coach introduction/playback so recorded Dead Bug
+    /// and Bird Dog demonstrations already have the mild top-down view.
+    /// User pose detection and A/B display-direction alignment remain separate.
+    /// </summary>
+    public bool IsLyingOverheadPresentationActive
+    {
+        get
+        {
+            if (!SupportsLyingDirectionPresentation() ||
+                !practiceRunning ||
+                motionRecorder == null ||
+                motionRecorder.CoachAnimator == null)
+            {
+                return false;
+            }
+
+            return !trainingPlaybackStarted ||
+                coachActionController == null ||
+                coachActionController.CurrentSegmentKind != TrainingSegmentKind.Finish;
+        }
+    }
     public Transform LyingPresentationAnchor =>
         motionRecorder != null && motionRecorder.CoachAnimator != null
             ? motionRecorder.CoachAnimator.transform

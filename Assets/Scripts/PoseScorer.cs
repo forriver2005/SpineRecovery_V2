@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
@@ -6,7 +6,7 @@ using UnityEngine;
 using UnityEngine.UI;
 using TMPro;
 
-// Result of scoring one segment hold.
+// Quality summary retained for reports and post-session diagnostics.
 public struct SegmentScore
 {
     public int segmentIndex;
@@ -18,9 +18,10 @@ public struct SegmentScore
     // keeps them equal to averageScore/bestScore so UI and statistics agree.
     public float rawAverageScore;
     public float rawBestScore;
-    public float averageScore;  // 0-100 averaged over the scoring window
+    public float averageScore;  // 0-100 robust average over continuous samples
     public float bestScore;     // best single frame
     public int frameCount;
+    public CoachTrackingQuality trackingQuality;
 }
 
 // World-space joints used by the deliberately broad Dead Bug preparation
@@ -226,11 +227,12 @@ public sealed class FormalActionScoreMappingSettings
 }
 
 // Scores the IMU user's pose against the coach's frozen target pose at each
-// segment hold. Formal actions first reach a coarse profile-driven pose, then
-// accumulate a short low-motion hold before scoring. A bounded follow window
-// can bypass noisy stillness, but never the coarse active-region requirement.
-public class PoseScorer : MonoBehaviour
+// playback phase. Coach mode observes tracking continuously while the playback
+// timeline advances independently. Missing/invalid measurements are recorded as
+// quality state and never block a phase.
+public partial class PoseScorer : MonoBehaviour
 {
+    public const float DefaultProgressionTimeoutSeconds = 5f;
     [Header("References")]
     [SerializeField] private SegmentedCoachController coachController;
     [SerializeField] private Animator coachAnimator;
@@ -241,8 +243,14 @@ public class PoseScorer : MonoBehaviour
     [SerializeField] private AvatarBodyPartHighlighter modelBodyPartHighlighter;
     [Tooltip("Shared tracker motor controller. It only consumes confirmed guidance parts.")]
     [SerializeField] private CoachHapticFeedbackController hapticFeedback;
-    private readonly HashSet<TrackerWearLocation> hapticLocationOverrides =
-        new HashSet<TrackerWearLocation>();
+    private readonly List<TrackerWearLocation> hapticLocationOverrides =
+        new List<TrackerWearLocation>(2);
+    private readonly List<BodyPart> hapticCandidateParts =
+        new List<BodyPart>(5);
+    private readonly List<BodyPart> selectedHapticParts =
+        new List<BodyPart>(2);
+    private readonly List<HapticTrackerCandidate> hapticTrackerCandidates =
+        new List<HapticTrackerCandidate>(10);
     private TargetedExercisePoseGeometry latestTargetedGuidanceGeometry;
     private bool hasLatestTargetedGuidanceGeometry;
     [SerializeField] private bool enableModelSurfaceHighlight = true;
@@ -250,6 +258,35 @@ public class PoseScorer : MonoBehaviour
         "recorded coach pose. Generic preserves the reusable target comparer.")]
     [SerializeField] private PoseGuidanceExercise guidanceExercise =
         PoseGuidanceExercise.Generic;
+    [Header("Recorded Dead Bug All-Limb Feedback")]
+    [Tooltip("Recorded Dead Bug briefly shows all four raised limbs in green, " +
+        "then fades the success overlay while the playback axis continues.")]
+    [SerializeField, Min(0.1f)] private float recordedDeadBugSuccessFadeSeconds = 1.2f;
+    [Header("Hip Thrust Teaching")]
+    [Tooltip("Legacy observation duration retained for scene compatibility; coach playback uses its own phase timing.")]
+    [SerializeField, Range(0.5f, 3f)] private float hipThrustObservationSeconds = 2f;
+    [SerializeField, Min(0f)] private float hipThrustRestSeconds = 4f;
+    [Tooltip("Normalized hip-height difference needed to enter the green target band.")]
+    [SerializeField, Min(0f)] private float hipThrustHeightEnterTolerance = 0.08f;
+    [Tooltip("Normalized hip-height difference tolerated before leaving the green band.")]
+    [SerializeField, Min(0f)] private float hipThrustHeightExitTolerance = 0.12f;
+    [Tooltip("Independent, tighter hip-height band for the waist IMU target pulse.")]
+    [SerializeField, Min(0f)] private float hipThrustHapticHeightTolerance = 0.05f;
+    [Tooltip("Time the hip must remain in the haptic target band before one pulse.")]
+    [SerializeField, Min(0f)] private float hipThrustHapticConfirmationSeconds = 0.18f;
+    // Keep the positive feedback in the same translucent overlay style as the
+    // original red diagnostic highlight. The previous near-pure green was too
+    // saturated and opaque over the blue avatar.
+    private static readonly Color GuidanceSuccessColor =
+        new Color(0.18f, 0.82f, 0.38f, 0.72f);
+    private static readonly Color HipThrustHeightReadyColor = GuidanceSuccessColor;
+    private HipThrustPoseGeometry hipThrustRestPose;
+    private bool hasHipThrustRestPose;
+    private bool hipThrustOptimalHeightPulseSent;
+    private bool hipThrustOptimalHeightPulsePending;
+    private bool hipThrustHapticHeightCandidateActive;
+    private float hipThrustHapticHeightStableSeconds;
+    private bool UsesHipThrustTeaching => guidanceExercise == PoseGuidanceExercise.HipThrust;
     [SerializeField] private TargetedExercisePoseGuidanceSettings
         targetedExerciseGuidance = new TargetedExercisePoseGuidanceSettings();
     [Tooltip("VMC receiver that drives the user avatar. The scorer resolves it " +
@@ -302,8 +339,8 @@ public class PoseScorer : MonoBehaviour
     [SerializeField] private DifficultyConfig stabilityDifficultyConfig;
     [SerializeField] private DifficultyConfig scoringDifficultyConfig;
 
-    [Header("Stability Detection")]
-    [Tooltip("Bones checked for stability (user must hold these still before scoring starts).")]
+    [Header("Legacy Stability Settings")]
+    [Tooltip("Legacy serialized bones retained for scene compatibility; continuous coach observation does not wait for stillness.")]
     [SerializeField] private HumanBodyBones[] stabilityBones = new HumanBodyBones[]
     {
         HumanBodyBones.Hips,
@@ -316,9 +353,9 @@ public class PoseScorer : MonoBehaviour
         HumanBodyBones.LeftUpperArm,
         HumanBodyBones.RightUpperArm
     };
-    [Tooltip("Max rotation drift (degrees/second) for a bone to be considered stable. (默认值 - 可被难度配置覆盖)")]
+    [Tooltip("Legacy serialized threshold retained for compatibility; it does not gate playback.")]
     [SerializeField] private float stabilityThresholdDegPerSec = 5f;
-    [Tooltip("How long the user must remain stable before scoring starts (seconds).")]
+    [Tooltip("Legacy serialized duration retained for compatibility; it does not gate playback.")]
     [SerializeField] private float stabilityDuration = 2f;
     [Header("Dead Bug Preparation")]
     [Tooltip("The relaxed preparation pose only needs a short continuous confirmation. " +
@@ -336,8 +373,8 @@ public class PoseScorer : MonoBehaviour
     [SerializeField] private float stabilityAlignmentThreshold = 35f;
     [Tooltip("Legacy leg alignment setting retained for difficulty configuration; surface guidance uses the scorer-derived thresholds above.")]
     [SerializeField] private float stabilityAlignmentThresholdLegs = 50f;
-    [Header("Scoring")]
-    [Tooltip("Duration of the scoring countdown (seconds).")]
+    [Header("Quality Observation Compatibility")]
+    [Tooltip("Legacy serialized value retained for compatibility; no fixed coach scoring window is started.")]
     [SerializeField] private float scoringDuration = 5f;
     [Tooltip("Bones compared for scoring. Rotation weight is higher than position.")]
     [SerializeField] private HumanBodyBones[] scoringBones = new HumanBodyBones[]
@@ -376,31 +413,29 @@ public class PoseScorer : MonoBehaviour
     [Tooltip("Remove fixed avatar and sensor-mounting offsets captured when training starts. " +
         "This is part of main's original robust scoring path.")]
     [SerializeField] private bool useSessionStartCalibration = true;
-    [Tooltip("Stability is measured over this interval instead of frame-to-frame, which suppresses IMU jitter.")]
+    [Tooltip("Legacy smoothing interval retained for compatibility; it does not gate playback.")]
     [Min(0.05f)] [SerializeField] private float stabilitySampleInterval = 0.18f;
-    [Tooltip("Additional IMU noise allowance added to the selected stability difficulty. " +
-        "The difficulty still changes the gate, while normal wearable jitter no longer blocks every hold.")]
+    [Tooltip("Legacy IMU tolerance retained for compatibility; normal jitter never blocks playback.")]
     [Min(0f)] [SerializeField] private float stabilityNoiseAllowanceDegPerSec = 7f;
     [Tooltip("A small fraction of noisy trackers may move without blocking the user.")]
     [Range(0f, 0.5f)] [SerializeField] private float allowedUnstableBoneFraction = 0.3f;
     [Tooltip("Hard cap for noisy bones allowed by the fraction above.")]
     [Min(0)] [SerializeField] private int maximumUnstableBoneCount = 2;
-    [Tooltip("Every active Profile region must roughly match for this long before stillness can advance scoring.")]
+    [Tooltip("Guidance latch confirmation time; it only affects feedback state, never playback.")]
     [Min(0f)] [SerializeField] private float coarseActionConfirmationSeconds = 0.3f;
-    [Tooltip("An already-ready active region must remain obviously wrong for this long before its coarse marker clears.")]
+    [Tooltip("Guidance latch release time; it only affects feedback state, never playback.")]
     [Min(0f)] [SerializeField] private float coarseActionReleaseSeconds = 0.5f;
-    [Tooltip("Ignore a short tracking spike without advancing or erasing the accumulated stable hold.")]
+    [Tooltip("Legacy tracking grace value retained for compatibility; it does not gate playback.")]
     [Min(0f)] [SerializeField] private float stabilityGraceDuration = 0.45f;
-    [Tooltip("When sustained movement is detected, accumulated stable time decays at this rate instead of resetting to zero.")]
+    [Tooltip("Legacy stability decay retained for compatibility; it does not gate playback.")]
     [Min(0f)] [SerializeField] private float stabilityProgressDecayRate = 0.35f;
-    [Tooltip("Stable time that must be re-earned if the user moves during the spoken scoring countdown.")]
+    [Tooltip("Legacy recovery value retained for compatibility; there is no spoken scoring gate.")]
     [Min(0.1f)] [SerializeField] private float stabilityRecoveryDuration = 0.75f;
-    [Tooltip("Maximum time spent in the follow-and-adjust state. When reached, the attempt is scored as-is instead of trapping the session forever.")]
-    [Min(0f)] [SerializeField] private float maximumFollowingWaitSeconds = 10f;
+    [Tooltip("Shared deadline for preparation, following and pre-score countdown combined. Also used by return/rest and completion controls. A retry never restarts this deadline.")]
+    [Min(0.5f)] [SerializeField] private float maximumFollowingWaitSeconds = DefaultProgressionTimeoutSeconds;
+    public float ProgressionTimeoutSeconds => Mathf.Max(0.5f, maximumFollowingWaitSeconds);
 
-    // Fired when a segment's scoring window finishes, with the averaged result.
-    public event Action<SegmentScore> OnSegmentScored;
-    // Fired when the whole action is complete, with all collected segment scores.
+    // Fired when the whole action is complete, with the continuous quality summary.
     public event Action<List<SegmentScore>> OnAllScored;
 
     private readonly List<SegmentScore> sessionScores = new List<SegmentScore>();
@@ -414,23 +449,32 @@ public class PoseScorer : MonoBehaviour
         new Dictionary<HumanBodyBones, Quaternion>();
     private bool hasSessionStartCalibration;
 
-    private enum State
+    private struct HapticTrackerCandidate
     {
-        Idle,               // not holding at a segment
-        WaitingStable,      // holding, waiting for user to stabilize
-        PreparingScore,     // stable confirmed; synchronized voice countdown
-        Scoring,            // counting down and sampling once per scoring beat
+        public readonly TrackerWearLocation location;
+        public readonly float severity;
+
+        public HapticTrackerCandidate(
+            TrackerWearLocation location,
+            float severity)
+        {
+            this.location = location;
+            this.severity = severity;
+        }
     }
 
-    private State currentState = State.Idle;
-    private float stateTimer;
+    private const string CurrentFlowPhaseName = "ContinuousObservation";
     private bool initialFollowInstructionAnnouncedEarly;
-    private Dictionary<HumanBodyBones, Quaternion> prevRotations = new Dictionary<HumanBodyBones, Quaternion>();
-    private float stabilitySampleElapsed;
-    private float unstableElapsed;
-    private float followingElapsed;
-    private bool lastStabilityResult = true;
-    private bool preparingBestEffortScore;
+    private bool continuousObservationActive;
+    private int hapticSetIndex = -1;
+    private int hapticRepeatIndex = -1;
+    private bool recordedDeadBugAllLimbFeedbackSent;
+    private bool recordedDeadBugAllLimbFeedbackLatched;
+    private bool recordedDeadBugAllLimbFeedbackCompleted;
+    private float recordedDeadBugAllLimbFeedbackStartedAt;
+    private int continuousValidSamples;
+    private int continuousUnavailableSamples;
+    private float continuousFeedbackCooldown;
     private HumanBodyBones[] effectiveStabilityBones;
 
     // Current segment scoring results
@@ -606,9 +650,10 @@ public class PoseScorer : MonoBehaviour
 
         if (coachController != null)
         {
-            coachController.OnSegmentHold += HandleSegmentHold;
             coachController.OnAllComplete += HandleAllComplete;
+            coachController.OnSegmentHold += HandleObservationHold;
         }
+        CoachEventBus.CoachSegmentStarted += HandleSegmentStarted;
 
         if (nextButton != null)
         {
@@ -697,10 +742,12 @@ public class PoseScorer : MonoBehaviour
     {
         if (coachController != null)
         {
-            coachController.OnSegmentHold -= HandleSegmentHold;
             coachController.OnAllComplete -= HandleAllComplete;
+            coachController.OnSegmentHold -= HandleObservationHold;
         }
+        CoachEventBus.CoachSegmentStarted -= HandleSegmentStarted;
 
+        lumbarTeachingEvidence?.Dispose();
         scoringEngine?.Dispose();
         scoringEngine = null;
         guidanceDiagnosticEngine?.Dispose();
@@ -720,119 +767,162 @@ public class PoseScorer : MonoBehaviour
         if (MobileCoachControls.IsPaused)
         {
             hapticFeedback?.StopAllHaptics();
+            ResetLumbarTargetFeedback(false);
+            pendingLumbarTargetPulses.Clear();
             return;
         }
         sessionMotionEvidence.Sample();
 
-        if (currentState == State.Idle)
+        if (continuousObservationActive)
         {
+            SampleContinuousPose();
+            UpdateContinuousObservation();
             UpdateHapticFeedback();
-            return;
-        }
 
-        if (currentState == State.WaitingStable)
-        {
-            UpdateWaitingStable();
-        }
-        else if (currentState == State.PreparingScore)
-        {
-            UpdatePreparingScore();
-        }
-        else if (currentState == State.Scoring)
-        {
-            stateTimer -= Time.deltaTime;
-            UpdateScoring();
+            return;
         }
 
         UpdateHapticFeedback();
 
+
     }
 
-    private void HandleSegmentHold(SegmentHoldInfo info)
+    private void HandleObservationHold(SegmentHoldInfo segment)
     {
-        hapticFeedback?.StopAllHaptics();
-        bool isFirstHold =
-            info.segmentIndex == 0 && info.repeatIndex == 0 && info.setIndex == 0;
+        if (!continuousObservationActive || !UsesLumbarTeaching) return;
+        // The segment-start pose precedes the movement. Refresh the observation
+        // target at the authored endpoint without advancing or delaying playback.
+        guidanceDiagnosticEngine?.BeginTarget(coachAnimator, EffectiveGuidanceBones,
+            segment.segmentKind, segment.poseGuidanceRule);
+    }
 
-        // First hold of a fresh run — clear previous session results.
-        if (isFirstHold)
+    private void HandleSegmentStarted(CoachSegmentEvent segment)
+    {
+        currentSegmentInfo = new SegmentHoldInfo(
+            segment.segmentId,
+            segment.repetitionIndex,
+            segment.setIndex,
+            segment.label,
+            1f,
+            0f,
+            segment.segmentKind,
+            FindObjectOfType<SegmentedCoachController>()?.CurrentPoseGuidanceRule ?? SegmentPoseGuidanceRule.Auto);
+        if (IsRecordedDeadBugScene)
         {
-            sessionScores.Clear();
+            recordedDeadBugAllLimbFeedbackLatched = false;
+            recordedDeadBugAllLimbFeedbackCompleted = false;
+            recordedDeadBugAllLimbFeedbackStartedAt = 0f;
         }
-
-        currentSegmentInfo = info;
+        ResetLumbarTargetFeedback(false);
         ResetVisualGuidanceEvidence();
-        frameScores.Clear();
-        frameWorstRegions.Clear();
-        prevRotations.Clear();
-        voiceManager?.CancelStabilityCountdown();
-        scoringEngine?.Reset();
         if (guidanceDiagnosticEngine == null)
         {
-            guidanceDiagnosticEngine = new PoseHighlightDiagnosticEngine(
-                guidanceDiagnostics);
+            guidanceDiagnosticEngine = new PoseHighlightDiagnosticEngine(guidanceDiagnostics);
         }
-        if (UsesTargetedExerciseGuidance)
+        if (UsesTargetedExerciseGuidance || UsesHipThrustTeaching)
         {
-            // Targeted Dead Bug / Bird Dog guidance must not inherit any
-            // recorded coach-pose error.
             guidanceDiagnosticEngine.ResetTarget();
         }
         else
         {
             guidanceDiagnosticEngine.BeginTarget(
                 coachAnimator,
-                GuidanceBones,
-                info.segmentKind,
-                info.poseGuidanceRule);
+                EffectiveGuidanceBones,
+                segment.segmentKind,
+                SegmentPoseGuidanceRule.Auto);
         }
+    }
 
-        EnterFollowingPhase(
-            "coach demonstration complete",
-            !isFirstHold || !initialFollowInstructionAnnouncedEarly,
-            RequiresRelaxedPreparation()
-                ? preparationConfirmationDuration
-                : -1f);
-
-        if (isFirstHold)
+    private void SampleContinuousPose()
+    {
+        continuousFeedbackCooldown = Mathf.Max(
+            0f,
+            continuousFeedbackCooldown - Time.unscaledDeltaTime);
+        if (!CanSampleCurrentPose())
         {
-            initialFollowInstructionAnnouncedEarly = false;
+            voiceManager?.ClearLessonCorrection();
+            continuousUnavailableSamples++;
+            return;
         }
 
-        if (nextButton != null)
+        continuousValidSamples++;
+        float score = CaptureScoringSample(Time.unscaledDeltaTime);
+        if (continuousFeedbackCooldown <= 0f && score < guidanceHighlightBelowScore)
         {
-            nextButton.interactable = false;
+            voiceManager?.PlayAdjustPose();
+            continuousFeedbackCooldown = 4f;
+        }
+    }
+
+    private void UpdateContinuousObservation()
+    {
+        UpdateGuidanceVmcFreshness(Time.unscaledDeltaTime);
+        UpdateStabilityGuidance();
+        // Playback no longer waits for a scored checkpoint. Keep the preparation
+        // reference as passive observation so lumbar progress can still be measured.
+        CaptureTeachingPreparation();
+    }
+
+    private void FinalizeContinuousObservation()
+    {
+        if (!continuousObservationActive ||
+            (continuousValidSamples == 0 && continuousUnavailableSamples == 0))
+        {
+            return;
         }
 
-        UpdateStatusText("等待姿势稳定...");
-        Debug.Log($"PoseScorer: Segment {info.segmentIndex} hold (duration {info.scoringDuration}s), waiting for user to stabilize.");
+        if (continuousValidSamples == 0)
+        {
+            sessionScores.Add(new SegmentScore
+            {
+                segmentIndex = currentSegmentInfo.segmentIndex,
+                repeatIndex = currentSegmentInfo.repeatIndex,
+                setIndex = currentSegmentInfo.setIndex,
+                segmentKind = currentSegmentInfo.segmentKind,
+                label = "连续质量观察",
+                trackingQuality = CoachTrackingQuality.Unavailable,
+                frameCount = 0
+            });
+            return;
+        }
+
+        float average = RobustPoseScoringEngine.CalculateRobustAverage(
+            frameScores,
+            robustScoring != null ? robustScoring.finalScoreTrimFraction : 0.1f);
+        float best = 0f;
+        foreach (float score in frameScores) best = Mathf.Max(best, score);
+        sessionScores.Add(new SegmentScore
+        {
+            segmentIndex = currentSegmentInfo.segmentIndex,
+            repeatIndex = currentSegmentInfo.repeatIndex,
+            setIndex = currentSegmentInfo.setIndex,
+            segmentKind = currentSegmentInfo.segmentKind,
+            label = "连续质量观察",
+            averageScore = average,
+            bestScore = best,
+            rawAverageScore = average,
+            rawBestScore = best,
+            frameCount = continuousValidSamples,
+            trackingQuality = continuousUnavailableSamples > 0
+                ? CoachTrackingQuality.Partial
+                : CoachTrackingQuality.Measured
+        });
     }
 
     private void HandleAllComplete()
     {
+        FinalizeContinuousObservation();
+        continuousObservationActive = false;
         hapticFeedback?.StopAllHaptics();
         sessionMotionEvidence.Stop();
-        TransitionTo(State.Idle, "all segments complete");
         // The final transition can be shorter than the queued completion cue.
         // Let VoicePromptManager finish naturally; the completion controls stay
         // hidden until it is idle.
         ResetVisualGuidanceEvidence();
         modelBodyPartHighlighter?.Hide();
 
-        float sessionAvg = 0f;
-        if (sessionScores.Count > 0)
-        {
-            foreach (SegmentScore s in sessionScores)
-            {
-                sessionAvg += s.averageScore;
-            }
-            sessionAvg /= sessionScores.Count;
-        }
-
-        Debug.Log($"PoseScorer: 训练完成！总平均分 {sessionAvg:F1} ({sessionScores.Count} 个片段)");
-        UpdateStatusText(
-            $"训练完成！总分 " +
-            $"{FormalActionScoreMappingSettings.RoundForDisplay(sessionAvg)}");
+        Debug.Log($"PoseScorer: 连续质量观察结束，样本={continuousValidSamples}，不可用={continuousUnavailableSamples}");
+        UpdateStatusText($"训练完成，完成 {CompletedRepetitions} 次练习流程");
         OnAllScored?.Invoke(sessionScores);
 
         if (nextButton != null)
@@ -860,7 +950,7 @@ public class PoseScorer : MonoBehaviour
         // Include all guided limbs in motion tracking. These bones only answer
         // whether the user has finished moving; coarse action readiness is
         // evaluated separately from profile-driven region evidence.
-        foreach (HumanBodyBones bone in GuidanceBones)
+        foreach (HumanBodyBones bone in EffectiveGuidanceBones)
         {
             if (seen.Add(bone))
             {
@@ -871,338 +961,31 @@ public class PoseScorer : MonoBehaviour
         effectiveStabilityBones = bones.ToArray();
     }
 
-    private void EnterFollowingPhase(
-        string reason,
-        bool announce,
-        float requiredStableSeconds = -1f,
-        bool resetFollowingWait = true)
-    {
-        voiceManager?.CancelStabilityCountdown();
-        unstableElapsed = 0f;
-        preparingBestEffortScore = false;
-        if (resetFollowingWait)
-        {
-            followingElapsed = 0f;
-        }
-        stateTimer = requiredStableSeconds > 0f
-            ? Mathf.Clamp(requiredStableSeconds, 0.1f, stabilityDuration)
-            : stabilityDuration;
-        TransitionTo(State.WaitingStable, reason);
-        CaptureCurrentRotations();
 
-        if (announce)
-        {
-            voiceManager?.PlayFollowCoach();
-        }
+
+    private bool CanSampleCurrentPose()
+    {
+        if (userAnimator == null || coachAnimator == null) return false;
+        guidanceInputIsFresh = !Application.isPlaying ||
+            UpdateGuidanceVmcFreshness(Time.unscaledDeltaTime);
+        return guidanceInputIsFresh && !HasHardPoseConstraint();
     }
 
-    private void TransitionTo(State nextState, string reason)
-    {
-        if (nextState == State.Scoring || nextState == State.Idle)
-            hapticFeedback?.StopAllHaptics();
-        State previousState = currentState;
-        currentState = nextState;
-        Debug.Log(
-            $"[CoachFlow] phase={nextState}, from={previousState}, reason={reason}, " +
-            $"stableRemaining={Mathf.Max(0f, stateTimer):0.00}s",
-            this);
-    }
 
-    private void UpdateWaitingStable()
-    {
-        UpdateStabilityGuidance();
-        bool motionIsStable = CheckUserStability();
-        bool requiresRelaxedPreparation = RequiresRelaxedPreparation();
-        bool coarseActionIsReady = IsCoarseActionReady();
-        bool isStable = requiresRelaxedPreparation
-            ? IsCurrentUserInRelaxedPreparationPose()
-            : motionIsStable && coarseActionIsReady;
-        followingElapsed += Time.deltaTime;
 
-        bool hasHighlightedMismatch = guidancePartsToHighlight.Count > 0;
-        bool maximumWaitReached =
-            maximumFollowingWaitSeconds > 0f &&
-            followingElapsed >= maximumFollowingWaitSeconds;
 
-        if (maximumWaitReached)
-        {
-            if (!requiresRelaxedPreparation && !coarseActionIsReady)
-            {
-                UpdateStatusText("请先把高亮提示的主动部位做到大致位置...");
-                return;
-            }
 
-            if (TryBeginScoringCountdown(true))
-            {
-                UpdateStatusText("本次跟做时间已到，按当前动作进入评分...");
-            }
-            else
-            {
-                UpdateStatusText("语音提示中，播放完后按当前动作进入评分...");
-            }
-            return;
-        }
 
-        if (isStable)
-        {
-            unstableElapsed = 0f;
-            stateTimer -= Time.deltaTime;
 
-            if (stateTimer <= 0f)
-            {
-                if (!TryBeginScoringCountdown(false))
-                {
-                    UpdateStatusText("已达到稳定要求，语音播放完后进入倒计时...");
-                }
-            }
-            else
-            {
-                UpdateStatusText(
-                    hasHighlightedMismatch
-                        ? $"根据高亮调整并保持 {Mathf.CeilToInt(stateTimer)}s..."
-                        : $"保持姿势 {Mathf.CeilToInt(stateTimer)}s...");
-            }
 
-            return;
-        }
 
-        if (!requiresRelaxedPreparation && !coarseActionIsReady)
-        {
-            unstableElapsed += Time.deltaTime;
-            if (unstableElapsed > stabilityGraceDuration)
-            {
-                stateTimer = Mathf.Min(
-                    stabilityDuration,
-                    stateTimer + Time.deltaTime * stabilityProgressDecayRate);
-            }
 
-            UpdateStatusText("请先把高亮提示的主动部位做到大致位置...");
-            return;
-        }
 
-        if (requiresRelaxedPreparation)
-        {
-            // Preparation is deliberately semantic and forgiving: once the
-            // user is lying down with both hands overhead and both legs
-            // straight, it counts as stable regardless of normal IMU drift.
-            // Reset on a missing condition so the short confirmation remains
-            // continuous instead of accumulating across unrelated poses.
-            unstableElapsed = 0f;
-            stateTimer = preparationConfirmationDuration;
-            UpdateStatusText(
-                coachController != null &&
-                coachController.UsesDeadBugPreparationPose
-                    ? "请躺下，双手举过头顶并伸直双腿..."
-                    : "请进入趴姿，用双手和双膝稳定支撑...");
-            return;
-        }
 
-        unstableElapsed += Time.deltaTime;
-        if (unstableElapsed <= stabilityGraceDuration)
-        {
-            // A brief noisy sample pauses progress. It does not count as stable
-            // time and does not erase stable time the user has already earned.
-            UpdateStatusText("检测到轻微晃动，请继续保持...");
-            return;
-        }
 
-        // Sustained movement slowly erodes progress instead of resetting the
-        // entire hold. This lets a real user converge across noisy IMU samples
-        // while someone who keeps moving still cannot advance.
-        stateTimer = Mathf.Min(
-            stabilityDuration,
-            stateTimer + Time.deltaTime * stabilityProgressDecayRate);
-        float required = Mathf.Max(0.1f, stabilityDuration);
-        float progress = 1f - Mathf.Clamp01(stateTimer / required);
-        UpdateStatusText($"请稳定姿势，已保持 {progress * 100f:0}%");
-    }
 
-    private bool TryBeginScoringCountdown(bool bestEffort)
-    {
-        // Do not queue a delayed announcement or interrupt a sentence belonging
-        // to the current event. WaitingStable retries after speech finishes and
-        // rechecks the live stability/highlight gate first.
-        if (voiceManager != null && voiceManager.IsBusy)
-        {
-            return false;
-        }
 
-        preparingBestEffortScore = bestEffort;
-        TransitionTo(
-            State.PreparingScore,
-            bestEffort
-                ? "maximum follow time reached; scoring current attempt"
-                : "accumulated stability requirement met");
-        UpdateStatusText("准备评分...");
 
-        if (voiceManager == null)
-        {
-            StartScoring();
-            return true;
-        }
-
-        if (!voiceManager.PlayStabilityCountdown(HandleScoringCountdownCompleted))
-        {
-            // An unexpected voice race must not strand PreparingScore. Return
-            // to the live gate; no prompt is queued for delayed playback.
-            preparingBestEffortScore = false;
-            TransitionTo(State.WaitingStable, "voice became busy before countdown started");
-            return false;
-        }
-
-        return true;
-    }
-
-    private void UpdatePreparingScore()
-    {
-        UpdateStabilityGuidance();
-
-        if (RequiresRelaxedPreparation())
-        {
-            // The relaxed preparation pose already completed its continuous
-            // confirmation before this spoken countdown started. Do not let a
-            // later tracker sample cancel "2, 1, start" and loop back to the
-            // follow-coach prompt.
-            unstableElapsed = 0f;
-            UpdateStatusText("请保持姿势，准备评分...");
-            return;
-        }
-
-        bool coarseActionIsReady = IsCoarseActionReady();
-
-        if (preparingBestEffortScore)
-        {
-            if (!coarseActionIsReady)
-            {
-                EnterFollowingPhase(
-                    "coarse action readiness lost during best-effort countdown",
-                    true,
-                    stabilityRecoveryDuration,
-                    false);
-                UpdateStatusText("主动部位偏离，请重新做到大致位置...");
-                return;
-            }
-
-            UpdateStatusText("请保持当前动作，准备评分...");
-            return;
-        }
-
-        bool motionIsStable = CheckUserStability();
-        bool isStable = RequiresRelaxedPreparation()
-            ? IsCurrentUserInRelaxedPreparationPose()
-            : motionIsStable && coarseActionIsReady;
-        if (isStable)
-        {
-            unstableElapsed = 0f;
-            UpdateStatusText("请保持姿势，准备评分...");
-            return;
-        }
-
-        unstableElapsed += Time.deltaTime;
-        if (unstableElapsed <= stabilityGraceDuration)
-        {
-            UpdateStatusText(
-                coarseActionIsReady
-                    ? "请继续保持稳定..."
-                    : "主动部位偏离，请恢复到大致位置...");
-            return;
-        }
-
-        EnterFollowingPhase(
-            coarseActionIsReady
-                ? "pre-score stability interrupted"
-                : "pre-score coarse action readiness lost",
-            true,
-            stabilityRecoveryDuration,
-            false);
-        UpdateStatusText(
-            coarseActionIsReady
-                ? "检测到持续移动，请重新稳定片刻..."
-                : "主动部位偏离，请重新做到大致位置...");
-    }
-
-    private void HandleScoringCountdownCompleted()
-    {
-        if (currentState == State.PreparingScore)
-        {
-            // The timeout may bypass noisy motion, but active regions must
-            // still retain their low-threshold coarse readiness marker.
-            bool requiresRelaxedPreparation = RequiresRelaxedPreparation();
-            bool coarseActionIsReady = false;
-            bool motionIsStable = false;
-            if (!requiresRelaxedPreparation)
-            {
-                coarseActionIsReady = IsCoarseActionReady();
-                motionIsStable = CheckUserStability();
-            }
-
-            bool isStable = CanCompleteScoringCountdown(
-                requiresRelaxedPreparation,
-                coarseActionIsReady,
-                motionIsStable,
-                preparingBestEffortScore);
-            if (isStable)
-            {
-                StartScoring();
-            }
-            else
-            {
-                EnterFollowingPhase(
-                    "not stable when scoring countdown completed",
-                    true,
-                    stabilityRecoveryDuration,
-                    false);
-            }
-        }
-    }
-
-    private void UpdateScoring()
-    {
-        // The original scorer evaluates every rendered frame. Audio beats are
-        // presentation only and must not define the statistical sample cadence.
-        float score = CaptureScoringSample(Time.deltaTime);
-        int remainingSec = Mathf.CeilToInt(stateTimer);
-        UpdateStatusText($"评分中 {remainingSec}s");
-        UpdateScoreText(
-            $"当前得分 {FormalActionScoreMappingSettings.RoundForDisplay(score)}");
-        scorePopup?.ShowLiveScore(score);
-
-        if (stateTimer <= 0f)
-        {
-            FinishScoring();
-        }
-    }
-
-    private void StartScoring()
-    {
-        TransitionTo(State.Scoring, "stability voice countdown completed");
-        preparingBestEffortScore = false;
-        // Use segment-specific duration if available, otherwise fall back to default
-        float duration = currentSegmentInfo.scoringDuration > 0f ? currentSegmentInfo.scoringDuration : scoringDuration;
-        stateTimer = duration;
-        frameScores.Clear();
-        frameWorstRegions.Clear();
-        scoringEngine?.Reset();
-        // 隐藏身体部位提示图片
-        if (bodyPartFeedback != null)
-        {
-            bodyPartFeedback.Hide();
-        }
-        modelBodyPartHighlighter?.Hide();
-        ResetVisualGuidanceEvidence();
-#if UNITY_EDITOR || DEVELOPMENT_BUILD
-        ReportGuidanceChange();
-#endif
-
-        // Beats remain audible countdown cues; UpdateScoring owns per-frame
-        // evaluation and timer-based completion.
-        voiceManager?.PlayScoringBeats(duration);
-
-        UpdateStatusText($"评分中 {Mathf.CeilToInt(stateTimer)}s");
-        Debug.Log(
-            $"PoseScorer: User stabilized, starting {duration}s scoring " +
-            "countdown with per-frame score sampling.");
-    }
 
     private float CaptureScoringSample(float sampleDeltaTime)
     {
@@ -1213,91 +996,13 @@ public class PoseScorer : MonoBehaviour
         return score;
     }
 
-    private void FinishScoring()
-    {
-        float avgScore = 0f;
-        float bestScore = 0f;
-        if (frameScores.Count > 0)
-        {
-            foreach (float s in frameScores)
-            {
-                avgScore += s;
-                if (s > bestScore)
-                {
-                    bestScore = s;
-                }
-            }
-            avgScore = RobustPoseScoringEngine.CalculateRobustAverage(
-                frameScores,
-                robustScoring != null ? robustScoring.finalScoreTrimFraction : 0.1f);
-        }
 
-        SegmentScore result = new SegmentScore
-        {
-            segmentIndex = currentSegmentInfo.segmentIndex,
-            repeatIndex = currentSegmentInfo.repeatIndex,
-            setIndex = currentSegmentInfo.setIndex,
-            segmentKind = currentSegmentInfo.segmentKind,
-            label = currentSegmentInfo.label,
-            // Retained for report-schema compatibility. Practice scoring now
-            // has one authoritative score stream: the values shown in the UI.
-            rawAverageScore = avgScore,
-            rawBestScore = bestScore,
-            averageScore = avgScore,
-            bestScore = bestScore,
-            frameCount = frameScores.Count
-        };
-        sessionScores.Add(result);
 
-        Debug.Log(
-            $"PoseScorer: Segment {result.segmentIndex} '{result.label}' " +
-            $"完成。平均分 {avgScore:F1}, 最高分 {bestScore:F1} " +
-            $"({result.frameCount} 帧采样)");
 
-        OnSegmentScored?.Invoke(result);
-        UpdateStatusText(
-            $"本段得分 {FormalActionScoreMappingSettings.RoundForDisplay(avgScore)}");
-        UpdateScoreText(
-            $"平均 {FormalActionScoreMappingSettings.RoundForDisplay(avgScore)} / " +
-            $"最高 {FormalActionScoreMappingSettings.RoundForDisplay(bestScore)}");
-
-        // 使用ScorePopup显示分数
-        if (scorePopup != null)
-        {
-            PoseBodyRegion feedbackRegion = GetDominantFeedbackRegion();
-            scorePopup.ShowAverageScore(
-                avgScore,
-                RobustPoseScoringEngine.GetEncouragingFeedback(avgScore, feedbackRegion));
-        }
-        else
-        {
-            Debug.LogWarning("PoseScorer: ScorePopup 未配置！");
-        }
-
-        bool hasNextCheckpoint = coachController != null &&
-            coachController.HasNextAfterCurrentHold;
-
-        // The manager serializes ding -> next action and skips the next-action
-        // announcement at the final checkpoint.
-        voiceManager?.FinishScoring(hasNextCheckpoint);
-
-        // Auto-advance to next segment
-        TransitionTo(State.Idle, "segment scoring complete");
-        if (coachController != null)
-        {
-            coachController.AdvanceToNext();
-        }
-    }
-
-    private bool RequiresRelaxedPreparation()
-    {
-        return currentSegmentInfo.segmentKind == TrainingSegmentKind.Preparation &&
-               coachController != null &&
-               coachController.IsPreparationHold;
-    }
 
     private bool IsCurrentUserInRelaxedPreparationPose()
     {
+        if (UsesShortTeaching) return IsTeachingPoseReady();
         if (coachController != null &&
             coachController.UsesDeadBugPreparationPose)
         {
@@ -1497,22 +1202,7 @@ public class PoseScorer : MonoBehaviour
         return torsoIsHorizontal && bothHandsSupport && bothKneesSupport;
     }
 
-    public static bool CanCompleteScoringCountdown(
-        bool requiresRelaxedPreparation,
-        bool coarseActionReady,
-        bool motionIsStable,
-        bool bestEffort)
-    {
-        // Reaching a preparation countdown means the exercise-specific pose
-        // has already passed its continuous confirmation. Sampling it again at
-        // the end can trap noisy avatar rigs in an endless countdown loop.
-        if (requiresRelaxedPreparation)
-        {
-            return true;
-        }
 
-        return coarseActionReady && (bestEffort || motionIsStable);
-    }
 
     private static bool IsLegStraight(
         Vector3 upperLeg,
@@ -1531,65 +1221,7 @@ public class PoseScorer : MonoBehaviour
             Mathf.Clamp(maximumKneeBend, 0f, 90f);
     }
 
-    private bool CheckUserStability()
-    {
-        if (userAnimator == null)
-        {
-            return false;
-        }
 
-        stabilitySampleElapsed += Time.deltaTime;
-        if (stabilitySampleElapsed < Mathf.Max(0.05f, stabilitySampleInterval))
-        {
-            return lastStabilityResult;
-        }
-
-        float sampleDuration = stabilitySampleElapsed;
-        stabilitySampleElapsed = 0f;
-        int checkedBoneCount = 0;
-        int unstableBoneCount = 0;
-        // Keep Relaxed/Medium/Strict distinct while accounting for the normal
-        // baseline jitter of wearable IMU trackers.
-        float effectiveThreshold = Mathf.Max(
-            0.1f,
-            GetEffectiveStabilityThreshold() + stabilityNoiseAllowanceDegPerSec);
-
-        foreach (HumanBodyBones bone in effectiveStabilityBones)
-        {
-            Transform t = userAnimator.GetBoneTransform(bone);
-            if (t == null)
-            {
-                continue;
-            }
-
-            Quaternion currentRot = t.localRotation;
-
-            if (prevRotations.TryGetValue(bone, out Quaternion prevRot))
-            {
-                float angleDiff = Quaternion.Angle(prevRot, currentRot);
-                float angularVelocity = angleDiff / Mathf.Max(sampleDuration, 1e-4f);
-
-                if (angularVelocity > effectiveThreshold)
-                {
-                    unstableBoneCount++;
-                }
-            }
-
-            checkedBoneCount++;
-
-            // Roll the reference forward at the fixed sampling interval.
-            prevRotations[bone] = currentRot;
-        }
-
-        int allowedUnstable = CalculateAllowedUnstableBoneCount(
-            checkedBoneCount,
-            allowedUnstableBoneFraction,
-            maximumUnstableBoneCount);
-        lastStabilityResult =
-            checkedBoneCount > 0 &&
-            unstableBoneCount <= allowedUnstable;
-        return lastStabilityResult;
-    }
 
     public static int CalculateAllowedUnstableBoneCount(
         int checkedBoneCount,
@@ -1602,26 +1234,6 @@ public class PoseScorer : MonoBehaviour
         return Mathf.Min(
             proportionalAllowance,
             Mathf.Max(0, maximumCount));
-    }
-
-    private void CaptureCurrentRotations()
-    {
-        if (userAnimator == null)
-        {
-            return;
-        }
-
-        prevRotations.Clear();
-        stabilitySampleElapsed = 0f;
-        lastStabilityResult = false;
-        foreach (HumanBodyBones bone in effectiveStabilityBones)
-        {
-            Transform t = userAnimator.GetBoneTransform(bone);
-            if (t != null)
-            {
-                prevRotations[bone] = t.localRotation;
-            }
-        }
     }
 
     // Compares user's current pose to coach's frozen target pose. Returns a score 0-100.
@@ -1685,11 +1297,7 @@ public class PoseScorer : MonoBehaviour
 
     private void UpdateScoreText(string message)
     {
-        if (mobileScoreText != null) mobileScoreText.text = message;
-        if (scoreText != null)
-        {
-            scoreText.text = message;
-        }
+        // Coach follow mode deliberately has no live score or segment result UI.
     }
 
     // Public API for debugging / manual control
@@ -1723,8 +1331,12 @@ public class PoseScorer : MonoBehaviour
     public PoseFrameScore LastFrameScore => lastFrameResult;
     public float MaximumUserMotionDegrees => sessionMotionEvidence.MaximumUserMotionDegrees;
     public float MaximumCoachMotionDegrees => sessionMotionEvidence.MaximumCoachMotionDegrees;
-    public string CurrentFlowPhase => currentState.ToString();
-    public float StabilityRemainingSeconds => Mathf.Max(0f, stateTimer);
+    public string CurrentFlowPhase => CurrentFlowPhaseName;
+    // One completed core/return pair is one practice attempt. Pose accuracy
+    // belongs in its score and must not silently discard the repetition.
+    public int CompletedRepetitions => coachController != null
+        ? coachController.CompletedRepetitions : 0;
+    public float StabilityRemainingSeconds => 0f;
     public bool CoarseActionReady => IsCoarseActionReady();
 
     public void BeginTrainingMeasurement()
@@ -1736,13 +1348,23 @@ public class PoseScorer : MonoBehaviour
 
         voiceManager?.StopAll();
         scorePopup?.HideImmediately();
-        TransitionTo(State.Idle, "training session started");
-        stateTimer = stabilityDuration;
-        followingElapsed = 0f;
-        unstableElapsed = 0f;
-        preparingBestEffortScore = false;
+        if (mobileScoreText != null) mobileScoreText.text = string.Empty;
+        if (scoreText != null) scoreText.text = string.Empty;
         initialFollowInstructionAnnouncedEarly = false;
         sessionScores.Clear();
+        continuousValidSamples = 0;
+        continuousUnavailableSamples = 0;
+        continuousFeedbackCooldown = 0f;
+        continuousObservationActive = true;
+        hapticSetIndex = -1;
+        hapticRepeatIndex = -1;
+        recordedDeadBugAllLimbFeedbackSent = false;
+        recordedDeadBugAllLimbFeedbackLatched = false;
+        recordedDeadBugAllLimbFeedbackCompleted = false;
+        recordedDeadBugAllLimbFeedbackStartedAt = 0f;
+        hapticFeedback?.ResetGuidancePulse();
+        lumbarTeachingEvidence?.Reset();
+        hasHipThrustRestPose = false;
         CaptureSessionStartCalibration();
         scoringEngine?.Reset();
         if (guidanceDiagnosticEngine == null)
@@ -1750,7 +1372,12 @@ public class PoseScorer : MonoBehaviour
             guidanceDiagnosticEngine = new PoseHighlightDiagnosticEngine(
                 guidanceDiagnostics);
         }
-        if (UsesTargetedExerciseGuidance)
+        if (UsesLumbarTeaching)
+        {
+            guidanceDiagnosticEngine.Dispose();
+            guidanceDiagnosticEngine = new PoseHighlightDiagnosticEngine(guidanceDiagnostics);
+        }
+        else if (UsesTargetedExerciseGuidance || UsesHipThrustTeaching)
         {
             guidanceDiagnosticEngine.ResetTarget();
         }
@@ -1759,7 +1386,7 @@ public class PoseScorer : MonoBehaviour
             guidanceDiagnosticEngine.CaptureSessionReference(
                 userAnimator,
                 coachAnimator,
-                GuidanceBones);
+                EffectiveGuidanceBones);
         }
         sessionMotionEvidence.Begin(coachAnimator, userAnimator, scoringBones);
     }
@@ -1776,16 +1403,13 @@ public class PoseScorer : MonoBehaviour
 
     public void StopTrainingMeasurement()
     {
+        FinalizeContinuousObservation();
+        continuousObservationActive = false;
         sessionMotionEvidence.Stop();
         voiceManager?.StopAll();
+        hapticFeedback?.StopAllHaptics();
         scorePopup?.HideImmediately();
-        TransitionTo(State.Idle, "training session stopped");
-        stateTimer = stabilityDuration;
-        followingElapsed = 0f;
-        unstableElapsed = 0f;
-        preparingBestEffortScore = false;
         initialFollowInstructionAnnouncedEarly = false;
-        prevRotations.Clear();
         frameScores.Clear();
         frameWorstRegions.Clear();
         ResetVisualGuidanceEvidence();
@@ -1820,42 +1444,17 @@ public class PoseScorer : MonoBehaviour
             userAnimator,
             coachAnimator,
             GuidanceBones);
-        HandleSegmentHold(new SegmentHoldInfo(
+        HandleSegmentStarted(new CoachSegmentEvent(
             0,
             0,
             0,
-            "Editor guidance probe",
-            1f,
-            Mathf.Max(3f, scoringDuration),
-            TrainingSegmentKind.CoreAction));
+            TrainingSegmentKind.CoreAction,
+            "Editor guidance probe"));
         Debug.Log("PoseScorer: editor guidance checkpoint started.");
     }
 #endif
 
-    private PoseBodyRegion GetDominantFeedbackRegion()
-    {
-        var counts = new Dictionary<PoseBodyRegion, int>();
-        PoseBodyRegion dominant = PoseBodyRegion.None;
-        int dominantCount = 0;
-        foreach (PoseBodyRegion region in frameWorstRegions)
-        {
-            if (region == PoseBodyRegion.None)
-            {
-                continue;
-            }
 
-            counts.TryGetValue(region, out int count);
-            count++;
-            counts[region] = count;
-            if (count > dominantCount)
-            {
-                dominant = region;
-                dominantCount = count;
-            }
-        }
-
-        return dominant;
-    }
 
     private void CaptureSessionStartCalibration()
     {
@@ -1886,9 +1485,67 @@ public class PoseScorer : MonoBehaviour
 
     private void UpdateStabilityGuidance()
     {
-        guidanceInputIsFresh = false;
+        guidanceInputIsFresh = !Application.isPlaying ||
+            UpdateGuidanceVmcFreshness(Time.unscaledDeltaTime);
         ShowMisalignedBodyParts();
         UpdateCoarseActionReadiness(Time.deltaTime);
+    }
+
+    private void UpdateHipThrustTargetHaptic()
+    {
+        if (!UsesHipThrustTeaching ||
+            currentSegmentInfo.segmentKind != TrainingSegmentKind.CoreAction ||
+            !guidanceInputIsFresh ||
+            !HipThrustPoseGuidance.TryCapture(
+                userAnimator,
+                out HipThrustPoseGeometry userPose) ||
+            !HipThrustPoseGuidance.TryCapture(
+                coachAnimator,
+                out HipThrustPoseGeometry coachPose))
+        {
+            hipThrustHapticHeightCandidateActive = false;
+            hipThrustHapticHeightStableSeconds = 0f;
+            return;
+        }
+
+        if (hipThrustOptimalHeightPulseSent)
+        {
+            return;
+        }
+
+        float heightError = Mathf.Abs(
+            userPose.hipAboveSupportLine - coachPose.hipAboveSupportLine);
+        float enterTolerance = Mathf.Max(0f, hipThrustHapticHeightTolerance);
+        float exitTolerance = enterTolerance + 0.03f;
+        if (!hipThrustHapticHeightCandidateActive)
+        {
+            if (heightError > enterTolerance)
+            {
+                hipThrustHapticHeightStableSeconds = 0f;
+                return;
+            }
+
+            hipThrustHapticHeightCandidateActive = true;
+        }
+        else if (heightError > exitTolerance)
+        {
+            hipThrustHapticHeightCandidateActive = false;
+            hipThrustHapticHeightStableSeconds = 0f;
+            return;
+        }
+
+        hipThrustHapticHeightStableSeconds += Mathf.Clamp(
+            Time.deltaTime,
+            0f,
+            0.1f);
+        if (hipThrustHapticHeightStableSeconds <
+            Mathf.Max(0f, hipThrustHapticConfirmationSeconds))
+        {
+            return;
+        }
+
+        hipThrustOptimalHeightPulseSent = true;
+        hipThrustOptimalHeightPulsePending = true;
     }
 
     private void EnsureHapticFeedbackController()
@@ -1907,51 +1564,143 @@ public class PoseScorer : MonoBehaviour
     private void UpdateHapticFeedback()
     {
         EnsureHapticFeedbackController();
+        if (continuousObservationActive && currentSegmentInfo.segmentKind == TrainingSegmentKind.CoreAction &&
+            (hapticSetIndex != currentSegmentInfo.setIndex || hapticRepeatIndex != currentSegmentInfo.repeatIndex))
+        {
+            hapticSetIndex = currentSegmentInfo.setIndex;
+            hapticRepeatIndex = currentSegmentInfo.repeatIndex;
+            hapticFeedback.ResetGuidancePulse();
+        }
         BuildHapticLocationOverrides();
-        bool guidancePhaseEnabled =
-            currentState == State.WaitingStable ||
-            currentState == State.PreparingScore;
+        bool guidancePhaseEnabled = continuousObservationActive;
         bool guidanceInputFresh = guidanceInputIsFresh;
-        hapticFeedback.Tick(
+        hapticFeedback.TickSelectedLocations(
             guidancePhaseEnabled,
             guidanceInputFresh,
-            confirmedGuidanceParts,
             hapticLocationOverrides,
             MobileCoachControls.IsPaused);
+    }
+
+    private void DispatchPendingHipThrustOptimalHeightPulse()
+    {
+        if (!hipThrustOptimalHeightPulsePending)
+        {
+            return;
+        }
+
+        hipThrustOptimalHeightPulsePending = false;
+        hapticFeedback.PulseOnce(TrackerWearLocation.Abdomen);
     }
 
     private void BuildHapticLocationOverrides()
     {
         hapticLocationOverrides.Clear();
-        foreach (BodyPart part in confirmedGuidanceParts)
+        if (!continuousObservationActive || !guidanceInputIsFresh || HasHardPoseConstraint())
+            return;
+
+        if (IsRecordedDeadBugScene && recordedDeadBugAllLimbFeedbackLatched &&
+            !recordedDeadBugAllLimbFeedbackCompleted)
         {
-            if (part == BodyPart.Torso)
-            {
-                hapticLocationOverrides.Add(TrackerWearLocation.Chest);
-                hapticLocationOverrides.Add(TrackerWearLocation.Abdomen);
-                continue;
-            }
+            hapticLocationOverrides.Add(TrackerWearLocation.LeftForearm);
+            hapticLocationOverrides.Add(TrackerWearLocation.RightForearm);
+            hapticLocationOverrides.Add(TrackerWearLocation.LeftLowerLeg);
+            hapticLocationOverrides.Add(TrackerWearLocation.RightLowerLeg);
+            return;
+        }
 
-            if (!UsesTargetedExerciseGuidance ||
-                !hasLatestTargetedGuidanceGeometry ||
-                !TryGetTargetedLimbHapticLocations(
-                    part,
-                    out TrackerWearLocation proximal,
-                    out TrackerWearLocation distal,
-                    out bool useProximal,
-                    out bool useDistal))
-            {
-                continue;
-            }
+        if (currentSegmentInfo.segmentKind != TrainingSegmentKind.CoreAction)
+            return;
 
-            if (useProximal)
+        bool hasTarget = false;
+        foreach (BodyPart part in AllGuidanceParts)
+        {
+            if (currentSegmentInfo.poseGuidanceRule.GetRole(part) != PoseGuidanceRegionRole.Active)
+                continue;
+            hasTarget = true;
+            if (!guidancePartsToHighlight.Contains(part))
             {
-                hapticLocationOverrides.Add(proximal);
+                hapticLocationOverrides.Clear();
+                return;
             }
-            if (useDistal)
+            hapticLocationOverrides.Add(GetDefaultHapticLocation(part));
+        }
+        if (!hasTarget) hapticLocationOverrides.Clear();
+    }
+
+    private void AddHapticTrackerCandidate(
+        TrackerWearLocation location,
+        float severity)
+    {
+        hapticTrackerCandidates.Add(new HapticTrackerCandidate(location, severity));
+    }
+
+    private void SelectHapticGuidanceParts()
+    {
+        selectedHapticParts.Clear();
+        if (UsesTargetedExerciseGuidance)
+        {
+            bool hasLeftArmRightLegPair =
+                hapticCandidateParts.Contains(BodyPart.LeftArm) &&
+                hapticCandidateParts.Contains(BodyPart.RightLeg);
+            bool hasRightArmLeftLegPair =
+                hapticCandidateParts.Contains(BodyPart.RightArm) &&
+                hapticCandidateParts.Contains(BodyPart.LeftLeg);
+
+            if (hasLeftArmRightLegPair || hasRightArmLeftLegPair)
             {
-                hapticLocationOverrides.Add(distal);
+                bool chooseLeftArmRightLeg = hasLeftArmRightLegPair &&
+                    (!hasRightArmLeftLegPair ||
+                     GetGuidancePartSeverity(BodyPart.LeftArm) +
+                     GetGuidancePartSeverity(BodyPart.RightLeg) >=
+                     GetGuidancePartSeverity(BodyPart.RightArm) +
+                     GetGuidancePartSeverity(BodyPart.LeftLeg));
+                AddHapticPair(
+                    chooseLeftArmRightLeg ? BodyPart.LeftArm : BodyPart.RightArm,
+                    chooseLeftArmRightLeg ? BodyPart.RightLeg : BodyPart.LeftLeg);
+                return;
             }
+        }
+
+        selectedHapticParts.AddRange(hapticCandidateParts);
+    }
+
+    private void AddHapticPair(BodyPart first, BodyPart second)
+    {
+        if (GetGuidancePartSeverity(first) >= GetGuidancePartSeverity(second))
+        {
+            selectedHapticParts.Add(first);
+            selectedHapticParts.Add(second);
+        }
+        else
+        {
+            selectedHapticParts.Add(second);
+            selectedHapticParts.Add(first);
+        }
+    }
+
+    private float GetGuidancePartSeverity(BodyPart part)
+    {
+        return CurrentGuidancePartSeverities.TryGetValue(part, out float severity)
+            ? severity
+            : 0f;
+    }
+
+    private static TrackerWearLocation GetDefaultHapticLocation(BodyPart part)
+    {
+        switch (part)
+        {
+            case BodyPart.LeftArm:
+                return TrackerWearLocation.LeftForearm;
+            case BodyPart.RightArm:
+                return TrackerWearLocation.RightForearm;
+            case BodyPart.LeftLeg:
+                return TrackerWearLocation.LeftLowerLeg;
+            case BodyPart.RightLeg:
+                return TrackerWearLocation.RightLowerLeg;
+            case BodyPart.Torso:
+                return TrackerWearLocation.Abdomen;
+            default:
+                return default;
         }
     }
 
@@ -1960,12 +1709,16 @@ public class PoseScorer : MonoBehaviour
         out TrackerWearLocation proximal,
         out TrackerWearLocation distal,
         out bool useProximal,
-        out bool useDistal)
+        out bool useDistal,
+        out float proximalSeverity,
+        out float distalSeverity)
     {
         proximal = default;
         distal = default;
         useProximal = false;
         useDistal = false;
+        proximalSeverity = 0f;
+        distalSeverity = 0f;
 
         if (!TryGetTargetedLimbEvidence(
                 part,
@@ -1980,20 +1733,22 @@ public class PoseScorer : MonoBehaviour
             return false;
         }
 
-        // A Bird Dog support failure may be caused by contact/endpoint drop,
-        // not one anatomical segment. Keep the existing full-limb cue there.
+        // A Bird Dog support failure may not identify one anatomical segment;
+        // the group selector resolves the tied locations under its two-motor cap.
         if (guidanceExercise == PoseGuidanceExercise.BirdDog && !expectedActive)
         {
             useProximal = true;
             useDistal = true;
+            proximalSeverity = GetGuidancePartSeverity(part);
+            distalSeverity = proximalSeverity;
             return true;
         }
 
-        float proximalSeverity = CalculateProximalHapticSeverity(
+        proximalSeverity = CalculateProximalHapticSeverity(
             direction,
             directionTracked,
             expectedActive);
-        float distalSeverity = guidanceExercise == PoseGuidanceExercise.BirdDog &&
+        distalSeverity = guidanceExercise == PoseGuidanceExercise.BirdDog &&
             expectedActive && bendTracked
             ? NormalizeAboveThreshold(
                 bendDegrees,
@@ -2047,7 +1802,7 @@ public class PoseScorer : MonoBehaviour
                 directionTracked = birdDog ? latestTargetedGuidanceGeometry.leftArmLineTracked : latestTargetedGuidanceGeometry.leftArmTracked;
                 bendDegrees = latestTargetedGuidanceGeometry.leftArmBendDegrees;
                 bendTracked = latestTargetedGuidanceGeometry.leftArmBendTracked;
-                proximal = TrackerWearLocation.LeftUpperArm;
+                proximal = TrackerWearLocation.LeftForearm;
                 distal = TrackerWearLocation.LeftForearm;
                 return true;
             case BodyPart.RightArm:
@@ -2055,7 +1810,7 @@ public class PoseScorer : MonoBehaviour
                 directionTracked = birdDog ? latestTargetedGuidanceGeometry.rightArmLineTracked : latestTargetedGuidanceGeometry.rightArmTracked;
                 bendDegrees = latestTargetedGuidanceGeometry.rightArmBendDegrees;
                 bendTracked = latestTargetedGuidanceGeometry.rightArmBendTracked;
-                proximal = TrackerWearLocation.RightUpperArm;
+                proximal = TrackerWearLocation.RightForearm;
                 distal = TrackerWearLocation.RightForearm;
                 return true;
             case BodyPart.LeftLeg:
@@ -2063,7 +1818,7 @@ public class PoseScorer : MonoBehaviour
                 directionTracked = latestTargetedGuidanceGeometry.leftLegTracked;
                 bendDegrees = latestTargetedGuidanceGeometry.leftLegBendDegrees;
                 bendTracked = latestTargetedGuidanceGeometry.leftLegBendTracked;
-                proximal = TrackerWearLocation.LeftThigh;
+                proximal = TrackerWearLocation.LeftLowerLeg;
                 distal = TrackerWearLocation.LeftLowerLeg;
                 return true;
             case BodyPart.RightLeg:
@@ -2071,7 +1826,7 @@ public class PoseScorer : MonoBehaviour
                 directionTracked = latestTargetedGuidanceGeometry.rightLegTracked;
                 bendDegrees = latestTargetedGuidanceGeometry.rightLegBendDegrees;
                 bendTracked = latestTargetedGuidanceGeometry.rightLegBendTracked;
-                proximal = TrackerWearLocation.RightThigh;
+                proximal = TrackerWearLocation.RightLowerLeg;
                 distal = TrackerWearLocation.RightLowerLeg;
                 return true;
             default:
@@ -2158,6 +1913,7 @@ public class PoseScorer : MonoBehaviour
 
     private bool IsCoarseActionReady()
     {
+        if (UsesShortTeaching) return IsTeachingPoseReady();
         EnsureGuidanceState();
         return !RequiresCoarseActionReadiness ||
             coarseActionReadinessLatch.IsReady;
@@ -2192,6 +1948,7 @@ public class PoseScorer : MonoBehaviour
         if (userAnimator == null ||
             (!UsesTargetedExerciseGuidance && coachAnimator == null))
         {
+            guidancePartsToHighlight.Clear();
             bodyPartFeedback?.Hide();
             modelBodyPartHighlighter?.Hide();
             return;
@@ -2205,14 +1962,35 @@ public class PoseScorer : MonoBehaviour
             ResolveGuidanceVmcReceiver();
         }
 
-        // EditMode validators drive HumanPose directly and intentionally have
-        // no live VMC receiver. Runtime/play mode keeps the full stale-input
-        // gate; editor-side pose diagnostics remain deterministic.
-        guidanceInputIsFresh = !Application.isPlaying ||
-            UpdateGuidanceVmcFreshness(Time.unscaledDeltaTime);
-
         PoseHighlightFrameDiagnostics diagnostics;
-        if (UsesTargetedExerciseGuidance)
+        if (RecordedAlternatingCoachMode.IsRecordedScene(gameObject.scene.name))
+        {
+            TargetedExercisePoseGeometry recordedGeometry = default;
+            hasLatestTargetedGuidanceGeometry = IsRecordedDeadBugScene &&
+                TryCaptureTargetedExerciseGeometry(out recordedGeometry);
+            latestTargetedGuidanceGeometry = recordedGeometry;
+            var recorded = GetComponent<RecordedPracticePoseGuidance>();
+            diagnostics = recorded != null
+                ? recorded.Evaluate(userAnimator, currentSegmentInfo.segmentKind,
+                    currentSegmentInfo.poseGuidanceRule, guidanceDiagnostics)
+                : default;
+        }
+        else if (UsesHipThrustTeaching)
+        {
+            hasLatestTargetedGuidanceGeometry = false;
+            diagnostics = currentSegmentInfo.segmentKind == TrainingSegmentKind.CoreAction &&
+                HipThrustPoseGuidance.TryCapture(userAnimator,
+                    out HipThrustPoseGeometry pose) &&
+                HipThrustPoseGuidance.TryCapture(coachAnimator,
+                    out HipThrustPoseGeometry target)
+                ? HipThrustPoseGuidance.EvaluateHeightTarget(
+                    pose,
+                    target,
+                    hipThrustHeightEnterTolerance,
+                    hipThrustHeightExitTolerance)
+                : default;
+        }
+        else if (UsesTargetedExerciseGuidance)
         {
             hasLatestTargetedGuidanceGeometry = TryCaptureTargetedExerciseGeometry(
                 out TargetedExercisePoseGeometry geometry);
@@ -2236,7 +2014,7 @@ public class PoseScorer : MonoBehaviour
             if (!guidanceDiagnosticEngine.HasTarget &&
                 !guidanceDiagnosticEngine.BeginTarget(
                     coachAnimator,
-                    GuidanceBones,
+                    EffectiveGuidanceBones,
                     currentSegmentInfo.segmentKind,
                     currentSegmentInfo.poseGuidanceRule))
             {
@@ -2248,19 +2026,73 @@ public class PoseScorer : MonoBehaviour
 
             diagnostics = guidanceDiagnosticEngine.Evaluate(
                 userAnimator,
-                GuidanceBones,
+                EffectiveGuidanceBones,
                 Time.deltaTime);
         }
 
         guidanceCandidateParts.Clear();
-        UpdateGuidancePart(BodyPart.LeftArm, diagnostics.leftArm);
-        UpdateGuidancePart(BodyPart.RightArm, diagnostics.rightArm);
-        UpdateGuidancePart(BodyPart.LeftLeg, diagnostics.leftLeg);
-        UpdateGuidancePart(BodyPart.RightLeg, diagnostics.rightLeg);
-        UpdateGuidancePart(BodyPart.Torso, diagnostics.torso);
+        UpdateGuidancePart(BodyPart.LeftArm, FilterLumbarHighlightRegion(
+            BodyPart.LeftArm, diagnostics.leftArm));
+        UpdateGuidancePart(BodyPart.RightArm, FilterLumbarHighlightRegion(
+            BodyPart.RightArm, diagnostics.rightArm));
+        UpdateGuidancePart(BodyPart.LeftLeg, FilterLumbarHighlightRegion(
+            BodyPart.LeftLeg, diagnostics.leftLeg));
+        UpdateGuidancePart(BodyPart.RightLeg, FilterLumbarHighlightRegion(
+            BodyPart.RightLeg, diagnostics.rightLeg));
+        UpdateGuidancePart(BodyPart.Torso, FilterLumbarHighlightRegion(
+            BodyPart.Torso, diagnostics.torso));
         UpdateConfirmedGuidanceParts(Time.deltaTime);
+        string correctionPart = null;
+        foreach (BodyPart part in AllGuidanceParts)
+        {
+            if (guidanceCandidateParts.Contains(part) && guidancePartValidity[part] &&
+                HasPositiveTargetTracking(part) &&
+                currentSegmentInfo.poseGuidanceRule.GetRole(part) == PoseGuidanceRegionRole.Active)
+            { correctionPart = part.ToString(); break; }
+        }
+        voiceManager?.ObserveLessonCorrection(correctionPart,
+            guidanceInputIsFresh && correctionPart != null);
 
-        UpdateGuidancePartColors();
+        // Patient-facing guidance is positive-only. Keep the existing
+        // diagnostics for corrective voice and haptic routing, but never
+        // expose mismatch regions as red highlights or an error list.
+        guidancePartsToHighlight.Clear();
+        foreach (BodyPart part in AllGuidanceParts)
+        {
+            if (continuousObservationActive && guidanceInputIsFresh && !HasHardPoseConstraint() &&
+                currentSegmentInfo.segmentKind == TrainingSegmentKind.CoreAction &&
+                (!UsesLumbarTeaching || !lumbarTeachingProfile.positiveHighlightAtTarget) &&
+                currentSegmentInfo.poseGuidanceRule.GetRole(part) ==
+                    PoseGuidanceRegionRole.Active &&
+                guidancePartValidity[part] && HasPositiveTargetTracking(part) &&
+                (UsesHipThrustTeaching ? diagnostics.Get(part).shouldActivate : guidancePartShouldClear[part]))
+            {
+                guidancePartsToHighlight.Add(part);
+            }
+        }
+
+        UpdateGuidancePartColors(diagnostics);
+        if (ShowRecordedDeadBugAllLimbFeedback())
+        {
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
+            ReportGuidanceChange();
+#endif
+            return;
+        }
+        bool showLumbarPositiveTarget = continuousObservationActive && UpdateLumbarPositiveTargetHighlight(
+            diagnostics.torso);
+        showLumbarPositiveTarget = showLumbarPositiveTarget &&
+            currentSegmentInfo.poseGuidanceRule.GetRole(BodyPart.Torso) == PoseGuidanceRegionRole.Active;
+        if (showLumbarPositiveTarget &&
+            !guidancePartsToHighlight.Contains(BodyPart.Torso))
+        {
+            guidancePartsToHighlight.Add(BodyPart.Torso);
+        }
+        if (showLumbarPositiveTarget)
+        {
+            guidancePartColors[BodyPart.Torso] =
+                GuidanceSuccessColor;
+        }
 
 #if UNITY_EDITOR || DEVELOPMENT_BUILD
         ReportGuidanceChange();
@@ -2276,7 +2108,9 @@ public class PoseScorer : MonoBehaviour
         BodyPart mostMisalignedPart = guidancePartsToHighlight[0];
         bool modelGuidanceShown = enableModelSurfaceHighlight &&
             modelBodyPartHighlighter != null &&
-            modelBodyPartHighlighter.Show(guidancePartColors);
+            (UsesHipThrustTeaching
+                ? modelBodyPartHighlighter.ShowHipPelvis(HipThrustHeightReadyColor)
+                : modelBodyPartHighlighter.Show(guidancePartColors));
         if (modelGuidanceShown)
         {
             // The surface overlay replaces the old picture card.
@@ -2284,16 +2118,222 @@ public class PoseScorer : MonoBehaviour
         }
         else
         {
-            // Keep the picture only as a fallback if an avatar mesh cannot
-            // produce overlays (for example, an unsupported runtime model).
+            // Do not show the diagnostic mismatch card in the patient UI.
             modelBodyPartHighlighter?.Hide();
-            bodyPartFeedback?.ShowBodyPart(mostMisalignedPart);
+            bodyPartFeedback?.Hide();
         }
+    }
+
+    private bool ShowRecordedDeadBugAllLimbFeedback()
+    {
+        if (!IsRecordedDeadBugScene ||
+            (currentSegmentInfo.segmentKind != TrainingSegmentKind.Preparation &&
+             currentSegmentInfo.segmentKind != TrainingSegmentKind.CoreAction))
+        {
+            return false;
+        }
+
+        if (recordedDeadBugAllLimbFeedbackCompleted)
+        {
+            guidancePartsToHighlight.Clear();
+            guidancePartColors.Clear();
+            modelBodyPartHighlighter?.Hide();
+            bodyPartFeedback?.Hide();
+            return true;
+        }
+
+        if (!recordedDeadBugAllLimbFeedbackLatched &&
+            !recordedDeadBugAllLimbFeedbackSent &&
+            IsRecordedDeadBugAllLimbsRaised())
+        {
+            recordedDeadBugAllLimbFeedbackLatched = true;
+            recordedDeadBugAllLimbFeedbackSent = true;
+            recordedDeadBugAllLimbFeedbackStartedAt = Time.unscaledTime;
+        }
+
+        if (!recordedDeadBugAllLimbFeedbackLatched)
+        {
+            return false;
+        }
+
+        float fadeSeconds = Mathf.Max(0.1f, recordedDeadBugSuccessFadeSeconds);
+        float alpha = 1f - Mathf.Clamp01(
+            (Time.unscaledTime - recordedDeadBugAllLimbFeedbackStartedAt) /
+            fadeSeconds);
+        guidancePartsToHighlight.Clear();
+        guidancePartColors.Clear();
+        if (alpha <= 0f)
+        {
+            recordedDeadBugAllLimbFeedbackCompleted = true;
+            modelBodyPartHighlighter?.Hide();
+            bodyPartFeedback?.Hide();
+            return true;
+        }
+
+        Color successColor = GuidanceSuccessColor;
+        successColor.a *= alpha;
+        foreach (BodyPart part in AllGuidanceParts)
+        {
+            guidancePartsToHighlight.Add(part);
+            guidancePartColors[part] = successColor;
+        }
+
+        bool shown = enableModelSurfaceHighlight &&
+            modelBodyPartHighlighter != null &&
+            modelBodyPartHighlighter.Show(guidancePartColors);
+        if (shown)
+        {
+            bodyPartFeedback?.Hide();
+        }
+        else
+        {
+            modelBodyPartHighlighter?.Hide();
+            bodyPartFeedback?.Hide();
+        }
+        return true;
+    }
+
+    private bool IsRecordedDeadBugAllLimbsRaised()
+    {
+        if (!guidanceInputIsFresh || HasHardPoseConstraint() ||
+            !hasLatestTargetedGuidanceGeometry ||
+            !latestTargetedGuidanceGeometry.bodyPlaneTracked ||
+            !latestTargetedGuidanceGeometry.torsoTiltTracked ||
+            latestTargetedGuidanceGeometry.torsoTiltFromHorizontalDegrees >
+                preparationMaxTorsoTiltFromHorizontal)
+        {
+            return false;
+        }
+
+        float requiredLift = targetedExerciseGuidance != null
+            ? targetedExerciseGuidance.requiredLiftClearAtOrAboveDegrees
+            : 45f;
+        return IsRecordedDeadBugLimbRaised(
+                   BodyPart.LeftArm,
+                   latestTargetedGuidanceGeometry.leftArmDirection,
+                   latestTargetedGuidanceGeometry.leftArmTracked,
+                   requiredLift) &&
+               IsRecordedDeadBugLimbRaised(
+                   BodyPart.RightArm,
+                   latestTargetedGuidanceGeometry.rightArmDirection,
+                   latestTargetedGuidanceGeometry.rightArmTracked,
+                   requiredLift) &&
+               IsRecordedDeadBugLimbRaised(
+                   BodyPart.LeftLeg,
+                   latestTargetedGuidanceGeometry.leftLegDirection,
+                   latestTargetedGuidanceGeometry.leftLegTracked,
+                   requiredLift) &&
+               IsRecordedDeadBugLimbRaised(
+                   BodyPart.RightLeg,
+                   latestTargetedGuidanceGeometry.rightLegDirection,
+                   latestTargetedGuidanceGeometry.rightLegTracked,
+                   requiredLift);
+    }
+
+    private bool IsRecordedDeadBugLimbRaised(
+        BodyPart part,
+        Vector3 direction,
+        bool directionTracked,
+        float requiredLift)
+    {
+        return directionTracked &&
+            TargetedExercisePoseGuidance.TryCalculateLiftDegrees(
+                PoseGuidanceExercise.DeadBug,
+                latestTargetedGuidanceGeometry.bodyPlaneNormal,
+                direction,
+                out float liftDegrees) &&
+            liftDegrees >= requiredLift &&
+            HasFreshRecordedDeadBugTracking(part);
+    }
+
+    private bool HasFreshRecordedDeadBugTracking(BodyPart part)
+    {
+        var receiver = guidanceVmcReceiver?.GetComponent<EVMC4U.ExternalReceiver>();
+        if (receiver == null)
+        {
+            return false;
+        }
+
+        float timeout = Mathf.Max(0.01f, vmcFreshnessTimeoutSeconds);
+        HumanBodyBones proximal;
+        HumanBodyBones distal;
+        switch (part)
+        {
+            case BodyPart.LeftArm:
+                proximal = HumanBodyBones.LeftUpperArm;
+                distal = HumanBodyBones.LeftLowerArm;
+                break;
+            case BodyPart.RightArm:
+                proximal = HumanBodyBones.RightUpperArm;
+                distal = HumanBodyBones.RightLowerArm;
+                break;
+            case BodyPart.LeftLeg:
+                proximal = HumanBodyBones.LeftUpperLeg;
+                distal = HumanBodyBones.LeftLowerLeg;
+                break;
+            case BodyPart.RightLeg:
+                proximal = HumanBodyBones.RightUpperLeg;
+                distal = HumanBodyBones.RightLowerLeg;
+                break;
+            default:
+                return false;
+        }
+
+        return receiver.HasFreshGuidanceBone(proximal, timeout) &&
+            receiver.HasFreshGuidanceBone(distal, timeout);
+    }
+
+    private bool HasPositiveTargetTracking(BodyPart part)
+    {
+        if (guidanceVmcReceiver == null || hapticFeedback == null ||
+            !hapticFeedback.HasValidTracking(part)) return false;
+        var receiver = guidanceVmcReceiver.GetComponent<EVMC4U.ExternalReceiver>();
+        if (receiver == null) return false;
+        float timeout = Mathf.Max(0.01f, vmcFreshnessTimeoutSeconds);
+        if (part == BodyPart.Torso)
+        {
+            return receiver.HasFreshGuidanceBone(HumanBodyBones.Hips, timeout) &&
+                (receiver.HasFreshGuidanceBone(HumanBodyBones.Spine, timeout) ||
+                 receiver.HasFreshGuidanceBone(HumanBodyBones.Chest, timeout) ||
+                 receiver.HasFreshGuidanceBone(HumanBodyBones.UpperChest, timeout));
+        }
+        // Lumbar profiles (including the side bridge support arm) also use
+        // limb targets. Only Bird Dog needs its additional bend geometry.
+        if (!RecordedAlternatingCoachMode.IsRecordedScene(gameObject.scene.name) &&
+            guidanceExercise == PoseGuidanceExercise.BirdDog &&
+            !hasLatestTargetedGuidanceGeometry) return false;
+        HumanBodyBones proximal, distal;
+        bool bendTracked;
+        switch (part)
+        {
+            case BodyPart.LeftArm:
+                proximal = HumanBodyBones.LeftUpperArm; distal = HumanBodyBones.LeftLowerArm;
+                bendTracked = latestTargetedGuidanceGeometry.leftArmBendTracked; break;
+            case BodyPart.RightArm:
+                proximal = HumanBodyBones.RightUpperArm; distal = HumanBodyBones.RightLowerArm;
+                bendTracked = latestTargetedGuidanceGeometry.rightArmBendTracked; break;
+            case BodyPart.LeftLeg:
+                proximal = HumanBodyBones.LeftUpperLeg; distal = HumanBodyBones.LeftLowerLeg;
+                bendTracked = latestTargetedGuidanceGeometry.leftLegBendTracked; break;
+            case BodyPart.RightLeg:
+                proximal = HumanBodyBones.RightUpperLeg; distal = HumanBodyBones.RightLowerLeg;
+                bendTracked = latestTargetedGuidanceGeometry.rightLegBendTracked; break;
+            default: return false;
+        }
+        if (!receiver.HasFreshGuidanceBone(proximal, timeout)) return false;
+        if (RecordedAlternatingCoachMode.IsRecordedScene(gameObject.scene.name))
+            return receiver.HasFreshGuidanceBone(distal, timeout);
+        return guidanceExercise != PoseGuidanceExercise.BirdDog ||
+            (bendTracked && receiver.HasFreshGuidanceBone(distal, timeout));
     }
 
     private bool UsesTargetedExerciseGuidance =>
         guidanceExercise == PoseGuidanceExercise.DeadBug ||
         guidanceExercise == PoseGuidanceExercise.BirdDog;
+
+    private bool IsRecordedDeadBugScene =>
+        guidanceExercise == PoseGuidanceExercise.DeadBug &&
+        gameObject.scene.name == "DeadBugPractice";
 
     private bool TryCaptureTargetedExerciseGeometry(
         out TargetedExercisePoseGeometry geometry)
@@ -2616,7 +2656,7 @@ public class PoseScorer : MonoBehaviour
         guidancePartRawScores[part] = compatibilityScore;
         guidancePartScores[part] = compatibilityScore;
         guidancePartThresholds[part] = 70f;
-        if (diagnostic.shouldActivate)
+        if (UsesHipThrustTeaching ? diagnostic.shouldClear : diagnostic.shouldActivate)
         {
             guidanceCandidateParts.Add(part);
         }
@@ -2636,7 +2676,9 @@ public class PoseScorer : MonoBehaviour
             guidanceEvidence.Add(new PoseGuidanceRegionEvidence(
                 part,
                 guidancePartValidity[part],
-                guidanceCandidateParts.Contains(part),
+                // Candidate mismatch diagnostics are not a positive state.
+                // Green requires valid tracking and the existing clear rule.
+                guidancePartValidity[part] && guidancePartShouldClear[part],
                 guidancePartShouldClear[part],
                 guidancePartSeverities[part]));
         }
@@ -2658,13 +2700,17 @@ public class PoseScorer : MonoBehaviour
         SyncGuidanceLatchState();
     }
 
-    private void UpdateGuidancePartColors()
+    private void UpdateGuidancePartColors(
+        PoseHighlightFrameDiagnostics diagnostics)
     {
         guidancePartColors.Clear();
         foreach (BodyPart part in guidancePartsToHighlight)
         {
-            guidancePartColors[part] = guidanceHighlightColor;
+            guidancePartColors[part] = UsesHipThrustTeaching
+                ? HipThrustHeightReadyColor
+                : GuidanceSuccessColor;
         }
+
     }
 
     private void EnsureGuidanceState()
@@ -2738,17 +2784,6 @@ public class PoseScorer : MonoBehaviour
     {
         EnsureGuidanceState();
         vmcFreshnessMonitor.Configure(vmcFreshnessTimeoutSeconds);
-        if (!enableVmcFreshnessGate)
-        {
-            if (!guidanceInputWasFresh)
-            {
-                ResetGuidanceLatchState();
-            }
-
-            guidanceInputWasFresh = true;
-            return true;
-        }
-
         ResolveGuidanceVmcReceiver();
         if (guidanceVmcReceiver == null)
         {
@@ -2769,7 +2804,8 @@ public class PoseScorer : MonoBehaviour
 
         hasLoggedMissingGuidanceReceiver = false;
         bool receiverAvailable = guidanceVmcReceiver.isActiveAndEnabled &&
-            guidanceVmcReceiver.GetAvailable() > 0;
+            guidanceVmcReceiver.GetAvailable() > 0 &&
+            !HasHardPoseConstraint();
         bool isFresh = vmcFreshnessMonitor.Update(
             receiverAvailable,
             guidanceVmcReceiver.GetRemoteTime(),
@@ -2786,6 +2822,18 @@ public class PoseScorer : MonoBehaviour
 
         guidanceInputWasFresh = isFresh;
         return isFresh;
+    }
+
+    private bool HasHardPoseConstraint()
+    {
+        if (guidanceVmcReceiver == null)
+        {
+            return false;
+        }
+
+        EVMC4U.ExternalReceiver receiver =
+            guidanceVmcReceiver.GetComponent<EVMC4U.ExternalReceiver>();
+        return receiver != null && receiver.HasHardPoseConstraint;
     }
 
     private void ResolveGuidanceVmcReceiver()
@@ -2905,7 +2953,7 @@ public class PoseScorer : MonoBehaviour
                 $"worst error {pair.Value:0.0}\u00b0, " +
                 $"severity {guidancePartSeverities[pair.Key]:0.00}"));
         Debug.Log(
-            $"[PoseGuidance] phase={currentState}, highlighted={highlighted}, " +
+            $"[PoseGuidance] phase={CurrentFlowPhaseName}, highlighted={highlighted}, " +
             $"exercise={guidanceExercise}, diagnostics: {errors}",
             this);
     }

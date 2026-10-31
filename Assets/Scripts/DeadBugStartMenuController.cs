@@ -10,9 +10,17 @@ public class DeadBugStartMenuController : MonoBehaviour
     public const float PracticeControlTopY = 350f;
     public const float PracticeControlVerticalSpacing = 175f;
     private static bool showPracticeControlsOnNextLoad;
+    private static bool showPracticeStartOnNextLoad;
+
+    public static void ShowPracticeStartOnNextLoad()
+    {
+        showPracticeControlsOnNextLoad = false;
+        showPracticeStartOnNextLoad = true;
+    }
 
     public static void ShowPracticeControlsOnNextLoad()
     {
+        showPracticeStartOnNextLoad = false;
         showPracticeControlsOnNextLoad = true;
     }
     public event Action TrainingStarted;
@@ -56,6 +64,7 @@ public class DeadBugStartMenuController : MonoBehaviour
     [Header("Training")]
     [SerializeField] private CoachActionController coachActionController;
     [SerializeField] private SegmentedCoachController practiceCoachController;
+    [SerializeField] private PracticeSessionController practiceSessionController;
     [SerializeField] private DeadBugGamingPoseScorer poseScorer;
     [SerializeField] private DeadBugGamingSideFeedback sideFeedback;
     [SerializeField] private GameObject actionMenu;
@@ -76,6 +85,9 @@ public class DeadBugStartMenuController : MonoBehaviour
     private bool practiceCompletionGateActive;
     private bool practiceCompletionPresentationReady;
     private bool practiceCompletionUserUpright;
+    private bool practiceCompletionChoicesVisible;
+    private float practiceCompletionWaitElapsed;
+    private PoseScorer practicePoseScorer;
     private readonly Dictionary<GameObject, bool> occludedRootActiveStates =
         new Dictionary<GameObject, bool>();
     private readonly Dictionary<Renderer, bool> menuHiddenRendererStates = new Dictionary<Renderer, bool>();
@@ -99,6 +111,7 @@ public class DeadBugStartMenuController : MonoBehaviour
         }
 
         ResolvePracticeCoachController();
+        ResolvePracticeSessionController();
         ConfigurePracticeActionMenu();
         ResolveTimesText();
         ResolveGamingCanvasRoot();
@@ -110,8 +123,9 @@ public class DeadBugStartMenuController : MonoBehaviour
             showPracticeControlsOnNextLoad;
         if (returningFromActionLibrary) showPracticeControlsOnNextLoad = false;
         InitializePresentation(
-            !returningFromActionLibrary &&
-            SpineFlowTrainingSession.ShouldShowPracticeStartConfirmation);
+            showPracticeStartOnNextLoad || (!returningFromActionLibrary &&
+            SpineFlowTrainingSession.ShouldShowPracticeStartConfirmation));
+        showPracticeStartOnNextLoad = false;
 
         if (endMenuRoot != null)
         {
@@ -194,6 +208,44 @@ public class DeadBugStartMenuController : MonoBehaviour
         SelectDifficulty(defaultDifficulty);
     }
 
+    private void ConfigurePracticeStartPresentation()
+    {
+        if (!IsPracticeCoachMode) return;
+        string key = VoicePromptManager.GetPracticeActionKey();
+        string title = key == "deadbug" ? "死虫式" : key == "birddog" ? "鸟狗式" :
+            key == "hipthrust" ? "臀桥" : key == "catcamel" ? "卧位猫式" :
+            key == "sidebridge" ? "侧桥" : key == "curlup" ? "卷腹" : null;
+        // The recorded Practice route is a normal patient-facing lesson; do not expose
+        // production metadata such as the recording source in the UI.
+        if (title != null && menuRoot != null)
+        {
+            Transform info = menuRoot.transform.Find("BackGroundPanel/DBUI");
+            if (info != null)
+            {
+                Image bakedInfo = info.GetComponent<Image>();
+                if (bakedInfo != null) bakedInfo.enabled = false;
+                GameObject titleObject = new GameObject("CoachActionTitle", typeof(RectTransform));
+                RectTransform rect = titleObject.GetComponent<RectTransform>();
+                rect.SetParent(info, false);
+                rect.anchorMin = Vector2.zero;
+                rect.anchorMax = Vector2.one;
+                rect.offsetMin = Vector2.zero;
+                rect.offsetMax = Vector2.zero;
+                TMP_Text label = titleObject.AddComponent<TextMeshProUGUI>();
+                label.font = timesText != null ? timesText.font : TMP_Settings.defaultFontAsset;
+                label.text = title + "\n<size=20>先观看讲解与完整示范，再跟随教练练习。</size>";
+                label.fontSize = 42f;
+                label.color = new Color(0.1f, 0.16f, 0.22f);
+                label.alignment = TextAlignmentOptions.Center;
+                label.raycastTarget = false;
+            }
+        }
+        Transform parent = menuRoot != null && menuRoot.activeSelf
+            ? menuRoot.transform : practiceActionMenu != null ? practiceActionMenu.transform : null;
+        if (parent != null && practiceSessionController != null)
+            practiceSessionController.ShowOrientationSelectionForStart(parent);
+    }
+
     private void ResolveGamingCanvasRoot()
     {
         if (gamingCanvasRoot == null || gamingCanvasRoot.name != "GamingCanvas")
@@ -270,7 +322,7 @@ public class DeadBugStartMenuController : MonoBehaviour
                 libraryButton.name = "ActionLibrary";
                 Button button = libraryButton.GetComponent<Button>();
                 button.onClick = new Button.ButtonClickedEvent();
-                button.onClick.AddListener(switcher.LoadCoachingChooseScene);
+                button.onClick.AddListener(switcher.LoadActionLibraryScene);
                 Image image = libraryButton.GetComponent<Image>();
                 Sprite librarySprite = Resources.Load<Sprite>(
                     "ActionLibrary/ActionLibraryButton");
@@ -298,6 +350,11 @@ public class DeadBugStartMenuController : MonoBehaviour
                     columnIndex = 0;
                     break;
                 case "Game":
+                    if (LumbarCoachMode.ForScene(gameObject.scene.name) != null)
+                    {
+                        child.gameObject.SetActive(false);
+                        continue;
+                    }
                     columnIndex = 1;
                     break;
                 case "PlayBack":
@@ -314,6 +371,8 @@ public class DeadBugStartMenuController : MonoBehaviour
             }
 
             child.gameObject.SetActive(true);
+            if (columnIndex > 1 && LumbarCoachMode.ForScene(gameObject.scene.name) != null)
+                columnIndex--;
             if (child is RectTransform rectTransform)
             {
                 rectTransform.sizeDelta = new Vector2(380f, 140f);
@@ -370,6 +429,7 @@ public class DeadBugStartMenuController : MonoBehaviour
 
     private void Start()
     {
+        ConfigurePracticeStartPresentation();
         if (!IsPracticeCoachMode &&
             GamingGuideNavigation.ConsumeCalibrationRestart(gameObject.scene.name))
         {
@@ -377,14 +437,31 @@ public class DeadBugStartMenuController : MonoBehaviour
         }
     }
 
-    private void Update()
+    // StartMenuCanvas is inactive during practice. The persistent practice
+    // controller must drive this gate; this component cannot rely on Update.
+    public void UpdatePracticeCompletionGate(float deltaTime)
     {
         // The final score popup and a spoken completion cue can finish in
-        // either order. Recheck after the voice becomes idle so neither is
-        // cut off by the controls-only presentation.
-        if (practiceCompletionGateActive &&
-            practiceCompletionPresentationReady &&
-            practiceCompletionUserUpright)
+        // either order. Prefer their natural completion, with a bounded wait
+        // so a missing callback or upright pose cannot hide the controls.
+        if (!practiceCompletionGateActive || MobileCoachControls.IsPaused) return;
+        practiceCompletionWaitElapsed += Mathf.Max(0f, deltaTime);
+        float timeout = practicePoseScorer != null ? practicePoseScorer.ProgressionTimeoutSeconds
+            : PoseScorer.DefaultProgressionTimeoutSeconds;
+        if (practiceCompletionWaitElapsed >= timeout &&
+            (!practiceCompletionPresentationReady || !practiceCompletionUserUpright ||
+             !IsPracticeCompletionVoiceFinished()))
+        {
+            ScorePopup pending = pendingPracticeScorePopup;
+            CancelPendingPracticeCompletion();
+            pending?.HideImmediately();
+            ResolveCompletionVoicePromptManager();
+            completionVoicePromptManager?.StopAll();
+            practiceCompletionPresentationReady = true;
+            practiceCompletionUserUpright = true;
+            Debug.Log("[CoachFlow] Completion presentation deadline reached; showing controls.", this);
+        }
+        if (practiceCompletionPresentationReady && practiceCompletionUserUpright)
         {
             TryShowGatedPracticeCompletionControls();
         }
@@ -432,6 +509,14 @@ public class DeadBugStartMenuController : MonoBehaviour
     public void StartTraining()
     {
         if (TrainingStartAllowed != null && !TrainingStartAllowed()) return;
+
+        if (IsPracticeCoachMode && practiceSessionController != null)
+        {
+            SpineFlowTrainingSession.AcknowledgePracticeStartConfirmation();
+            practiceSessionController.StartPractice();
+            return;
+        }
+
         if (!IsPracticeCoachMode && poseScorer != null && !poseScorer.CanStartTraining)
         {
             ApplyCalibrationGate();
@@ -551,6 +636,7 @@ public class DeadBugStartMenuController : MonoBehaviour
     {
         if (IsPracticeCoachMode)
         {
+            SetPracticeToolbarVisible(false);
             HideOccludedWorldRoots();
             HideSceneVisualsExceptMenus();
             return;
@@ -636,7 +722,8 @@ public class DeadBugStartMenuController : MonoBehaviour
 
         // Keep legacy scenes usable before their explicit gaze-canvas reference
         // is serialized.
-        return candidate.name == "GazedotCanvas";
+        return candidate.name == "GazedotCanvas" ||
+            candidate.name == "CoachOrientationSelection";
     }
 
     private void RestoreSceneVisualsHiddenByMenu()
@@ -754,6 +841,8 @@ public class DeadBugStartMenuController : MonoBehaviour
 
     private void ShowPracticeSelectionControlsOnly()
     {
+        practiceCompletionChoicesVisible = false;
+        RestorePracticeActionMenuChoices();
         if (menuRoot != null)
         {
             menuRoot.SetActive(false);
@@ -773,7 +862,19 @@ public class DeadBugStartMenuController : MonoBehaviour
 
     public void BeginPracticePlaybackPresentation()
     {
+        practiceCompletionChoicesVisible = false;
+        if (menuRoot != null)
+        {
+            menuRoot.SetActive(false);
+        }
+
+        if (endMenuRoot != null)
+        {
+            endMenuRoot.SetActive(false);
+        }
+
         ResetPracticeCompletionGate();
+        RestorePracticeActionMenuChoices();
         RestoreModelsHiddenByMenu();
         RestoreSceneVisualsHiddenByMenu();
         RestoreOccludedWorldRoots();
@@ -783,6 +884,20 @@ public class DeadBugStartMenuController : MonoBehaviour
         // world-space Canvas is hidden so it cannot overlap the two avatars or
         // receive gaze interaction during formal playback.
         SetPracticeActionMenuCanvasVisible(false);
+        SetPracticeToolbarVisible(true);
+    }
+
+    private void SetPracticeToolbarVisible(bool visible)
+    {
+        foreach (MobileCoachControls controls in FindObjectsOfType<MobileCoachControls>(true))
+        {
+            if (controls.gameObject.scene != gameObject.scene) continue;
+            controls.gameObject.SetActive(visible);
+            Transform pause = controls.transform.Find("MobilePause");
+            if (pause != null) pause.gameObject.SetActive(visible);
+            foreach (Canvas canvas in controls.GetComponentsInChildren<Canvas>(true))
+                canvas.enabled = visible;
+        }
     }
 
     private void DisableRetiredDifficultySelectionCanvas()
@@ -803,23 +918,16 @@ public class DeadBugStartMenuController : MonoBehaviour
 
     private void ShowEndMenu()
     {
-        // FinishScoring raises coach completion synchronously, immediately after
-        // starting the final score popup. Keep the avatars and score visible
-        // until that popup has completed; otherwise the completion controls hide
-        // the whole practice presentation in the same frame.
+        // The playback timeline has already ended. Quality data is summarized
+        // after the session and never delays the completion controls.
         if (IsPracticeCoachMode)
         {
-            BeginPracticeCompletionPostureGate();
-            ScorePopup scorePopup = FindObjectOfType<ScorePopup>(true);
-            if (scorePopup != null && scorePopup.IsShowing)
+            if (practiceCompletionChoicesVisible)
             {
-                CancelPendingPracticeCompletion();
-                pendingPracticeScorePopup = scorePopup;
-                pendingPracticeScorePopup.DisplayFinished +=
-                    HandleFinalPracticeScoreFinished;
                 return;
             }
 
+            BeginPracticeCompletionPostureGate();
             MarkPracticeCompletionPresentationReady();
             return;
         }
@@ -899,6 +1007,11 @@ public class DeadBugStartMenuController : MonoBehaviour
             return false;
         }
 
+        if (practiceCompletionChoicesVisible)
+        {
+            return true;
+        }
+
         // Completion returns to the same controls-only presentation used after
         // the start confirmation. This also clears stale score/feedback UI.
         HideWorldContentForMenu();
@@ -910,19 +1023,126 @@ public class DeadBugStartMenuController : MonoBehaviour
 
         practiceActionMenu.SetActive(true);
         SetPracticeActionMenuCanvasVisible(true);
+        ConfigurePracticeCompletionChoices();
         ResetPracticeCompletionGate();
+        practiceCompletionChoicesVisible = true;
 
         return true;
     }
 
+    private void ConfigurePracticeCompletionChoices()
+    {
+        ResolvePracticeActionMenu();
+        if (practiceActionMenu == null) return;
+
+        ConfigurePracticeActionMenu();
+        foreach (Transform child in practiceActionMenu.transform)
+        {
+            // Completion presents only the two patient decisions. Transient
+            // controls and unrelated navigation must not compete with the
+            // learn-again / game choices.
+            bool transient = child.name == "Pause" ||
+                child.name == "Back" ||
+                child.name == "PlayAction1Button" ||
+                child.name == "ReturnIdle";
+            if (transient)
+            {
+                child.gameObject.SetActive(false);
+                continue;
+            }
+
+            bool replay = child.name == "Start";
+            bool game = child.name == "Game";
+            child.gameObject.SetActive(replay || game);
+
+            if (!replay && !game) continue;
+            if (child is RectTransform choiceRect)
+            {
+                choiceRect.sizeDelta = new Vector2(850f, 130f);
+                choiceRect.anchoredPosition = new Vector2(0f, game ? 95f : -95f);
+            }
+
+            Image background = child.GetComponent<Image>();
+            if (background != null)
+            {
+                background.sprite = null;
+                background.type = Image.Type.Simple;
+                background.color = new Color(0.08f, 0.38f, 0.46f, 1f);
+            }
+            TMP_Text label = child.GetComponentInChildren<TMP_Text>(true);
+            if (label != null)
+            {
+                label.gameObject.SetActive(true);
+                label.enabled = true;
+                label.color = Color.white;
+                label.alignment = TextAlignmentOptions.Center;
+                label.rectTransform.anchorMin = Vector2.zero;
+                label.rectTransform.anchorMax = Vector2.one;
+                label.rectTransform.offsetMin = new Vector2(20f, 10f);
+                label.rectTransform.offsetMax = new Vector2(-20f, -10f);
+                label.text = replay
+                    ? "还需要学习，再来一次教练模式"
+                    : IsGameUnavailableForCurrentPractice()
+                        ? "我已学会，进入游戏模式（尚未开放）"
+                        : "我已学会，进入游戏模式";
+                Button choice = child.GetComponent<Button>();
+                if (choice != null && game)
+                    choice.interactable = !IsGameUnavailableForCurrentPractice();
+                label.enableAutoSizing = true;
+                label.fontSizeMin = 20f;
+                label.fontSizeMax = 48f;
+            }
+        }
+    }
+
+    private bool IsGameUnavailableForCurrentPractice()
+    {
+        string scene = gameObject.scene.name;
+        return scene == "CatCamelPractice" || scene == "maleCatCamelPractice" ||
+            scene == "SideBridgePractice" || scene == "maleSideBridgePractice" ||
+            scene == "CurlUpPractice" || scene == "maleCurlUpPractice";
+    }
+
+    private void RestorePracticeActionMenuChoices()
+    {
+        ResolvePracticeActionMenu();
+        if (practiceActionMenu == null) return;
+
+        Transform start = practiceActionMenu.transform.Find("Start");
+        Transform game = practiceActionMenu.transform.Find("Game");
+        if (start != null)
+        {
+            TMP_Text label = start.GetComponentInChildren<TMP_Text>(true);
+            if (label != null) label.text = "Start";
+        }
+        if (game != null)
+        {
+            TMP_Text label = game.GetComponentInChildren<TMP_Text>(true);
+            if (label != null) label.text = "Game";
+            Button button = game.GetComponent<Button>();
+            if (button != null) button.interactable = true;
+        }
+        ConfigurePracticeActionMenu();
+    }
+
     public void BeginPracticeCompletionPostureGate()
     {
-        if (!IsPracticeCoachMode || practiceCompletionGateActive)
+        if (!IsPracticeCoachMode || practiceCompletionGateActive || practiceCompletionChoicesVisible)
         {
             return;
         }
 
         practiceCompletionGateActive = true;
+        practiceCompletionWaitElapsed = 0f;
+        if (practicePoseScorer == null)
+        {
+            foreach (PoseScorer candidate in FindObjectsOfType<PoseScorer>(true))
+            {
+                if (candidate.gameObject.scene != gameObject.scene) continue;
+                practicePoseScorer = candidate;
+                break;
+            }
+        }
         practiceCompletionPresentationReady = false;
         practiceCompletionUserUpright = false;
         SetPracticeActionMenuCanvasVisible(false);
@@ -950,8 +1170,6 @@ public class DeadBugStartMenuController : MonoBehaviour
     {
         return practiceCompletionGateActive &&
             practiceCompletionPresentationReady &&
-            practiceCompletionUserUpright &&
-            IsPracticeCompletionVoiceFinished() &&
             ShowPracticeCompletionControls();
     }
 
@@ -987,6 +1205,7 @@ public class DeadBugStartMenuController : MonoBehaviour
         practiceCompletionGateActive = false;
         practiceCompletionPresentationReady = false;
         practiceCompletionUserUpright = false;
+        practiceCompletionWaitElapsed = 0f;
     }
 
     public bool IsPracticeCompletionPostureGateActive =>
@@ -1177,6 +1396,14 @@ public class DeadBugStartMenuController : MonoBehaviour
         if (practiceCoachController == null)
         {
             practiceCoachController = FindObjectOfType<SegmentedCoachController>(true);
+        }
+    }
+
+    private void ResolvePracticeSessionController()
+    {
+        if (practiceSessionController == null)
+        {
+            practiceSessionController = FindObjectOfType<PracticeSessionController>(true);
         }
     }
 

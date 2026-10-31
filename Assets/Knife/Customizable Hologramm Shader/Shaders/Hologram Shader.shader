@@ -96,7 +96,7 @@ Shader "Knife/Hologram Shader Unlit"
 			CGINCLUDE
 			#pragma target 3.0
 			ENDCG
-			Blend SrcAlpha OneMinusSrcAlpha
+			Blend One OneMinusSrcAlpha
 			Cull [_CullMode]
 			ColorMask RGBA
 			ZWrite [_ZWrite]
@@ -686,6 +686,8 @@ Shader "Knife/Hologram Shader Unlit"
 				
 				
 				outColor = ( appendResult325 * i.ase_color );
+				// Premultiply before blending so LDR targets preserve the HDR color ratios.
+				outColor.rgb *= outColor.a;
 				return outColor;
 			}
 			ENDCG

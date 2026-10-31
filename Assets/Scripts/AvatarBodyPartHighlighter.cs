@@ -1,4 +1,4 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Rendering;
 
@@ -13,14 +13,14 @@ public sealed class AvatarBodyPartHighlighter : MonoBehaviour
 
     [SerializeField] private Animator targetAnimator;
     [SerializeField] private Material highlightMaterial;
-    [SerializeField] private Color highlightColor = new Color(0f, 1f, 0f, 0.95f);
+    [SerializeField] private Color highlightColor = new Color(0.18f, 0.82f, 0.38f, 0.72f);
     [SerializeField, Range(0.05f, 0.9f)] private float minimumTriangleWeight = 0.35f;
     [Tooltip("Torso uses a stricter surface threshold so shoulder, neck, hip, " +
         "and clothing-edge triangles are not painted as one oversized block.")]
     [SerializeField, Range(0.05f, 0.95f)] private float torsoMinimumTriangleWeight = 0.55f;
     [SerializeField] private bool pulse = true;
     [SerializeField, Min(0f)] private float pulseSpeed = 3f;
-    [SerializeField] private Vector2 pulseRange = new Vector2(0.85f, 1.35f);
+    [SerializeField] private Vector2 pulseRange = new Vector2(0.9f, 1.12f);
     [Tooltip("Minimum delay before an automatic retry after no usable overlay " +
         "could be generated.")]
     [SerializeField, Min(0.1f)] private float failedBuildRetrySeconds = 1f;
@@ -201,6 +201,19 @@ public sealed class AvatarBodyPartHighlighter : MonoBehaviour
         return ShowParts(parts);
     }
 
+    public bool ShowHipPelvis(Color color)
+    {
+        if (!EnsureBuiltForDisplay())
+        {
+            Hide();
+            return false;
+        }
+
+        activeColorOverrides.Clear();
+        activeColorOverrides[BodyPart.HipPelvis] = color;
+        return ShowParts(activeColorOverrides.Keys);
+    }
+
     /// <summary>
     /// Shows every supplied body part with its own diagnostic color.
     /// </summary>
@@ -359,14 +372,18 @@ public sealed class AvatarBodyPartHighlighter : MonoBehaviour
             BodyPart.RightArm,
             BodyPart.LeftLeg,
             BodyPart.RightLeg,
-            BodyPart.Torso
+            BodyPart.Torso,
+            BodyPart.HipPelvis
         };
 
         var weightsByPart = new Dictionary<BodyPart, float[]>();
         var trianglesByPart = new Dictionary<BodyPart, List<int>>();
+        bool[] hipPelvisRegion = BuildHipPelvisRegion(source, sourceMesh);
         foreach (BodyPart part in parts)
         {
-            weightsByPart[part] = BuildVertexWeights(weights, bones, part);
+            weightsByPart[part] = part == BodyPart.HipPelvis
+                ? BuildHipPelvisVertexWeights(weights, bones, hipPelvisRegion)
+                : BuildVertexWeights(weights, bones, part);
             trianglesByPart[part] = new List<int>();
         }
 
@@ -404,6 +421,95 @@ public sealed class AvatarBodyPartHighlighter : MonoBehaviour
         }
 
         return result;
+    }
+
+    private float[] BuildHipPelvisVertexWeights(
+        BoneWeight[] weights,
+        Transform[] bones,
+        bool[] inHipPelvisRegion)
+    {
+        float[] result = new float[weights.Length];
+        for (int index = 0; index < weights.Length; index++)
+        {
+            if (!inHipPelvisRegion[index]) continue;
+            BoneWeight weight = weights[index];
+            result[index] =
+                GetHipPelvisWeight(weight.boneIndex0, weight.weight0, bones) +
+                GetHipPelvisWeight(weight.boneIndex1, weight.weight1, bones) +
+                GetHipPelvisWeight(weight.boneIndex2, weight.weight2, bones) +
+                GetHipPelvisWeight(weight.boneIndex3, weight.weight3, bones);
+        }
+
+        return result;
+    }
+
+    private float GetHipPelvisWeight(int index, float weight, Transform[] bones)
+    {
+        if (weight <= 0f || index < 0 || index >= bones.Length || bones[index] == null)
+        {
+            return 0f;
+        }
+
+        Transform bone = bones[index];
+        // Skin around the pelvis can be weighted to lower torso bones too;
+        // the spatial pelvis mask above keeps this out of the upper trunk.
+        bool pelvisBone = ClassifyBone(bone) == BodyPart.Torso ||
+            IsInBranch(bone, HumanBodyBones.LeftUpperLeg) ||
+            IsInBranch(bone, HumanBodyBones.RightUpperLeg) ||
+            ContainsAny(bone.name.ToLowerInvariant(), "pelvis", "glute", "butt");
+        return pelvisBone ? weight : 0f;
+    }
+
+    private bool[] BuildHipPelvisRegion(
+        SkinnedMeshRenderer source,
+        Mesh sourceMesh)
+    {
+        var region = new bool[sourceMesh.vertexCount];
+        if (targetAnimator == null) return region;
+
+        Transform hips = targetAnimator.GetBoneTransform(HumanBodyBones.Hips);
+        Transform chest = targetAnimator.GetBoneTransform(HumanBodyBones.Chest) ??
+            targetAnimator.GetBoneTransform(HumanBodyBones.Spine);
+        Transform leftHip = targetAnimator.GetBoneTransform(HumanBodyBones.LeftUpperLeg);
+        Transform rightHip = targetAnimator.GetBoneTransform(HumanBodyBones.RightUpperLeg);
+        if (hips == null || chest == null || leftHip == null || rightHip == null)
+        {
+            return region;
+        }
+
+        Vector3 torsoAxis = chest.position - hips.position;
+        Vector3 lateralAxis = rightHip.position - leftHip.position;
+        float torsoLength = torsoAxis.magnitude;
+        float pelvisWidth = lateralAxis.magnitude;
+        if (torsoLength <= 0.0001f || pelvisWidth <= 0.0001f)
+        {
+            return region;
+        }
+
+        torsoAxis /= torsoLength;
+        lateralAxis = Vector3.ProjectOnPlane(lateralAxis / pelvisWidth, torsoAxis);
+        if (lateralAxis.sqrMagnitude <= 0.000001f) return region;
+        lateralAxis.Normalize();
+        Vector3 depthAxis = Vector3.Cross(lateralAxis, torsoAxis).normalized;
+
+        Mesh posedMesh = new Mesh();
+        source.BakeMesh(posedMesh);
+        Vector3[] vertices = posedMesh.vertices;
+        for (int index = 0; index < vertices.Length; index++)
+        {
+            Vector3 offset = source.transform.TransformPoint(vertices[index]) - hips.position;
+            float alongTorso = Vector3.Dot(offset, torsoAxis) / torsoLength;
+            float acrossPelvis = Mathf.Abs(Vector3.Dot(offset, lateralAxis)) / pelvisWidth;
+            float depth = Mathf.Abs(Vector3.Dot(offset, depthAxis)) / torsoLength;
+            // Hips is the skeletal pivot, above the visible gluteal surface.
+            // A bone-sized box selected mostly internal pelvis geometry and
+            // only 78 skin triangles on the formal avatar. Cover the outer
+            // pelvic skin as well, still excluding abdomen and distal thighs.
+            region[index] = alongTorso >= -0.9f && alongTorso <= 0.35f &&
+                acrossPelvis <= 1.15f && depth <= 0.65f;
+        }
+        Destroy(posedMesh);
+        return region;
     }
 
     private float GetWeightForBone(int index, float weight, Transform[] bones, BodyPart part)
@@ -585,6 +691,17 @@ public sealed class AvatarBodyPartHighlighter : MonoBehaviour
                         (vertexWeights[a] +
                          vertexWeights[b] +
                          vertexWeights[c]) / 3f;
+                    // Pelvis is a subregion of torso/legs, not a competing body
+                    // part. Equal bone weights must not discard its surface.
+                    if (part == BodyPart.HipPelvis)
+                    {
+                        if (averageWeight >= Mathf.Max(minimumTriangleWeight, 0.45f))
+                        {
+                            var pelvis = trianglesByPart[BodyPart.HipPelvis];
+                            pelvis.Add(a); pelvis.Add(b); pelvis.Add(c);
+                        }
+                        continue;
+                    }
                     if (averageWeight > dominantWeight)
                     {
                         dominantWeight = averageWeight;
@@ -594,7 +711,9 @@ public sealed class AvatarBodyPartHighlighter : MonoBehaviour
 
                 float requiredWeight = dominantPart == BodyPart.Torso
                     ? Mathf.Max(minimumTriangleWeight, torsoMinimumTriangleWeight)
-                    : minimumTriangleWeight;
+                    : dominantPart == BodyPart.HipPelvis
+                        ? Mathf.Max(minimumTriangleWeight, 0.45f)
+                        : minimumTriangleWeight;
                 if (dominantPart == BodyPart.None ||
                     dominantWeight < requiredWeight)
                 {
@@ -705,6 +824,7 @@ public sealed class AvatarBodyPartHighlighter : MonoBehaviour
         overlays[BodyPart.LeftLeg] = new List<SkinnedMeshRenderer>();
         overlays[BodyPart.RightLeg] = new List<SkinnedMeshRenderer>();
         overlays[BodyPart.Torso] = new List<SkinnedMeshRenderer>();
+        overlays[BodyPart.HipPelvis] = new List<SkinnedMeshRenderer>();
     }
 
     private void HideRenderersOnly()

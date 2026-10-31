@@ -13,6 +13,8 @@ public class KeyframeCoachMotionBackend : ICoachMotionBackend, IDisposable
     private readonly HumanPoseHandler poseHandler;
     private readonly bool lockRootPosition;
     private readonly Vector3 initialBodyPosition;
+    private readonly float transitionBlendSeconds;
+    private CoachMotionFrame entryPose;
 
     private HumanPose pose;
     private int activeSegmentIndex = -1;
@@ -23,11 +25,13 @@ public class KeyframeCoachMotionBackend : ICoachMotionBackend, IDisposable
     public KeyframeCoachMotionBackend(
         Animator animator,
         CoachMotionPackage package,
-        bool lockRootPosition = false)
+        bool lockRootPosition = false,
+        float transitionBlendSeconds = 0f)
     {
         this.animator = animator;
         this.package = package;
         this.lockRootPosition = lockRootPosition;
+        this.transitionBlendSeconds = Mathf.Max(0f, transitionBlendSeconds);
 
         if (animator == null || package == null)
         {
@@ -70,7 +74,17 @@ public class KeyframeCoachMotionBackend : ICoachMotionBackend, IDisposable
         }
 
         activeSegmentIndex = index;
-        cursorTime = 0f;
+        if (transitionBlendSeconds > 0f)
+        {
+            poseHandler.GetHumanPose(ref pose);
+            entryPose = new CoachMotionFrame
+            {
+                bodyPosition = pose.bodyPosition,
+                bodyRotation = pose.bodyRotation,
+                muscles = (float[])pose.muscles.Clone()
+            };
+        }
+        cursorTime = -transitionBlendSeconds;
         frozen = false;
         reachedEnd = false;
         ApplyPoseAt(cursorTime);
@@ -157,6 +171,13 @@ public class KeyframeCoachMotionBackend : ICoachMotionBackend, IDisposable
         CoachMotionFrame[] frames = package.segments[activeSegmentIndex].frames;
         if (frames == null || frames.Length == 0)
         {
+            return;
+        }
+
+        if (time < 0f && entryPose != null)
+        {
+            WriteInterpolatedPose(entryPose, frames[0],
+                Mathf.Clamp01(1f + time / transitionBlendSeconds));
             return;
         }
 

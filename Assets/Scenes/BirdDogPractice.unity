@@ -1473,7 +1473,7 @@ MonoBehaviour:
         m_CallState: 2
       - m_Target: {fileID: 1723679895}
         m_TargetAssemblyTypeName: SceneSwitcher, Assembly-CSharp
-        m_MethodName: LoadCoachingChooseScene
+        m_MethodName: LoadActionLibraryScene
         m_Mode: 1
         m_Arguments:
           m_ObjectArgument: {fileID: 0}
@@ -4239,7 +4239,7 @@ MonoBehaviour:
   userTrackerReceiver: {fileID: 199749593}
   trackerDataTimeoutSeconds: 0.35
   maximumLyingPlaneAlignmentOffset: 0.1
-  requireUprightPoseForCompletionControls: 1
+  requireUprightPoseForCompletionControls: 0
   completionMaximumTorsoTiltDegrees: 35
   completionUprightHoldSeconds: 0.4
 --- !u!114 &648710575
@@ -6327,7 +6327,7 @@ Camera:
     height: 1
   near clip plane: 0.1
   far clip plane: 20
-  field of view: 51.38676
+  field of view: 60
   orthographic: 0
   orthographic size: 5
   m_Depth: -1
@@ -15965,7 +15965,7 @@ MonoBehaviour:
       activeRegions: 0
       stabilizerRegions: 0
     applyFormalActionScoreMapping: 0
-  setCount: 2
+  setCount: 1
   repetitionsPerSet: 4
   repeatBoundarySegmentsPerSet: 0
   segmentTransitionBlendSeconds: 0.12
@@ -17178,8 +17178,8 @@ MonoBehaviour:
   progressText: {fileID: 0}
   anchoredPosition: {x: 0, y: 420}
   size: {x: 450, y: 96}
-  fontSize: 63
-  backgroundColor: {r: 0, g: 0, b: 0, a: 0}
+  fontSize: 34
+  backgroundColor: {r: 0, g: 0, b: 0, a: 0.22}
 --- !u!114 &1900000007
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -18564,7 +18564,7 @@ MonoBehaviour:
   stabilityGraceDuration: 0.45
   stabilityProgressDecayRate: 0.35
   stabilityRecoveryDuration: 0.75
-  maximumFollowingWaitSeconds: 10
+  maximumFollowingWaitSeconds: 5
 --- !u!4 &1989429036
 Transform:
   m_ObjectHideFlags: 0

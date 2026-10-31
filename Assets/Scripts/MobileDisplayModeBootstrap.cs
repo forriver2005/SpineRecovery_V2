@@ -57,13 +57,14 @@ public sealed class MobileDisplayModeBootstrap : MonoBehaviour
     private static void ConvertCanvasesToScreenSpace()
     {
         Canvas[] canvases = FindObjectsOfType<Canvas>(true);
+        bool hasCoachControls = FindObjectOfType<MobileCoachControls>(true) != null;
         foreach (Canvas canvas in canvases)
         {
             if (canvas == null) continue;
             // Avatar labels must remain attached to the models, not cover the
             // phone viewport as independent full-screen canvases.
             if (canvas.GetComponentInParent<Animator>() != null &&
-                FindObjectOfType<MobileCoachControls>() != null) continue;
+                hasCoachControls) continue;
             canvas.renderMode = RenderMode.ScreenSpaceOverlay;
             canvas.worldCamera = null;
             if (canvas.name == "StartMenuCanvas")

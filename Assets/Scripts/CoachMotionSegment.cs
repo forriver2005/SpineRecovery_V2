@@ -3,7 +3,7 @@ using UnityEngine;
 
 /// <summary>
 /// 动作包里的一段子动作。对应原来 Animator 的一个 state（如 deadbug_1_up）。
-/// 播到末帧后冻结，等待 PoseScorer 评分完成再前进。
+/// 播到末帧后冻结进入固定的播放保持阶段；质量观察不会决定前进。
 /// </summary>
 [Serializable]
 public class CoachMotionSegment
@@ -17,13 +17,13 @@ public class CoachMotionSegment
     /// <summary>该段重复次数</summary>
     public int repeatCount = 1;
 
-    /// <summary>打分宽松倍数。1 = 正常；>1 更宽松</summary>
+    /// <summary>质量观察容错倍数。1 = 正常；>1 更宽松（兼容旧字段名）</summary>
     public float scoreLeniency = 1f;
 
-    /// <summary>该段打分持续时间（秒）</summary>
+    /// <summary>该段播放保持阶段持续时间（秒，兼容旧字段名）</summary>
     public float scoringDuration = 6f;
 
-    /// <summary>是否套用正式动作的评分映射（准备段和过渡段不要开）</summary>
+    /// <summary>是否套用正式动作的报告映射（准备段和过渡段不要开）</summary>
     public bool applyFormalActionScoreMapping;
 
     /// <summary>Action-agnostic corrective guidance serialized with the segment.</summary>
@@ -32,7 +32,7 @@ public class CoachMotionSegment
     /// <summary>语音提示的资源名（可空）。运行时按名查找已打包的 AudioClip。</summary>
     public string voiceClipName;
 
-    /// <summary>该段的逐帧姿势。最后一帧即评分目标姿势。</summary>
+    /// <summary>该段的逐帧姿势。最后一帧是播放保持阶段的目标姿势。</summary>
     public CoachMotionFrame[] frames = Array.Empty<CoachMotionFrame>();
 
     public bool IsValid(out string error)

@@ -1,4 +1,4 @@
-using System.Collections;
+﻿using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UI;
@@ -7,6 +7,12 @@ using TMPro;
 [DefaultExecutionOrder(20000)]
 public class PracticeSessionController : MonoBehaviour
 {
+    public enum CoachOrientationMode
+    {
+        FollowUser = 0,
+        AlignUserToCoach = 1
+    }
+
     private const float DirectionLockDeadZoneDegrees = 0.25f;
     public const float DefaultMaximumLyingPlaneAlignmentOffset = 0.1f;
     private static readonly HumanBodyBones[] LyingPlaneReferenceBones =
@@ -17,8 +23,8 @@ public class PracticeSessionController : MonoBehaviour
         HumanBodyBones.UpperChest
     };
 
-    // Practice mode drives the SEGMENTED coach (pauses at each segment-end pose
-    // for IMU scoring), not the continuous gaming/demo CoachActionController.
+    // Practice mode drives the SEGMENTED coach (fixed playback phases with
+    // parallel quality observation), not the gaming/demo CoachActionController.
     [SerializeField] private SegmentedCoachController coachActionController;
     [SerializeField] private MotionRecorder motionRecorder;
 
@@ -38,10 +44,17 @@ public class PracticeSessionController : MonoBehaviour
     [Header("Coach Mode Introduction")]
     [Tooltip("Serializes the coach, user-model and ready-countdown voice prompts.")]
     [SerializeField] private VoicePromptManager voicePromptManager;
+    [Header("Coach lesson preview")]
+    [SerializeField] [Min(0.1f)] private float demonstrationPreviewSeconds = 30f;
     [Tooltip("The world-space Coach label that follows the coach avatar's visibility.")]
     [SerializeField] private GameObject coachLabel;
 
     [Header("Avatar Direction")]
+    [Tooltip("A: coach follows the user's display heading. B: user display aligns to the authored coach view.")]
+    [SerializeField] private CoachOrientationMode orientationMode =
+        CoachOrientationMode.FollowUser;
+    [SerializeField] private float coachFollowRotationSpeed = 5f;
+    [SerializeField] private TMP_FontAsset orientationFont;
     [Tooltip("Keep the user avatar's rendered direction aligned with the coach " +
         "inside their shared camera-facing presentation space, independent of " +
         "the tracked person's room heading.")]
@@ -96,6 +109,8 @@ public class PracticeSessionController : MonoBehaviour
     [SerializeField] private float completionUprightHoldSeconds = 0.4f;
 
     // 是否已经配置过难度
+    private DisplayYawRestore displayYawRestore;
+    private float coachDisplayYaw;
     private bool difficultyConfigured;
     private bool practiceRunning;
     private Transform avatarDirectionReference;
@@ -107,14 +122,25 @@ public class PracticeSessionController : MonoBehaviour
     private float secondsSinceFreshTrackerBones = float.PositiveInfinity;
     private bool waitingForCompletionUprightPose;
     private float completionUprightReadySeconds;
+    private float completionWaitElapsed;
     private Quaternion lockedUserRotationInReference = Quaternion.identity;
-    private Vector3 lockedCoachHeadwardInReference = Vector3.forward;
     private float lockedCoachVerticalAlignmentOffset;
     private Transform directionLockedUserRoot;
     private Transform directionLockedUserOriginalParent;
     private Quaternion userLocalRotationBeforeDirectionLock = Quaternion.identity;
     private bool hasUserRotationBeforeDirectionLock;
+    private Transform authoredCoachRoot;
+    private Quaternion authoredCoachLocalRotation = Quaternion.identity;
+    private bool hasAuthoredCoachRotation;
+    private GameObject orientationSelectionRoot;
     private bool trainingPlaybackStarted;
+    private bool coachResultFinalized;
+    private float introductionWaitElapsed;
+    private int introductionGeneration;
+    private bool introductionVoiceFinished;
+    private bool introductionDemonstrationFinished;
+    private bool lessonCountdownStarted;
+    private CoachFlowPresentation flowPresentation;
     private Renderer[] introductionCoachRenderers = System.Array.Empty<Renderer>();
     private Renderer[] introductionUserRenderers = System.Array.Empty<Renderer>();
     private readonly Dictionary<Renderer, bool> introductionRendererStates =
@@ -132,6 +158,8 @@ public class PracticeSessionController : MonoBehaviour
     private Camera coachOverlayCamera;
 
     public bool IsLyingOverheadPresentationReady =>
+        SupportsLyingDirectionPresentation() &&
+        IsCoachLyingPresentationReady() &&
         ShouldUseLyingOverheadPresentation(
             practiceRunning,
             hasLockedUserRotation,
@@ -178,8 +206,11 @@ public class PracticeSessionController : MonoBehaviour
             difficultySettings = difficultySelectionUI.Settings;
         }
 
+        displayYawRestore = gameObject.AddComponent<DisplayYawRestore>();
         ApplyDefaultDifficulty();
         SpineFlowTrainingSession.MobileSessionAccepted += ApplyPlannedTrainingVolume;
+        CoachEventBus.CoachSessionCompleted += HandleCoachTimelineCompleted;
+        CoachEventBus.CoachHardStopRequested += HandleLessonHardStop;
         ApplyPlannedTrainingVolume();
         DisableLegacyDifficultySelectionPanel();
 
@@ -187,17 +218,15 @@ public class PracticeSessionController : MonoBehaviour
         ResolveVoicePromptManager();
         ResolveCoachLabel();
         EnsureCoachOverlayLabel();
+        EnsureCoachFlowPresentation();
         ResolveUserTrackerReceiver();
         CaptureAuthoredUserScale();
+        CaptureAuthoredCoachRotation();
         DisableTrackerRootScaleSynchronization();
 
         if (coachActionController != null)
         {
             coachActionController.OnAllComplete += HandlePracticeCompleted;
-            coachActionController.OnSegmentStarted +=
-                HandleDirectionLockSegmentStarted;
-            coachActionController.OnSegmentHold +=
-                HandleDirectionLockSegmentHold;
         }
 
         // 如果配置了场景播放按钮，绑定点击事件
@@ -210,16 +239,15 @@ public class PracticeSessionController : MonoBehaviour
     private void OnDestroy()
     {
         SpineFlowTrainingSession.MobileSessionAccepted -= ApplyPlannedTrainingVolume;
+        CoachEventBus.CoachSessionCompleted -= HandleCoachTimelineCompleted;
+        CoachEventBus.CoachHardStopRequested -= HandleLessonHardStop;
         CancelPracticeIntroduction();
-        RestoreUserRotationBeforeDirectionLock();
+        ResetUserDirectionLock();
+        DestroyOrientationSelection();
 
         if (coachActionController != null)
         {
             coachActionController.OnAllComplete -= HandlePracticeCompleted;
-            coachActionController.OnSegmentStarted -=
-                HandleDirectionLockSegmentStarted;
-            coachActionController.OnSegmentHold -=
-                HandleDirectionLockSegmentHold;
         }
 
         if (scenePlayButton != null)
@@ -250,26 +278,116 @@ public class PracticeSessionController : MonoBehaviour
 
     private void LateUpdate()
     {
-        if (MobileCoachControls.IsPaused) return;
+        if (MobileCoachControls.IsPaused)
+        {
+            if (practiceRunning) ApplyDisplayOrientation(0f);
+            return;
+        }
         PreserveAuthoredUserScale();
         UpdateUserTrackerFreshness(Time.unscaledDeltaTime);
         UpdateCompletionPostureGate(Time.unscaledDeltaTime);
+        ResolvePresentationController();
+        presentationController?.UpdatePracticeCompletionGate(Time.unscaledDeltaTime);
         UpdateCoachOverlayLabel();
 
-        if (!practiceRunning || !alignUserDirectionToCoachOnStart)
+        if (!practiceRunning)
         {
             return;
         }
 
-        if (preparationDirectionAlignmentActive && !hasLockedUserRotation)
+        ApplyDisplayOrientation(Time.unscaledDeltaTime);
+    }
+
+    private void ApplyDisplayOrientation(float deltaTime)
+    {
+        if (motionRecorder == null || motionRecorder.UserAnimator == null ||
+            motionRecorder.CoachAnimator == null || displayYawRestore == null) return;
+        Animator user = motionRecorder.UserAnimator;
+        Animator coach = motionRecorder.CoachAnimator;
+        ResolveAvatarDirectionReference(user, coach);
+        if (avatarDirectionReference == null ||
+            !TryGetComparableHeadings(user, coach, avatarDirectionReference.up,
+                out Vector3 userHeading, out Vector3 coachHeading)) return;
+        if (!TryCalculateYawAlignmentDegrees(coachHeading, userHeading,
+                avatarDirectionReference.up, out float coachToUser)) return;
+
+        Transform root;
+        float yaw;
+        if (orientationMode == CoachOrientationMode.FollowUser)
         {
-            TryLockReadyUserDirection(Time.unscaledDeltaTime, false);
+            float smooth = 1f - Mathf.Exp(-Mathf.Max(0.1f, coachFollowRotationSpeed) *
+                Mathf.Max(0f, deltaTime));
+            coachDisplayYaw = Mathf.LerpAngle(coachDisplayYaw, coachToUser, smooth);
+            root = coach.transform;
+            yaw = coachDisplayYaw;
+        }
+        else
+        {
+            root = user.transform;
+            yaw = -coachToUser;
+        }
+        displayYawRestore.Apply(root, avatarDirectionReference.up, yaw);
+    }
+
+    private void CaptureAuthoredCoachRotation()
+    {
+        authoredCoachRoot = motionRecorder != null && motionRecorder.CoachAnimator != null
+            ? motionRecorder.CoachAnimator.transform
+            : null;
+        if (authoredCoachRoot == null)
+        {
+            return;
         }
 
-        if (hasLockedUserRotation)
+        authoredCoachLocalRotation = authoredCoachRoot.localRotation;
+        hasAuthoredCoachRotation = true;
+    }
+
+    private void RestoreAuthoredCoachRotation()
+    {
+        if (hasAuthoredCoachRotation && authoredCoachRoot != null)
         {
-            EnforceLockedUserRotation();
+            authoredCoachRoot.localRotation = authoredCoachLocalRotation;
         }
+    }
+
+    private void FollowUserDisplayDirection(float deltaTime)
+    {
+        if (motionRecorder == null || motionRecorder.UserAnimator == null ||
+            motionRecorder.CoachAnimator == null)
+        {
+            return;
+        }
+
+        ResolveAvatarDirectionReference(
+            motionRecorder.UserAnimator,
+            motionRecorder.CoachAnimator);
+        if (avatarDirectionReference == null ||
+            !TryGetComparableHeadings(
+                motionRecorder.UserAnimator, motionRecorder.CoachAnimator,
+                avatarDirectionReference.up, out Vector3 userHeading, out Vector3 coachHeading))
+        {
+            return;
+        }
+
+        Vector3 userInReference = avatarDirectionReference.InverseTransformDirection(userHeading);
+        Vector3 coachInReference = avatarDirectionReference.InverseTransformDirection(coachHeading);
+        if (!TryCalculateYawAlignmentDegrees(
+                coachInReference,
+                userInReference,
+                Vector3.up,
+                out float correctionDegrees))
+        {
+            return;
+        }
+
+        Transform coachRoot = motionRecorder.CoachAnimator.transform;
+        Quaternion target = Quaternion.AngleAxis(
+            correctionDegrees,
+            avatarDirectionReference.up) * coachRoot.rotation;
+        float smooth = 1f - Mathf.Exp(-Mathf.Max(0.1f, coachFollowRotationSpeed) *
+            Mathf.Max(0f, deltaTime));
+        coachRoot.rotation = Quaternion.Slerp(coachRoot.rotation, target, smooth);
     }
 
     private void CaptureAuthoredUserScale()
@@ -326,12 +444,12 @@ public class PracticeSessionController : MonoBehaviour
         {
             // 第一次点击：显示难度选择界面
             ApplyDefaultDifficulty();
-            StartPracticeDirectly();
+            StartPractice();
         }
         else
         {
             // 已配置难度，直接开始练习
-            StartPracticeDirectly();
+            StartPractice();
         }
     }
 
@@ -414,10 +532,17 @@ public class PracticeSessionController : MonoBehaviour
             return;
         }
 
+        DestroyOrientationSelection();
+
         if (motionRecorder == null || coachActionController == null)
         {
             Debug.LogError("PracticeSessionController references are missing.");
             return;
+        }
+
+        if (authoredCoachRoot == null)
+        {
+            CaptureAuthoredCoachRotation();
         }
 
         ResolvePresentationController();
@@ -427,6 +552,7 @@ public class PracticeSessionController : MonoBehaviour
         CancelCompletionPostureGate();
         practiceRunning = true;
         trainingPlaybackStarted = false;
+        coachResultFinalized = false;
         Debug.Log(
             "PracticeSessionController: starting coach-mode introduction.",
             this);
@@ -438,7 +564,17 @@ public class PracticeSessionController : MonoBehaviour
             $"{coachActionController.RepetitionsPerSet} reps.",
             this);
 
-        BeginPracticeIntroduction();
+        if (PracticeSceneController.ConsumeSkipLessonOnNextLoad())
+        {
+            // "再学一次" keeps the preparation/countdown and starts the
+            // four-repetition coach timeline without replaying the separate
+            // coach-only lesson preview.
+            BeginLessonCountdown();
+        }
+        else
+        {
+            BeginPracticeIntroduction();
+        }
     }
 
     private void ApplyPlannedTrainingVolume()
@@ -451,24 +587,62 @@ public class PracticeSessionController : MonoBehaviour
         SpineFlowTrainingVolume volume =
             SpineFlowTrainingSession.GetPlannedTrainingVolume(
                 "coach",
-                coachActionController.TotalSets,
-                coachActionController.RepetitionsPerSet);
+                1,
+                4);
         coachActionController.SetTrainingVolume(volume.sets, volume.repetitionsPerSet);
     }
 
     private void BeginPracticeIntroduction()
     {
+        int generation = ++introductionGeneration;
+        introductionWaitElapsed = 0f;
+        introductionVoiceFinished = false;
+        introductionDemonstrationFinished = false;
+        lessonCountdownStarted = false;
         CaptureIntroductionRendererStates();
+        FindObjectOfType<CoachSetProgressUI>()?.ShowLessonStage("动作讲解");
+        flowPresentation?.ShowLessonStage(true);
+        // During the lesson the coach is the only avatar on screen. The
+        // tracked-user model returns for formal patient playback.
+        ShowCoachIntroductionStage();
+
+        bool demonstrationStarted = coachActionController != null &&
+            coachActionController.PlayDemonstrationPreview(
+                demonstrationPreviewSeconds,
+                () =>
+                {
+                    if (generation != introductionGeneration || !practiceRunning)
+                    {
+                        return;
+                    }
+
+                    introductionDemonstrationFinished = true;
+                    TryFinishSynchronizedIntroduction(generation);
+                });
+        if (!demonstrationStarted)
+        {
+            introductionDemonstrationFinished = true;
+        }
 
         if (voicePromptManager != null)
         {
             voicePromptManager.StopAll();
             if (voicePromptManager.PlayPracticeIntroduction(
                 ShowCoachIntroductionStage,
-                ShowUserIntroductionStage,
-                ShowBothIntroductionStage,
-                BeginFormalPracticePlayback))
+                ShowCoachIntroductionStage,
+                ShowCoachIntroductionStage,
+                () =>
+                {
+                    if (generation != introductionGeneration || !practiceRunning)
+                    {
+                        return;
+                    }
+
+                    introductionVoiceFinished = true;
+                    TryFinishSynchronizedIntroduction(generation);
+                }))
             {
+                TryFinishSynchronizedIntroduction(generation);
                 return;
             }
         }
@@ -477,8 +651,53 @@ public class PracticeSessionController : MonoBehaviour
             "PracticeSessionController could not start the voice introduction; " +
             "formal playback will begin with both avatars visible.",
             this);
-        ShowBothIntroductionStage();
-        BeginFormalPracticePlayback();
+        introductionVoiceFinished = true;
+        TryFinishSynchronizedIntroduction(generation);
+    }
+
+    private void TryFinishSynchronizedIntroduction(int generation)
+    {
+        if (generation != introductionGeneration || !practiceRunning ||
+            trainingPlaybackStarted || lessonCountdownStarted ||
+            !introductionVoiceFinished || !introductionDemonstrationFinished)
+        {
+            return;
+        }
+
+        BeginLessonCountdown();
+    }
+
+    private void BeginLessonCountdown()
+    {
+        if (!practiceRunning || trainingPlaybackStarted || lessonCountdownStarted) return;
+        lessonCountdownStarted = true;
+        flowPresentation?.ShowLessonStage(false);
+        RestoreIntroductionRendererStates();
+        FindObjectOfType<CoachSetProgressUI>()?.ShowLessonStage("准备跟练");
+        if (voicePromptManager != null) voicePromptManager.PlayLessonCountdown(BeginFormalPracticePlayback);
+        else BeginFormalPracticePlayback();
+    }
+
+    /// <summary>
+    /// Skips only the synchronized lesson/demo phase. The original ready
+    /// prompt and full countdown still run before formal repetition one.
+    /// </summary>
+    public void SkipPracticeIntroduction()
+    {
+        if (!practiceRunning || trainingPlaybackStarted || lessonCountdownStarted)
+        {
+            return;
+        }
+
+        introductionGeneration++;
+        introductionVoiceFinished = true;
+        introductionDemonstrationFinished = true;
+        voicePromptManager?.CancelPracticeIntroduction();
+        voicePromptManager?.StopAll();
+        coachActionController?.CancelDemonstrationPreview();
+        flowPresentation?.ShowLessonStage(false);
+        RestoreIntroductionRendererStates();
+        BeginLessonCountdown();
     }
 
     private void BeginFormalPracticePlayback()
@@ -489,6 +708,7 @@ public class PracticeSessionController : MonoBehaviour
         }
 
         RestoreIntroductionRendererStates();
+        flowPresentation?.ShowLessonStage(false);
         // The coach name remains visible during formal training, as in the
         // authored coach-mode scene. Introduction stages may hide it briefly.
         ResolveCoachLabel();
@@ -515,6 +735,16 @@ public class PracticeSessionController : MonoBehaviour
             practiceRunning = false;
             trainingPlaybackStarted = false;
             poseScorer?.StopTrainingMeasurement();
+            SpineFlowTrainingSession.EndCoachTraining(
+                poseScorer != null ? poseScorer.SessionScores : null,
+                poseScorer != null ? poseScorer.MaximumUserMotionDegrees : 0f,
+                poseScorer != null ? poseScorer.MaximumCoachMotionDegrees : 0f,
+                coachActionController != null
+                    ? coachActionController.CompletedRepetitions
+                    : 0,
+                CoachTimelineStatus.Interrupted,
+                CoachEndReason.TechnicalError);
+            coachResultFinalized = true;
             Debug.LogError(
                 $"Practice action failed to start; replay was not created: {actionStartError}",
                 this);
@@ -523,8 +753,9 @@ public class PracticeSessionController : MonoBehaviour
 
         if (!motionRecorder.TryBeginRecording(out string recordingError))
         {
-            practiceRunning = false;
-            trainingPlaybackStarted = false;
+            coachActionController.StopTimeline(
+                CoachTimelineStatus.Interrupted,
+                CoachEndReason.TechnicalError);
             poseScorer?.StopTrainingMeasurement();
             coachActionController.ReturnIdle();
             Debug.LogError(
@@ -790,13 +1021,29 @@ public class PracticeSessionController : MonoBehaviour
 
     private void CancelPracticeIntroduction()
     {
+        introductionGeneration++;
+        introductionVoiceFinished = false;
+        introductionDemonstrationFinished = false;
+        lessonCountdownStarted = false;
         voicePromptManager?.CancelPracticeIntroduction();
+        coachActionController?.CancelDemonstrationPreview();
+        flowPresentation?.ShowLessonStage(false);
         RestoreIntroductionRendererStates();
+    }
+
+    private void EnsureCoachFlowPresentation()
+    {
+        flowPresentation = GetComponent<CoachFlowPresentation>();
+        if (flowPresentation == null)
+        {
+            flowPresentation = gameObject.AddComponent<CoachFlowPresentation>();
+        }
+        flowPresentation.Initialize(this, coachActionController);
     }
 
     private void AlignUserDirectionToCoach()
     {
-        if (!alignUserDirectionToCoachOnStart)
+        if (orientationMode != CoachOrientationMode.AlignUserToCoach)
         {
             return;
         }
@@ -809,7 +1056,8 @@ public class PracticeSessionController : MonoBehaviour
     private void HandleDirectionLockSegmentStarted(
         PracticeSegmentPlaybackInfo segment)
     {
-        if (!practiceRunning || !alignUserDirectionToCoachOnStart)
+        if (!practiceRunning ||
+            orientationMode != CoachOrientationMode.AlignUserToCoach)
         {
             return;
         }
@@ -853,7 +1101,7 @@ public class PracticeSessionController : MonoBehaviour
     private void HandleDirectionLockSegmentHold(SegmentHoldInfo segment)
     {
         if (practiceRunning &&
-            alignUserDirectionToCoachOnStart &&
+            orientationMode == CoachOrientationMode.AlignUserToCoach &&
             segment.segmentKind == TrainingSegmentKind.Preparation)
         {
             AlignUserDirectionToCoach();
@@ -867,58 +1115,11 @@ public class PracticeSessionController : MonoBehaviour
             return false;
         }
 
-        bool hasFreshUserTrackerData = HasFreshUserTrackerData();
-
-        if (requirePreparationPoseBeforeDirectionLock)
-        {
-            Animator userAnimator = motionRecorder.UserAnimator;
-            Animator coachAnimator = motionRecorder.CoachAnimator;
-            ResolveAvatarDirectionReference(userAnimator, coachAnimator);
-            bool poseReady = IsUserInRelaxedDirectionLockPose(userAnimator);
-            if (!CanUseUserPoseForDirectionLock(
-                    hasFreshUserTrackerData,
-                    poseReady))
-            {
-                UpdateDirectionPreparationReadiness(false, deltaTime);
-                if (reportResult)
-                {
-                    Debug.Log(
-                        "PracticeSessionController left the user avatar " +
-                        "transform untouched because neither fresh Tracker " +
-                        "telemetry nor a live preparation pose is available.",
-                        this);
-                }
-
-                return false;
-            }
-
-            UpdateDirectionPreparationReadiness(poseReady, deltaTime);
-            if (!poseReady || preparationPoseReadySeconds + Mathf.Epsilon <
-                Mathf.Max(0f, preparationPoseHoldSeconds))
-            {
-                return false;
-            }
-        }
-        else if (!hasFreshUserTrackerData)
-        {
-            if (reportResult)
-            {
-                Debug.Log(
-                    "PracticeSessionController left the user avatar transform " +
-                    "untouched because no fresh Humanoid Tracker data is " +
-                    "available.",
-                    this);
-            }
-
-            return false;
-        }
-
         bool alignmentSucceeded = ApplyUserDirectionLock(reportResult);
         if (alignmentSucceeded)
         {
             Debug.Log(
-                "PracticeSessionController detected the relaxed exercise " +
-                "preparation pose, then aligned and locked the user " +
+                "PracticeSessionController aligned and locked the user " +
                 "display direction to the coach.",
                 this);
         }
@@ -950,6 +1151,32 @@ public class PracticeSessionController : MonoBehaviour
                 birdDogPose,
                 Mathf.Min(preparationMaximumTorsoTiltDegrees, 35f),
                 preparationMinimumSupportDropRatio);
+    }
+
+    private bool SupportsLyingDirectionPresentation()
+    {
+        string sceneName = gameObject.scene.name;
+        return sceneName.IndexOf(
+                   "DeadBug",
+                   System.StringComparison.OrdinalIgnoreCase) >= 0 ||
+            sceneName.IndexOf(
+                "BirdDog",
+                System.StringComparison.OrdinalIgnoreCase) >= 0;
+    }
+
+    private bool IsCoachLyingPresentationReady()
+    {
+        Animator coachAnimator = motionRecorder != null
+            ? motionRecorder.CoachAnimator
+            : null;
+        return coachAnimator != null &&
+            TryGetBodyHeadwardDirection(
+                coachAnimator,
+                out Vector3 coachHeadward) &&
+            IsHorizontalPreparationPose(
+                coachHeadward,
+                ResolveWorldUp(),
+                preparationMaximumTorsoTiltDegrees);
     }
 
     private void UpdateDirectionPreparationReadiness(
@@ -987,20 +1214,16 @@ public class PracticeSessionController : MonoBehaviour
         }
 
         ResolveAvatarDirectionReference(userAnimator, coachAnimator);
-
         if (avatarDirectionReference == null ||
-            !TryGetBodyHeadwardDirection(
-                userAnimator,
-                out Vector3 userHeadwardWorld) ||
-            !TryGetBodyHeadwardDirection(
-                coachAnimator,
-                out Vector3 coachHeadwardWorld))
+            !TryGetComparableHeadings(
+                userAnimator, coachAnimator, avatarDirectionReference.up,
+                out Vector3 userHeadwardWorld, out Vector3 coachHeadwardWorld))
         {
             if (reportResult)
             {
                 Debug.LogWarning(
                     "PracticeSessionController could not lock the user display " +
-                    "direction because a reliable hip-to-torso direction is " +
+                    "direction because a reliable avatar heading is " +
                     "unavailable.",
                     this);
             }
@@ -1024,8 +1247,8 @@ public class PracticeSessionController : MonoBehaviour
             {
                 Debug.LogWarning(
                     "PracticeSessionController could not lock the user display " +
-                    "direction because the lying head-to-feet direction is " +
-                    "not horizontal enough to resolve.",
+                    "direction because the available avatar heading is not " +
+                    "horizontal enough to resolve.",
                     this);
             }
 
@@ -1044,9 +1267,6 @@ public class PracticeSessionController : MonoBehaviour
         lockedUserRotationInReference =
             Quaternion.Inverse(referenceRotation) *
             userRoot.rotation;
-        lockedCoachHeadwardInReference = Vector3.ProjectOnPlane(
-            coachHeadwardInReference,
-            Vector3.up).normalized;
         lockedCoachVerticalAlignmentOffset =
             TryGetLyingBodyPlaneHeightInReference(
                 userAnimator,
@@ -1068,14 +1288,187 @@ public class PracticeSessionController : MonoBehaviour
         if (reportResult)
         {
             Debug.Log(
-                "PracticeSessionController aligned only the user's horizontal " +
-                "lying direction to the coach and captured a stable " +
+                "PracticeSessionController aligned the user's horizontal " +
+                "display direction to the coach and captured a stable " +
                 "display-space rotation lock. Coach lying-plane correction: " +
                 $"{lockedCoachVerticalAlignmentOffset:F3} m.",
                 this);
         }
 
         return true;
+    }
+
+    private bool AlignUserDisplayYawToCoach()
+    {
+        if (motionRecorder == null ||
+            motionRecorder.UserAnimator == null ||
+            motionRecorder.CoachAnimator == null)
+        {
+            return false;
+        }
+
+        Animator userAnimator = motionRecorder.UserAnimator;
+        Animator coachAnimator = motionRecorder.CoachAnimator;
+        Transform userRoot = userAnimator.transform;
+        Transform coachRoot = coachAnimator.transform;
+        ResolveAvatarDirectionReference(userAnimator, coachAnimator);
+        if (avatarDirectionReference == null)
+        {
+            return false;
+        }
+
+        Vector3 userForwardInReference =
+            avatarDirectionReference.InverseTransformDirection(userRoot.forward);
+        Vector3 coachForwardInReference =
+            avatarDirectionReference.InverseTransformDirection(coachRoot.forward);
+        if (!TryCalculateYawAlignmentDegrees(
+                userForwardInReference,
+                coachForwardInReference,
+                Vector3.up,
+                out float correctionDegrees))
+        {
+            return false;
+        }
+
+        CaptureUserRotationBeforeDirectionLock(userRoot);
+        if (Mathf.Abs(correctionDegrees) > DirectionLockDeadZoneDegrees)
+        {
+            userRoot.rotation = Quaternion.AngleAxis(
+                correctionDegrees,
+                avatarDirectionReference.up) * userRoot.rotation;
+        }
+
+        return true;
+    }
+
+    private static bool TryGetBodyFacingDirection(
+        Animator animator,
+        Vector3 worldUp,
+        out Vector3 facing)
+    {
+        facing = Vector3.zero;
+        if (animator == null || worldUp.sqrMagnitude < 0.0001f)
+        {
+            return false;
+        }
+
+        Transform head = animator.GetBoneTransform(HumanBodyBones.Head);
+        Transform chest = animator.GetBoneTransform(HumanBodyBones.UpperChest) ??
+            animator.GetBoneTransform(HumanBodyBones.Chest) ??
+            animator.GetBoneTransform(HumanBodyBones.Spine);
+        Transform leftShoulder =
+            animator.GetBoneTransform(HumanBodyBones.LeftShoulder) ??
+            animator.GetBoneTransform(HumanBodyBones.LeftUpperArm);
+        Transform rightShoulder =
+            animator.GetBoneTransform(HumanBodyBones.RightShoulder) ??
+            animator.GetBoneTransform(HumanBodyBones.RightUpperArm);
+        Transform leftHip = animator.GetBoneTransform(HumanBodyBones.LeftUpperLeg);
+        Transform rightHip = animator.GetBoneTransform(HumanBodyBones.RightUpperLeg);
+        if (chest == null)
+        {
+            return false;
+        }
+
+        Vector3 lateral = Vector3.zero;
+        if (leftShoulder != null && rightShoulder != null)
+        {
+            lateral = rightShoulder.position - leftShoulder.position;
+        }
+        if (leftHip != null && rightHip != null)
+        {
+            Vector3 hipLateral = rightHip.position - leftHip.position;
+            lateral = lateral.sqrMagnitude > 0.0001f
+                ? lateral + hipLateral
+                : hipLateral;
+        }
+
+        Vector3 safeUp = worldUp.normalized;
+        if (head != null)
+        {
+            Vector3 headForward = Vector3.ProjectOnPlane(
+                head.forward,
+                safeUp);
+            if (headForward.sqrMagnitude > 0.0001f)
+            {
+                facing = headForward.normalized;
+                return true;
+            }
+        }
+
+        Vector3 chestForward = Vector3.ProjectOnPlane(chest.forward, safeUp);
+        if (chestForward.sqrMagnitude > 0.0001f)
+        {
+            facing = chestForward.normalized;
+            return true;
+        }
+
+        lateral = Vector3.ProjectOnPlane(lateral, safeUp);
+        if (lateral.sqrMagnitude < 0.0001f)
+        {
+            lateral = Vector3.ProjectOnPlane(chest.right, safeUp);
+        }
+        if (lateral.sqrMagnitude < 0.0001f)
+        {
+            return false;
+        }
+
+        Vector3 candidate = Vector3.Cross(lateral.normalized, safeUp);
+        facing = candidate.normalized;
+        return facing.sqrMagnitude > 0.0001f;
+    }
+
+    // Compare the same anatomical axis on both avatars. A lying torso axis
+    // must never be compared with the other avatar's upright facing axis.
+    private static bool TryGetComparableHeadings(Animator user, Animator coach,
+        Vector3 up, out Vector3 userHeading, out Vector3 coachHeading)
+    {
+        userHeading = Vector3.zero;
+        coachHeading = Vector3.zero;
+        if (TryGetBodyHeadwardDirection(user, out Vector3 u) &&
+            TryGetBodyHeadwardDirection(coach, out Vector3 c))
+        {
+            Vector3 pu = Vector3.ProjectOnPlane(u, up);
+            Vector3 pc = Vector3.ProjectOnPlane(c, up);
+            if (u.sqrMagnitude > 0.0001f && c.sqrMagnitude > 0.0001f &&
+                pu.sqrMagnitude / u.sqrMagnitude > 0.55f &&
+                pc.sqrMagnitude / c.sqrMagnitude > 0.55f)
+            {
+                userHeading = pu.normalized;
+                coachHeading = pc.normalized;
+                return true;
+            }
+        }
+        return TryGetBodyFacingDirection(user, up, out userHeading) &&
+            TryGetBodyFacingDirection(coach, up, out coachHeading);
+    }
+
+    private static bool TryGetStableAvatarHeading(
+        Animator animator,
+        Vector3 worldUp,
+        out Vector3 heading)
+    {
+        heading = Vector3.zero;
+        if (animator == null || worldUp.sqrMagnitude < 0.0001f)
+        {
+            return false;
+        }
+
+        if (TryGetBodyHeadwardDirection(animator, out Vector3 headward))
+        {
+            Vector3 safeUp = worldUp.normalized;
+            Vector3 horizontalHeadward = Vector3.ProjectOnPlane(
+                headward,
+                safeUp);
+            float headwardLengthSquared = headward.sqrMagnitude;
+            if (headwardLengthSquared > 0.0001f &&
+                horizontalHeadward.sqrMagnitude / headwardLengthSquared > 0.55f)
+            {
+                heading = horizontalHeadward.normalized;
+                return true;
+            }
+        }
+
+        return TryGetBodyFacingDirection(animator, worldUp, out heading);
     }
 
     private Transform ResolveAvatarDirectionReference(
@@ -1114,28 +1507,6 @@ public class PracticeSessionController : MonoBehaviour
         userRoot.rotation =
             avatarDirectionReference.rotation *
             lockedUserRotationInReference;
-
-        // A real VMC/IMU stream carries the person's room heading in the Hips
-        // bone, not in the avatar root. Restoring only the root therefore does
-        // not hold the displayed direction when a person lies down at another
-        // heading. Re-evaluate the latest tracked torso after restoring the
-        // authored display root and cancel only its horizontal yaw. Tracker
-        // pitch/roll and all exercise articulation remain untouched.
-        if (TryGetBodyHeadwardDirection(
-                motionRecorder.UserAnimator,
-                out Vector3 userHeadwardWorld) &&
-            TryCalculateYawAlignmentDegrees(
-                avatarDirectionReference.InverseTransformDirection(
-                    userHeadwardWorld),
-                lockedCoachHeadwardInReference,
-                Vector3.up,
-                out float yawCorrectionDegrees) &&
-            Mathf.Abs(yawCorrectionDegrees) > DirectionLockDeadZoneDegrees)
-        {
-            userRoot.rotation = Quaternion.AngleAxis(
-                yawCorrectionDegrees,
-                avatarDirectionReference.up) * userRoot.rotation;
-        }
 
         return true;
     }
@@ -1444,12 +1815,39 @@ public class PracticeSessionController : MonoBehaviour
 
     public void StopPractice()
     {
+        bool shouldFinalize = trainingPlaybackStarted && !coachResultFinalized;
         practiceRunning = false;
-        trainingPlaybackStarted = false;
         CancelPracticeIntroduction();
         CancelCompletionPostureGate();
         ResetUserDirectionLock();
+        if (shouldFinalize)
+        {
+            coachActionController?.StopTimeline(
+                CoachTimelineStatus.EndedEarly,
+                CoachEndReason.UserEnded);
+        }
+        trainingPlaybackStarted = false;
+
+        if (shouldFinalize && coachResultFinalized)
+        {
+            coachActionController?.ReturnIdle();
+            return;
+        }
+
         poseScorer?.StopTrainingMeasurement();
+        if (shouldFinalize)
+        {
+            SpineFlowTrainingSession.EndCoachTraining(
+                poseScorer != null ? poseScorer.SessionScores : null,
+                poseScorer != null ? poseScorer.MaximumUserMotionDegrees : 0f,
+                poseScorer != null ? poseScorer.MaximumCoachMotionDegrees : 0f,
+                coachActionController != null
+                    ? coachActionController.CompletedRepetitions
+                    : 0,
+                CoachTimelineStatus.EndedEarly,
+                CoachEndReason.UserEnded);
+            coachResultFinalized = true;
+        }
         if (motionRecorder != null)
         {
             motionRecorder.FinishAndSave(false);
@@ -1465,6 +1863,7 @@ public class PracticeSessionController : MonoBehaviour
     {
         practiceRunning = false;
         trainingPlaybackStarted = false;
+        ResetUserDirectionLock();
         preparationDirectionAlignmentActive = false;
         BeginCompletionPostureGate();
         if (motionRecorder != null)
@@ -1472,16 +1871,57 @@ public class PracticeSessionController : MonoBehaviour
             motionRecorder.RequestFinish();
         }
 
-        if (poseScorer != null)
+        SpineFlowTrainingSession.CompleteCoachTraining(
+            poseScorer != null ? poseScorer.SessionScores : null,
+            poseScorer != null ? poseScorer.MaximumUserMotionDegrees : 0f,
+            poseScorer != null ? poseScorer.MaximumCoachMotionDegrees : 0f,
+            coachActionController != null
+                ? coachActionController.CompletedRepetitions
+                : 0);
+        coachResultFinalized = true;
+    }
+
+    private void HandleLessonHardStop(CoachEndReason reason)
+    {
+        if (practiceRunning && !trainingPlaybackStarted) StopPractice();
+    }
+
+    private void HandleCoachTimelineCompleted(
+        CoachTimelineStatus status,
+        CoachEndReason reason)
+    {
+        if (status == CoachTimelineStatus.Completed ||
+            !trainingPlaybackStarted ||
+            coachResultFinalized)
         {
-            SpineFlowTrainingSession.CompleteCoachTraining(
-                poseScorer.SessionScores,
-                poseScorer.MaximumUserMotionDegrees,
-                poseScorer.MaximumCoachMotionDegrees,
-                coachActionController != null
-                    ? coachActionController.CompletedRepetitions
-                    : 0);
+            return;
         }
+
+        FindObjectOfType<MobileCoachControls>(true)?.SetPaused(false);
+        practiceRunning = false;
+        trainingPlaybackStarted = false;
+        ResetUserDirectionLock();
+        poseScorer?.StopTrainingMeasurement();
+        SpineFlowTrainingSession.EndCoachTraining(
+            poseScorer != null ? poseScorer.SessionScores : null,
+            poseScorer != null ? poseScorer.MaximumUserMotionDegrees : 0f,
+            poseScorer != null ? poseScorer.MaximumCoachMotionDegrees : 0f,
+            coachActionController != null
+                ? coachActionController.CompletedRepetitions
+                : 0,
+            status,
+            reason);
+        coachResultFinalized = true;
+        motionRecorder?.FinishAndSave(false);
+        Debug.LogWarning(
+            $"PracticeSessionController: coach timeline stopped; status={status}, reason={reason}.",
+            this);
+#if UNITY_ANDROID && !UNITY_EDITOR
+        if (SpineFlowTrainingSession.HasMobileSession)
+        {
+            SpineFlowTrainingSession.TryReturnToMobile();
+        }
+#endif
     }
 
     private void BeginCompletionPostureGate()
@@ -1489,6 +1929,7 @@ public class PracticeSessionController : MonoBehaviour
         ResolvePresentationController();
         presentationController?.BeginPracticeCompletionPostureGate();
         completionUprightReadySeconds = 0f;
+        completionWaitElapsed = 0f;
 
         if (!requireUprightPoseForCompletionControls)
         {
@@ -1505,6 +1946,19 @@ public class PracticeSessionController : MonoBehaviour
     {
         if (!waitingForCompletionUprightPose)
         {
+            return;
+        }
+
+        completionWaitElapsed += deltaTime;
+        float timeout = poseScorer != null ? poseScorer.ProgressionTimeoutSeconds
+            : PoseScorer.DefaultProgressionTimeoutSeconds;
+        if (completionWaitElapsed >= timeout)
+        {
+            waitingForCompletionUprightPose = false;
+            ResetUserDirectionLock();
+            ResolvePresentationController();
+            presentationController?.NotifyPracticeCompletionUserUpright();
+            Debug.Log("[CoachFlow] Completion posture wait expired; releasing controls without requiring standing.", this);
             return;
         }
 
@@ -1541,6 +1995,7 @@ public class PracticeSessionController : MonoBehaviour
     {
         waitingForCompletionUprightPose = false;
         completionUprightReadySeconds = 0f;
+        completionWaitElapsed = 0f;
     }
 
     private void UpdateUserTrackerFreshness(float deltaTime)
@@ -1603,7 +2058,8 @@ public class PracticeSessionController : MonoBehaviour
     {
         return receiver != null &&
             receiver.isActiveAndEnabled &&
-            !receiver.Freeze;
+            !receiver.Freeze &&
+            receiver.GetAvailable() > 0;
     }
 
     private void ResolveUserTrackerReceiver()
@@ -1760,7 +2216,10 @@ public class PracticeSessionController : MonoBehaviour
 
     private void ResetUserDirectionLock()
     {
+        displayYawRestore?.Restore();
+        coachDisplayYaw = 0f;
         RestoreUserRotationBeforeDirectionLock();
+        RestoreAuthoredCoachRotation();
         preparationDirectionAlignmentActive = false;
         hasAlignedDuringPreparation = false;
         hasLockedUserRotation = false;
@@ -1768,9 +2227,178 @@ public class PracticeSessionController : MonoBehaviour
         preparationPoseMissSeconds = 0f;
         secondsSinceFreshTrackerBones = float.PositiveInfinity;
         lockedUserRotationInReference = Quaternion.identity;
-        lockedCoachHeadwardInReference = Vector3.forward;
         lockedCoachVerticalAlignmentOffset = 0f;
         avatarDirectionReference = null;
+    }
+
+    private void ShowOrientationSelection(Transform parent)
+    {
+        if (orientationSelectionRoot != null)
+        {
+            return;
+        }
+
+        orientationMode = CoachOrientationMode.FollowUser;
+        orientationSelectionRoot = new GameObject("CoachOrientationSelection");
+        RectTransform selectionRect = orientationSelectionRoot.AddComponent<RectTransform>();
+        selectionRect.SetParent(parent, false);
+        selectionRect.anchorMin = Vector2.zero;
+        selectionRect.anchorMax = Vector2.one;
+        selectionRect.offsetMin = Vector2.zero;
+        selectionRect.offsetMax = Vector2.zero;
+
+        GameObject panelObject = new GameObject("Panel");
+        panelObject.transform.SetParent(orientationSelectionRoot.transform, false);
+        RectTransform panel = panelObject.AddComponent<RectTransform>();
+        panel.anchorMin = new Vector2(0.5f, 0f);
+        panel.anchorMax = new Vector2(0.5f, 0f);
+        panel.pivot = new Vector2(0.5f, 0.5f);
+        panel.anchoredPosition = new Vector2(0f, 100f);
+        panel.sizeDelta = new Vector2(900f, 160f);
+        Image panelImage = panelObject.AddComponent<Image>();
+        panelImage.color = new Color(0.04f, 0.06f, 0.09f, 0.96f);
+
+        TMP_Text title = CreateOrientationText(
+            panelObject.transform,
+            "教练朝向（默认 A）",
+            new Vector2(0f, 52f),
+            new Vector2(800f, 40f),
+            26f);
+        title.alignment = TextAlignmentOptions.Center;
+        CreateOrientationButton(
+            panelObject.transform,
+            "A  教练跟随我的方向",
+            new Vector2(-210f, 0f),
+            () => SelectOrientation(CoachOrientationMode.FollowUser));
+        CreateOrientationButton(
+            panelObject.transform,
+            "B  我跟随教练的方向",
+            new Vector2(210f, 0f),
+            () => SelectOrientation(CoachOrientationMode.AlignUserToCoach));
+        TMP_Text hint = CreateOrientationText(
+            panelObject.transform,
+            "A 教练持续跟随你转向 · B 你的显示模型对齐教练",
+            new Vector2(0f, -55f),
+            new Vector2(850f, 36f),
+            22f);
+        hint.alignment = TextAlignmentOptions.Center;
+        SelectOrientation(CoachOrientationMode.FollowUser);
+    }
+
+    private TMP_Text CreateOrientationText(
+        Transform parent,
+        string text,
+        Vector2 position,
+        Vector2 size,
+        float fontSize)
+    {
+        GameObject textObject = new GameObject("Text");
+        textObject.transform.SetParent(parent, false);
+        RectTransform rect = textObject.AddComponent<RectTransform>();
+        rect.anchorMin = new Vector2(0.5f, 0.5f);
+        rect.anchorMax = new Vector2(0.5f, 0.5f);
+        rect.pivot = new Vector2(0.5f, 0.5f);
+        rect.anchoredPosition = position;
+        rect.sizeDelta = size;
+        TMP_Text label = textObject.AddComponent<TextMeshProUGUI>();
+        label.text = text;
+        label.font = ResolveOrientationFont();
+        label.fontSize = fontSize;
+        label.color = Color.white;
+        label.alignment = TextAlignmentOptions.MidlineLeft;
+        return label;
+    }
+
+    private TMP_FontAsset ResolveOrientationFont()
+    {
+        if (orientationFont != null)
+        {
+            return orientationFont;
+        }
+
+        foreach (TMP_Text existingText in FindObjectsOfType<TMP_Text>(true))
+        {
+            if (existingText.font != null &&
+                existingText.font.name.IndexOf("SourceHan", System.StringComparison.OrdinalIgnoreCase) >= 0)
+            {
+                orientationFont = existingText.font;
+                return orientationFont;
+            }
+        }
+
+        foreach (TMP_FontAsset loadedFont in Resources.FindObjectsOfTypeAll<TMP_FontAsset>())
+        {
+            if (loadedFont != null &&
+                loadedFont.name.IndexOf("SourceHan", System.StringComparison.OrdinalIgnoreCase) >= 0)
+            {
+                orientationFont = loadedFont;
+                return orientationFont;
+            }
+        }
+
+        return TMP_Settings.defaultFontAsset;
+    }
+
+    private void CreateOrientationButton(
+        Transform parent,
+        string text,
+        Vector2 position,
+        UnityEngine.Events.UnityAction action)
+    {
+        GameObject buttonObject = new GameObject(text);
+        buttonObject.transform.SetParent(parent, false);
+        RectTransform rect = buttonObject.AddComponent<RectTransform>();
+        rect.anchorMin = new Vector2(0.5f, 0.5f);
+        rect.anchorMax = new Vector2(0.5f, 0.5f);
+        rect.pivot = new Vector2(0.5f, 0.5f);
+        rect.anchoredPosition = position;
+        rect.sizeDelta = new Vector2(390f, 60f);
+        Image image = buttonObject.AddComponent<Image>();
+        image.color = new Color(0.15f, 0.55f, 0.72f, 1f);
+        Button button = buttonObject.AddComponent<Button>();
+        button.targetGraphic = image;
+        button.onClick.AddListener(action);
+        TMP_Text label = CreateOrientationText(
+            buttonObject.transform,
+            text,
+            Vector2.zero,
+            rect.sizeDelta,
+            26f);
+        label.alignment = TextAlignmentOptions.Center;
+    }
+
+    private void SelectOrientation(CoachOrientationMode mode)
+    {
+        RestoreUserRotationBeforeDirectionLock();
+        RestoreAuthoredCoachRotation();
+        orientationMode = mode;
+        ResetUserDirectionLock();
+        if (orientationSelectionRoot != null)
+        {
+            Button[] buttons = orientationSelectionRoot.GetComponentsInChildren<Button>();
+            for (int i = 0; i < buttons.Length; i++)
+                buttons[i].image.color = i == (int)mode
+                    ? new Color(0.08f, 0.55f, 0.65f, 1f)
+                    : new Color(0.23f, 0.28f, 0.33f, 1f);
+        }
+    }
+
+    private void DestroyOrientationSelection()
+    {
+        if (orientationSelectionRoot != null)
+        {
+            Destroy(orientationSelectionRoot);
+            orientationSelectionRoot = null;
+        }
+
+    }
+
+    public void ShowOrientationSelectionForStart(Transform parent)
+    {
+        if (!practiceRunning)
+        {
+            ShowOrientationSelection(parent);
+        }
     }
 
     private void DisableLegacyDifficultySelectionPanel()
@@ -1804,4 +2432,30 @@ public class PracticeSessionController : MonoBehaviour
     public bool IsIntroductionPlaying =>
         practiceRunning && !trainingPlaybackStarted;
     public bool HasTrainingPlaybackStarted => trainingPlaybackStarted;
+}
+
+// Restore before normal Update and animation/receiver processing. The yaw is
+// applied again only after those systems and pose observation have run.
+[DefaultExecutionOrder(-32000)]
+public class DisplayYawRestore : MonoBehaviour
+{
+    private Transform root;
+    private Quaternion rawLocalRotation;
+
+    public void Apply(Transform target, Vector3 up, float yaw)
+    {
+        Restore();
+        root = target;
+        rawLocalRotation = root.localRotation;
+        root.rotation = Quaternion.AngleAxis(yaw, up) * root.rotation;
+    }
+
+    public void Restore()
+    {
+        if (root != null) root.localRotation = rawLocalRotation;
+        root = null;
+    }
+
+    private void Update() { Restore(); }
+    private void OnDisable() { Restore(); }
 }

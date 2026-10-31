@@ -96,7 +96,7 @@ public sealed class HipThrustRuleScoring : MonoBehaviour
     public void Tick(float deltaTime)
     {
         ObserveInput();
-        InputFresh=motion!=null && motion.HasFreshFrame && Time.unscaledTime-lastFrameAt<=.5f;
+        InputFresh=motion!=null && motion.HasFreshFrame && Time.unscaledTime-lastFrameAt<=(sideBridge!=null?.35f:.5f);
         bool valid=TargetsReady && InputFresh && deltaTime>0 && deltaTime<=.1001f && calibration!=null && calibration.IsCalibrated;
         if(sideBridge!=null&&TargetsReady)sideBridge.UpdateReference();
         Progress=Quality=TrackingQuality=CoachProgress=0;HasMeasurement=false;

@@ -13,8 +13,9 @@ public static class TrainingToleranceSceneVerification
     static readonly string[] AllScenes={"BirdDog_RingSkinC_Recorded","DeadBug_RingSkinC_Recorded","HipThrust_RingBridge_NewScoring","HipThrust_RingBridge_Hold30","SideBridge_RingBridge_Dynamic","SideBridge_RingBridge_Hold30"};
     static readonly string[] ProbeScenes={"DeadBug_RingSkinC_Recorded","HipThrust_RingBridge_NewScoring","SideBridge_RingBridge_Dynamic","SideBridge_RingBridge_Hold30"};
     static readonly string[] HipScenes={"HipThrust_RingBridge_NewScoring","HipThrust_RingBridge_Hold30"};
+    static readonly string[] SideScenes={"SideBridge_RingBridge_Dynamic","SideBridge_RingBridge_Hold30"};
     static readonly string[] RhythmScenes={"BirdDog_RingSkinC_Recorded","DeadBug_RingSkinC_Recorded"};
-    static string[] Scenes=>SessionState.GetBool("ToleranceRhythmOnly",false)?RhythmScenes:SessionState.GetBool("ToleranceHipOnly",false)?HipScenes:SessionState.GetBool("ToleranceFast",false)?ProbeScenes:AllScenes;
+    static string[] Scenes=>SessionState.GetBool("ToleranceSideOnly",false)?SideScenes:SessionState.GetBool("ToleranceRhythmOnly",false)?RhythmScenes:SessionState.GetBool("ToleranceHipOnly",false)?HipScenes:SessionState.GetBool("ToleranceFast",false)?ProbeScenes:AllScenes;
     static int sceneIndex,difficultyIndex,stage;
     static GameWorkoutScene entry;
     static readonly BindingFlags Private=BindingFlags.Instance|BindingFlags.NonPublic;
@@ -23,7 +24,9 @@ public static class TrainingToleranceSceneVerification
     public static void RunFast(){SetMode(true,false,false);Start();}
     public static void RunHipOnly(){SetMode(false,true,false);Start();}
     public static void RunRhythmOnly(){SetMode(false,false,true);Start();}
-    static void SetMode(bool fast,bool hip,bool rhythm){SessionState.SetBool("ToleranceFast",fast);SessionState.SetBool("ToleranceHipOnly",hip);SessionState.SetBool("ToleranceRhythmOnly",rhythm);}
+    public static void RunSideOnly(){SetMode(false,false,false);SessionState.SetBool("ToleranceSideOnly",true);Start();}
+    public static void RunSideBaseline(){SetMode(false,false,false);SessionState.SetBool("ToleranceSideOnly",true);SessionState.SetBool("SideDeliveryBaseline",true);Start();}
+    static void SetMode(bool fast,bool hip,bool rhythm){SessionState.SetBool("ToleranceFast",fast);SessionState.SetBool("ToleranceHipOnly",hip);SessionState.SetBool("ToleranceRhythmOnly",rhythm);SessionState.SetBool("ToleranceSideOnly",false);SessionState.SetBool("SideDeliveryBaseline",false);}
     static void Start()
     {
         TrainingToleranceScenarios.Begin();

@@ -136,15 +136,9 @@ public sealed class GameTrainingAssessment : MonoBehaviour
             double credit=Summary.IsContinuous?rule.BestContinuousSeconds:rule.RoundValidHoldSeconds;
             if(rule.RoundFinished)credit=rule.LastRoundHoldSeconds;
             double longest=rule.BestContinuousSeconds;
-            if(Summary.IsContinuous)
-            {
-                var rep=bridgePlan[index];var measured=bridgeAttempts[index];
-                double eligible=Math.Max(0,Math.Min(now,rep.lower)-Math.Max(before,rep.top));
-                float lowPoint=Entry.menu.SelectedDifficultyKey=="simple"?.22f:Entry.menu.SelectedDifficultyKey=="hard"?.25f:.23f;
-                bool high=rules.sideBridge.SupportReady && rules.Progress>=(measured.TotalHold>0?rule.SustainProgress:rule.EnterProgress) && rules.Quality>=rule.ValidQuality;
-                measured.Step(dt,eligible,usable,rules.sideBridge.SupportReady&&rules.Progress<=lowPoint,high,now>=rep.lower);
-                credit=longest=measured.LongestHold;
-            }
+            // The delivery state machine owns both live and settled hold time.
+            // A second threshold-based observer could disagree after a brief
+            // calibration wobble or count time rejected for instability.
             Summary.RecordDose(index,credit,longest,rule.RoundFinished,
                 TrainingScoringTolerance.HoldQualified(credit,Summary.Repetitions[index].targetSeconds,Summary.IsContinuous));
             return;

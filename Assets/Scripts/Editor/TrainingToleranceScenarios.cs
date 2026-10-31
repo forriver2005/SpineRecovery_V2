@@ -8,26 +8,30 @@ public static class TrainingToleranceScenarios
 {
     const BindingFlags Private=BindingFlags.Instance|BindingFlags.NonPublic;
     const string Output="output/training-assessment/tolerance-scenarios.txt";
-    public static void Begin(){File.WriteAllText(Output,"Separate humanoid patient replay, synthetic packet transport; no physical IMU validation.\n");}
+    public static void Begin(){Directory.CreateDirectory(Path.GetDirectoryName(Output));File.WriteAllText(Output,"Separate humanoid patient replay, synthetic packet transport; no physical IMU validation.\n");File.WriteAllText("output/training-assessment/side-transitions.txt","");}
     public static void Bridge(GameWorkoutScene entry,Animator patient)
     {
         var game=entry.taiko;var scoring=game.RuleScoring;var assessment=entry.GetComponent<GameTrainingAssessment>();
         var motion=UnityEngine.Object.FindObjectOfType<AvatarMotionSource>();
         Set(entry.scorer,"userAnimator",patient);Set(entry.scorer,"calibrated",true);
-        Quaternion rotation=patient.transform.rotation;
+        Quaternion rotation=patient.transform.rotation;Vector3 scale=patient.transform.localScale;
         using(var coachHandler=new HumanPoseHandler(game.CoachAnimator.avatar,game.CoachAnimator.transform))
         using(var patientHandler=new HumanPoseHandler(patient.avatar,patient.transform))
         {
-            foreach(string scenario in new[]{"follow","range_90","range_80","delay_350ms","delay_500ms","jitter_3deg","jitter_5deg","gap_1frame_mid","gap_1frame_end","gap_100ms_mid","spike_100ms_mid","gap_300ms_mid","rest","half_range","wrong_orientation","disconnect","heartbeat_only","early_lower"})
+            var scenarios=new System.Collections.Generic.List<string>{"follow","range_90","range_80","delay_350ms","delay_500ms","jitter_3deg","jitter_5deg","gap_1frame_mid","gap_1frame_end","gap_100ms_mid","spike_100ms_mid","gap_300ms_mid","rest","half_range","wrong_orientation","disconnect","heartbeat_only","early_lower"};
+            if(scoring.sideBridge!=null)scenarios.AddRange(new[]{"calibration_roll_5","calibration_roll_8","calibration_leg_8","calibration_arm_8","calibration_roll_minus8","calibration_leg_minus8","calibration_arm_minus8","range80_bias5","half_bias8","raised_start","no_low_return","heading_90","scale_85","scale_115","wrong_support_arm","wrong_pelvis_roll","wrong_leg_direction","wrong_knee"});
+            foreach(string scenario in scenarios)
             {
                 if(SkipProbe(scenario))continue;
                 patient.transform.rotation=rotation;
+                patient.transform.localScale=scale*(scenario=="scale_85"?.85f:scenario=="scale_115"?1.15f:1);
                 var bones=patient.GetComponentsInChildren<Transform>(true);var beforePosition=new Vector3[bones.Length];var beforeRotation=new Quaternion[bones.Length];
                 for(int b=0;b<bones.Length;b++){beforePosition[b]=bones[b].localPosition;beforeRotation[b]=bones[b].localRotation;}
                 game.StartMode();
                 TrainingUsageScenarios.AssertRestored(bones,beforePosition,beforeRotation);
                 var plan=game.AssessmentRepetitions();Seek(plan[0].start);var rest=new HumanPose();coachHandler.GetHumanPose(ref rest);
                 int invalidHits=0,earlyFullScores=0,partialHighScores=0;double validSamples=0;
+                string lastSideState="";
                 for(int sample=1;sample<=Math.Ceiling(game.Duration*30);sample++)
                 {
                     double time=Math.Min(game.Duration,sample/30d);Seek(time);int index=0;
@@ -35,18 +39,29 @@ public static class TrainingToleranceScenarios
                     var rep=plan[index];bool inSecondHoldHalf=time>rep.top+(rep.lower-rep.top)/2&&time<rep.lower;
                     double delay=scenario=="delay_350ms"?.35:scenario=="delay_500ms"?.5:0; if(delay>0)Seek(Math.Max(0,time-delay));
                     var pose=new HumanPose();coachHandler.GetHumanPose(ref pose);
+                    if((scenario=="raised_start"&&time<rep.top)||(scenario=="no_low_return"&&time>=rep.lower))
+                    {Seek(rep.top);coachHandler.GetHumanPose(ref pose);}
                     if(scenario=="rest"||(scenario=="early_lower"&&inSecondHoldHalf)||(scenario=="spike_100ms_mid"&&time>=rep.top+(rep.lower-rep.top)/2&&time<rep.top+(rep.lower-rep.top)/2+.1))pose=rest;
-                    if(scenario=="range_90"||scenario=="range_80"||scenario=="half_range")
+                    if(scenario=="range_90"||scenario=="range_80"||scenario=="half_range"||scenario=="range80_bias5"||scenario=="half_bias8")
                     {
-                        for(int m=0;m<pose.muscles.Length;m++)pose.muscles[m]=Mathf.Lerp(rest.muscles[m],pose.muscles[m],scenario=="range_90"?.9f:scenario=="range_80"?.8f:.5f);
-                        pose.bodyPosition=Vector3.Lerp(rest.bodyPosition,pose.bodyPosition,scenario=="range_90"?.9f:scenario=="range_80"?.8f:.5f);pose.bodyRotation=Quaternion.Slerp(rest.bodyRotation,pose.bodyRotation,scenario=="range_90"?.9f:scenario=="range_80"?.8f:.5f);
+                        float range=scenario=="range_90"?.9f:scenario=="half_range"||scenario=="half_bias8"?.5f:.8f;
+                        for(int m=0;m<pose.muscles.Length;m++)pose.muscles[m]=Mathf.Lerp(rest.muscles[m],pose.muscles[m],range);
+                        pose.bodyPosition=Vector3.Lerp(rest.bodyPosition,pose.bodyPosition,range);pose.bodyRotation=Quaternion.Slerp(rest.bodyRotation,pose.bodyRotation,range);
                     }
                     patientHandler.SetHumanPose(ref pose);
                     patient.transform.rotation=scenario=="wrong_orientation"?Quaternion.Euler(0,0,180)*rotation:rotation;
                     Jitter(patient,scenario,sample);
+                    if(scenario=="heading_90")patient.transform.rotation=Quaternion.Euler(0,90,0)*rotation;
+                    SideCalibrationError(patient,scenario);
                     Seek(time);motion.ReportFrame((float)time,scenario=="heartbeat_only"?0:55);
                     double mid=rep.top+(rep.lower-rep.top)/2; bool absent=Gap(scenario,time,mid,rep.lower)||(scenario=="disconnect"&&inSecondHoldHalf);if(absent)motion.SetAvailable(false);
                     scoring.Tick(1f/30);assessment.ObserveBridge(1f/30);
+                    if(scoring.sideBridge!=null)
+                    {
+                        var rule=scoring.sideBridge.Rule;string state=index+"/"+rule.Phase+"/"+rule.RoundFinished;
+                        if(state!=lastSideState)File.AppendAllText("output/training-assessment/side-transitions.txt",$"{entry.menu.SelectedDifficultyKey}/{scenario} t={time:F2} rep={index} state={state} progress={scoring.Progress:F3} quality={scoring.Quality:F1} hold={rule.RoundValidHoldSeconds:F2} stable={scoring.sideBridge.Stable} low={rule.LowConfirmed}\n");
+                        lastSideState=state;
+                    }
                     if(scenario=="follow"&&assessment.Summary.IsContinuous&&time>=rep.top&&time<rep.lower-.05&&game.Score==100)earlyFullScores++;
                     if((absent||scenario=="heartbeat_only")&&(bool)Call(game,"PoseMatchesCoach"))invalidHits++;
                     if(scoring.LiveScore>0)validSamples++;
@@ -54,6 +69,7 @@ public static class TrainingToleranceScenarios
                 }
                 assessment.Finish();var s=assessment.Summary;
                 File.AppendAllText(Output,$"{game.gameObject.scene.name} | {entry.menu.SelectedDifficultyKey} | {scenario} | score={s.Score} quality={s.Quality:F1} hold={s.CreditedSeconds:F2}/{s.TargetSeconds:F2} qualified={s.Qualified}/{s.Planned} live_frames={validSamples} invalid_hits={invalidHits}\n");
+                if(UnityEditor.SessionState.GetBool("SideDeliveryBaseline",false))continue;
                 if(invalidHits!=0)throw new Exception("Invalid telemetry produced HIT: "+scenario);
                 if(partialHighScores!=0)throw new Exception("Sustained half lift earned live hold points");
                 if(earlyFullScores!=0)throw new Exception("Full live score before the prescribed 30-second hold ends");
@@ -61,9 +77,10 @@ public static class TrainingToleranceScenarios
                 if((scenario=="rest"||scenario=="half_range"||scenario=="wrong_orientation"||scenario=="early_lower")&&s.Qualified>0)
                     throw new Exception("Invalid motion earned qualified repetitions: "+scenario);
                 CheckResult(s,scenario);
+                if(scoring.sideBridge!=null)CheckSideResult(s,scenario);
             }
         }
-        patient.transform.rotation=rotation;Set(entry.scorer,"userAnimator",game.CoachAnimator);
+        patient.transform.rotation=rotation;patient.transform.localScale=scale;Set(entry.scorer,"userAnimator",game.CoachAnimator);
         void Seek(double t){Set(game,"elapsed",t);Call(game,"RenderTimeline");}
     }
     public static void Rhythm(GameWorkoutScene entry,Animator patient)
@@ -172,6 +189,25 @@ public static class TrainingToleranceScenarios
     }
     static bool SkipProbe(string scenario)=>UnityEditor.SessionState.GetBool("ToleranceFast",false)&&
         scenario!="follow"&&scenario!="delay_350ms"&&scenario!="delay_500ms"&&scenario!="jitter_3deg"&&scenario!="jitter_5deg"&&scenario!="spike_100ms_mid";
+    static void SideCalibrationError(Animator patient,string scenario)
+    {
+        float sign=scenario.Contains("minus")?-1:1;
+        if(scenario.StartsWith("calibration_roll_")||scenario=="range80_bias5"||scenario=="half_bias8"||scenario=="wrong_pelvis_roll")
+            patient.GetBoneTransform(HumanBodyBones.Hips).rotation=Quaternion.AngleAxis(scenario=="wrong_pelvis_roll"?70:scenario.EndsWith("8")?8*sign:5,patient.transform.forward)*patient.GetBoneTransform(HumanBodyBones.Hips).rotation;
+        if(scenario.StartsWith("calibration_leg_"))foreach(var bone in new[]{HumanBodyBones.LeftUpperLeg,HumanBodyBones.RightUpperLeg,HumanBodyBones.LeftLowerLeg,HumanBodyBones.RightLowerLeg})
+            patient.GetBoneTransform(bone).localRotation*=Quaternion.Euler(8*sign,0,0);
+        if(scenario.StartsWith("calibration_arm_")||scenario=="wrong_support_arm")
+            patient.GetBoneTransform(HumanBodyBones.LeftUpperArm).localRotation*=Quaternion.Euler(0,0,scenario=="wrong_support_arm"?85:8*sign);
+    }
+    static void CheckSideResult(TrainingQualitySummary s,string scenario)
+    {
+        if((scenario.StartsWith("calibration_")||scenario=="range80_bias5"||scenario=="range_80")&&
+            (s.Score<75||s.Qualified<s.Planned*2f/3))throw new Exception("Moderate calibration/range error over-penalized: "+scenario);
+        if((scenario=="heading_90"||scenario.StartsWith("scale_"))&&(s.Score<98||s.Qualified!=s.Planned))throw new Exception("Heading/body scale changed side-bridge assessment");
+        if(scenario.StartsWith("wrong_")&&(s.Score>=60||s.Qualified!=0))throw new Exception("Gross side-bridge error passed: "+scenario);
+        if((scenario=="half_bias8"||scenario=="raised_start"||scenario=="no_low_return")&&s.Qualified!=0)throw new Exception("Calibration/completion guard bypassed: "+scenario);
+        if(scenario=="half_bias8"&&s.Score>=60)throw new Exception("Half lift plus calibration bias passed");
+    }
     static void Jitter(Animator patient,string scenario,int frame)
     {
         if(scenario=="wrong_leg_direction")foreach(var bone in new[]{HumanBodyBones.LeftUpperLeg,HumanBodyBones.RightUpperLeg})

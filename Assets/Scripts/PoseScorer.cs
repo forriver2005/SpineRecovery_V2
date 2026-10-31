@@ -1599,7 +1599,8 @@ public partial class PoseScorer : MonoBehaviour
         if (!continuousObservationActive || !guidanceInputIsFresh || HasHardPoseConstraint())
             return;
 
-        if (IsRecordedDeadBugScene && recordedDeadBugAllLimbFeedbackLatched &&
+        if (!UsesGameTargetFeedback &&
+            IsRecordedDeadBugScene && recordedDeadBugAllLimbFeedbackLatched &&
             !recordedDeadBugAllLimbFeedbackCompleted)
         {
             hapticLocationOverrides.Add(TrackerWearLocation.LeftForearm);
@@ -2127,6 +2128,11 @@ public partial class PoseScorer : MonoBehaviour
 
     private bool ShowRecordedDeadBugAllLimbFeedback()
     {
+        if (UsesGameTargetFeedback)
+        {
+            return false;
+        }
+
         if (!IsRecordedDeadBugScene ||
             (currentSegmentInfo.segmentKind != TrainingSegmentKind.Preparation &&
              currentSegmentInfo.segmentKind != TrainingSegmentKind.CoreAction))

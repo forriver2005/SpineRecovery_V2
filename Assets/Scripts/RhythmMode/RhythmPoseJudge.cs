@@ -87,6 +87,15 @@ public sealed class RhythmPoseJudge : MonoBehaviour
             progress>=GameDifficultyPolicy.MinimumExtension(Difficulty,target)&&poseScore>=SuccessThreshold;
     }
 
+    public bool IsTargetAtRest(RhythmBodyTarget target,RhythmMovementRange reference,out float poseScore)
+    {
+        poseScore=0;
+        if(!HasTracking(target)||reference==null)return false;
+        return reference.TryRestEndpoint(poseScorer,target,out float progress,out poseScore)&&
+            progress<=1f-GameDifficultyPolicy.MinimumExtension(Difficulty,target)&&
+            poseScore>=SuccessThreshold;
+    }
+
     public float GetScore(RhythmBodyTarget target)
     {
         if(poseScorer==null||!poseScorer.IsSessionActive||poseScorer.IsScoringPaused||!poseScorer.HasFreshInput||!poseScorer.HasMatchingFloorPosture)return 0;

@@ -13,6 +13,9 @@ public partial class PoseScorer
     SideBridgePoseGeometry coachingSideGeometry;
     int coachingGameSegment = -1;
     int coachingGameRepeat = -1;
+    bool coachingPreparationFeedbackLatched;
+    bool coachingPreparationFeedbackCompleted;
+    float coachingPreparationFeedbackStartedAt;
     readonly HashSet<BodyPart> coachingGameReadyParts = new HashSet<BodyPart>();
     readonly Dictionary<BodyPart, bool> previousCoachingGameReady =
         new Dictionary<BodyPart, bool>();
@@ -28,15 +31,22 @@ public partial class PoseScorer
     void UpdateGameTargetFeedback()
     {
         coachingGameReadyParts.Clear();
+        bool preparation = currentSegmentInfo.segmentKind == TrainingSegmentKind.Preparation &&
+            (guidanceExercise == PoseGuidanceExercise.DeadBug ||
+             guidanceExercise == PoseGuidanceExercise.BirdDog);
         if (!continuousObservationActive || !UsesGameTargetFeedback ||
-            currentSegmentInfo.segmentKind != TrainingSegmentKind.CoreAction ||
+            (!preparation && currentSegmentInfo.segmentKind != TrainingSegmentKind.CoreAction) ||
             !guidanceInputIsFresh || HasHardPoseConstraint())
         {
             ResetCoachingGameReadyState();
             return;
         }
 
-        if (guidanceExercise == PoseGuidanceExercise.DeadBug ||
+        if (preparation)
+        {
+            UpdatePreparationTargetFeedback();
+        }
+        else if (guidanceExercise == PoseGuidanceExercise.DeadBug ||
             guidanceExercise == PoseGuidanceExercise.BirdDog)
         {
             UpdateDeadBugBirdDogGameTargets();
@@ -79,20 +89,7 @@ public partial class PoseScorer
         coachingGamePoseScorer.SetExternalCoachingInputFresh(guidanceInputIsFresh);
         coachingGamePoseScorer.EvaluateExternalCoachingFrame(Time.deltaTime);
 
-        if (coachingGameSegment != currentSegmentInfo.segmentIndex ||
-            coachingGameRepeat != currentSegmentInfo.repeatIndex ||
-            coachingMovementRange == null)
-        {
-            coachingGameSegment = currentSegmentInfo.segmentIndex;
-            coachingGameRepeat = currentSegmentInfo.repeatIndex;
-            coachingMovementRange = new RhythmMovementRange();
-            AnimatorStateInfo state = coachAnimator != null
-                ? coachAnimator.GetCurrentAnimatorStateInfo(0)
-                : default;
-            coachingMovementRange.BeginAtState(
-                coachingGamePoseScorer,
-                state.fullPathHash);
-        }
+        EnsureCoachingMovementRange();
 
         foreach (BodyPart part in AllGuidanceParts)
         {
@@ -112,6 +109,77 @@ public partial class PoseScorer
                 coachingGameReadyParts.Add(part);
             }
         }
+    }
+
+    void UpdatePreparationTargetFeedback()
+    {
+        EnsureCoachingDeadBugPredicate();
+        coachingGamePoseScorer.ConfigureExternalCoaching(
+            coachAnimator,
+            userAnimator,
+            guidanceInputIsFresh,
+            GetCoachingDifficultyKey());
+        coachingGamePoseScorer.SetExternalCoachingInputFresh(guidanceInputIsFresh);
+        coachingGamePoseScorer.EvaluateExternalCoachingFrame(Time.deltaTime);
+        EnsureCoachingMovementRange();
+
+        bool allReached = true;
+        foreach (BodyPart part in AllGuidanceParts)
+        {
+            RhythmBodyTarget target = ToRhythmTarget(part);
+            bool reached = guidanceExercise == PoseGuidanceExercise.DeadBug
+                ? coachingRhythmPoseJudge.IsTargetReached(
+                    target, coachingMovementRange, out _)
+                : coachingRhythmPoseJudge.IsTargetAtRest(
+                    target, coachingMovementRange, out _);
+            allReached &= reached;
+        }
+
+        if (!coachingPreparationFeedbackLatched &&
+            !coachingPreparationFeedbackCompleted && allReached)
+        {
+            coachingPreparationFeedbackLatched = true;
+            coachingPreparationFeedbackStartedAt = Time.unscaledTime;
+        }
+
+        if (!coachingPreparationFeedbackLatched ||
+            coachingPreparationFeedbackCompleted)
+        {
+            return;
+        }
+
+        if (Time.unscaledTime - coachingPreparationFeedbackStartedAt >=
+            Mathf.Max(0.1f, recordedDeadBugSuccessFadeSeconds))
+        {
+            coachingPreparationFeedbackCompleted = true;
+            return;
+        }
+
+        foreach (BodyPart part in AllGuidanceParts)
+        {
+            coachingGameReadyParts.Add(part);
+        }
+    }
+
+    void EnsureCoachingMovementRange()
+    {
+        if (coachingGameSegment == currentSegmentInfo.segmentIndex &&
+            coachingGameRepeat == currentSegmentInfo.repeatIndex &&
+            coachingMovementRange != null)
+        {
+            return;
+        }
+
+        coachingGameSegment = currentSegmentInfo.segmentIndex;
+        coachingGameRepeat = currentSegmentInfo.repeatIndex;
+        coachingMovementRange = new RhythmMovementRange();
+        AnimatorStateInfo state = coachAnimator != null
+            ? coachAnimator.GetCurrentAnimatorStateInfo(0)
+            : default;
+        coachingMovementRange.BeginAtState(coachingGamePoseScorer, state.fullPathHash);
+        coachingPreparationFeedbackLatched = false;
+        coachingPreparationFeedbackCompleted = false;
+        coachingPreparationFeedbackStartedAt = 0f;
     }
 
     void EnsureCoachingBridgePredicate()
@@ -182,10 +250,21 @@ public partial class PoseScorer
         EnsureHapticFeedbackController();
         guidancePartsToHighlight.Clear();
         guidancePartColors.Clear();
+        Color successColor = GuidanceSuccessColor;
+        bool preparationFeedback = currentSegmentInfo.segmentKind == TrainingSegmentKind.Preparation &&
+            coachingPreparationFeedbackLatched;
+        if (preparationFeedback)
+        {
+            float fade = 1f - Mathf.Clamp01(
+                (Time.unscaledTime - coachingPreparationFeedbackStartedAt) /
+                Mathf.Max(0.1f, recordedDeadBugSuccessFadeSeconds));
+            successColor.a *= fade;
+        }
+
         foreach (BodyPart part in coachingGameReadyParts)
         {
             guidancePartsToHighlight.Add(part);
-            guidancePartColors[part] = GuidanceSuccessColor;
+            guidancePartColors[part] = successColor;
             bool wasReady = previousCoachingGameReady.TryGetValue(part, out bool previous) && previous;
             if (!wasReady)
             {
@@ -206,7 +285,7 @@ public partial class PoseScorer
 
         if (UsesHipThrustTeaching || UsesSideBridgeTeaching)
         {
-            modelBodyPartHighlighter?.ShowHipPelvis(GuidanceSuccessColor);
+            modelBodyPartHighlighter?.ShowHipPelvis(successColor);
         }
         else
         {
@@ -217,6 +296,9 @@ public partial class PoseScorer
     void ResetCoachingGameReadyState()
     {
         coachingGameReadyParts.Clear();
+        coachingPreparationFeedbackLatched = false;
+        coachingPreparationFeedbackCompleted = false;
+        coachingPreparationFeedbackStartedAt = 0f;
         guidancePartsToHighlight.Clear();
         guidancePartColors.Clear();
         if (UsesGameTargetFeedback)

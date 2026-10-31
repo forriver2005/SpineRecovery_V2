@@ -110,6 +110,25 @@ public sealed class RhythmMovementRange
         quality=Mathf.Min(direction,100*Mathf.InverseLerp(.4f,.9f,progress));
         return true;
     }
+
+    public bool TryRestEndpoint(DeadBugGamingPoseScorer scorer,RhythmBodyTarget target,out float progress,out float quality)
+    {
+        progress=quality=0;
+        if(!HasMatchingPosture(scorer))return false;
+        var pose=scorer.CaptureAssessmentPose(true);
+        if(!Progress(pose,target,out progress))return false;
+        if(!HasPlausibleLegDirections(pose,target,false))return false;
+        HumanBodyBones primary=PrimaryBone(target);
+        if(!pose.TryGetValue(primary,out var actual)||!current.rest.TryGetValue(primary,out var expected))return false;
+        float direction=DirectionQuality(actual,expected);
+        HumanBodyBones secondary=target==RhythmBodyTarget.LeftHand?HumanBodyBones.LeftLowerArm:
+            target==RhythmBodyTarget.RightHand?HumanBodyBones.RightLowerArm:
+            target==RhythmBodyTarget.LeftFoot?HumanBodyBones.LeftLowerLeg:HumanBodyBones.RightLowerLeg;
+        if(pose.TryGetValue(secondary,out actual)&&current.rest.TryGetValue(secondary,out expected))
+            direction=.85f*direction+.15f*DirectionQuality(actual,expected);
+        quality=Mathf.Min(direction,100*Mathf.InverseLerp(.6f,.1f,progress));
+        return true;
+    }
     bool HasPlausibleLegDirections(Dictionary<HumanBodyBones,Vector3> pose,RhythmBodyTarget target,bool up)
         =>HasPlausibleLegDirections(pose,up?current.top:current.rest,target);
     static bool HasPlausibleLegDirections(Dictionary<HumanBodyBones,Vector3> pose,Dictionary<HumanBodyBones,Vector3> expected,RhythmBodyTarget target)

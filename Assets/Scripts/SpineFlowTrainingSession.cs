@@ -49,9 +49,9 @@ public sealed class SpineFlowTrainingSession : MonoBehaviour
     private const string DeadBugSceneName = "DeadBug";
     private const string DeadBugPracticeSceneName = "DeadBugPractice";
     private const string MaleDeadBugSceneName = "maleDeadBug 1";
-    private const string MaleDeadBugPracticeSceneName = "maleDeadBugPractice";
+    private const string MaleDeadBugPracticeSceneName = "maleDeadBugPracticeOld";
     private const string BirdDogPracticeSceneName = "BirdDogPractice";
-    private const string MaleBirdDogPracticeSceneName = "maleBirdDogPractice";
+    private const string MaleBirdDogPracticeSceneName = "maleBirdDogPracticeOld";
     private const string HipThrustPracticeSceneName = "HipThrustPractice";
     private const string MaleHipThrustPracticeSceneName = "maleHipThrustPractice";
     private const string UnifiedPracticeSceneName = "testPractice";

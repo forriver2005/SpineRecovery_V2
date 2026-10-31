@@ -136,6 +136,11 @@ public class PracticeSessionController : MonoBehaviour
     private bool trainingPlaybackStarted;
     private bool coachResultFinalized;
     private float introductionWaitElapsed;
+    private int introductionGeneration;
+    private bool introductionVoiceFinished;
+    private bool introductionDemonstrationFinished;
+    private bool lessonCountdownStarted;
+    private CoachFlowPresentation flowPresentation;
     private Renderer[] introductionCoachRenderers = System.Array.Empty<Renderer>();
     private Renderer[] introductionUserRenderers = System.Array.Empty<Renderer>();
     private readonly Dictionary<Renderer, bool> introductionRendererStates =
@@ -213,6 +218,7 @@ public class PracticeSessionController : MonoBehaviour
         ResolveVoicePromptManager();
         ResolveCoachLabel();
         EnsureCoachOverlayLabel();
+        EnsureCoachFlowPresentation();
         ResolveUserTrackerReceiver();
         CaptureAuthoredUserScale();
         CaptureAuthoredCoachRotation();
@@ -558,7 +564,17 @@ public class PracticeSessionController : MonoBehaviour
             $"{coachActionController.RepetitionsPerSet} reps.",
             this);
 
-        BeginPracticeIntroduction();
+        if (PracticeSceneController.ConsumeSkipLessonOnNextLoad())
+        {
+            // "再学一次" keeps the preparation/countdown and starts the
+            // four-repetition coach timeline without replaying the separate
+            // coach-only lesson preview.
+            BeginLessonCountdown();
+        }
+        else
+        {
+            BeginPracticeIntroduction();
+        }
     }
 
     private void ApplyPlannedTrainingVolume()
@@ -571,26 +587,62 @@ public class PracticeSessionController : MonoBehaviour
         SpineFlowTrainingVolume volume =
             SpineFlowTrainingSession.GetPlannedTrainingVolume(
                 "coach",
-                coachActionController.TotalSets,
-                coachActionController.RepetitionsPerSet);
+                1,
+                4);
         coachActionController.SetTrainingVolume(volume.sets, volume.repetitionsPerSet);
     }
 
     private void BeginPracticeIntroduction()
     {
+        int generation = ++introductionGeneration;
         introductionWaitElapsed = 0f;
+        introductionVoiceFinished = false;
+        introductionDemonstrationFinished = false;
+        lessonCountdownStarted = false;
         CaptureIntroductionRendererStates();
         FindObjectOfType<CoachSetProgressUI>()?.ShowLessonStage("动作讲解");
+        flowPresentation?.ShowLessonStage(true);
+        // During the lesson the coach is the only avatar on screen. The
+        // tracked-user model returns for formal patient playback.
+        ShowCoachIntroductionStage();
+
+        bool demonstrationStarted = coachActionController != null &&
+            coachActionController.PlayDemonstrationPreview(
+                demonstrationPreviewSeconds,
+                () =>
+                {
+                    if (generation != introductionGeneration || !practiceRunning)
+                    {
+                        return;
+                    }
+
+                    introductionDemonstrationFinished = true;
+                    TryFinishSynchronizedIntroduction(generation);
+                });
+        if (!demonstrationStarted)
+        {
+            introductionDemonstrationFinished = true;
+        }
 
         if (voicePromptManager != null)
         {
             voicePromptManager.StopAll();
             if (voicePromptManager.PlayPracticeIntroduction(
                 ShowCoachIntroductionStage,
-                ShowUserIntroductionStage,
-                ShowBothIntroductionStage,
-                BeginLessonPreview))
+                ShowCoachIntroductionStage,
+                ShowCoachIntroductionStage,
+                () =>
+                {
+                    if (generation != introductionGeneration || !practiceRunning)
+                    {
+                        return;
+                    }
+
+                    introductionVoiceFinished = true;
+                    TryFinishSynchronizedIntroduction(generation);
+                }))
             {
+                TryFinishSynchronizedIntroduction(generation);
                 return;
             }
         }
@@ -599,25 +651,16 @@ public class PracticeSessionController : MonoBehaviour
             "PracticeSessionController could not start the voice introduction; " +
             "formal playback will begin with both avatars visible.",
             this);
-        ShowBothIntroductionStage();
-        BeginLessonPreview();
+        introductionVoiceFinished = true;
+        TryFinishSynchronizedIntroduction(generation);
     }
 
-    private void BeginLessonPreview()
+    private void TryFinishSynchronizedIntroduction(int generation)
     {
-        FindObjectOfType<CoachSetProgressUI>()?.ShowLessonStage("完整示范 · 先观看");
-        if (!practiceRunning || trainingPlaybackStarted)
+        if (generation != introductionGeneration || !practiceRunning ||
+            trainingPlaybackStarted || lessonCountdownStarted ||
+            !introductionVoiceFinished || !introductionDemonstrationFinished)
         {
-            return;
-        }
-
-        SetCoachOverlayVisible(true);
-        if (coachActionController != null &&
-            coachActionController.PlayDemonstrationPreview(
-                demonstrationPreviewSeconds,
-                BeginLessonCountdown))
-        {
-            Debug.Log("PracticeSessionController: starting authored coach demonstration preview.", this);
             return;
         }
 
@@ -626,10 +669,35 @@ public class PracticeSessionController : MonoBehaviour
 
     private void BeginLessonCountdown()
     {
-        if (!practiceRunning || trainingPlaybackStarted) return;
+        if (!practiceRunning || trainingPlaybackStarted || lessonCountdownStarted) return;
+        lessonCountdownStarted = true;
+        flowPresentation?.ShowLessonStage(false);
+        RestoreIntroductionRendererStates();
         FindObjectOfType<CoachSetProgressUI>()?.ShowLessonStage("准备跟练");
         if (voicePromptManager != null) voicePromptManager.PlayLessonCountdown(BeginFormalPracticePlayback);
         else BeginFormalPracticePlayback();
+    }
+
+    /// <summary>
+    /// Skips only the synchronized lesson/demo phase. The original ready
+    /// prompt and full countdown still run before formal repetition one.
+    /// </summary>
+    public void SkipPracticeIntroduction()
+    {
+        if (!practiceRunning || trainingPlaybackStarted || lessonCountdownStarted)
+        {
+            return;
+        }
+
+        introductionGeneration++;
+        introductionVoiceFinished = true;
+        introductionDemonstrationFinished = true;
+        voicePromptManager?.CancelPracticeIntroduction();
+        voicePromptManager?.StopAll();
+        coachActionController?.CancelDemonstrationPreview();
+        flowPresentation?.ShowLessonStage(false);
+        RestoreIntroductionRendererStates();
+        BeginLessonCountdown();
     }
 
     private void BeginFormalPracticePlayback()
@@ -640,6 +708,7 @@ public class PracticeSessionController : MonoBehaviour
         }
 
         RestoreIntroductionRendererStates();
+        flowPresentation?.ShowLessonStage(false);
         // The coach name remains visible during formal training, as in the
         // authored coach-mode scene. Introduction stages may hide it briefly.
         ResolveCoachLabel();
@@ -952,8 +1021,24 @@ public class PracticeSessionController : MonoBehaviour
 
     private void CancelPracticeIntroduction()
     {
+        introductionGeneration++;
+        introductionVoiceFinished = false;
+        introductionDemonstrationFinished = false;
+        lessonCountdownStarted = false;
         voicePromptManager?.CancelPracticeIntroduction();
+        coachActionController?.CancelDemonstrationPreview();
+        flowPresentation?.ShowLessonStage(false);
         RestoreIntroductionRendererStates();
+    }
+
+    private void EnsureCoachFlowPresentation()
+    {
+        flowPresentation = GetComponent<CoachFlowPresentation>();
+        if (flowPresentation == null)
+        {
+            flowPresentation = gameObject.AddComponent<CoachFlowPresentation>();
+        }
+        flowPresentation.Initialize(this, coachActionController);
     }
 
     private void AlignUserDirectionToCoach()

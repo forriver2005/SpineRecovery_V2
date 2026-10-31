@@ -13,14 +13,14 @@ public sealed class AvatarBodyPartHighlighter : MonoBehaviour
 
     [SerializeField] private Animator targetAnimator;
     [SerializeField] private Material highlightMaterial;
-    [SerializeField] private Color highlightColor = new Color(0f, 1f, 0f, 0.95f);
+    [SerializeField] private Color highlightColor = new Color(0.18f, 0.82f, 0.38f, 0.72f);
     [SerializeField, Range(0.05f, 0.9f)] private float minimumTriangleWeight = 0.35f;
     [Tooltip("Torso uses a stricter surface threshold so shoulder, neck, hip, " +
         "and clothing-edge triangles are not painted as one oversized block.")]
     [SerializeField, Range(0.05f, 0.95f)] private float torsoMinimumTriangleWeight = 0.55f;
     [SerializeField] private bool pulse = true;
     [SerializeField, Min(0f)] private float pulseSpeed = 3f;
-    [SerializeField] private Vector2 pulseRange = new Vector2(0.85f, 1.35f);
+    [SerializeField] private Vector2 pulseRange = new Vector2(0.9f, 1.12f);
     [Tooltip("Minimum delay before an automatic retry after no usable overlay " +
         "could be generated.")]
     [SerializeField, Min(0.1f)] private float failedBuildRetrySeconds = 1f;

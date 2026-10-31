@@ -25,7 +25,7 @@
 
 ## 六场景顺序运行
 
-Editor-only 的 CoachSixSimulationRun 在显式存在 `.codex/run-six-simulation` 时运行；可用 `.codex/resume-six-index` 写入0至5选择起始动作。当前按 DeadBugRecordedPractice、BirdDogRecordedPractice、臀桥、卧位猫式、侧桥、卷腹顺序打开正式场景（旧死虫/鸟狗课程保留，不受新录制接管）并调用同一 StartPractice 入口，正常播放讲解、示范、倒数和默认4次练习。
+Editor-only 的 CoachSixSimulationRun 在显式存在 `.codex/run-six-simulation` 时运行；可用 `.codex/resume-six-index` 写入0至5选择起始动作。当前按 DeadBugPractice、BirdDogPractice、臀桥、卧位猫式、侧桥、卷腹顺序打开正式场景；DeadBugPractice/BirdDogPractice 已接入 recorded 录制，旧素材场景改名为 DeadBugPracticeOld/BirdDogPracticeOld 并冻结。模拟调用同一 StartPractice 入口，默认4次练习。
 
 输入按当前相位切换到源录制对应准备/目标/回位姿态；第2次加70度转向，第3次置设备无效，第4次恢复设备并令motor返回503。正式播放节奏完全不受该工具控制。日志在 six-run.log；INTERRUPTED/DISCARD 不能计为完成。切换前脏场景只另存副本到 `.codex/scene-backups`，不会覆盖原场景。
 
@@ -33,8 +33,10 @@ Editor-only 的 CoachSixSimulationRun 在显式存在 `.codex/run-six-simulation
 
 开发复核附加标记：`.codex/sim-only-current` 在当前动作完成后退出顺序运行；`.codex/sim-visual-review` 只复核臀桥、侧桥、卷腹，其中侧桥调用原选择处理器选择B，其余默认A。结束后都应删除，避免影响下次标准六动作顺序运行。
 
+截图复核：在同时存在 `.codex/run-six-simulation` 和 `.codex/capture-coach-flow` 时，Editor-only 运行器会把当前动作代表帧写入 `.codex/coach-flow-screenshots/`，文件名带 `unity-sim-current-`。这些文件明确是 Unity Editor GameView 模拟截图，不是 APK 真机截图。
+
 新录制复核：`.codex/sim-recorded-only` 在新鸟狗完成后停止（从index0可顺序验证两个新场景）。`.codex/pause-on-diagonal-green` 仅在真实患者高亮组件同时显示右臂/左腿时暂停Editor，便于保存截图；不是强制绿显。完成后删除标记。
 
 `birddog_positive.vmc` 是额外的独立合成输入：把活动手臂沿躯干方向伸展，用于验证旧正向判定及同组HTTP。只有 `.codex/sim-positive-input` 标记才会使用；它不代表录制素材验收，普通 `birddog.vmc` 未做该动作修改。
 
-旧课程独立复核：菜单 Export Original Coach Simulator Targets 将旧FBX每个正式分段的末端姿势导出为 original_*.vmc（单帧目标，发送端仍平滑过渡）。`.codex/sim-original-courses` 选择旧DeadBugPractice/BirdDogPractice，并按实际clipStateName发送对应目标。默认六动作输入及新场景不变。使用后删除标记。此输入验证末端姿势与反馈，不代表患者完整运动轨迹。
+旧课程独立复核：菜单 Export Original Coach Simulator Targets 将旧FBX每个正式分段的末端姿势导出为 original_*.vmc（单帧目标，发送端仍平滑过渡）。`.codex/sim-original-courses` 选择冻结的 DeadBugPracticeOld/BirdDogPracticeOld，并按实际 clipStateName 发送对应目标。使用后删除标记。此输入验证末端姿势与反馈，不代表患者完整运动轨迹。

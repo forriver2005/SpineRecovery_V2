@@ -2,7 +2,7 @@ Shader "SpineRecovery/BodyPartHighlightOverlay"
 {
     Properties
     {
-        _Color ("Highlight Color", Color) = (0, 1, 0, 0.95)
+        _Color ("Highlight Color", Color) = (0.18, 0.82, 0.38, 0.72)
         _Pulse ("Pulse", Range(0, 2)) = 1
     }
 

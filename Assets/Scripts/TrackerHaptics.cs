@@ -108,31 +108,26 @@ public sealed class CoachHapticFeedbackController : MonoBehaviour
 
     private static readonly TrackerWearLocation[] RightArmMapping =
     {
-        TrackerWearLocation.RightUpperArm,
         TrackerWearLocation.RightForearm
     };
 
     private static readonly TrackerWearLocation[] LeftArmMapping =
     {
-        TrackerWearLocation.LeftUpperArm,
         TrackerWearLocation.LeftForearm
     };
 
     private static readonly TrackerWearLocation[] RightLegMapping =
     {
-        TrackerWearLocation.RightThigh,
         TrackerWearLocation.RightLowerLeg
     };
 
     private static readonly TrackerWearLocation[] LeftLegMapping =
     {
-        TrackerWearLocation.LeftThigh,
         TrackerWearLocation.LeftLowerLeg
     };
 
     private static readonly TrackerWearLocation[] TorsoMapping =
     {
-        TrackerWearLocation.Chest,
         TrackerWearLocation.Abdomen
     };
 

@@ -95,7 +95,9 @@ public class CoachSetProgressUI : MonoBehaviour
         string name = action == "deadbug" ? "死虫" : action == "birddog" ? "鸟狗" :
             action == "hipthrust" ? "臀桥" : action == "catcamel" ? "卧位猫式" :
             action == "sidebridge" ? "侧桥" : action == "curlup" ? "卷腹" : "动作课程";
-        progressText.text = $"{name} · {stage}";
+        progressText.text = stage == "动作讲解"
+            ? GetLessonActionTitle(action)
+            : $"{name} · {stage}";
         progressRoot.gameObject.SetActive(true);
     }
 
@@ -148,7 +150,6 @@ public class CoachSetProgressUI : MonoBehaviour
             coachController.CurrentSegmentKind == TrainingSegmentKind.Preparation ? "准备" :
             coachController.CurrentSegmentKind == TrainingSegmentKind.ReturnTransition ? "回位" :
             coachController.IsHoldingAtSegment ? "保持" :
-            gameObject.scene.name == "DeadBugRecordedPractice" ? "放下" :
             VoicePromptManager.GetPracticeActionKey() == "catcamel" ? "向上拱背" :
             VoicePromptManager.GetPracticeActionKey() == "curlup" ? "卷起" :
             VoicePromptManager.GetPracticeActionKey() == "birddog" ? "伸展" : "抬起";
@@ -179,6 +180,20 @@ public class CoachSetProgressUI : MonoBehaviour
         if ((limbs & CoachGuidanceLimb.LeftLeg) != 0) parts.Add("左腿");
         if ((limbs & CoachGuidanceLimb.RightLeg) != 0) parts.Add("右腿");
         return parts.Count == 0 ? string.Empty : $" · {string.Join(" + ", parts)}";
+    }
+
+    private static string GetLessonActionTitle(string action)
+    {
+        switch (action)
+        {
+            case "deadbug": return "死虫式";
+            case "birddog": return "鸟狗式";
+            case "hipthrust": return "臀桥";
+            case "catcamel": return "卧位猫式";
+            case "sidebridge": return "侧桥";
+            case "curlup": return "卷腹";
+            default: return "动作";
+        }
     }
 
     private void HideProgress()
@@ -254,6 +269,7 @@ public class CoachSetProgressUI : MonoBehaviour
         }
 
         progressText.alignment = TextAlignmentOptions.Center;
+        progressText.fontSize = Mathf.Max(fontSize, 42f);
         var mobileControls = FindObjectOfType<MobileCoachControls>(true);
         if (mobileControls != null)
         {
@@ -263,7 +279,7 @@ public class CoachSetProgressUI : MonoBehaviour
             progressText.fontSizeMin = 20f;
             progressText.fontSizeMax = fontSize;
         }
-        progressText.fontSize = fontSize;
+        progressText.fontSize = Mathf.Max(fontSize, 42f);
         progressText.fontStyle = FontStyles.Bold;
         progressText.color = Color.white;
         progressText.raycastTarget = false;

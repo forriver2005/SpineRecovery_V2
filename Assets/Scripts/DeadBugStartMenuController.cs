@@ -211,7 +211,8 @@ public class DeadBugStartMenuController : MonoBehaviour
         string title = key == "deadbug" ? "死虫式" : key == "birddog" ? "鸟狗式" :
             key == "hipthrust" ? "臀桥" : key == "catcamel" ? "卧位猫式" :
             key == "sidebridge" ? "侧桥" : key == "curlup" ? "卷腹" : null;
-        if (title != null && RecordedAlternatingCoachMode.IsRecordedScene(gameObject.scene.name)) title += "（新录制）";
+        // The recorded Practice route is a normal patient-facing lesson; do not expose
+        // production metadata such as the recording source in the UI.
         if (title != null && menuRoot != null)
         {
             Transform info = menuRoot.transform.Find("BackGroundPanel/DBUI");

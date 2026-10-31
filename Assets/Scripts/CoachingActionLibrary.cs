@@ -75,8 +75,8 @@ public sealed class CoachingActionLibrary : MonoBehaviour
         return RecordedAlternatingCoachMode.IsRecordedScene(sceneName) || LumbarCoachMode.ForScene(sceneName) != null ||
             sceneName == "DeadBugPractice" ||
             sceneName == "BirdDogPractice" ||
-            sceneName == "maleDeadBugPractice" ||
-            sceneName == "maleBirdDogPractice" ||
+            sceneName == "maleDeadBugPracticeOld" ||
+            sceneName == "maleBirdDogPracticeOld" ||
             sceneName == "HipThrustPractice" ||
             sceneName == "maleHipThrustPractice";
     }
@@ -275,8 +275,8 @@ public sealed class CoachingActionLibrary : MonoBehaviour
             case "clip_10":
             case "clip_11":
             case "clip_13": return LumbarCoachMode.ForAction("side_bridge")?.sceneName;
-            case "clip_29": return "DeadBugRecordedPractice";
-            case "clip_30": return "BirdDogRecordedPractice";
+            case "clip_29": return "DeadBugPractice";
+            case "clip_30": return "BirdDogPractice";
             default: return null;
         }
     }

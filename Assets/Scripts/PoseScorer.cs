@@ -258,6 +258,10 @@ public partial class PoseScorer : MonoBehaviour
         "recorded coach pose. Generic preserves the reusable target comparer.")]
     [SerializeField] private PoseGuidanceExercise guidanceExercise =
         PoseGuidanceExercise.Generic;
+    [Header("Recorded Dead Bug All-Limb Feedback")]
+    [Tooltip("Recorded Dead Bug briefly shows all four raised limbs in green, " +
+        "then fades the success overlay while the playback axis continues.")]
+    [SerializeField, Min(0.1f)] private float recordedDeadBugSuccessFadeSeconds = 1.2f;
     [Header("Hip Thrust Teaching")]
     [Tooltip("Legacy observation duration retained for scene compatibility; coach playback uses its own phase timing.")]
     [SerializeField, Range(0.5f, 3f)] private float hipThrustObservationSeconds = 2f;
@@ -270,8 +274,12 @@ public partial class PoseScorer : MonoBehaviour
     [SerializeField, Min(0f)] private float hipThrustHapticHeightTolerance = 0.05f;
     [Tooltip("Time the hip must remain in the haptic target band before one pulse.")]
     [SerializeField, Min(0f)] private float hipThrustHapticConfirmationSeconds = 0.18f;
-    private static readonly Color HipThrustHeightReadyColor =
-        new Color(0.05f, 1f, 0.25f, 0.95f);
+    // Keep the positive feedback in the same translucent overlay style as the
+    // original red diagnostic highlight. The previous near-pure green was too
+    // saturated and opaque over the blue avatar.
+    private static readonly Color GuidanceSuccessColor =
+        new Color(0.18f, 0.82f, 0.38f, 0.72f);
+    private static readonly Color HipThrustHeightReadyColor = GuidanceSuccessColor;
     private HipThrustPoseGeometry hipThrustRestPose;
     private bool hasHipThrustRestPose;
     private bool hipThrustOptimalHeightPulseSent;
@@ -460,6 +468,10 @@ public partial class PoseScorer : MonoBehaviour
     private bool continuousObservationActive;
     private int hapticSetIndex = -1;
     private int hapticRepeatIndex = -1;
+    private bool recordedDeadBugAllLimbFeedbackSent;
+    private bool recordedDeadBugAllLimbFeedbackLatched;
+    private bool recordedDeadBugAllLimbFeedbackCompleted;
+    private float recordedDeadBugAllLimbFeedbackStartedAt;
     private int continuousValidSamples;
     private int continuousUnavailableSamples;
     private float continuousFeedbackCooldown;
@@ -795,6 +807,12 @@ public partial class PoseScorer : MonoBehaviour
             0f,
             segment.segmentKind,
             FindObjectOfType<SegmentedCoachController>()?.CurrentPoseGuidanceRule ?? SegmentPoseGuidanceRule.Auto);
+        if (IsRecordedDeadBugScene)
+        {
+            recordedDeadBugAllLimbFeedbackLatched = false;
+            recordedDeadBugAllLimbFeedbackCompleted = false;
+            recordedDeadBugAllLimbFeedbackStartedAt = 0f;
+        }
         ResetLumbarTargetFeedback(false);
         ResetVisualGuidanceEvidence();
         if (guidanceDiagnosticEngine == null)
@@ -1340,6 +1358,10 @@ public partial class PoseScorer : MonoBehaviour
         continuousObservationActive = true;
         hapticSetIndex = -1;
         hapticRepeatIndex = -1;
+        recordedDeadBugAllLimbFeedbackSent = false;
+        recordedDeadBugAllLimbFeedbackLatched = false;
+        recordedDeadBugAllLimbFeedbackCompleted = false;
+        recordedDeadBugAllLimbFeedbackStartedAt = 0f;
         hapticFeedback?.ResetGuidancePulse();
         lumbarTeachingEvidence?.Reset();
         hasHipThrustRestPose = false;
@@ -1573,8 +1595,20 @@ public partial class PoseScorer : MonoBehaviour
     private void BuildHapticLocationOverrides()
     {
         hapticLocationOverrides.Clear();
-        if (!continuousObservationActive || !guidanceInputIsFresh || HasHardPoseConstraint() ||
-            currentSegmentInfo.segmentKind != TrainingSegmentKind.CoreAction)
+        if (!continuousObservationActive || !guidanceInputIsFresh || HasHardPoseConstraint())
+            return;
+
+        if (IsRecordedDeadBugScene && recordedDeadBugAllLimbFeedbackLatched &&
+            !recordedDeadBugAllLimbFeedbackCompleted)
+        {
+            hapticLocationOverrides.Add(TrackerWearLocation.LeftForearm);
+            hapticLocationOverrides.Add(TrackerWearLocation.RightForearm);
+            hapticLocationOverrides.Add(TrackerWearLocation.LeftLowerLeg);
+            hapticLocationOverrides.Add(TrackerWearLocation.RightLowerLeg);
+            return;
+        }
+
+        if (currentSegmentInfo.segmentKind != TrainingSegmentKind.CoreAction)
             return;
 
         bool hasTarget = false;
@@ -1656,13 +1690,13 @@ public partial class PoseScorer : MonoBehaviour
         switch (part)
         {
             case BodyPart.LeftArm:
-                return TrackerWearLocation.LeftUpperArm;
+                return TrackerWearLocation.LeftForearm;
             case BodyPart.RightArm:
-                return TrackerWearLocation.RightUpperArm;
+                return TrackerWearLocation.RightForearm;
             case BodyPart.LeftLeg:
-                return TrackerWearLocation.LeftThigh;
+                return TrackerWearLocation.LeftLowerLeg;
             case BodyPart.RightLeg:
-                return TrackerWearLocation.RightThigh;
+                return TrackerWearLocation.RightLowerLeg;
             case BodyPart.Torso:
                 return TrackerWearLocation.Abdomen;
             default:
@@ -1768,7 +1802,7 @@ public partial class PoseScorer : MonoBehaviour
                 directionTracked = birdDog ? latestTargetedGuidanceGeometry.leftArmLineTracked : latestTargetedGuidanceGeometry.leftArmTracked;
                 bendDegrees = latestTargetedGuidanceGeometry.leftArmBendDegrees;
                 bendTracked = latestTargetedGuidanceGeometry.leftArmBendTracked;
-                proximal = TrackerWearLocation.LeftUpperArm;
+                proximal = TrackerWearLocation.LeftForearm;
                 distal = TrackerWearLocation.LeftForearm;
                 return true;
             case BodyPart.RightArm:
@@ -1776,7 +1810,7 @@ public partial class PoseScorer : MonoBehaviour
                 directionTracked = birdDog ? latestTargetedGuidanceGeometry.rightArmLineTracked : latestTargetedGuidanceGeometry.rightArmTracked;
                 bendDegrees = latestTargetedGuidanceGeometry.rightArmBendDegrees;
                 bendTracked = latestTargetedGuidanceGeometry.rightArmBendTracked;
-                proximal = TrackerWearLocation.RightUpperArm;
+                proximal = TrackerWearLocation.RightForearm;
                 distal = TrackerWearLocation.RightForearm;
                 return true;
             case BodyPart.LeftLeg:
@@ -1784,7 +1818,7 @@ public partial class PoseScorer : MonoBehaviour
                 directionTracked = latestTargetedGuidanceGeometry.leftLegTracked;
                 bendDegrees = latestTargetedGuidanceGeometry.leftLegBendDegrees;
                 bendTracked = latestTargetedGuidanceGeometry.leftLegBendTracked;
-                proximal = TrackerWearLocation.LeftThigh;
+                proximal = TrackerWearLocation.LeftLowerLeg;
                 distal = TrackerWearLocation.LeftLowerLeg;
                 return true;
             case BodyPart.RightLeg:
@@ -1792,7 +1826,7 @@ public partial class PoseScorer : MonoBehaviour
                 directionTracked = latestTargetedGuidanceGeometry.rightLegTracked;
                 bendDegrees = latestTargetedGuidanceGeometry.rightLegBendDegrees;
                 bendTracked = latestTargetedGuidanceGeometry.rightLegBendTracked;
-                proximal = TrackerWearLocation.RightThigh;
+                proximal = TrackerWearLocation.RightLowerLeg;
                 distal = TrackerWearLocation.RightLowerLeg;
                 return true;
             default:
@@ -1931,7 +1965,10 @@ public partial class PoseScorer : MonoBehaviour
         PoseHighlightFrameDiagnostics diagnostics;
         if (RecordedAlternatingCoachMode.IsRecordedScene(gameObject.scene.name))
         {
-            hasLatestTargetedGuidanceGeometry = false;
+            TargetedExercisePoseGeometry recordedGeometry = default;
+            hasLatestTargetedGuidanceGeometry = IsRecordedDeadBugScene &&
+                TryCaptureTargetedExerciseGeometry(out recordedGeometry);
+            latestTargetedGuidanceGeometry = recordedGeometry;
             var recorded = GetComponent<RecordedPracticePoseGuidance>();
             diagnostics = recorded != null
                 ? recorded.Evaluate(userAnimator, currentSegmentInfo.segmentKind,
@@ -2035,6 +2072,13 @@ public partial class PoseScorer : MonoBehaviour
         }
 
         UpdateGuidancePartColors(diagnostics);
+        if (ShowRecordedDeadBugAllLimbFeedback())
+        {
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
+            ReportGuidanceChange();
+#endif
+            return;
+        }
         bool showLumbarPositiveTarget = continuousObservationActive && UpdateLumbarPositiveTargetHighlight(
             diagnostics.torso);
         showLumbarPositiveTarget = showLumbarPositiveTarget &&
@@ -2047,7 +2091,7 @@ public partial class PoseScorer : MonoBehaviour
         if (showLumbarPositiveTarget)
         {
             guidancePartColors[BodyPart.Torso] =
-                new Color(0.05f, 1f, 0.25f, 0.95f);
+                GuidanceSuccessColor;
         }
 
 #if UNITY_EDITOR || DEVELOPMENT_BUILD
@@ -2078,6 +2122,165 @@ public partial class PoseScorer : MonoBehaviour
             modelBodyPartHighlighter?.Hide();
             bodyPartFeedback?.Hide();
         }
+    }
+
+    private bool ShowRecordedDeadBugAllLimbFeedback()
+    {
+        if (!IsRecordedDeadBugScene ||
+            (currentSegmentInfo.segmentKind != TrainingSegmentKind.Preparation &&
+             currentSegmentInfo.segmentKind != TrainingSegmentKind.CoreAction))
+        {
+            return false;
+        }
+
+        if (recordedDeadBugAllLimbFeedbackCompleted)
+        {
+            guidancePartsToHighlight.Clear();
+            guidancePartColors.Clear();
+            modelBodyPartHighlighter?.Hide();
+            bodyPartFeedback?.Hide();
+            return true;
+        }
+
+        if (!recordedDeadBugAllLimbFeedbackLatched &&
+            !recordedDeadBugAllLimbFeedbackSent &&
+            IsRecordedDeadBugAllLimbsRaised())
+        {
+            recordedDeadBugAllLimbFeedbackLatched = true;
+            recordedDeadBugAllLimbFeedbackSent = true;
+            recordedDeadBugAllLimbFeedbackStartedAt = Time.unscaledTime;
+        }
+
+        if (!recordedDeadBugAllLimbFeedbackLatched)
+        {
+            return false;
+        }
+
+        float fadeSeconds = Mathf.Max(0.1f, recordedDeadBugSuccessFadeSeconds);
+        float alpha = 1f - Mathf.Clamp01(
+            (Time.unscaledTime - recordedDeadBugAllLimbFeedbackStartedAt) /
+            fadeSeconds);
+        guidancePartsToHighlight.Clear();
+        guidancePartColors.Clear();
+        if (alpha <= 0f)
+        {
+            recordedDeadBugAllLimbFeedbackCompleted = true;
+            modelBodyPartHighlighter?.Hide();
+            bodyPartFeedback?.Hide();
+            return true;
+        }
+
+        Color successColor = GuidanceSuccessColor;
+        successColor.a *= alpha;
+        foreach (BodyPart part in AllGuidanceParts)
+        {
+            guidancePartsToHighlight.Add(part);
+            guidancePartColors[part] = successColor;
+        }
+
+        bool shown = enableModelSurfaceHighlight &&
+            modelBodyPartHighlighter != null &&
+            modelBodyPartHighlighter.Show(guidancePartColors);
+        if (shown)
+        {
+            bodyPartFeedback?.Hide();
+        }
+        else
+        {
+            modelBodyPartHighlighter?.Hide();
+            bodyPartFeedback?.Hide();
+        }
+        return true;
+    }
+
+    private bool IsRecordedDeadBugAllLimbsRaised()
+    {
+        if (!guidanceInputIsFresh || HasHardPoseConstraint() ||
+            !hasLatestTargetedGuidanceGeometry ||
+            !latestTargetedGuidanceGeometry.bodyPlaneTracked ||
+            !latestTargetedGuidanceGeometry.torsoTiltTracked ||
+            latestTargetedGuidanceGeometry.torsoTiltFromHorizontalDegrees >
+                preparationMaxTorsoTiltFromHorizontal)
+        {
+            return false;
+        }
+
+        float requiredLift = targetedExerciseGuidance != null
+            ? targetedExerciseGuidance.requiredLiftClearAtOrAboveDegrees
+            : 45f;
+        return IsRecordedDeadBugLimbRaised(
+                   BodyPart.LeftArm,
+                   latestTargetedGuidanceGeometry.leftArmDirection,
+                   latestTargetedGuidanceGeometry.leftArmTracked,
+                   requiredLift) &&
+               IsRecordedDeadBugLimbRaised(
+                   BodyPart.RightArm,
+                   latestTargetedGuidanceGeometry.rightArmDirection,
+                   latestTargetedGuidanceGeometry.rightArmTracked,
+                   requiredLift) &&
+               IsRecordedDeadBugLimbRaised(
+                   BodyPart.LeftLeg,
+                   latestTargetedGuidanceGeometry.leftLegDirection,
+                   latestTargetedGuidanceGeometry.leftLegTracked,
+                   requiredLift) &&
+               IsRecordedDeadBugLimbRaised(
+                   BodyPart.RightLeg,
+                   latestTargetedGuidanceGeometry.rightLegDirection,
+                   latestTargetedGuidanceGeometry.rightLegTracked,
+                   requiredLift);
+    }
+
+    private bool IsRecordedDeadBugLimbRaised(
+        BodyPart part,
+        Vector3 direction,
+        bool directionTracked,
+        float requiredLift)
+    {
+        return directionTracked &&
+            TargetedExercisePoseGuidance.TryCalculateLiftDegrees(
+                PoseGuidanceExercise.DeadBug,
+                latestTargetedGuidanceGeometry.bodyPlaneNormal,
+                direction,
+                out float liftDegrees) &&
+            liftDegrees >= requiredLift &&
+            HasFreshRecordedDeadBugTracking(part);
+    }
+
+    private bool HasFreshRecordedDeadBugTracking(BodyPart part)
+    {
+        var receiver = guidanceVmcReceiver?.GetComponent<EVMC4U.ExternalReceiver>();
+        if (receiver == null)
+        {
+            return false;
+        }
+
+        float timeout = Mathf.Max(0.01f, vmcFreshnessTimeoutSeconds);
+        HumanBodyBones proximal;
+        HumanBodyBones distal;
+        switch (part)
+        {
+            case BodyPart.LeftArm:
+                proximal = HumanBodyBones.LeftUpperArm;
+                distal = HumanBodyBones.LeftLowerArm;
+                break;
+            case BodyPart.RightArm:
+                proximal = HumanBodyBones.RightUpperArm;
+                distal = HumanBodyBones.RightLowerArm;
+                break;
+            case BodyPart.LeftLeg:
+                proximal = HumanBodyBones.LeftUpperLeg;
+                distal = HumanBodyBones.LeftLowerLeg;
+                break;
+            case BodyPart.RightLeg:
+                proximal = HumanBodyBones.RightUpperLeg;
+                distal = HumanBodyBones.RightLowerLeg;
+                break;
+            default:
+                return false;
+        }
+
+        return receiver.HasFreshGuidanceBone(proximal, timeout) &&
+            receiver.HasFreshGuidanceBone(distal, timeout);
     }
 
     private bool HasPositiveTargetTracking(BodyPart part)
@@ -2127,6 +2330,10 @@ public partial class PoseScorer : MonoBehaviour
     private bool UsesTargetedExerciseGuidance =>
         guidanceExercise == PoseGuidanceExercise.DeadBug ||
         guidanceExercise == PoseGuidanceExercise.BirdDog;
+
+    private bool IsRecordedDeadBugScene =>
+        guidanceExercise == PoseGuidanceExercise.DeadBug &&
+        gameObject.scene.name == "DeadBugPractice";
 
     private bool TryCaptureTargetedExerciseGeometry(
         out TargetedExercisePoseGeometry geometry)
@@ -2501,7 +2708,7 @@ public partial class PoseScorer : MonoBehaviour
         {
             guidancePartColors[part] = UsesHipThrustTeaching
                 ? HipThrustHeightReadyColor
-                : new Color(0.05f, 1f, 0.25f, 0.95f);
+                : GuidanceSuccessColor;
         }
 
     }

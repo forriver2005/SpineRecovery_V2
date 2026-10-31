@@ -30,6 +30,7 @@ public enum CoachVoicePhase
     SegmentCue,
     HoldGuidance,
     RestGuidance,
+    SelfPracticeTransition,
     FinishCue
 }
 

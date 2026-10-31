@@ -7,12 +7,22 @@ using UnityEngine.SceneManagement;
 /// </summary>
 public static class PracticeSceneController
 {
+    private static bool skipLessonOnNextLoad;
+
+    public static bool ConsumeSkipLessonOnNextLoad()
+    {
+        bool value = skipLessonOnNextLoad;
+        skipLessonOnNextLoad = false;
+        return value;
+    }
+
     /// <summary>
     /// 重新开始当前练习（刷新场景）
     /// </summary>
     public static void RestartPractice()
     {
         string currentScene = SceneManager.GetActiveScene().name;
+        skipLessonOnNextLoad = true;
         SceneManager.LoadScene(currentScene);
         Debug.Log($"[PracticeSceneController] 重新加载练习场景: {currentScene}");
     }

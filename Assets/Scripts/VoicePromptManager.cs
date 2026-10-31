@@ -34,7 +34,7 @@ public class VoicePromptManager : MonoBehaviour
     [SerializeField] private AudioClip keepStill;
     [Tooltip("'2' 语音")]
     [SerializeField] private AudioClip count2;
-    [Tooltip("'1' 语音")]
+    [Tooltip("遗留序列化兼容字段；正式 Practice 不再播放独立的1")]
     [SerializeField] private AudioClip count1;
     [Tooltip("'开始' 语音")]
     [SerializeField] private AudioClip start;
@@ -48,7 +48,7 @@ public class VoicePromptManager : MonoBehaviour
     [SerializeField] private AudioClip coachIntroduction;
     [Tooltip("Introduces the tracked avatar while only the user's model is visible.")]
     [SerializeField] private AudioClip userModelIntroduction;
-    [Tooltip("Plays the ready prompt and 3-2-1 countdown while both avatars are visible.")]
+    [Tooltip("Plays the ready prompt before formal Practice begins.")]
     [SerializeField] private AudioClip readyCountdown;
     [Tooltip("Short visual lead-in before each introduction line begins.")]
     [SerializeField] [Min(0f)] private float introductionVisualLeadSeconds = 0.3f;
@@ -56,6 +56,8 @@ public class VoicePromptManager : MonoBehaviour
     [SerializeField] [Min(0f)] private float introductionStageGapSeconds = 0.35f;
     [Tooltip("Keeps a stage visible when its audio clip is unavailable.")]
     [SerializeField] [Min(0f)] private float missingIntroductionClipSeconds = 1.25f;
+    [Tooltip("Patient preparation window after the recorded coach asks the patient to lie down.")]
+    [SerializeField] [Min(0f)] private float recordedPreparationWaitSeconds = 2.5f;
 
     [Header("节拍音效")]
     [Tooltip("节拍音 'deng'")]
@@ -96,11 +98,13 @@ public class VoicePromptManager : MonoBehaviour
     public float StabilityCountdownDurationSeconds =>
         (keepStill != null ? keepStill.length + StabilityPromptGapSeconds : 0f) +
         (count2 != null ? count2.length + StabilityNumberGapSeconds : StabilityMissingNumberStepSeconds) +
-        (count1 != null ? count1.length + StabilityNumberGapSeconds : StabilityMissingNumberStepSeconds) +
         (start != null ? start.length : 0f);
     public float PracticeIntroductionDurationSeconds =>
         3f * Mathf.Max(0f, introductionVisualLeadSeconds) +
         2f * Mathf.Max(0f, introductionStageGapSeconds) +
+        (LoadPracticeLessonClip("recorded_lie_down") != null
+            ? LoadPracticeLessonClip("recorded_lie_down").length + recordedPreparationWaitSeconds
+            : 0f) +
         (coachIntroduction != null ? coachIntroduction.length : Mathf.Max(0f, missingIntroductionClipSeconds)) +
         (userModelIntroduction != null ? userModelIntroduction.length : Mathf.Max(0f, missingIntroductionClipSeconds)) +
         (readyCountdown != null ? readyCountdown.length : Mathf.Max(0f, missingIntroductionClipSeconds));
@@ -115,8 +119,27 @@ public class VoicePromptManager : MonoBehaviour
     {
         CoachEventBus.CoachVoicePhaseRequested += HandleVoicePhaseRequested;
         CoachEventBus.CoachVoicePhaseCancelRequested += HandleVoicePhaseCancelRequested;
+        CoachEventBus.CoachSegmentStarted += HandleCoachSegmentStarted;
         CoachEventBus.CoachHardStopRequested += HandleCoachHardStopRequested;
         CoachEventBus.CoachSessionCompleted += HandleCoachSessionCompleted;
+    }
+
+    private void HandleCoachSegmentStarted(CoachSegmentEvent segment)
+    {
+        if (segment.segmentKind == TrainingSegmentKind.CoreAction ||
+            segment.segmentKind == TrainingSegmentKind.ReturnTransition)
+        {
+            PlayGuidanceBeat();
+        }
+    }
+
+    /// <summary>Plays a short non-blocking movement/countdown beat.</summary>
+    public void PlayGuidanceBeat()
+    {
+        if (beatSource != null && beatDeng != null && !MobileCoachControls.IsPaused)
+        {
+            beatSource.PlayOneShot(beatDeng, beatVolume);
+        }
     }
 
     private void HandleCoachHardStopRequested(CoachEndReason reason)
@@ -156,8 +179,8 @@ public class VoicePromptManager : MonoBehaviour
     }
 
     /// <summary>
-    /// Introduces the two coach-mode avatars, then counts down before formal
-    /// playback starts. Visual callbacks are synchronized with the voice stages.
+    /// Introduces the coach-only lesson, then counts down before formal
+    /// playback starts. Visual callbacks are synchronized with the voice stage.
     /// </summary>
     public bool PlayPracticeIntroduction(
         Action showCoach,
@@ -251,7 +274,7 @@ public class VoicePromptManager : MonoBehaviour
 
     public bool PlayNextAction()
     {
-        return PlaySinglePrompt(PromptKind.NextAction, nextAction, voiceVolume);
+        return PlaySinglePrompt(PromptKind.NextAction, ResolveRestGuidanceClip(), voiceVolume);
     }
 
     public bool PlayAdjustPose()
@@ -320,7 +343,7 @@ public class VoicePromptManager : MonoBehaviour
     private string correctionCandidate;
     private float correctionStableSeconds;
     private AudioClip pendingCorrection;
-    public float LessonRestDuration => (nextAction != null ? nextAction.length : 0f) +
+    public float LessonRestDuration => (ResolveRestGuidanceClip() != null ? ResolveRestGuidanceClip().length : 0f) +
         (pendingCorrection != null ? pendingCorrection.length : 0f) + 0.1f;
 
     public void ClearLessonCorrection()
@@ -445,8 +468,16 @@ public class VoicePromptManager : MonoBehaviour
             case CoachVoicePhase.RestGuidance:
                 AudioClip correction = pendingCorrection;
                 pendingCorrection = null;
-                yield return PlayAndWait(voiceSource, nextAction, voiceVolume);
+                yield return PlayAndWait(voiceSource, ResolveRestGuidanceClip(), voiceVolume);
                 if (!phaseCancelRequested) yield return PlayAndWait(voiceSource, correction, voiceVolume);
+                break;
+            case CoachVoicePhase.SelfPracticeTransition:
+                AudioClip selfPractice = Resources.Load<AudioClip>(
+                    "CoachLessons/Coach_self_practice_transition");
+                if (selfPractice != null)
+                {
+                    yield return PlayAndWait(voiceSource, selfPractice, voiceVolume);
+                }
                 break;
             case CoachVoicePhase.FinishCue:
                 yield return PlayAndWait(beatSource, beatDing, beatVolume);
@@ -510,6 +541,21 @@ public class VoicePromptManager : MonoBehaviour
         source.playOnAwake = false;
         source.spatialBlend = 0f;
         return source;
+    }
+
+    private AudioClip ResolveRestGuidanceClip()
+    {
+        string action = GetPracticeActionKey();
+        if (action == "deadbug" || action == "birddog")
+        {
+            AudioClip recorded = Resources.Load<AudioClip>(
+                "CoachLessons/Coach_self_practice_return");
+            if (recorded != null)
+            {
+                return recorded;
+            }
+        }
+        return nextAction;
     }
 
     private bool PlaySinglePrompt(PromptKind kind, AudioClip clip, float volume)
@@ -608,17 +654,6 @@ public class VoicePromptManager : MonoBehaviour
                 StabilityMissingNumberStepSeconds);
         }
 
-        if (count1 != null)
-        {
-            yield return PlayAndWait(voiceSource, count1, voiceVolume);
-            yield return WaitRealtime(StabilityNumberGapSeconds);
-        }
-        else
-        {
-            yield return WaitRealtime(
-                StabilityMissingNumberStepSeconds);
-        }
-
         if (start != null)
         {
             yield return PlayAndWait(voiceSource, start, voiceVolume);
@@ -633,24 +668,30 @@ public class VoicePromptManager : MonoBehaviour
         Action showBoth,
         Action onComplete)
     {
+        // The action-specific lesson and authored demonstration share one
+        // visible timeline. During the lesson only the coach is shown; the
+        // tracked-user model is revealed when formal patient playback begins.
         showCoach?.Invoke();
         yield return WaitRealtime(introductionVisualLeadSeconds);
+        AudioClip recordedLieDown = LoadPracticeLessonClip("recorded_lie_down");
+        if (recordedLieDown != null)
+        {
+            yield return PlayIntroductionClipOrFallback(recordedLieDown);
+            yield return WaitRealtime(recordedPreparationWaitSeconds);
+        }
         AudioClip lessonSetup = LoadPracticeLessonClip("lesson");
         if (lessonSetup != null)
         {
             yield return PlayIntroductionClipOrFallback(lessonSetup);
-            yield return WaitRealtime(introductionStageGapSeconds);
         }
-        yield return PlayIntroductionClipOrFallback(coachIntroduction);
-        yield return WaitRealtime(introductionStageGapSeconds);
-
-        showUserModel?.Invoke();
-        yield return WaitRealtime(introductionVisualLeadSeconds);
-        yield return PlayIntroductionClipOrFallback(userModelIntroduction);
-        yield return WaitRealtime(introductionStageGapSeconds);
-
-        showBoth?.Invoke();
-        yield return WaitRealtime(introductionVisualLeadSeconds);
+        else
+        {
+            // Legacy scenes without an action lesson retain the generic voice
+            // prompts instead of showing an empty teaching window.
+            yield return PlayIntroductionClipOrFallback(coachIntroduction);
+            yield return WaitRealtime(introductionStageGapSeconds);
+            yield return PlayIntroductionClipOrFallback(userModelIntroduction);
+        }
         // Countdown belongs after the complete demonstration.
 
         CompleteSequence(onComplete);
@@ -664,7 +705,14 @@ public class VoicePromptManager : MonoBehaviour
     private IEnumerator LessonCountdownSequence(Action completed)
     {
         yield return PlayIntroductionClipOrFallback(readyCountdown);
-        yield return StabilityCountdownSequence(completed);
+        AudioClip recordedPreparation = LoadPracticeLessonClip("recorded_prepare");
+        if (recordedPreparation != null)
+        {
+            yield return PlayIntroductionClipOrFallback(recordedPreparation);
+        }
+        // Formal Practice starts after the preparation phrase. Numeric
+        // countdowns are reserved for the later self-practice hold overlay.
+        CompleteSequence(completed);
     }
 
     private static AudioClip LoadPracticeLessonClip(string phase)
@@ -713,11 +761,6 @@ public class VoicePromptManager : MonoBehaviour
         if (count2 != null)
         {
             yield return PlayAndWait(voiceSource, count2, voiceVolume);
-            yield return WaitRealtime(StabilityNumberGapSeconds);
-        }
-        if (count1 != null)
-        {
-            yield return PlayAndWait(voiceSource, count1, voiceVolume);
             yield return WaitRealtime(StabilityNumberGapSeconds);
         }
         if (start != null)
@@ -881,6 +924,7 @@ public class VoicePromptManager : MonoBehaviour
     {
         CoachEventBus.CoachVoicePhaseRequested -= HandleVoicePhaseRequested;
         CoachEventBus.CoachVoicePhaseCancelRequested -= HandleVoicePhaseCancelRequested;
+        CoachEventBus.CoachSegmentStarted -= HandleCoachSegmentStarted;
         CoachEventBus.CoachHardStopRequested -= HandleCoachHardStopRequested;
         CoachEventBus.CoachSessionCompleted -= HandleCoachSessionCompleted;
         StopAll();

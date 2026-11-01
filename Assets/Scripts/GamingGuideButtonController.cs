@@ -25,7 +25,14 @@ public sealed class GamingGuideButtonController : MonoBehaviour
 
     public void OpenGuide()
     {
-        GamingGuideNavigation.SetReturnScene(SceneManager.GetActiveScene().name);
+        string currentScene = SceneManager.GetActiveScene().name;
+        if (CoachModeNavigation.IsSupportedGameScene(currentScene))
+        {
+            CoachModeNavigation.OpenCoachFromGame(currentScene);
+            return;
+        }
+
+        GamingGuideNavigation.SetReturnScene(currentScene);
         SceneManager.LoadScene(guideSceneName);
     }
 }

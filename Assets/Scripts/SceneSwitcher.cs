@@ -75,17 +75,19 @@ public class SceneSwitcher : MonoBehaviour
 
     public void LoadBirdDogGamingScene()
     {
-        if (IsCoachWithoutGame()) return;
+        if (IsCoachWithoutGame() && !CoachModeNavigation.HasReplayGameReturn) return;
         LoadSceneForCurrentMobileSession(ResolveReplayReturnScene(
-            BirdDogGamingScene,
-            ReplaySessionContext.ReturnGamingScene));
+            CoachModeNavigation.BirdDogGameScene,
+            ReplaySessionContext.ReturnGamingScene,
+            true));
     }
 
     public void LoadBirdDogPracticeScene()
     {
         LoadSceneForCurrentMobileSession(ResolveReplayReturnScene(
-            BirdDogPracticeScene,
-            ReplaySessionContext.ReturnPracticeScene));
+            CoachModeNavigation.BirdDogCoachScene,
+            ReplaySessionContext.ReturnPracticeScene,
+            false));
     }
 
     public void LoadDeadBugScene()
@@ -95,10 +97,11 @@ public class SceneSwitcher : MonoBehaviour
 
     public void LoadDeadBugGamingScene()
     {
-        if (IsCoachWithoutGame()) return;
+        if (IsCoachWithoutGame() && !CoachModeNavigation.HasReplayGameReturn) return;
         LoadSceneForCurrentMobileSession(ResolveReplayReturnScene(
-            DeadBugGamingScene,
-            ReplaySessionContext.ReturnGamingScene));
+            CoachModeNavigation.DeadBugGameScene,
+            ReplaySessionContext.ReturnGamingScene,
+            true));
     }
 
     public void LoadTestGamingScene()
@@ -109,14 +112,34 @@ public class SceneSwitcher : MonoBehaviour
 
     public void LoadHipThrustScene()
     {
-        LoadSceneForCurrentMobileSession(HipThrustScene);
+        LoadSceneForCurrentMobileSession(ResolveReplayReturnScene(
+            CoachModeNavigation.HipThrustGameScene,
+            ReplaySessionContext.ReturnGamingScene,
+            true));
     }
 
     public void LoadDeadBugPracticeScene()
     {
         LoadSceneForCurrentMobileSession(ResolveReplayReturnScene(
-            DeadBugPracticeScene,
-            ReplaySessionContext.ReturnPracticeScene));
+            CoachModeNavigation.DeadBugCoachScene,
+            ReplaySessionContext.ReturnPracticeScene,
+            false));
+    }
+
+    public void LoadHipThrustPracticeScene()
+    {
+        LoadSceneForCurrentMobileSession(ResolveReplayReturnScene(
+            CoachModeNavigation.HipThrustCoachScene,
+            ReplaySessionContext.ReturnPracticeScene,
+            false));
+    }
+
+    public void LoadSideBridgePracticeScene()
+    {
+        LoadSceneForCurrentMobileSession(ResolveReplayReturnScene(
+            CoachModeNavigation.SideBridgeCoachScene,
+            ReplaySessionContext.ReturnPracticeScene,
+            false));
     }
 
     public void LoadPlayBackScene()
@@ -193,13 +216,25 @@ public class SceneSwitcher : MonoBehaviour
             (scene == PlayBackScene && LumbarCoachMode.ForScene(ReplaySessionContext.ReturnPracticeScene) != null);
     }
 
-    private static string ResolveReplayReturnScene(string fallback, string replayTarget)
+    private static string ResolveReplayReturnScene(
+        string fallback,
+        string replayTarget,
+        bool gaming)
     {
-        return string.Equals(
-                   SceneManager.GetActiveScene().name,
-                   PlayBackScene,
-                   System.StringComparison.OrdinalIgnoreCase) &&
-               !string.IsNullOrWhiteSpace(replayTarget)
+        if (!string.Equals(
+                SceneManager.GetActiveScene().name,
+                PlayBackScene,
+                System.StringComparison.OrdinalIgnoreCase))
+        {
+            return fallback;
+        }
+
+        if (CoachModeNavigation.TryConsumeReplayReturnScene(gaming, out string coachRoute))
+        {
+            return coachRoute;
+        }
+
+        return !string.IsNullOrWhiteSpace(replayTarget)
             ? replayTarget
             : fallback;
     }

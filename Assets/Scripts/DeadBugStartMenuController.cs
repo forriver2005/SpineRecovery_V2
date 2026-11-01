@@ -3,6 +3,7 @@ using System.Collections;
 using System.Collections.Generic;
 using TMPro;
 using UnityEngine;
+using UnityEngine.Events;
 using UnityEngine.UI;
 
 public class DeadBugStartMenuController : MonoBehaviour
@@ -860,6 +861,14 @@ public class DeadBugStartMenuController : MonoBehaviour
         SetPracticeActionMenuCanvasVisible(true);
     }
 
+    public void ShowPracticeControlsAfterNavigation()
+    {
+        if (IsPracticeCoachMode)
+        {
+            ShowPracticeSelectionControlsOnly();
+        }
+    }
+
     public void BeginPracticePlaybackPresentation()
     {
         practiceCompletionChoicesVisible = false;
@@ -885,6 +894,82 @@ public class DeadBugStartMenuController : MonoBehaviour
         // receive gaze interaction during formal playback.
         SetPracticeActionMenuCanvasVisible(false);
         SetPracticeToolbarVisible(true);
+    }
+
+    /// <summary>
+    /// Shows the same five-button action page used by the coach controls while
+    /// the lesson is paused. Button listeners are rebound here because the
+    /// authored scene listeners belong to the start/completion flows.
+    /// </summary>
+    public bool ShowPracticePauseControls()
+    {
+        if (!IsPracticeCoachMode)
+        {
+            return false;
+        }
+
+        ResolvePracticeActionMenu();
+        if (practiceActionMenu == null ||
+            !CoachModeNavigation.IsSupportedCoachScene(gameObject.scene.name))
+        {
+            return false;
+        }
+
+        HideOccludedWorldRoots();
+        HideSceneVisualsExceptMenus();
+        ConfigurePracticeActionMenu();
+        ConfigurePauseButton("Start", ResumePracticeFromPause);
+        ConfigurePauseButton("Game", () => CoachModeNavigation.OpenGameFromCoach());
+        ConfigurePauseButton("PlayBack", () => CoachModeNavigation.OpenReplayFromCoach());
+        ConfigurePauseButton("Home", () => CoachModeNavigation.ReturnToCoachStart());
+        ConfigurePauseButton("ActionLibrary", CoachModeNavigation.OpenActionLibraryFromCoach);
+
+        foreach (Transform child in practiceActionMenu.transform)
+        {
+            bool visible = child.name == "Start" || child.name == "Game" ||
+                child.name == "PlayBack" || child.name == "Home" ||
+                child.name == "ActionLibrary";
+            child.gameObject.SetActive(visible);
+        }
+
+        SetPracticeActionMenuCanvasVisible(true);
+        return true;
+    }
+
+    public void HidePracticePauseControls()
+    {
+        if (IsPracticeCoachMode)
+        {
+            BeginPracticePlaybackPresentation();
+        }
+    }
+
+    private void ResumePracticeFromPause()
+    {
+        MobileCoachControls controls = FindObjectOfType<MobileCoachControls>(true);
+        if (controls != null)
+        {
+            controls.SetPaused(false);
+        }
+    }
+
+    private void ConfigurePauseButton(
+        string objectName,
+        UnityAction action)
+    {
+        Transform buttonTransform = practiceActionMenu.transform.Find(objectName);
+        if (buttonTransform == null)
+        {
+            return;
+        }
+
+        Button button = buttonTransform.GetComponent<Button>();
+        if (button != null)
+        {
+            button.onClick = new Button.ButtonClickedEvent();
+            button.onClick.AddListener(action);
+            button.interactable = true;
+        }
     }
 
     private void SetPracticeToolbarVisible(bool visible)
@@ -1087,7 +1172,15 @@ public class DeadBugStartMenuController : MonoBehaviour
                         : "我已学会，进入游戏模式";
                 Button choice = child.GetComponent<Button>();
                 if (choice != null && game)
-                    choice.interactable = !IsGameUnavailableForCurrentPractice();
+                {
+                    bool available = !IsGameUnavailableForCurrentPractice();
+                    choice.onClick = new Button.ButtonClickedEvent();
+                    if (available)
+                    {
+                        choice.onClick.AddListener(() => CoachModeNavigation.OpenGameFromCoach());
+                    }
+                    choice.interactable = available;
+                }
                 label.enableAutoSizing = true;
                 label.fontSizeMin = 20f;
                 label.fontSizeMax = 48f;
@@ -1097,10 +1190,7 @@ public class DeadBugStartMenuController : MonoBehaviour
 
     private bool IsGameUnavailableForCurrentPractice()
     {
-        string scene = gameObject.scene.name;
-        return scene == "CatCamelPractice" || scene == "maleCatCamelPractice" ||
-            scene == "SideBridgePractice" || scene == "maleSideBridgePractice" ||
-            scene == "CurlUpPractice" || scene == "maleCurlUpPractice";
+        return !CoachModeNavigation.IsSupportedCoachScene(gameObject.scene.name);
     }
 
     private void RestorePracticeActionMenuChoices()
@@ -1114,15 +1204,67 @@ public class DeadBugStartMenuController : MonoBehaviour
         {
             TMP_Text label = start.GetComponentInChildren<TMP_Text>(true);
             if (label != null) label.text = "Start";
+            Button button = start.GetComponent<Button>();
+            if (button != null && practiceSessionController != null)
+            {
+                button.onClick = new Button.ButtonClickedEvent();
+                button.onClick.AddListener(practiceSessionController.StartPractice);
+            }
         }
         if (game != null)
         {
             TMP_Text label = game.GetComponentInChildren<TMP_Text>(true);
             if (label != null) label.text = "Game";
             Button button = game.GetComponent<Button>();
-            if (button != null) button.interactable = true;
+            if (button != null)
+            {
+                bool available = CoachModeNavigation.IsSupportedCoachScene(gameObject.scene.name);
+                button.onClick = new Button.ButtonClickedEvent();
+                if (available)
+                {
+                    button.onClick.AddListener(() => CoachModeNavigation.OpenGameFromCoach());
+                }
+                button.interactable = available;
+            }
         }
+        ConfigurePracticeButton("PlayBack", LoadPracticeReplay);
+        ConfigurePracticeButton("Home", ReturnToMobileHome);
+        ConfigurePracticeButton("ActionLibrary", LoadPracticeActionLibrary);
         ConfigurePracticeActionMenu();
+    }
+
+    private void ConfigurePracticeButton(
+        string objectName,
+        UnityAction action)
+    {
+        Transform buttonTransform = practiceActionMenu.transform.Find(objectName);
+        if (buttonTransform == null)
+        {
+            return;
+        }
+
+        Button button = buttonTransform.GetComponent<Button>();
+        if (button != null)
+        {
+            button.onClick = new Button.ButtonClickedEvent();
+            button.onClick.AddListener(action);
+        }
+    }
+
+    private void LoadPracticeReplay()
+    {
+        FindObjectOfType<SceneSwitcher>(true)?.LoadPlayBackScene();
+    }
+
+    private void ReturnToMobileHome()
+    {
+        practiceSessionController?.StopPractice();
+        FindObjectOfType<SceneSwitcher>(true)?.ReturnToMobileApp();
+    }
+
+    private void LoadPracticeActionLibrary()
+    {
+        FindObjectOfType<SceneSwitcher>(true)?.LoadActionLibraryScene();
     }
 
     public void BeginPracticeCompletionPostureGate()

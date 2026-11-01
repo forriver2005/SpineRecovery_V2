@@ -39,6 +39,7 @@ public sealed class MobileCoachControls : MonoBehaviour
             Time.timeScale = 0f;
             AudioListener.pause = true;
             if (input != null) input.Freeze = true;
+            FindObjectOfType<DeadBugStartMenuController>(true)?.ShowPracticePauseControls();
         }
         else
         {
@@ -52,6 +53,7 @@ public sealed class MobileCoachControls : MonoBehaviour
             Time.timeScale = previousTimeScale;
             AudioListener.pause = previousAudioPause;
             if (input != null) input.Freeze = previousInputFreeze;
+            FindObjectOfType<DeadBugStartMenuController>(true)?.HidePracticePauseControls();
         }
         if (pauseLabel != null) pauseLabel.text = pause ? "继续" : "暂停";
     }

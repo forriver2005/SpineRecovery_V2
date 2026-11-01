@@ -518,6 +518,9 @@ public sealed class CoachingActionLibrary : MonoBehaviour
             }
         }
 
+        UnityEngine.Object.FindObjectOfType<DeadBugStartMenuController>(true)
+            ?.ShowPracticeControlsAfterNavigation();
+
         retainedPracticeScene = default;
         retainedPracticeRoots = null;
         retainedRootActiveStates = null;

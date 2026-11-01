@@ -48,6 +48,13 @@ public sealed class CoachingActionLibrary : MonoBehaviour
     private TextAsset loadedMotion;
     private KeyframeCoachMotionBackend player;
     private int selectedIndex = -1;
+    private Vector3 previewTarget;
+    private Vector3 previewBaseDirection;
+    private float previewDistance;
+    private float previewYaw;
+    private float previewPitch;
+    private bool previewMouseDragging;
+    private Vector2 previousMousePosition;
 
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.BeforeSceneLoad)]
     private static void Register()
@@ -156,6 +163,7 @@ public sealed class CoachingActionLibrary : MonoBehaviour
 
     private void Update()
     {
+        UpdatePreviewDrag();
         if (player == null || !player.IsReady)
         {
             return;
@@ -190,6 +198,49 @@ public sealed class CoachingActionLibrary : MonoBehaviour
         };
         previewCamera.targetTexture = previewTexture;
         previewImage.texture = previewTexture;
+    }
+
+    private void UpdatePreviewDrag()
+    {
+        if (Input.touchCount > 0)
+        {
+            previewMouseDragging = false;
+            Touch touch = Input.GetTouch(0);
+            if (touch.phase == TouchPhase.Began)
+            {
+                previewMouseDragging = IsPreviewDragPosition(touch.position);
+            }
+            else if (previewMouseDragging && (touch.phase == TouchPhase.Moved || touch.phase == TouchPhase.Stationary))
+            {
+                OrbitPreview(touch.deltaPosition);
+            }
+            else if (touch.phase == TouchPhase.Ended || touch.phase == TouchPhase.Canceled)
+            {
+                previewMouseDragging = false;
+            }
+            return;
+        }
+
+        Vector2 mousePosition = Input.mousePosition;
+        if (Input.GetMouseButtonDown(0))
+        {
+            previewMouseDragging = IsPreviewDragPosition(mousePosition);
+            previousMousePosition = mousePosition;
+        }
+        else if (previewMouseDragging && Input.GetMouseButton(0))
+        {
+            OrbitPreview(mousePosition - previousMousePosition);
+            previousMousePosition = mousePosition;
+        }
+        if (Input.GetMouseButtonUp(0)) previewMouseDragging = false;
+    }
+
+    private bool IsPreviewDragPosition(Vector2 screenPosition)
+    {
+        RectTransform previewRect = previewImage.rectTransform;
+        if (!RectTransformUtility.RectangleContainsScreenPoint(previewRect, screenPosition, null)) return false;
+        return startPracticeButton == null ||
+            !RectTransformUtility.RectangleContainsScreenPoint((RectTransform)startPracticeButton.transform, screenPosition, null);
     }
 
     private void BindInterface()
@@ -276,8 +327,8 @@ public sealed class CoachingActionLibrary : MonoBehaviour
             case "clip_10":
             case "clip_11":
             case "clip_13": return LumbarCoachMode.ForAction("side_bridge")?.sceneName;
-            case "dead_bug": return "DeadBugPractice";
-            case "clip_29": return "DeadBugPractice";
+            case "dead_bug": return "DeadBug_RingSkinC_Recorded";
+            case "clip_29": return "DeadBug_RingSkinC_Recorded";
             case "bird_dog": return "BirdDogPractice";
             case "clip_30": return "BirdDogPractice";
             default: return null;
@@ -288,11 +339,6 @@ public sealed class CoachingActionLibrary : MonoBehaviour
     {
         string sceneName = selectedIndex >= 0 && selectedIndex < entries.Length
             ? ResolvePracticeScene(entries[selectedIndex]) : null;
-        if (!string.IsNullOrEmpty(sceneName))
-        {
-            sceneName = SpineFlowTrainingSession.ResolveSceneForMobileSession(sceneName);
-        }
-
         bool available = !string.IsNullOrEmpty(sceneName) &&
             Application.CanStreamedLevelBeLoaded(sceneName);
         startPracticeButton.interactable = available;
@@ -307,7 +353,6 @@ public sealed class CoachingActionLibrary : MonoBehaviour
 
         string destination = ResolvePracticeScene(entries[selectedIndex]);
         if (string.IsNullOrEmpty(destination)) return;
-        destination = SpineFlowTrainingSession.ResolveSceneForMobileSession(destination);
         if (!Application.CanStreamedLevelBeLoaded(destination))
         {
             statusText.text = "对应的教练模式场景不可用";
@@ -459,8 +504,25 @@ public sealed class CoachingActionLibrary : MonoBehaviour
                 depth + Mathf.Abs(Vector3.Dot(offset, screenRight)) / (tangent * aspect));
         }
 
+        previewTarget = target;
+        previewBaseDirection = viewDirection;
+        previewDistance = distance * 1.08f;
+        previewYaw = 0f;
+        previewPitch = 0f;
         previewCamera.transform.SetPositionAndRotation(
-            target + viewDirection * (distance * 1.08f), rotation);
+            target + viewDirection * previewDistance, rotation);
+    }
+
+    internal void OrbitPreview(Vector2 delta)
+    {
+        previewYaw += delta.x * 0.35f;
+        previewPitch = Mathf.Clamp(previewPitch - delta.y * 0.25f, -70f, 70f);
+        Vector3 direction = Quaternion.Euler(previewPitch, previewYaw, 0f) * previewBaseDirection;
+        Vector3 up = Vector3.ProjectOnPlane(Vector3.up, direction).normalized;
+        if (up.sqrMagnitude < 0.5f) up = Vector3.forward;
+        previewCamera.transform.SetPositionAndRotation(
+            previewTarget + direction * previewDistance,
+            Quaternion.LookRotation(-direction, up));
     }
 
     private static void GoBack()

@@ -10,7 +10,7 @@ Shader "SpineRecovery/BodyPartHighlightOverlay"
     {
         Tags
         {
-            "Queue" = "Transparent+50"
+            "Queue" = "Transparent+20"
             "RenderType" = "Transparent"
             "IgnoreProjector" = "True"
         }
@@ -18,10 +18,10 @@ Shader "SpineRecovery/BodyPartHighlightOverlay"
         Pass
         {
             Blend SrcAlpha OneMinusSrcAlpha
-            Cull Off
+            Cull Back
             ZWrite Off
-            ZTest Always
-            Offset -1, -1
+            ZTest LEqual
+            Offset -2, -2
 
             CGPROGRAM
             #pragma vertex vert

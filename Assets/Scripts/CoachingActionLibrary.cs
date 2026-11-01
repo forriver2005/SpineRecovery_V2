@@ -327,8 +327,8 @@ public sealed class CoachingActionLibrary : MonoBehaviour
             case "clip_10":
             case "clip_11":
             case "clip_13": return LumbarCoachMode.ForAction("side_bridge")?.sceneName;
-            case "dead_bug": return "DeadBug_RingSkinC_Recorded";
-            case "clip_29": return "DeadBug_RingSkinC_Recorded";
+            case "dead_bug": return "DeadBugPractice";
+            case "clip_29": return "DeadBugPractice";
             case "bird_dog": return "BirdDogPractice";
             case "clip_30": return "BirdDogPractice";
             default: return null;

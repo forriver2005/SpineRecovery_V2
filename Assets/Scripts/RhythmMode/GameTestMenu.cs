@@ -6,7 +6,7 @@ using UnityEngine;
 using UnityEngine.SceneManagement;
 using UnityEngine.UI;
 
-/// <summary>Test-build navigation. Switching deliberately cancels the current set.</summary>
+/// <summary>In-game action navigation. Switching deliberately cancels the current set.</summary>
 public sealed class GameTestMenu : MonoBehaviour
 {
     public static readonly string[] Scenes = {
@@ -20,13 +20,7 @@ public sealed class GameTestMenu : MonoBehaviour
     };
     public static bool EnabledForBuild
     {
-        get {
-#if UNITY_EDITOR || SPINE_TEST_BUILD
-            return true;
-#else
-            return false;
-#endif
-        }
+        get => true;
     }
     public GameObject Panel => panel;
     public Button[] GameButtons { get; private set; }

@@ -37,7 +37,10 @@ public static class RecordedAlternatingCoachMode
             {
                 var scorer = sceneRoot.GetComponentInChildren<PoseScorer>(true);
                 if (scorer != null)
+                {
+                    scorer.ConfigureCoachTargetCriterion(coach.CoachAnimator, package);
                     scorer.gameObject.AddComponent<RecordedPracticePoseGuidance>().Initialize(coach.CoachAnimator, package);
+                }
             }
             coach.ReturnIdle();
             break;

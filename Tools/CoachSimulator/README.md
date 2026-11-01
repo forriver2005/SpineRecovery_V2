@@ -31,6 +31,8 @@ Editor-only 的 CoachSixSimulationRun 在显式存在 `.codex/run-six-simulation
 
 这是输入与HTTP的模拟验收，不能证明真实IMU精度、蓝牙/网络延迟、实体起振或患者听感。具体通过/未通过结果以验收报告为准。
 
+独立教练判据验收：同时创建 `.codex/sim-criterion-acceptance` 时，顺序运行死虫、鸟狗、臀桥、侧桥四个场景。四次练习分别使用简单、标准、进阶、进阶；中间两次发送80%/45%时间位置的录制输入（时间比例不等于实际动作幅度），最后一次模拟motor失败。每秒在同一实际输入上读取三档判据，并记录真实高亮部位、准备位透明度和触觉状态到 `.codex/coach-criterion-acceptance.log`。它不直接设置判据结果或高亮。结束后删除此标记及其他模拟标记。
+
 开发复核附加标记：`.codex/sim-only-current` 在当前动作完成后退出顺序运行；`.codex/sim-visual-review` 只复核臀桥、侧桥、卷腹，其中侧桥调用原选择处理器选择B，其余默认A。结束后都应删除，避免影响下次标准六动作顺序运行。
 
 截图复核：在同时存在 `.codex/run-six-simulation` 和 `.codex/capture-coach-flow` 时，Editor-only 运行器会把当前动作代表帧写入 `.codex/coach-flow-screenshots/`，文件名带 `unity-sim-current-`。这些文件明确是 Unity Editor GameView 模拟截图，不是 APK 真机截图。

@@ -584,6 +584,7 @@ public partial class PoseScorer : MonoBehaviour
     private CoarseActionReadinessLatch coarseActionReadinessLatch;
     private VmcPoseDataFreshnessMonitor vmcFreshnessMonitor;
     private bool guidanceInputIsFresh = true;
+    public bool HasFreshGuidanceInput => guidanceInputIsFresh;
     private bool guidanceInputWasFresh;
     private bool hasLoggedMissingGuidanceReceiver;
 #if UNITY_EDITOR || DEVELOPMENT_BUILD
@@ -789,7 +790,6 @@ public partial class PoseScorer : MonoBehaviour
         {
             SampleContinuousPose();
             UpdateContinuousObservation();
-            UpdateGameTargetFeedback();
             UpdateHapticFeedback();
 
             return;
@@ -820,7 +820,7 @@ public partial class PoseScorer : MonoBehaviour
             0f,
             segment.segmentKind,
             FindObjectOfType<SegmentedCoachController>()?.CurrentPoseGuidanceRule ?? SegmentPoseGuidanceRule.Auto);
-        if (IsRecordedDeadBugScene)
+        if (RecordedAlternatingCoachMode.IsRecordedScene(gameObject.scene.name))
         {
             recordedDeadBugAllLimbFeedbackLatched = false;
             recordedDeadBugAllLimbFeedbackCompleted = false;
@@ -1611,8 +1611,7 @@ public partial class PoseScorer : MonoBehaviour
         if (!continuousObservationActive || !guidanceInputIsFresh || HasHardPoseConstraint())
             return;
 
-        if (!UsesGameTargetFeedback &&
-            IsRecordedDeadBugScene && recordedDeadBugAllLimbFeedbackLatched &&
+        if (RecordedAlternatingCoachMode.IsRecordedScene(gameObject.scene.name) && recordedDeadBugAllLimbFeedbackLatched &&
             !recordedDeadBugAllLimbFeedbackCompleted)
         {
             hapticLocationOverrides.Add(TrackerWearLocation.LeftForearm);
@@ -2075,11 +2074,12 @@ public partial class PoseScorer : MonoBehaviour
         {
             if (continuousObservationActive && guidanceInputIsFresh && !HasHardPoseConstraint() &&
                 currentSegmentInfo.segmentKind == TrainingSegmentKind.CoreAction &&
-                (!UsesLumbarTeaching || !lumbarTeachingProfile.positiveHighlightAtTarget) &&
+                (UsesCoachTargetCriterion || !UsesLumbarTeaching || !lumbarTeachingProfile.positiveHighlightAtTarget) &&
                 currentSegmentInfo.poseGuidanceRule.GetRole(part) ==
                     PoseGuidanceRegionRole.Active &&
-                guidancePartValidity[part] && HasPositiveTargetTracking(part) &&
-                (UsesHipThrustTeaching ? diagnostics.Get(part).shouldActivate : guidancePartShouldClear[part]))
+                (UsesCoachTargetCriterion || guidancePartValidity[part]) && HasPositiveTargetTracking(part) &&
+                (UsesCoachTargetCriterion ? IsCoachTargetReached(part) :
+                    UsesHipThrustTeaching ? diagnostics.Get(part).shouldActivate : guidancePartShouldClear[part]))
             {
                 guidancePartsToHighlight.Add(part);
             }
@@ -2093,7 +2093,7 @@ public partial class PoseScorer : MonoBehaviour
 #endif
             return;
         }
-        bool showLumbarPositiveTarget = continuousObservationActive && UpdateLumbarPositiveTargetHighlight(
+        bool showLumbarPositiveTarget = !UsesCoachTargetCriterion && continuousObservationActive && UpdateLumbarPositiveTargetHighlight(
             diagnostics.torso);
         showLumbarPositiveTarget = showLumbarPositiveTarget &&
             currentSegmentInfo.poseGuidanceRule.GetRole(BodyPart.Torso) == PoseGuidanceRegionRole.Active;
@@ -2140,12 +2140,7 @@ public partial class PoseScorer : MonoBehaviour
 
     private bool ShowRecordedDeadBugAllLimbFeedback()
     {
-        if (UsesGameTargetFeedback)
-        {
-            return false;
-        }
-
-        if (!IsRecordedDeadBugScene ||
+        if (!RecordedAlternatingCoachMode.IsRecordedScene(gameObject.scene.name) ||
             (currentSegmentInfo.segmentKind != TrainingSegmentKind.Preparation &&
              currentSegmentInfo.segmentKind != TrainingSegmentKind.CoreAction))
         {
@@ -2163,7 +2158,7 @@ public partial class PoseScorer : MonoBehaviour
 
         if (!recordedDeadBugAllLimbFeedbackLatched &&
             !recordedDeadBugAllLimbFeedbackSent &&
-            IsRecordedDeadBugAllLimbsRaised())
+            (UsesCoachTargetCriterion ? IsCoachPreparationReached() : IsRecordedDeadBugAllLimbsRaised()))
         {
             recordedDeadBugAllLimbFeedbackLatched = true;
             recordedDeadBugAllLimbFeedbackSent = true;
@@ -2193,6 +2188,7 @@ public partial class PoseScorer : MonoBehaviour
         successColor.a *= alpha;
         foreach (BodyPart part in AllGuidanceParts)
         {
+            if (part == BodyPart.Torso) continue;
             guidancePartsToHighlight.Add(part);
             guidancePartColors[part] = successColor;
         }

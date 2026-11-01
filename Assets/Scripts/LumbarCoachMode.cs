@@ -144,7 +144,18 @@ public static class LumbarCoachMode
                 coach.ReturnIdle();
             }
             PoseScorer scorer = root.GetComponentInChildren<PoseScorer>(true);
-            if (scorer != null) scorer.ConfigureLumbarTeaching(profile);
+            if (scorer != null)
+            {
+                scorer.ConfigureLumbarTeaching(profile);
+                if (profile.actionId == "side_bridge")
+                {
+                    foreach (var coachRoot in scene.GetRootGameObjects())
+                    {
+                        var controller = coachRoot.GetComponentInChildren<SegmentedCoachController>(true);
+                        if (controller != null) scorer.ConfigureCoachTargetCriterion(controller.CoachAnimator, package);
+                    }
+                }
+            }
         }
     }
 

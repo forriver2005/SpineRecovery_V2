@@ -51,6 +51,11 @@ public sealed class HipThrustCoachMode : MonoBehaviour
             // This recording begins supine. Show that preparation pose from
             // the start menu onward, before either avatar is introduced.
             coach.ReturnIdle();
+            foreach (var root in scene.GetRootGameObjects())
+            {
+                var scorer = root.GetComponentInChildren<PoseScorer>(true);
+                if (scorer != null) scorer.ConfigureCoachTargetCriterion(coach.CoachAnimator, package);
+            }
         }
     }
 

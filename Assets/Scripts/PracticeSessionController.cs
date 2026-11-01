@@ -111,6 +111,13 @@ public class PracticeSessionController : MonoBehaviour
     // 是否已经配置过难度
     private DisplayYawRestore displayYawRestore;
     private float coachDisplayYaw;
+    private enum FollowHeadingAxis { None, Upright, Headward }
+    private FollowHeadingAxis followHeadingAxis;
+    private FollowHeadingAxis pendingFollowAxis;
+    private float pendingFollowYaw;
+    private float pendingFollowSeconds;
+    private float acceptedFollowYaw;
+    private bool hasFollowTarget;
     private bool difficultyConfigured;
     private string coachingDifficultyKey = "simple";
     private bool practiceRunning;
@@ -329,29 +336,35 @@ public class PracticeSessionController : MonoBehaviour
             motionRecorder.CoachAnimator == null || displayYawRestore == null) return;
         Animator user = motionRecorder.UserAnimator;
         Animator coach = motionRecorder.CoachAnimator;
+        // Sample the source pose, never the display correction from a previous call.
+        displayYawRestore.Restore();
+        if (orientationMode == CoachOrientationMode.FollowUser)
+        {
+            if (avatarDirectionReference == null)
+                avatarDirectionReference = FindSharedDisplayReference(user.transform, coach.transform);
+            // A camera tilt must not change what counts as lying or upright.
+            Vector3 up = avatarDirectionReference != null ? avatarDirectionReference.up : ResolveWorldUp();
+            if (deltaTime > 0f)
+            {
+                bool fresh = poseScorer != null ? poseScorer.HasFreshGuidanceInput : HasFreshUserTrackerData();
+                if (fresh && TryGetFollowHeadings(user, coach, up, out Vector3 userDirection,
+                        out Vector3 coachDirection, out FollowHeadingAxis axis) &&
+                    TryCalculateYawAlignmentDegrees(coachDirection, userDirection, up, out float targetYaw))
+                    UpdateFollowYaw(axis, targetYaw, deltaTime);
+                else
+                    ResetFollowHeadingAcquisition();
+            }
+            displayYawRestore.Apply(coach.transform, up, coachDisplayYaw);
+            return;
+        }
+
         ResolveAvatarDirectionReference(user, coach);
-        if (avatarDirectionReference == null ||
-            !TryGetComparableHeadings(user, coach, avatarDirectionReference.up,
+        if (avatarDirectionReference == null) return;
+        if (!TryGetComparableHeadings(user, coach, avatarDirectionReference.up,
                 out Vector3 userHeading, out Vector3 coachHeading)) return;
         if (!TryCalculateYawAlignmentDegrees(coachHeading, userHeading,
                 avatarDirectionReference.up, out float coachToUser)) return;
-
-        Transform root;
-        float yaw;
-        if (orientationMode == CoachOrientationMode.FollowUser)
-        {
-            float smooth = 1f - Mathf.Exp(-Mathf.Max(0.1f, coachFollowRotationSpeed) *
-                Mathf.Max(0f, deltaTime));
-            coachDisplayYaw = Mathf.LerpAngle(coachDisplayYaw, coachToUser, smooth);
-            root = coach.transform;
-            yaw = coachDisplayYaw;
-        }
-        else
-        {
-            root = user.transform;
-            yaw = -coachToUser;
-        }
-        displayYawRestore.Apply(root, avatarDirectionReference.up, yaw);
+        displayYawRestore.Apply(user.transform, avatarDirectionReference.up, -coachToUser);
     }
 
     private void CaptureAuthoredCoachRotation()
@@ -1477,6 +1490,114 @@ public class PracticeSessionController : MonoBehaviour
             TryGetBodyFacingDirection(coach, up, out coachHeading);
     }
 
+    private bool TryGetFollowHeadings(Animator user, Animator coach, Vector3 up,
+        out Vector3 userHeading, out Vector3 coachHeading, out FollowHeadingAxis axis)
+    {
+        userHeading = coachHeading = Vector3.zero;
+        axis = FollowHeadingAxis.None;
+        if (up.sqrMagnitude < .0001f) return false;
+        up.Normalize();
+        if (!TryGetFollowTorsoDirection(user, out Vector3 u) ||
+            !TryGetFollowTorsoDirection(coach, out Vector3 c)) return false;
+        axis = SelectFollowHeadingAxis(u, c, up, followHeadingAxis);
+        if (axis == FollowHeadingAxis.Headward)
+        {
+            userHeading = Vector3.ProjectOnPlane(u, up).normalized;
+            coachHeading = Vector3.ProjectOnPlane(c, up).normalized;
+            return true;
+        }
+        return axis == FollowHeadingAxis.Upright &&
+            TryGetPelvisFacing(user, up, out userHeading) &&
+            TryGetPelvisFacing(coach, up, out coachHeading);
+    }
+
+    private static bool TryGetFollowTorsoDirection(Animator animator, out Vector3 direction)
+    {
+        direction = Vector3.zero;
+        if (animator == null) return false;
+        Transform hips = animator.GetBoneTransform(HumanBodyBones.Hips);
+        Transform chest = animator.GetBoneTransform(HumanBodyBones.UpperChest) ??
+            animator.GetBoneTransform(HumanBodyBones.Chest);
+        if (hips == null || chest == null) return false;
+        // The ten-tracker setup has no head tracker. Use the trunk, not Head.forward
+        // or distal limbs; hip-joint positions are unaffected by knee/arm motion.
+        direction = chest.position - hips.position;
+        return direction.sqrMagnitude >= .0001f;
+    }
+
+    private static FollowHeadingAxis SelectFollowHeadingAxis(Vector3 userTorso,
+        Vector3 coachTorso, Vector3 up, FollowHeadingAxis previous)
+    {
+        if (userTorso.sqrMagnitude < .0001f || coachTorso.sqrMagnitude < .0001f ||
+            up.sqrMagnitude < .0001f) return FollowHeadingAxis.None;
+        up.Normalize();
+        float userVertical = Vector3.Dot(userTorso.normalized, up);
+        float coachVertical = Vector3.Dot(coachTorso.normalized, up);
+        float userHorizontal = Mathf.Clamp01(1f - userVertical * userVertical);
+        float coachHorizontal = Mathf.Clamp01(1f - coachVertical * coachVertical);
+        // Lying/prone/sideways: compare the head-end axis on BOTH bodies.
+        // Retain it during bridge lifts and curl-ups until projection degenerates.
+        float headwardThreshold = previous == FollowHeadingAxis.Headward ? .40f : .60f;
+        if (Mathf.Min(userHorizontal, coachHorizontal) >= headwardThreshold)
+            return FollowHeadingAxis.Headward;
+        // Only two upright bodies may use the pelvis axis. Never fall back to it
+        // for a standing/lying mismatch, or for a side bridge's near-vertical hips.
+        float uprightThreshold = previous == FollowHeadingAxis.Upright ? .35f : .20f;
+        if (userVertical > 0f && coachVertical > 0f &&
+            Mathf.Max(userHorizontal, coachHorizontal) <= uprightThreshold)
+            return FollowHeadingAxis.Upright;
+        return FollowHeadingAxis.None;
+    }
+
+    private void UpdateFollowYaw(FollowHeadingAxis axis, float targetYaw, float deltaTime)
+    {
+        float dt = Mathf.Clamp(deltaTime, 0f, .1f);
+        // One confirmation covers acquisition, axis changes and isolated large
+        // packet jumps. Normal continuous turns need no additional waiting.
+        if (pendingFollowAxis != axis || Mathf.Abs(Mathf.DeltaAngle(pendingFollowYaw, targetYaw)) > 12f)
+        {
+            pendingFollowAxis = axis;
+            pendingFollowYaw = targetYaw;
+            pendingFollowSeconds = 0f;
+        }
+        pendingFollowSeconds += dt;
+        bool needsConfirmation = !hasFollowTarget || axis != followHeadingAxis ||
+            Mathf.Abs(Mathf.DeltaAngle(acceptedFollowYaw, targetYaw)) > 45f;
+        if (needsConfirmation && pendingFollowSeconds < .2f) return;
+
+        hasFollowTarget = true;
+        followHeadingAxis = axis;
+        acceptedFollowYaw = targetYaw;
+        float error = Mathf.DeltaAngle(coachDisplayYaw, targetYaw);
+        // Subtract the dead zone instead of stopping abruptly at its boundary.
+        float correction = Mathf.Sign(error) * Mathf.Max(0f, Mathf.Abs(error) - 1.5f);
+        float smooth = 1f - Mathf.Exp(-Mathf.Max(.1f, coachFollowRotationSpeed) * dt);
+        coachDisplayYaw = Mathf.DeltaAngle(0f,
+            coachDisplayYaw + Mathf.Clamp(correction * smooth, -60f * dt, 60f * dt));
+    }
+
+    private void ResetFollowHeadingAcquisition()
+    {
+        hasFollowTarget = false;
+        pendingFollowAxis = FollowHeadingAxis.None;
+        pendingFollowSeconds = 0f;
+    }
+
+    private static bool TryGetPelvisFacing(Animator animator, Vector3 up, out Vector3 heading)
+    {
+        heading = Vector3.zero;
+        if (animator == null) return false;
+        Transform left = animator.GetBoneTransform(HumanBodyBones.LeftUpperLeg);
+        Transform right = animator.GetBoneTransform(HumanBodyBones.RightUpperLeg);
+        if (left == null || right == null) return false;
+        Vector3 lateral = right.position - left.position;
+        Vector3 projected = Vector3.ProjectOnPlane(lateral, up);
+        if (lateral.sqrMagnitude < .0001f || projected.sqrMagnitude / lateral.sqrMagnitude < .35f)
+            return false;
+        heading = Vector3.Cross(projected.normalized, up).normalized;
+        return true;
+    }
+
     private static bool TryGetStableAvatarHeading(
         Animator animator,
         Vector3 worldUp,
@@ -2253,6 +2374,8 @@ public class PracticeSessionController : MonoBehaviour
     {
         displayYawRestore?.Restore();
         coachDisplayYaw = 0f;
+        followHeadingAxis = FollowHeadingAxis.None;
+        ResetFollowHeadingAcquisition();
         RestoreUserRotationBeforeDirectionLock();
         RestoreAuthoredCoachRotation();
         preparationDirectionAlignmentActive = false;

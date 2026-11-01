@@ -16,7 +16,7 @@ public static class CoachSixSimulationRun
     static readonly float[] Times={10f,23f,27,14.5f,17,10.5f};
     static readonly float[] PreparationTimes={6.5f,20f,22,10,14,7};
     static readonly float[] ReturnTimes={12.5f,26.5f,40,20,26,15.5f};
-    const BindingFlags Flags=BindingFlags.Instance|BindingFlags.NonPublic;
+    const BindingFlags Flags=BindingFlags.Instance|BindingFlags.NonPublic|BindingFlags.Public;
     static double nextSample,readyAt,lessonCaptureAfter;
     static bool started;
     static string lastControl;
@@ -41,6 +41,7 @@ public static class CoachSixSimulationRun
         }
         if(File.Exists(".codex/resume-six-index")){SessionState.SetInt("CoachSix.index",int.Parse(File.ReadAllText(".codex/resume-six-index")));File.Delete(".codex/resume-six-index");}
         int index=SessionState.GetInt("CoachSix.index",0);
+        bool criterionAcceptance=File.Exists(".codex/sim-criterion-acceptance");
         bool original=File.Exists(".codex/sim-original-courses");
         Scenes[0]="DeadBugPractice";
         Scenes[1]="BirdDogPractice";
@@ -72,9 +73,20 @@ public static class CoachSixSimulationRun
             File.AppendAllText("Tools/CoachSimulator/six-run.log","START "+Scenes[index]+" "+DateTime.Now.ToString("o")+"\n");
         }
         int rep=coach.CurrentRepeat;
+        if (criterionAcceptance)
+        {
+            string level = rep == 0 ? "simple" : rep == 1 ? "standard" : "hard";
+            if (!Equals(Field(session, "coachingDifficultyKey"), level)) session.SetCoachingDifficultyKey(level);
+        }
         float sampleTime=coach.CurrentSegmentKind==TrainingSegmentKind.CoreAction?Times[index]:coach.CurrentSegmentKind==TrainingSegmentKind.ReturnTransition?ReturnTimes[index]:PreparationTimes[index];
         if(rep%2==1 && index<2 && coach.CurrentSegmentKind==TrainingSegmentKind.CoreAction)sampleTime=index==0?19.4f:15.4f;
         if(rep%2==1 && index<2 && coach.CurrentSegmentKind==TrainingSegmentKind.ReturnTransition)sampleTime=index==0?21.5f:19.6f;
+        if (criterionAcceptance && coach.CurrentSegmentKind == TrainingSegmentKind.CoreAction && (rep == 1 || rep == 2))
+        {
+            float start = PreparationTimes[index];
+            if (index < 2 && rep % 2 == 1) start = index == 0 ? 17.3f : 12f;
+            sampleTime = Mathf.Lerp(start, sampleTime, rep == 1 ? .8f : .45f);
+        }
         // Rep 3 loses device validity; rep 4 returns valid input but motor requests fail.
         string selectedAction = index == 0 && File.Exists(".codex/sim-deadbug-all-limb")
             ? "deadbug_all_limb"
@@ -82,6 +94,7 @@ public static class CoachSixSimulationRun
                 ? "birddog_positive"
                 : Actions[index];
         string control="{\"action\":\""+selectedAction+"\",\"time\":"+sampleTime.ToString(System.Globalization.CultureInfo.InvariantCulture)+",\"yaw\":"+(rep==1?70:0)+",\"stream\":true,\"connected\":"+(rep==2?"false":"true")+",\"status\":\"OK\",\"motorFail\":"+(rep==3?"true":"false")+",\"stop\":false}";
+        if (criterionAcceptance) control=control.Replace("\"connected\":false", "\"connected\":true");
         if(original && index<2) {
             var segments=Field(coach,"segments") as System.Collections.Generic.List<ActionSegment>;
             string action="original_"+segments[coach.CurrentSegmentIndex].clipStateName;
@@ -94,6 +107,7 @@ public static class CoachSixSimulationRun
         {
             nextSample=EditorApplication.timeSinceStartup+1;
             var scorer=UnityEngine.Object.FindObjectOfType<PoseScorer>();
+            if (criterionAcceptance) RecordCriterionAcceptance(scorer, coach, index, rep, sampleTime);
             var evidence=Field(scorer,"lumbarTeachingEvidence") as LumbarTeachingEvidence;
             float progress=0;bool hasProgress=evidence!=null && evidence.TryGetProgress(Field(scorer,"userAnimator") as Animator,out progress);
             string text=DateTime.Now.ToString("o")+" "+Scenes[index]+" rep="+rep+" completed="+coach.CompletedRepetitions+" phase="+coach.CurrentSegmentKind+" hold="+coach.IsWaitingForNext+" running="+Field(session,"practiceRunning")+" green="+Collection(Field(scorer,"guidancePartsToHighlight"))+" lumbarGreen="+Field(scorer,"lumbarPositiveHighlightConfirmed")+" fresh="+Field(scorer,"guidanceInputIsFresh")+" baseline="+(evidence!=null && evidence.HasBaseline)+" progress="+(hasProgress?progress.ToString("F3"):"unknown")+" valid="+Collection(Field(scorer,"guidancePartValidity"))+" clear="+Collection(Field(scorer,"guidancePartShouldClear"));
@@ -136,8 +150,53 @@ public static class CoachSixSimulationRun
         if(completionVisible || completionDone)
         {
             File.AppendAllText("Tools/CoachSimulator/six-run.log","COMPLETE "+Scenes[index]+" reps="+coach.CompletedRepetitions+"\n");
-            SessionState.SetInt("CoachSix.index",(File.Exists(".codex/sim-only-current") || index==1 && File.Exists(".codex/sim-recorded-only"))?6:File.Exists(".codex/sim-visual-review") && index==2?4:index+1);EditorApplication.isPlaying=false;
+            SessionState.SetInt("CoachSix.index",criterionAcceptance ? (index == 2 ? 4 : index == 4 ? 6 : index+1) : (File.Exists(".codex/sim-only-current") || index==1 && File.Exists(".codex/sim-recorded-only"))?6:File.Exists(".codex/sim-visual-review") && index==2?4:index+1);EditorApplication.isPlaying=false;
         }
+    }
+
+    private static void RecordCriterionAcceptance(PoseScorer scorer, SegmentedCoachController coach, int index, int rep, float inputTime)
+    {
+        var criterion = Field(scorer, "coachTargetCriterion");
+        var user = Field(scorer, "userAnimator") as Animator;
+        var colors = Field(scorer, "guidancePartColors") as System.Collections.Generic.Dictionary<BodyPart, Color>;
+        string text = DateTime.UtcNow.ToString("o") + " scene=" + Scenes[index] + " rep=" + rep +
+            " segment=" + coach.CurrentSegmentIndex + " phase=" + coach.CurrentSegmentKind +
+            " hold=" + coach.IsHoldingAtSegment + " input=" + inputTime.ToString("F2") +
+            " fresh=" + Field(scorer, "guidanceInputIsFresh") + " green=" + Collection(Field(scorer, "guidancePartsToHighlight"));
+        if (colors != null) foreach (var color in colors) text += " alpha_" + color.Key + "=" + color.Value.a.ToString("F3");
+        if (criterion != null)
+        {
+            var refs = Field(criterion, "references") as Array;
+            if (refs != null && coach.CurrentSegmentIndex < refs.Length)
+            {
+                var reference = refs.GetValue(coach.CurrentSegmentIndex);
+                AnatomicalMotionScoringEngine.TryGetBodyFrame(user, out var body);
+                text += " front=" + Vector3.Dot(body * Vector3.forward, Vector3.up).ToString("F3") +
+                    " tilt=" + Vector3.Dot(body * Vector3.up, Vector3.up).ToString("F3") + " referenceFront=" + Field(reference,"front");
+                if (index == 4 && SideBridgePoseGeometry.TryMeasure(user, out var actual))
+                {
+                    var rest = Field(reference,"sideRest") as SideBridgePoseGeometry.Pose;
+                    var top = Field(reference,"sideTarget") as SideBridgePoseGeometry.Pose;
+                    text += " sideActual=" + actual.lift + "/" + actual.IsLeftSupport +
+                        " sideRest=" + rest?.lift + "/" + rest?.IsLeftSupport +
+                        " sideTop=" + top?.lift + "/" + top?.IsLeftSupport +
+                        " support=" + (top != null && SideBridgePoseGeometry.HasStableSupport(actual,top)) +
+                        " quality=" + (top != null ? new SideBridgePoseGeometry().Quality(actual,top,1.6f) : 0);
+                }
+            }
+            var method = criterion.GetType().GetMethod("Reached");
+            foreach (BodyPart part in new[] {BodyPart.LeftArm,BodyPart.RightArm,BodyPart.LeftLeg,BodyPart.RightLeg,BodyPart.Torso})
+            {
+                text += " " + part + "=";
+                foreach (string level in new[] {"simple", "standard", "hard"})
+                    text += (bool)method.Invoke(criterion, new object[] {user, coach.CurrentSegmentIndex, part,
+                        coach.CurrentSegmentKind == TrainingSegmentKind.Preparation, level}) ? "1" : "0";
+            }
+        }
+        text += " prepLatched=" + Field(scorer,"recordedDeadBugAllLimbFeedbackLatched") +
+            " prepDone=" + Field(scorer,"recordedDeadBugAllLimbFeedbackCompleted") +
+            " pulse=" + Field(Field(scorer,"hapticFeedback"),"hasGuidanceGroupPulse");
+        File.AppendAllText(".codex/coach-criterion-acceptance.log", text + "\n");
     }
 
     private static void CaptureRepresentativeFrames(

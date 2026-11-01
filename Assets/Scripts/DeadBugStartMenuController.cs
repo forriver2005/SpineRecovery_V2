@@ -100,6 +100,7 @@ public class DeadBugStartMenuController : MonoBehaviour
     private string originalStartButtonText;
     private bool originalStartButtonTextActive;
     private bool calibrationStatusCached;
+    private Sprite pauseOriginalStartSprite;
 
     private bool IsPracticeCoachMode =>
         hideMenuOnlyOnStart || practiceCoachController != null;
@@ -897,7 +898,7 @@ public class DeadBugStartMenuController : MonoBehaviour
     }
 
     /// <summary>
-    /// Shows the same five-button action page used by the coach controls while
+    /// Shows the three-button action page while
     /// the lesson is paused. Button listeners are rebound here because the
     /// authored scene listeners belong to the start/completion flows.
     /// </summary>
@@ -909,8 +910,7 @@ public class DeadBugStartMenuController : MonoBehaviour
         }
 
         ResolvePracticeActionMenu();
-        if (practiceActionMenu == null ||
-            !CoachModeNavigation.IsSupportedCoachScene(gameObject.scene.name))
+        if (practiceActionMenu == null)
         {
             return false;
         }
@@ -920,17 +920,26 @@ public class DeadBugStartMenuController : MonoBehaviour
         ConfigurePracticeActionMenu();
         ConfigurePauseButton("Start", ResumePracticeFromPause);
         ConfigurePauseButton("Game", () => CoachModeNavigation.OpenGameFromCoach());
-        ConfigurePauseButton("PlayBack", () => CoachModeNavigation.OpenReplayFromCoach());
-        ConfigurePauseButton("Home", () => CoachModeNavigation.ReturnToCoachStart());
         ConfigurePauseButton("ActionLibrary", CoachModeNavigation.OpenActionLibraryFromCoach);
-
+        bool gameAvailable = CoachModeNavigation.IsSupportedCoachScene(gameObject.scene.name);
         foreach (Transform child in practiceActionMenu.transform)
         {
             bool visible = child.name == "Start" || child.name == "Game" ||
-                child.name == "PlayBack" || child.name == "Home" ||
                 child.name == "ActionLibrary";
             child.gameObject.SetActive(visible);
+            if (!visible) continue;
+            TMP_Text label = child.GetComponentInChildren<TMP_Text>(true);
+            if (label != null) label.gameObject.SetActive(false);
         }
+        Button gameButton = practiceActionMenu.transform.Find("Game")?.GetComponent<Button>();
+        if (gameButton != null) gameButton.interactable = gameAvailable;
+        Image startImage = practiceActionMenu.transform.Find("Start")?.GetComponent<Image>();
+        if (startImage != null)
+        {
+            pauseOriginalStartSprite = startImage.sprite;
+            startImage.sprite = Resources.Load<Sprite>("ActionLibrary/ContinueButton");
+        }
+        LayoutPauseButtons();
 
         SetPracticeActionMenuCanvasVisible(true);
         return true;
@@ -969,6 +978,19 @@ public class DeadBugStartMenuController : MonoBehaviour
             button.onClick = new Button.ButtonClickedEvent();
             button.onClick.AddListener(action);
             button.interactable = true;
+        }
+    }
+
+    private void LayoutPauseButtons()
+    {
+        string[] names = { "Start", "Game", "ActionLibrary" };
+        for (int i = 0; i < names.Length; i++)
+        {
+            RectTransform rect = practiceActionMenu.transform.Find(names[i]) as RectTransform;
+            if (rect == null) continue;
+            rect.anchorMin = rect.anchorMax = rect.pivot = new Vector2(0.5f, 0.5f);
+            rect.anchoredPosition = new Vector2(0f, (1 - i) * PracticeControlVerticalSpacing);
+            rect.sizeDelta = new Vector2(380f, 140f);
         }
     }
 
@@ -1202,6 +1224,12 @@ public class DeadBugStartMenuController : MonoBehaviour
         Transform game = practiceActionMenu.transform.Find("Game");
         if (start != null)
         {
+            Image image = start.GetComponent<Image>();
+            if (image != null && pauseOriginalStartSprite != null)
+            {
+                image.sprite = pauseOriginalStartSprite;
+                pauseOriginalStartSprite = null;
+            }
             TMP_Text label = start.GetComponentInChildren<TMP_Text>(true);
             if (label != null) label.text = "Start";
             Button button = start.GetComponent<Button>();
@@ -1388,6 +1416,13 @@ public class DeadBugStartMenuController : MonoBehaviour
     private void SelectDifficulty(Difficulty difficulty)
     {
         selectedDifficulty = difficulty;
+
+        string difficultyKey = difficulty == Difficulty.Simple ? "simple" :
+            difficulty == Difficulty.Hard ? "hard" : "standard";
+        if (practiceSessionController != null)
+        {
+            practiceSessionController.SetCoachingDifficultyKey(difficultyKey);
+        }
 
         if (coachActionController != null)
         {

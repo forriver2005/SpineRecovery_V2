@@ -6,8 +6,8 @@ EditorBuildSettings:
   serializedVersion: 2
   m_Scenes:
   - enabled: 1
-    path: Assets/Scenes/DeadBugPractice.unity
-    guid: 2de38b4b94aa4a339a23f253efb2aad5
+    path: Assets/Scenes/DeadBug_RingSkinC_Recorded.unity
+    guid: 7a1d9048ab0b25f4cbf34b8e870d02b3
   - enabled: 1
     path: Assets/Scenes/BirdDogPractice.unity
     guid: 31dbbc37cff84d0da386fe90862cc042
@@ -44,9 +44,6 @@ EditorBuildSettings:
   - enabled: 1
     path: Assets/Scenes/BirdDog_RingSkinC_Recorded.unity
     guid: 63ece4d2ca80c6e4c844d636c4b359bc
-  - enabled: 1
-    path: Assets/Scenes/DeadBug_RingSkinC_Recorded.unity
-    guid: 7a1d9048ab0b25f4cbf34b8e870d02b3
   - enabled: 1
     path: Assets/Scenes/HipThrust_RingBridge_NewScoring.unity
     guid: 234f7694059c72d42b32532ff9d38ba9

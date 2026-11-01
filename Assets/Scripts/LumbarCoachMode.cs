@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.SceneManagement;
@@ -19,6 +19,9 @@ public sealed class LumbarCoachProfile
     public HumanBodyBones[][] targetHapticMovementBones;
     public bool positiveHighlightAtTarget;
     public float[] recordedStart, recordedTarget;
+    public float feedbackEnterMin = 0.88f, feedbackEnterMax = 1.12f;
+    public float feedbackReleaseMin = 0.78f, feedbackReleaseMax = 1.22f;
+    public float feedbackStableSeconds = 0.2f;
 }
 
 public static class LumbarCoachMode
@@ -47,13 +50,14 @@ public static class LumbarCoachMode
         {
             actionId = "cat_camel", displayName = "卧位猫", sceneName = "CatCamelPractice", clip = 23,
             from = 10f, peak = 14.5f, returnFrom = 16f, to = 20f,
-            preparation = "舒适四点支撑准备",
-            instruction = "按示范缓慢向上拱背，小幅跟做，正常呼吸",
-            recovery = "缓慢回到舒适支撑位，放松休息",
+            preparation = "四点支撑准备，双手在肩下，双膝在髋下，保持脊柱中立",
+            instruction = "缓慢拱起胸腰背部，收紧腹部并随呼吸活动脊柱，不追求极限幅度",
+            recovery = "缓慢回到中立支撑位，保持颈部放松，短暂休息",
             active = PoseGuidanceRegionMask.Torso, support = BothLegs | BothArms,
             targetHapticLocations = new[] { TrackerWearLocation.Abdomen },
             targetHapticMovementBones = new[] { TrunkMotion },
             positiveHighlightAtTarget = true,
+            feedbackEnterMin = 0.84f, feedbackEnterMax = 1.12f, feedbackReleaseMin = 0.76f, feedbackReleaseMax = 1.20f, feedbackStableSeconds = 0.22f,
             scoringBones = Join(Torso, Legs, new[] { HumanBodyBones.LeftUpperArm,
                 HumanBodyBones.RightUpperArm, HumanBodyBones.LeftLowerArm, HumanBodyBones.RightLowerArm }),
             movementBones = TrunkMotion
@@ -70,6 +74,7 @@ public static class LumbarCoachMode
             targetHapticMovementBones = new[]
                 { Join(TrunkMotion, new[] { HumanBodyBones.LeftUpperLeg, HumanBodyBones.RightUpperLeg }) },
             positiveHighlightAtTarget = true,
+            feedbackEnterMin = 0.88f, feedbackEnterMax = 1.12f, feedbackReleaseMin = 0.78f, feedbackReleaseMax = 1.22f, feedbackStableSeconds = 0.2f,
             scoringBones = Join(Torso, Legs, new[] { HumanBodyBones.LeftUpperArm, HumanBodyBones.LeftLowerArm }),
             movementBones = Join(TrunkMotion, new[] { HumanBodyBones.LeftUpperLeg, HumanBodyBones.RightUpperLeg })
         },
@@ -77,71 +82,16 @@ public static class LumbarCoachMode
         {
             actionId = "curl_up", displayName = "卷腹", sceneName = "CurlUpPractice", clip = 28,
             from = 7f, peak = 10.5f, returnFrom = 12.5f, to = 15.5f,
-            preparation = "仰卧屈膝准备，颈部保持舒适",
-            instruction = "按示范小幅卷起上背，不拉扯颈部，正常呼吸",
-            recovery = "缓慢放下上背，仰卧放松休息",
+            preparation = "仰卧屈膝准备，双脚着地，腰背保持舒适，颈部放松",
+            instruction = "收紧腹部，小幅抬起肩胛下角，保持腰椎舒适并正常呼吸",
+            recovery = "缓慢放下上背，保持腹部控制，回到仰卧准备位休息",
             active = PoseGuidanceRegionMask.Torso, support = BothLegs,
             targetHapticLocations = new[] { TrackerWearLocation.Abdomen },
             targetHapticMovementBones = new[] { TrunkMotion },
             positiveHighlightAtTarget = true,
+            feedbackEnterMin = 0.86f, feedbackEnterMax = 1.10f, feedbackReleaseMin = 0.78f, feedbackReleaseMax = 1.18f, feedbackStableSeconds = 0.20f,
             scoringBones = Join(Torso, Legs), movementBones = TrunkMotion
         },
-        new LumbarCoachProfile
-        {
-            actionId = "knee_flexion", displayName = "屈膝", sceneName = "KneeFlexionPractice", clip = 31,
-            from = 19f, peak = 24f, returnFrom = 25f, to = 29f,
-            preparation = "仰卧屈膝准备，先看双腿位置",
-            instruction = "按示范缓慢屈膝收腿，在舒适范围活动，不强拉",
-            recovery = "双腿缓慢回到准备位置，放松休息",
-            active = BothLegs, support = PoseGuidanceRegionMask.Torso,
-            targetHapticLocations = new[]
-                { TrackerWearLocation.LeftLowerLeg, TrackerWearLocation.RightLowerLeg },
-            targetHapticMovementBones = new[]
-            {
-                new[] { HumanBodyBones.LeftUpperLeg, HumanBodyBones.LeftLowerLeg },
-                new[] { HumanBodyBones.RightUpperLeg, HumanBodyBones.RightLowerLeg }
-            },
-            scoringBones = Join(Torso, Legs), movementBones = Legs
-        },
-        new LumbarCoachProfile
-        {
-            actionId = "standing_extension", displayName = "站立位伸展", sceneName = "StandingExtensionPractice", clip = 32,
-            from = 2f, peak = 9f, returnFrom = 10f, to = 12f,
-            preparation = "舒适站立准备，双脚稳稳支撑",
-            instruction = "按示范小幅伸展，保持呼吸，不追求后伸幅度",
-            recovery = "缓慢回到自然站姿，放松休息",
-            active = PoseGuidanceRegionMask.Torso, support = BothLegs,
-            targetHapticLocations = new[] { TrackerWearLocation.Abdomen },
-            targetHapticMovementBones = new[] { TrunkMotion },
-            positiveHighlightAtTarget = true,
-            scoringBones = Join(Torso, Legs), movementBones = TrunkMotion
-        },
-        new LumbarCoachProfile
-        {
-            actionId = "seated_cat_camel", displayName = "坐位", sceneName = "SeatedCatCamelPractice", clip = 24,
-            from = 16f, peak = 20f, returnFrom = 24f, to = 27f,
-            preparation = "舒适坐稳，按录制位置摆好双腿",
-            instruction = "坐稳后按示范轻缓活动背部，小幅跟做，正常呼吸",
-            recovery = "缓慢回到舒适坐姿，放松休息",
-            active = PoseGuidanceRegionMask.Torso, support = PoseGuidanceRegionMask.None,
-            targetHapticLocations = new[] { TrackerWearLocation.Abdomen },
-            targetHapticMovementBones = new[] { TrunkMotion },
-            positiveHighlightAtTarget = true,
-            scoringBones = Torso, movementBones = TrunkMotion
-        },
-        new LumbarCoachProfile
-        {
-            actionId = "standing_cat_camel", displayName = "站位", sceneName = "StandingCatCamelPractice", clip = 25,
-            from = 16f, peak = 19f, returnFrom = 22f, to = 26f,
-            preparation = "舒适站稳，双脚支撑",
-            instruction = "站稳后按示范轻缓活动骨盆与背部，不追求幅度",
-            recovery = "缓慢回到舒适站姿，放松休息",
-            active = PoseGuidanceRegionMask.Torso, support = PoseGuidanceRegionMask.None,
-            targetHapticLocations = new[] { TrackerWearLocation.Abdomen },
-            targetHapticMovementBones = new[] { TrunkMotion },
-            positiveHighlightAtTarget = true,
-            scoringBones = Torso, movementBones = TrunkMotion
-        }
     };
 
     public static LumbarCoachProfile ForScene(string scene)
@@ -162,8 +112,6 @@ public static class LumbarCoachMode
         if (id == "catcamel" || id == "catcow") return Profiles[0];
         if (id == "sideplank" || id == "sidebridge") return Profiles[1];
         if (id == "curlup" || id == "crunch") return Profiles[2];
-        if (id == "seatedcatcamel" || id == "seatedcatcow" || id == "坐位猫式") return Profiles[5];
-        if (id == "standingcatcamel" || id == "standingcatcow" || id == "站位猫式") return Profiles[6];
         return null;
     }
 

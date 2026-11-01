@@ -112,6 +112,7 @@ public class PracticeSessionController : MonoBehaviour
     private DisplayYawRestore displayYawRestore;
     private float coachDisplayYaw;
     private bool difficultyConfigured;
+    private string coachingDifficultyKey = "simple";
     private bool practiceRunning;
     private Transform avatarDirectionReference;
     private bool preparationDirectionAlignmentActive;
@@ -485,8 +486,11 @@ public class PracticeSessionController : MonoBehaviour
         DifficultyConfig config = difficultySettings != null
             ? difficultySettings.GetConfig(defaultDifficulty)
             : DifficultySettings.CreateBuiltInConfig(defaultDifficulty);
+        coachingDifficultyKey = defaultDifficulty == DifficultyLevel.Strict ? "hard" :
+            defaultDifficulty == DifficultyLevel.Medium ? "standard" : "simple";
         if (poseScorer != null)
         {
+            poseScorer.SetCoachingDifficultyKey(coachingDifficultyKey);
             poseScorer.SetStabilityDifficulty(config);
             poseScorer.SetScoringDifficulty(config);
         }
@@ -497,6 +501,13 @@ public class PracticeSessionController : MonoBehaviour
             $"PracticeSessionController: coach mode uses the fixed " +
             $"{DifficultySettings.GetDifficultyName(defaultDifficulty)} threshold preset.",
             this);
+    }
+
+    public void SetCoachingDifficultyKey(string key)
+    {
+        coachingDifficultyKey = string.IsNullOrEmpty(key) ? "standard" : key;
+        if (poseScorer == null) poseScorer = FindObjectOfType<PoseScorer>(true);
+        if (poseScorer != null) poseScorer.SetCoachingDifficultyKey(coachingDifficultyKey);
     }
 
     /// <summary>

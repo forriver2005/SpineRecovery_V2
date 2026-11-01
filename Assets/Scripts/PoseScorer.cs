@@ -338,6 +338,7 @@ public partial class PoseScorer : MonoBehaviour
     [Tooltip("难度配置 - 如果为空则使用下方的默认值")]
     [SerializeField] private DifficultyConfig stabilityDifficultyConfig;
     [SerializeField] private DifficultyConfig scoringDifficultyConfig;
+    private string coachingDifficultyKeyOverride;
 
     [Header("Legacy Stability Settings")]
     [Tooltip("Legacy serialized bones retained for scene compatibility; continuous coach observation does not wait for stillness.")]
@@ -686,6 +687,17 @@ public partial class PoseScorer : MonoBehaviour
             scoringDifficultyConfig = config;
             Debug.Log($"PoseScorer: 评分难度已设置 - 最大误差={config.maxAngleError}°, 完美阈值={config.perfectAngleThreshold}°");
         }
+    }
+
+    public void SetCoachingDifficultyKey(string key)
+    {
+        coachingDifficultyKeyOverride = string.IsNullOrEmpty(key) ? "standard" : key;
+        DifficultyLevel level = coachingDifficultyKeyOverride == "simple"
+            ? DifficultyLevel.Relaxed
+            : coachingDifficultyKeyOverride == "hard" ? DifficultyLevel.Strict : DifficultyLevel.Medium;
+        DifficultyConfig config = DifficultySettings.CreateBuiltInConfig(level);
+        SetStabilityDifficulty(config);
+        SetScoringDifficulty(config);
     }
 
     /// <summary>

@@ -70,7 +70,7 @@ public partial class PoseScorer
             return false;
         }
 
-        bool isInsideEnterBand = progress >= 0.88f && progress <= 1.12f;
+        bool isInsideEnterBand = progress >= lumbarTeachingProfile.feedbackEnterMin && progress <= lumbarTeachingProfile.feedbackEnterMax;
 
         if (!lumbarPositiveHighlightCandidateActive)
         {
@@ -91,7 +91,7 @@ public partial class PoseScorer
             Time.deltaTime,
             0f,
             0.1f);
-        if (lumbarPositiveHighlightStableSeconds >= 0.2f)
+        if (lumbarPositiveHighlightStableSeconds >= lumbarTeachingProfile.feedbackStableSeconds)
         {
             lumbarPositiveHighlightConfirmed = true;
         }
@@ -175,12 +175,12 @@ public partial class PoseScorer
             }
 
             bool active = lumbarTargetHapticCandidates.Contains(location);
-            if (!active && (progress < 0.88f || progress > 1.12f))
+            if (!active && (progress < lumbarTeachingProfile.feedbackEnterMin || progress > lumbarTeachingProfile.feedbackEnterMax))
             {
                 lumbarTargetHapticStableSeconds.Remove(location);
                 continue;
             }
-            if (active && (progress < 0.78f || progress > 1.22f))
+            if (active && (progress < lumbarTeachingProfile.feedbackReleaseMin || progress > lumbarTeachingProfile.feedbackReleaseMax))
             {
                 lumbarTargetHapticCandidates.Remove(location);
                 lumbarTargetHapticStableSeconds.Remove(location);
@@ -192,7 +192,7 @@ public partial class PoseScorer
                 location,
                 out float stableSeconds);
             stableSeconds += Mathf.Clamp(Time.deltaTime, 0f, 0.1f);
-            if (stableSeconds < 0.18f)
+            if (stableSeconds < Mathf.Max(0.16f, lumbarTeachingProfile.feedbackStableSeconds - 0.04f))
             {
                 lumbarTargetHapticStableSeconds[location] = stableSeconds;
                 continue;

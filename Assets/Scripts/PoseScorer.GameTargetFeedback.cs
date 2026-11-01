@@ -76,16 +76,16 @@ public partial class PoseScorer
             coachingRhythmPoseJudge = gameObject.AddComponent<RhythmPoseJudge>();
             coachingRhythmPoseJudge.ConfigurePoseScorer(coachingGamePoseScorer);
         }
-    }
-
-    void UpdateDeadBugBirdDogGameTargets()
-    {
-        EnsureCoachingDeadBugPredicate();
         coachingGamePoseScorer.ConfigureExternalCoaching(
             coachAnimator,
             userAnimator,
             guidanceInputIsFresh,
             GetCoachingDifficultyKey());
+    }
+
+    void UpdateDeadBugBirdDogGameTargets()
+    {
+        EnsureCoachingDeadBugPredicate();
         coachingGamePoseScorer.SetExternalCoachingInputFresh(guidanceInputIsFresh);
         coachingGamePoseScorer.EvaluateExternalCoachingFrame(Time.deltaTime);
 
@@ -324,6 +324,10 @@ public partial class PoseScorer
 
     string GetCoachingDifficultyKey()
     {
+        if (!string.IsNullOrEmpty(coachingDifficultyKeyOverride))
+        {
+            return coachingDifficultyKeyOverride;
+        }
         CoachActionController action = FindObjectOfType<CoachActionController>(true);
         if (action != null)
         {

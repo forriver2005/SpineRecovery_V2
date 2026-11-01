@@ -271,11 +271,14 @@ public sealed class CoachingActionLibrary : MonoBehaviour
 
         switch (entry.id)
         {
+            case "hip_thrust": return "HipThrustPractice";
             case "clip_09": return "HipThrustPractice";
             case "clip_10":
             case "clip_11":
             case "clip_13": return LumbarCoachMode.ForAction("side_bridge")?.sceneName;
+            case "dead_bug": return "DeadBugPractice";
             case "clip_29": return "DeadBugPractice";
+            case "bird_dog": return "BirdDogPractice";
             case "clip_30": return "BirdDogPractice";
             default: return null;
         }
@@ -296,9 +299,6 @@ public sealed class CoachingActionLibrary : MonoBehaviour
         startPracticeButton.targetGraphic.color = available
             ? new Color(0.10f, 0.38f, 0.31f, 0.98f)
             : new Color(0.28f, 0.28f, 0.28f, 0.95f);
-        if (!available) statusText.text = string.IsNullOrEmpty(sceneName)
-            ? "该动作暂无对应的教练模式场景"
-            : "对应的教练模式场景不可用";
     }
 
     private void StartSelectedPractice()
@@ -352,7 +352,7 @@ public sealed class CoachingActionLibrary : MonoBehaviour
         {
             cards[i].color = i == selectedIndex ? selectedColor : cardColor;
         }
-        selectedName.text = entries[index].displayName;
+        selectedName.text = "";
         statusText.text = "";
         RefreshStartPracticeButton();
 

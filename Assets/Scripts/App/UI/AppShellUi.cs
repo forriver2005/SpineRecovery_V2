@@ -1498,7 +1498,8 @@ namespace SpineRecovery.App
             coach = SpineFlowTrainingSession.ResolveSceneForGender(coach, male);
             LaunchPlan(new TrainingPlan
             {
-                accountId = user.accountId, patientId = user.profile.patientId ?? user.accountId,
+                accountId = user.accountId,
+                patientId = string.IsNullOrWhiteSpace(user.profile.patientId) ? user.accountId : user.profile.patientId,
                 gender = male ? "male" : "female", actionId = actionId, targetScene = coach,
                 preTrainingEventId = user.preTrainingEventId,
                 actions = new[]

@@ -1,0 +1,1758 @@
+using UnityEngine;
+using UnityEngine.EventSystems;
+using UnityEngine.InputSystem.UI;
+using UnityEngine.UI;
+using UnityEngine.SceneManagement;
+using System.Collections.Generic;
+using System.Linq;
+
+namespace SpineRecovery.App
+{
+    public sealed partial class AppShellUi : MonoBehaviour
+    {
+        private AppBootstrap bootstrap;
+        private Canvas appCanvas;
+        private Camera shellCamera;
+        private bool nativeBusy;
+        private string previewActivationCode;
+        private int loginGeneration;
+        private bool auxiliaryPageOpen;
+        private AppRoute auxiliaryReturnRoute;
+        private RectTransform safeContent;
+        private Rect lastSafeArea;
+        private Text loginMessage;
+        private Text homeMessage;
+        private Text trackingMessage;
+        private Text adminMessage;
+        private Text historyMessage;
+        private Text postTrainingMessage;
+        private Text activationMessage;
+        private Text routineMessage;
+        private Text routinePainLabel;
+        private Text arTrainingMessage;
+        private Text trainingMenuMessage;
+        private EventSystem appEventSystem;
+        private Button trackingCompleteButton;
+        private InputField accountInput;
+        private InputField passwordInput;
+        private InputField registerAccountInput;
+        private InputField registerPasswordInput;
+        private InputField registerConfirmInput;
+        private InputField activationCodeInput;
+        private InputField[] profileInputs;
+        private Text flowMessage;
+        private Text painScoreLabel;
+        private Text surveySelectionLabel;
+        private Text selectedPainPartLabel;
+        private Text preTrainingPainLabel;
+        private Button[] situationButtons;
+        private Button[] symptomButtons;
+        private Button[] preTrainingSymptomButtons;
+        private Button[] genderButtons;
+        private Button[] painPartButtons;
+        private Button noPainButton;
+        private Button[] flexionResponseButtons;
+        private Button[] extensionResponseButtons;
+        private Button[] flexionPhaseButtons;
+        private Button[] extensionPhaseButtons;
+        private Button[] postTrainingFeelingButtons;
+        private Button[] postTrainingDifficultyButtons;
+        private Button[] routineSymptomButtons;
+        private readonly Dictionary<AppRoute, Text> flowMessages = new Dictionary<AppRoute, Text>();
+        private int selectedPain = 3;
+        private int flexionAdmissionPain;
+        private int extensionAdmissionPain;
+        private bool painFree;
+        private bool flexionPainRated;
+        private bool extensionPainRated;
+        private int flexionCompletedCount, extensionCompletedCount;
+        private string selectedGender = "";
+        private string selectedSituation = "";
+        private string selectedSymptom = "";
+        private string selectedPreTrainingSymptom = "";
+        private string selectedPainPart = "";
+        private string flexionResponse;
+        private string extensionResponse;
+        private string flexionPainPhase;
+        private string extensionPainPhase;
+        private readonly List<string> selectedPainParts = new List<string>();
+        private readonly Dictionary<string, int> painLevelsByPart = new Dictionary<string, int>();
+        private string postTrainingFeeling = "";
+        private string postTrainingDifficulty = "";
+        private int routinePain;
+        private string routineSymptom = "";
+
+        private void Start()
+        {
+            AppBootstrap sceneBootstrap = GetComponent<AppBootstrap>();
+            if (AppBootstrap.Instance != null && AppBootstrap.Instance != sceneBootstrap)
+            {
+                return;
+            }
+
+            bootstrap = AppBootstrap.Instance ?? GetComponent<AppBootstrap>();
+            if (bootstrap == null)
+            {
+                bootstrap = gameObject.AddComponent<AppBootstrap>();
+            }
+
+            SceneManager.sceneLoaded += HandleSceneLoaded;
+            bootstrap.State.SessionChanged += HandleSessionChanged;
+            EnsureEventSystem();
+            EnsureCameraIfNeeded();
+            ScreenOrientationService.SetPortrait();
+            appCanvas = CreateCanvas(transform);
+            GameObject safe = new GameObject("SafeArea", typeof(RectTransform));
+            safe.transform.SetParent(appCanvas.transform, false);
+            safeContent = safe.GetComponent<RectTransform>();
+            ApplySafeArea();
+            GameObject loginPanel = CreateLoginPanel(safeContent);
+            GameObject registerPanel = CreateRegisterPanel(safeContent);
+            GameObject activationPanel = CreateActivationPanel(safeContent);
+            GameObject homePanel = CreateHomePanel(safeContent);
+            GameObject arTrainingPanel = CreateArTrainingPanel(safeContent);
+            GameObject trainingMenuPanel = CreateTrainingMenuPanel(safeContent);
+            GameObject trackingPanel = CreateTrackingCalibrationPanel(safeContent);
+            GameObject profilePanel = CreateFormPanel(safeContent, "资料登记", "请填写基本资料（年龄 10–100，身高 120–220 cm，体重 35–200 kg）", CreateProfileForm);
+            GameObject surveyPanel = CreateFormPanel(safeContent, "基础问卷", "选择最符合当前情况的一项；如出现危险症状请暂停并联系专业人员。", CreateSurveyForm);
+            GameObject painPanel = CreateFormPanel(safeContent, "疼痛记录", "选择疼痛部位并记录 1–10 分；没有疼痛可选择“无疼痛”。", CreatePainForm);
+            GameObject admissionPanel = CreateFormPanel(safeContent, "首次动作评估", "仅记录体验，不用于诊断。若疼痛明显加重或达到 8/10，请停止并寻求专业评估。", CreateAdmissionForm);
+            GameObject reviewPanel = CreateFormPanel(safeContent, "需要专业评估", "根据当前记录，系统暂停自助训练。请联系医疗专业人员；该结果不是诊断。", CreateReviewForm);
+            GameObject preTrainingPanel = CreateFormPanel(safeContent, "训练前检查", "每次训练前记录当前疼痛和症状变化。", CreatePreTrainingForm);
+            GameObject adminPanel = CreateAdminPanel(safeContent);
+            GameObject historyPanel = CreateHistoryPanel(safeContent);
+            GameObject postTrainingPanel = CreatePostTrainingPanel(safeContent);
+            GameObject routinePanel = CreateRoutineQuestionnairePanel(safeContent);
+
+            bootstrap.Router.Initialize(bootstrap.State);
+            bootstrap.Router.RegisterPanel(AppRoute.Login, loginPanel);
+            bootstrap.Router.RegisterPanel(AppRoute.Register, registerPanel);
+            bootstrap.Router.RegisterPanel(AppRoute.Activation, activationPanel);
+            bootstrap.Router.RegisterPanel(AppRoute.Home, homePanel);
+            bootstrap.Router.RegisterPanel(AppRoute.Training, arTrainingPanel);
+            bootstrap.Router.RegisterPanel(AppRoute.TrainingPreparation, trainingMenuPanel);
+            bootstrap.Router.RegisterPanel(AppRoute.TrackingCalibration, trackingPanel);
+            bootstrap.Router.RegisterPanel(AppRoute.BasicProfile, profilePanel);
+            bootstrap.Router.RegisterPanel(AppRoute.BasicSurvey, surveyPanel);
+            bootstrap.Router.RegisterPanel(AppRoute.PainSelect, painPanel);
+            bootstrap.Router.RegisterPanel(AppRoute.MobileAdmission, admissionPanel);
+            bootstrap.Router.RegisterPanel(AppRoute.AdmissionDecision, reviewPanel);
+            bootstrap.Router.RegisterPanel(AppRoute.PreTraining, preTrainingPanel);
+            bootstrap.Router.RegisterPanel(AppRoute.Admin, adminPanel);
+            bootstrap.Router.RegisterPanel(AppRoute.History, historyPanel);
+            bootstrap.Router.RegisterPanel(AppRoute.PostTrainingSurvey, postTrainingPanel);
+            bootstrap.Router.RegisterPanel(AppRoute.RoutineQuestionnaire, routinePanel);
+        }
+
+        public void ShowAppShell()
+        {
+            if (appCanvas != null)
+            {
+                appCanvas.gameObject.SetActive(true);
+            }
+            EnsureEventSystem();
+            EnsureCameraIfNeeded();
+            if (shellCamera != null) shellCamera.enabled = true;
+            SetAppEventSystemEnabled(true);
+
+            if (bootstrap != null && bootstrap.State.Session != null && homeMessage != null)
+            {
+                RefreshHomeSummary();
+            }
+        }
+
+        private void HandleSceneLoaded(Scene scene, LoadSceneMode mode)
+        {
+            if (mode == LoadSceneMode.Additive) return;
+            if (scene.name != "AppShell") { HideAppShell(); return; }
+            ShowAppShell();
+            AppRoute route = bootstrap.State.Session == null ? AppRoute.Login :
+                auxiliaryPageOpen ? auxiliaryReturnRoute : AppRoute.Home;
+            bool auxiliary = auxiliaryPageOpen;
+            auxiliaryPageOpen = false;
+            bootstrap.Router.Navigate(route);
+            if (!auxiliary) bootstrap.Training.RestoreForCurrentUser();
+        }
+
+        private void Update()
+        {
+            if (safeContent != null && Screen.safeArea != lastSafeArea) ApplySafeArea();
+        }
+
+        private void ApplySafeArea()
+        {
+            if (safeContent == null || Screen.width <= 0 || Screen.height <= 0) return;
+            Rect area = Screen.safeArea;
+            lastSafeArea = area;
+            safeContent.anchorMin = new Vector2(area.xMin / Screen.width, area.yMin / Screen.height);
+            safeContent.anchorMax = new Vector2(area.xMax / Screen.width, area.yMax / Screen.height);
+            safeContent.offsetMin = safeContent.offsetMax = Vector2.zero;
+        }
+
+        private void HideAppShell()
+        {
+            if (appCanvas != null) appCanvas.gameObject.SetActive(false);
+            if (shellCamera != null) shellCamera.enabled = false;
+            SetAppEventSystemEnabled(false);
+        }
+
+        private void HandleSessionChanged(UserSession session)
+        {
+            if (session == null)
+            {
+                loginGeneration++;
+                NativeMobileService.Call("logout");
+            }
+        }
+
+        private void OnDestroy()
+        {
+            SceneManager.sceneLoaded -= HandleSceneLoaded;
+            if (bootstrap != null) bootstrap.State.SessionChanged -= HandleSessionChanged;
+        }
+
+        private void RefreshHomeSummary()
+        {
+            if (bootstrap == null || bootstrap.State == null || bootstrap.State.Session == null || homeMessage == null)
+                return;
+
+            UserSession session = bootstrap.State.Session;
+            string identity = "当前用户：" + session.accountId + (session.IsReturningUser ? "（回访用户）" : "（新用户）");
+            if (session.IsAdministrator)
+            {
+                homeMessage.text = identity;
+                return;
+            }
+
+            AdminTrainingConfiguration config = bootstrap.AdminConfigs?.CurrentPublished();
+            AdminActionDefinition[] recommended = config?.RecommendedActions(session.userTags);
+            string tagText = session.userTags == null || session.userTags.Length == 0
+                ? "暂无用户标签"
+                : "用户标签：" + string.Join("、", session.userTags);
+            string recommendation = recommended == null || recommended.Length == 0
+                ? "当前暂无匹配的推荐动作"
+                : "推荐动作：" + string.Join("、", recommended.Select(action => action.displayName));
+            string routineReminder = NativeMobileService.Available
+                ? "\n例行问卷可在线刷新医生安排"
+                : "";
+            homeMessage.text = identity + "\n" + tagText + "\n" + (NativeMobileService.Available ? "开始训练时获取本次医生处方" : recommendation) + routineReminder;
+        }
+
+        private static bool RoutineQuestionnaireDue(UserSession session)
+        {
+            if (session == null || string.IsNullOrWhiteSpace(session.routineQuestionnaireCompletedAt)) return true;
+            if (!System.DateTimeOffset.TryParse(session.routineQuestionnaireCompletedAt, out System.DateTimeOffset completedAt)) return true;
+            return System.DateTimeOffset.UtcNow - completedAt >= System.TimeSpan.FromHours(24);
+        }
+
+        private GameObject CreateLoginPanel(Transform parent)
+        {
+            GameObject panel = CreatePanel("LoginPanel", parent, new Color(0.973f, 0.980f, 1f));
+            CreateLabel(panel.transform, "Spine Recovery", new Vector2(0, 230), 30);
+            CreateLabel(panel.transform, "脊柱康复训练", new Vector2(0, 170), 16);
+            CreateLabel(panel.transform, "使用您的患者账号登录，训练记录按账号保存。", new Vector2(0, 110), 14);
+            accountInput = CreateInput(panel.transform, "账号", new Vector2(0, 30), false);
+            passwordInput = CreateInput(panel.transform, "密码", new Vector2(0, -45), true);
+            CreateButton(panel.transform, "登录", new Vector2(0, -130), HandleLoginClicked);
+            CreateButton(panel.transform, "注册新账号", new Vector2(0, -200), () => bootstrap.Router.Navigate(AppRoute.Register));
+            loginMessage = CreateLabel(panel.transform, "", new Vector2(0, -265), 14);
+            return panel;
+        }
+
+        private GameObject CreateRegisterPanel(Transform parent)
+        {
+            GameObject panel = CreatePanel("RegisterPanel", parent, new Color(0.973f, 0.980f, 1f));
+            CreateLabel(panel.transform, "注册账号", new Vector2(0, 250), 30);
+            CreateLabel(panel.transform, "创建账号后可以绑定激活档案。", new Vector2(0, 195), 16);
+            registerAccountInput = CreateInput(panel.transform, "设置账号", new Vector2(0, 115), false);
+            registerPasswordInput = CreateInput(panel.transform, "设置密码", new Vector2(0, 40), true);
+            registerConfirmInput = CreateInput(panel.transform, "再次输入密码", new Vector2(0, -35), true);
+            CreateButton(panel.transform, "注册并继续激活", new Vector2(0, -125), HandleRegisterClicked);
+            CreateButton(panel.transform, "返回登录", new Vector2(0, -195), () => bootstrap.Router.Navigate(AppRoute.Login));
+            return panel;
+        }
+
+        private GameObject CreateActivationPanel(Transform parent)
+        {
+            GameObject panel = CreatePanel("ActivationPanel", parent, new Color(0.973f, 0.980f, 1f));
+            CreateLabel(panel.transform, "激活档案", new Vector2(0, 220), 30);
+            CreateLabel(panel.transform, "请输入医生建档时提供的 11 位手机号激活码。", new Vector2(0, 165), 16);
+            activationCodeInput = CreateInput(panel.transform, "激活码（11位手机号）", new Vector2(0, 80), false);
+            activationMessage = CreateLabel(panel.transform, "本地演示会保存绑定状态；正式环境可替换为服务器预览/核销。", new Vector2(0, 15), 14);
+            activationMessage.rectTransform.sizeDelta = new Vector2(760, 70);
+            CreateButton(panel.transform, "确认绑定", new Vector2(0, -75), HandleActivationClicked);
+            CreateButton(panel.transform, "跳过，稍后激活", new Vector2(0, -145), SkipActivation);
+            CreateButton(panel.transform, "返回登录", new Vector2(0, -215), () => bootstrap.State.ClearSession());
+            return panel;
+        }
+
+        private GameObject CreateRoutineQuestionnairePanel(Transform parent)
+        {
+            return CreateServerRoutinePanel(parent);
+        }
+
+        private GameObject CreateHomePanel(Transform parent)
+        {
+            GameObject panel = CreatePanel("HomePanel", parent, new Color(0.973f, 0.980f, 1f));
+            CreateLabel(panel.transform, "训练首页", new Vector2(0, 450), 30);
+            homeMessage = CreateLabel(panel.transform, "", new Vector2(0, 300), 18);
+            homeMessage.rectTransform.sizeDelta = new Vector2(860, 170);
+            CreateButton(panel.transform, "追踪器连接与校准", new Vector2(0, 75), () => bootstrap.Router.Navigate(AppRoute.TrackingCalibration));
+            CreateButton(panel.transform, "进入 AR 训练", new Vector2(0, 0), () => bootstrap.Router.Navigate(AppRoute.Training));
+            CreateButton(panel.transform, "激活档案", new Vector2(0, -75), () => bootstrap.Router.Navigate(AppRoute.Activation));
+            CreateButton(panel.transform, "例行问卷", new Vector2(0, -150), ShowRoutineQuestionnaire);
+            CreateButton(panel.transform, "训练历史", new Vector2(0, -225), ShowHistory);
+            CreateButton(panel.transform, "同步训练记录", new Vector2(0, -300), RequestSync);
+            CreateButton(panel.transform, "检查动作包更新", new Vector2(0, -450), RequestConfigUpdate);
+            CreateButton(panel.transform, "导入旧记录与回放备份", new Vector2(0, -525), ImportLegacyArchive);
+            CreateButton(panel.transform, "退出登录", new Vector2(0, -375), () => bootstrap.State.ClearSession());
+            return panel;
+        }
+
+        private GameObject CreateArTrainingPanel(Transform parent)
+        {
+            GameObject panel = CreatePanel("ArTrainingPanel", parent, new Color(0.973f, 0.980f, 1f));
+            CreateLabel(panel.transform, "AR 训练", new Vector2(0, 250), 34);
+            CreateLabel(panel.transform, "连接投屏眼镜与 IMU 追踪器，进入本次训练流程。", new Vector2(0, 190), 17);
+            arTrainingMessage = CreateLabel(panel.transform, "建议先完成追踪器校准，再开始训练。", new Vector2(0, 130), 16);
+            arTrainingMessage.rectTransform.sizeDelta = new Vector2(820, 70);
+            // The Unity V2 scene owns the AR preparation screen and its action
+            // menu.  Enter it directly so the phone flow matches SpineFlowMobile.
+            CreateButton(panel.transform, "开始训练", new Vector2(0, 40), () => StartTraining("SpineV2Minimal", "dead_bug"));
+            CreateButton(panel.transform, "追踪器连接与校准", new Vector2(0, -50), () => bootstrap.Router.Navigate(AppRoute.TrackingCalibration));
+            CreateButton(panel.transform, "动作示范库", new Vector2(0, -140), OpenActionLibrary);
+            CreateButton(panel.transform, "返回训练首页", new Vector2(0, -230), () => bootstrap.Router.Navigate(AppRoute.Home));
+            return panel;
+        }
+
+        private GameObject CreateTrainingMenuPanel(Transform parent)
+        {
+            GameObject panel = CreatePanel("TrainingMenuPanel", parent, new Color(0.973f, 0.980f, 1f));
+            CreateLabel(panel.transform, "选择训练内容", new Vector2(0, 250), 32);
+            CreateLabel(panel.transform, "开始训练前请选择一种模式或测试项目。", new Vector2(0, 195), 17);
+            trainingMenuMessage = CreateLabel(panel.transform, "训练模式会按当前处方进入指导训练。", new Vector2(0, 135), 16);
+            trainingMenuMessage.rectTransform.sizeDelta = new Vector2(820, 70);
+            CreateButton(panel.transform, "训练模式", new Vector2(0, 55), () => StartTraining("SpineV2Minimal", "dead_bug"));
+            CreateButton(panel.transform, "动作示范库", new Vector2(0, -35), OpenActionLibrary);
+            CreateButton(panel.transform, "返回 AR 训练", new Vector2(0, -305), () => bootstrap.Router.Navigate(AppRoute.Training));
+            CreateButton(panel.transform, "回到主页", new Vector2(0, -395), () => bootstrap.Router.Navigate(AppRoute.Home));
+            return panel;
+        }
+
+        private void ImportLegacyArchive()
+        {
+            if (!NativeMobileService.Available || bootstrap.State.Session == null) return;
+            NativeMobileService.Call("openLegacyImport", bootstrap.State.Session.accountId);
+        }
+
+        private void OnApplicationFocus(bool focused)
+        {
+            if (!focused || !NativeMobileService.Available || bootstrap?.State?.Session == null) return;
+            var user = bootstrap.Users.Load(bootstrap.State.Session.accountId);
+            JsonUtility.FromJsonOverwrite(JsonUtility.ToJson(user), bootstrap.State.Session);
+            RefreshHomeSummary();
+            RefreshHistorySummary();
+        }
+
+        [System.Serializable] private sealed class ImportedReplayList { public string[] items; }
+
+        private void RequestSync()
+        {
+            NativeMobileService.Instance.Request("sync", new NativeRequest { accountId = bootstrap.State.Session?.accountId },
+                reply => { if (homeMessage != null) homeMessage.text = reply.ok ? JsonUtility.FromJson<NativeMessage>(reply.dataJson).message : reply.error; });
+        }
+
+        private void RequestConfigUpdate()
+        {
+            NativeMobileService.Instance.Request("configUpdate", new NativeRequest { accountId = bootstrap.State.Session?.accountId },
+                reply => { if (homeMessage != null) homeMessage.text = reply.ok ? JsonUtility.FromJson<NativeMessage>(reply.dataJson).message : reply.error; });
+        }
+
+        private void OpenActionLibrary()
+        {
+            if (!Application.CanStreamedLevelBeLoaded("CoachingChoose")) return;
+            auxiliaryReturnRoute = bootstrap.State.Route;
+            auxiliaryPageOpen = true;
+            HideAppShell();
+            ScreenOrientationService.SetLandscape();
+            SceneManager.LoadScene("CoachingChoose", LoadSceneMode.Single);
+        }
+
+        private void OpenReplay()
+        {
+            if (!Application.CanStreamedLevelBeLoaded("PlayBack")) return;
+            var record = (bootstrap.State.Session?.trainingHistory ?? System.Array.Empty<TrainingHistoryRecord>())
+                .Reverse().FirstOrDefault(row => !string.IsNullOrEmpty(row.replaySessionId));
+            string replayId = record?.replaySessionId;
+            if (string.IsNullOrEmpty(replayId) && NativeMobileService.Available)
+            {
+                string ids = NativeMobileService.Call<string>("importedReplayIds", bootstrap.State.Session.accountId);
+                var imported = JsonUtility.FromJson<ImportedReplayList>("{\"items\":" + ids + "}");
+                replayId = imported.items?.LastOrDefault();
+            }
+            if (string.IsNullOrEmpty(replayId))
+            { historyMessage.text = "暂无本账号已完成的回放。"; return; }
+            ReplaySessionContext.SetCommitted(replayId);
+            auxiliaryReturnRoute = AppRoute.History;
+            auxiliaryPageOpen = true;
+            HideAppShell();
+            ScreenOrientationService.SetLandscape();
+            SceneManager.LoadScene("PlayBack", LoadSceneMode.Single);
+        }
+
+        private GameObject CreateAdminPanel(Transform parent)
+        {
+            GameObject panel = CreatePanel("AdminPanel", parent, new Color(0.973f, 0.980f, 1f));
+            CreateLabel(panel.transform, "管理员配置（只读）", new Vector2(0, 220), 28);
+            adminMessage = CreateLabel(panel.transform, "", new Vector2(0, 80), 16);
+            adminMessage.rectTransform.sizeDelta = new Vector2(900, 260);
+            CreateButton(panel.transform, "刷新已发布配置", new Vector2(0, -80), RefreshAdminSummary);
+            CreateButton(panel.transform, "从当前版本创建草稿", new Vector2(0, -155), CreateAdminDraft);
+            CreateButton(panel.transform, "标记 AR 测试通过", new Vector2(0, -230), MarkAdminArTestPassed);
+            CreateButton(panel.transform, "发布当前草稿", new Vector2(0, -305), PublishAdminDraft);
+            CreateButton(panel.transform, "回滚到最近归档版本", new Vector2(0, -380), RollbackAdminVersion);
+            CreateButton(panel.transform, "返回登录", new Vector2(0, -455), () => bootstrap.State.ClearSession());
+            return panel;
+        }
+
+        private GameObject CreateHistoryPanel(Transform parent)
+        {
+            GameObject panel = CreatePanel("HistoryPanel", parent, new Color(0.973f, 0.980f, 1f));
+            CreateLabel(panel.transform, "训练历史", new Vector2(0, 700), 28);
+            var scrollObject = new GameObject("HistoryScroll", typeof(RectTransform), typeof(Image), typeof(ScrollRect));
+            scrollObject.transform.SetParent(panel.transform, false);
+            var rect = scrollObject.GetComponent<RectTransform>();
+            rect.sizeDelta = new Vector2(900, 850);
+            rect.anchoredPosition = new Vector2(0, 170);
+            scrollObject.GetComponent<Image>().color = new Color(1, 1, 1, 0.01f);
+            var viewportObject = new GameObject("Viewport", typeof(RectTransform), typeof(RectMask2D));
+            viewportObject.transform.SetParent(scrollObject.transform, false);
+            var viewport = viewportObject.GetComponent<RectTransform>();
+            viewport.anchorMin = Vector2.zero; viewport.anchorMax = Vector2.one;
+            viewport.offsetMin = viewport.offsetMax = Vector2.zero;
+            historyMessage = CreateLabel(viewport, "", Vector2.zero, 16);
+            historyMessage.rectTransform.anchorMin = historyMessage.rectTransform.anchorMax = new Vector2(0.5f, 1);
+            historyMessage.rectTransform.pivot = new Vector2(0.5f, 1);
+            historyMessage.rectTransform.sizeDelta = new Vector2(840, 0);
+            historyMessage.alignment = TextAnchor.UpperLeft;
+            historyMessage.verticalOverflow = VerticalWrapMode.Overflow;
+            historyMessage.gameObject.AddComponent<ContentSizeFitter>().verticalFit = ContentSizeFitter.FitMode.PreferredSize;
+            var scroll = scrollObject.GetComponent<ScrollRect>();
+            scroll.viewport = viewport; scroll.content = historyMessage.rectTransform;
+            scroll.horizontal = false; scroll.movementType = ScrollRect.MovementType.Clamped;
+            CreateButton(panel.transform, "查看最近完成的回放", new Vector2(0, -350), OpenReplay);
+            CreateButton(panel.transform, "返回训练首页", new Vector2(0, -450), () => bootstrap.Router.Navigate(AppRoute.Home));
+            return panel;
+        }
+
+        private GameObject CreatePostTrainingPanel(Transform parent)
+        {
+            GameObject panel = CreatePanel("PostTrainingPanel", parent, new Color(0.973f, 0.980f, 1f));
+            CreateLabel(panel.transform, "训练后反馈", new Vector2(0, 220), 30);
+            CreateLabel(panel.transform, "请确认本次训练是否完整完成，并记录训练后的感受。", new Vector2(0, 165), 16);
+            postTrainingMessage = CreateLabel(panel.transform, "请选择反馈后提交。", new Vector2(0, 110), 16);
+            postTrainingFeelingButtons = new[]
+            {
+                CreateButton(panel.transform, "感觉：良好", new Vector2(-145, 45), () => SelectPostTrainingFeeling("良好"), 250),
+                CreateButton(panel.transform, "感觉：一般", new Vector2(145, 45), () => SelectPostTrainingFeeling("一般"), 250),
+                CreateButton(panel.transform, "感觉：不适", new Vector2(0, -25), () => SelectPostTrainingFeeling("不适"), 250),
+            };
+            postTrainingDifficultyButtons = new[]
+            {
+                CreateButton(panel.transform, "难度：容易", new Vector2(-145, -105), () => SelectPostTrainingDifficulty("容易"), 250),
+                CreateButton(panel.transform, "难度：合适", new Vector2(145, -105), () => SelectPostTrainingDifficulty("合适"), 250),
+                CreateButton(panel.transform, "难度：困难", new Vector2(0, -175), () => SelectPostTrainingDifficulty("困难"), 250),
+            };
+            CreateButton(panel.transform, "提交并查看结果", new Vector2(0, -265), SubmitPostTrainingFeedback);
+            CreateButton(panel.transform, "稍后填写", new Vector2(0, -335), AbortPostTrainingFeedback);
+            return panel;
+        }
+
+        public void ShowPostTrainingSurvey()
+        {
+            postTrainingFeeling = "";
+            postTrainingDifficulty = "";
+            RefreshPostTrainingChoiceColors();
+            if (postTrainingMessage != null) postTrainingMessage.text = bootstrap.Training.CurrentResult?.completed == true
+                ? "训练结果已保存，请记录感受。" : "本次训练已中断，已有结果已保存，请记录感受。";
+            if (bootstrap != null && bootstrap.Router != null)
+                bootstrap.Router.Navigate(AppRoute.PostTrainingSurvey);
+        }
+
+        private void SelectPostTrainingFeeling(string value)
+        {
+            postTrainingFeeling = value;
+            RefreshPostTrainingChoiceColors();
+            if (postTrainingMessage != null) postTrainingMessage.text = "训练感受：" + value +
+                (string.IsNullOrEmpty(postTrainingDifficulty) ? "；请选择训练难度。" : "；训练难度：" + postTrainingDifficulty);
+        }
+
+        private void SelectPostTrainingDifficulty(string value)
+        {
+            postTrainingDifficulty = value;
+            RefreshPostTrainingChoiceColors();
+            if (postTrainingMessage != null) postTrainingMessage.text =
+                (string.IsNullOrEmpty(postTrainingFeeling) ? "请选择训练感受" : "训练感受：" + postTrainingFeeling) + "；训练难度：" + value;
+        }
+
+        private void RefreshPostTrainingChoiceColors()
+        {
+            RefreshChoiceColors(postTrainingFeelingButtons,
+                postTrainingFeeling == "良好" ? 0 : postTrainingFeeling == "一般" ? 1 : postTrainingFeeling == "不适" ? 2 : -1,
+                new Color(0.08f, 0.28f, 0.70f));
+            RefreshChoiceColors(postTrainingDifficultyButtons,
+                postTrainingDifficulty == "容易" ? 0 : postTrainingDifficulty == "合适" ? 1 : postTrainingDifficulty == "困难" ? 2 : -1,
+                new Color(0.08f, 0.28f, 0.70f));
+        }
+
+        private void SubmitPostTrainingFeedback()
+        {
+            if (string.IsNullOrEmpty(postTrainingFeeling) || string.IsNullOrEmpty(postTrainingDifficulty))
+            {
+                if (postTrainingMessage != null) postTrainingMessage.text = "请先选择训练感受和训练难度。";
+                return;
+            }
+
+            bootstrap.Training.SubmitFeedback(postTrainingFeeling, postTrainingDifficulty);
+            RefreshHistorySummary();
+            bootstrap.Router.Navigate(AppRoute.History);
+        }
+
+        private void AbortPostTrainingFeedback()
+        {
+            bootstrap.Training.DeferFeedback();
+            bootstrap.Router.Navigate(AppRoute.Home);
+        }
+
+        private void ShowHistory()
+        {
+            RefreshHistorySummary();
+            bootstrap.Router.Navigate(AppRoute.History);
+        }
+
+        private void HandleRegisterClicked()
+        {
+            if (registerAccountInput == null || registerPasswordInput == null || registerConfirmInput == null) return;
+            if (string.IsNullOrWhiteSpace(registerAccountInput.text) || string.IsNullOrWhiteSpace(registerPasswordInput.text))
+            {
+                loginMessage.text = "注册失败：账号和密码不能为空。";
+                bootstrap.Router.Navigate(AppRoute.Login);
+                return;
+            }
+            if (registerPasswordInput.text != registerConfirmInput.text)
+            {
+                loginMessage.text = "注册失败：两次输入的密码不一致。";
+                bootstrap.Router.Navigate(AppRoute.Login);
+                return;
+            }
+            AccountRegistrationResult result = bootstrap.Users.TryRegister(registerAccountInput.text, registerPasswordInput.text, out UserSession session);
+            if (result != AccountRegistrationResult.Success)
+            {
+                loginMessage.text = result == AccountRegistrationResult.AccountAlreadyExists
+                    ? "注册失败：账号已存在。" : "注册失败：请检查账号和密码。";
+                bootstrap.Router.Navigate(AppRoute.Login);
+                return;
+            }
+            bootstrap.State.SetSession(session);
+            bootstrap.Training.RestoreForCurrentUser();
+            activationCodeInput.text = "";
+            activationMessage.text = "账号已创建，请绑定医生激活码，或选择稍后激活。";
+            bootstrap.Router.Navigate(AppRoute.Activation);
+        }
+
+        private void HandleActivationClicked()
+        {
+            if (nativeBusy || bootstrap.State.Session == null) return;
+            string code = activationCodeInput.text.Trim();
+            string account = bootstrap.State.Session.accountId;
+            bool confirmed = previewActivationCode == code;
+            nativeBusy = true;
+            activationMessage.text = confirmed ? "正在绑定医生档案…" : "正在核对档案…";
+            NativeMobileService.Instance.Request(confirmed ? "activate" : "previewActivation",
+                new NativeRequest { accountId = account, code = code }, reply =>
+                {
+                    nativeBusy = false;
+                    if (bootstrap.State.Session?.accountId != account) return;
+                    if (!reply.ok) { activationMessage.text = reply.error; return; }
+                    if (!confirmed)
+                    {
+                        previewActivationCode = code;
+                        activationMessage.text = JsonUtility.FromJson<NativeMessage>(reply.dataJson).message + "；确认是本人后再次点击绑定。";
+                        return;
+                    }
+                    previewActivationCode = null;
+                    bootstrap.State.SetSession(JsonUtility.FromJson<UserSession>(reply.dataJson));
+                    activationMessage.text = "医生档案绑定成功。";
+                    bootstrap.Router.Navigate(bootstrap.State.Session.profile.ageYears > 0 ? AppRoute.Home : AppRoute.BasicProfile);
+                });
+        }
+
+        [System.Serializable]
+        private sealed class NativeMessage { public string message; }
+
+        private void SkipActivation()
+        {
+            UserSession session = bootstrap.State.Session;
+            bootstrap.Router.Navigate(session != null && session.profile.ageYears > 0 ? AppRoute.Home : AppRoute.BasicProfile);
+        }
+
+        private void ShowRoutineQuestionnaire()
+        {
+            bootstrap.Router.Navigate(AppRoute.RoutineQuestionnaire);
+            RefreshServerRoutine();
+        }
+
+        private void ChangeRoutinePain(int delta)
+        {
+            routinePain = Mathf.Clamp(routinePain + delta, 0, 10);
+            if (routinePainLabel != null) routinePainLabel.text = "当前疼痛评分：" + routinePain + " / 10";
+        }
+
+        private void SelectRoutineSymptom(string value)
+        {
+            routineSymptom = value;
+            RefreshRoutineSymptomSelection();
+        }
+
+        private void RefreshRoutineSymptomSelection()
+        {
+            int selected = routineSymptom == "stable" ? 0 : routineSymptom == "slightly_worse" ? 1 : routineSymptom == "worse" ? 2 : -1;
+            RefreshChoiceColors(routineSymptomButtons, selected, new Color(0.08f, 0.28f, 0.70f));
+        }
+
+        private void SaveRoutineQuestionnaire()
+        {
+            UserSession session = bootstrap.State.Session;
+            if (session == null || string.IsNullOrEmpty(routineSymptom))
+            {
+                if (routineMessage != null) routineMessage.text = "请选择症状变化后再保存。";
+                return;
+            }
+            session.routineQuestionnairePainLevel = routinePain;
+            session.routineQuestionnaireSymptomChange = routineSymptom;
+            session.routineQuestionnaireCompletedAt = System.DateTimeOffset.UtcNow.ToString("O");
+            session.routineQuestionnaireAnswers = "pain=" + routinePain + ";symptom=" + routineSymptom;
+            bootstrap.Users.AppendPainRecord(session, new PainHistoryRecord
+            {
+                id = "routine:" + System.DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(),
+                recordedAt = session.routineQuestionnaireCompletedAt,
+                painLevel = routinePain,
+                source = "DailyQuestionnaire",
+                painParts = session.painParts ?? System.Array.Empty<string>(),
+            });
+            if (routineMessage != null) routineMessage.text = "例行问卷已保存。";
+            bootstrap.Router.Navigate(AppRoute.Home);
+        }
+
+        [System.Serializable] private sealed class HistoryScore { public int overallScore; }
+
+        private void RefreshHistorySummary()
+        {
+            UserSession session = bootstrap.State.Session;
+            if (session == null || historyMessage == null) return;
+            var pain = session.painHistory ?? System.Array.Empty<PainHistoryRecord>();
+            var training = session.trainingHistory ?? System.Array.Empty<TrainingHistoryRecord>();
+            List<string> trainingLines = new List<string>();
+            foreach (TrainingHistoryRecord record in training)
+            {
+                string feedback = string.IsNullOrWhiteSpace(record.feedback) ? "" : "，反馈：" + record.feedback;
+                var result = string.IsNullOrEmpty(record.resultJson) ? null : JsonUtility.FromJson<HistoryScore>(record.resultJson);
+                string state = record.endReason == "LEGACY_IMPORT" ? "导入记录" : record.completed ? "完成" : string.IsNullOrEmpty(record.endReason) ? "进行中" : "中断";
+                trainingLines.Add(record.completedAt + "  " + record.actionId + "  " + state +
+                    (record.completed && result != null ? "  得分 " + result.overallScore : "") + feedback);
+            }
+            List<string> painLines = pain
+                .OrderByDescending(record => record.recordedAt)
+                .Take(8)
+                .Select(record => record.recordedAt + "  疼痛 " + record.painLevel + "/10" +
+                    (record.painParts == null || record.painParts.Length == 0 ? "" : "（" + string.Join("、", record.painParts) + "）"))
+                .ToList();
+            historyMessage.text = "疼痛记录：" + pain.Length + " 条\n" +
+                (painLines.Count == 0 ? "暂无疼痛记录。" : string.Join("\n", painLines)) + "\n\n" +
+                "训练记录：" + training.Length + " 条\n" +
+                (trainingLines.Count == 0 ? "完成训练并提交结果后，这里会显示训练记录。" :
+                    string.Join("\n", trainingLines));
+        }
+
+        private void RefreshAdminSummary()
+        {
+            if (adminMessage == null || bootstrap.AdminConfigs == null) return;
+            var config = bootstrap.AdminConfigs.CurrentPublished();
+            var actions = config.actions ?? System.Array.Empty<AdminActionDefinition>();
+            List<string> actionLines = new List<string>();
+            foreach (AdminActionDefinition action in actions)
+            {
+                actionLines.Add(action.displayName + " [" + action.actionId + "]");
+            }
+            var ruleLines = (config.recommendationRules ?? System.Array.Empty<AdminRecommendationRule>())
+                .Where(rule => rule != null && rule.enabled)
+                .OrderByDescending(rule => rule.priority)
+                .Select(rule => rule.userTag + " → " + string.Join("、", rule.actionIds ?? System.Array.Empty<string>()))
+                .ToArray();
+            adminMessage.text = "当前版本：" + config.versionName + "（" + config.state + "）\n" +
+                "配置 ID：" + config.configId + "\n" +
+                "动作：" + string.Join("、", actionLines) + "\n" +
+                "推荐规则：" + (ruleLines.Length == 0 ? "暂无" : string.Join("；", ruleLines)) + "\n" +
+                "说明：患者侧只读取 Published 配置；发布前必须完成 AR 测试。";
+        }
+
+        private AdminTrainingConfiguration LatestAdminDraft()
+        {
+            return bootstrap.AdminConfigs?.ListConfigurations()
+                .FirstOrDefault(config => config.state == AdminConfigState.Draft || config.state == AdminConfigState.ArTestPassed);
+        }
+
+        private void CreateAdminDraft()
+        {
+            if (!(bootstrap.AdminConfigs is JsonAdminConfigRepository repository)) return;
+            repository.CreateDraftFromPublished();
+            RefreshAdminSummary();
+            if (adminMessage != null) adminMessage.text += "\n已创建草稿，可先执行 AR 测试。";
+        }
+
+        private void MarkAdminArTestPassed()
+        {
+            if (!(bootstrap.AdminConfigs is JsonAdminConfigRepository repository)) return;
+            AdminTrainingConfiguration draft = LatestAdminDraft();
+            bool passed = draft != null && repository.MarkArTestPassed(draft.configId, "unity-demo-ar-proof-" + System.DateTimeOffset.UtcNow.ToUnixTimeMilliseconds());
+            RefreshAdminSummary();
+            if (adminMessage != null) adminMessage.text += passed ? "\nAR 测试已通过，可发布。" : "\n没有可测试的草稿。请先创建草稿。";
+        }
+
+        private void PublishAdminDraft()
+        {
+            if (!(bootstrap.AdminConfigs is JsonAdminConfigRepository repository)) return;
+            AdminTrainingConfiguration draft = LatestAdminDraft();
+            bool published = draft != null && repository.Publish(draft.configId);
+            RefreshAdminSummary();
+            if (adminMessage != null) adminMessage.text += published ? "\n配置已发布，患者侧将读取此版本。" : "\n发布失败：必须先完成 AR 测试。";
+        }
+
+        private void RollbackAdminVersion()
+        {
+            if (!(bootstrap.AdminConfigs is JsonAdminConfigRepository repository)) return;
+            AdminTrainingConfiguration archived = bootstrap.AdminConfigs.ListConfigurations()
+                .Where(config => config.state == AdminConfigState.Archived)
+                .OrderByDescending(config => config.updatedAt)
+                .FirstOrDefault();
+            bool rolledBack = archived != null && repository.RollbackTo(archived.configId);
+            RefreshAdminSummary();
+            if (adminMessage != null) adminMessage.text += rolledBack ? "\n已回滚到归档版本。" : "\n没有可回滚的归档版本。";
+        }
+
+        private GameObject CreateTrackingCalibrationPanel(Transform parent)
+        {
+            GameObject panel = CreatePanel("TrackingCalibrationPanel", parent, new Color(0.973f, 0.980f, 1f));
+            CreateLabel(panel.transform, "IMU 追踪器校准", new Vector2(0, 185), 28);
+            CreateLabel(panel.transform,
+                "启动内嵌 SlimeVR，按引导连接追踪器并完成校准。返回后请确认校准状态。",
+                new Vector2(0, 115), 15);
+            trackingMessage = CreateLabel(panel.transform, "校准尚未开始", new Vector2(0, 55), 15);
+            CreateButton(panel.transform, "打开 SlimeVR 校准清单", new Vector2(0, -15), OpenEmbeddedSlimeVrCalibration);
+            trackingCompleteButton = CreateButton(panel.transform, "我已完成校准，继续", new Vector2(0, -85), ConfirmTrackingCalibration);
+            trackingCompleteButton.interactable = false;
+            CreateButton(panel.transform, "返回训练首页", new Vector2(0, -155), () => bootstrap.Router.Navigate(AppRoute.Home));
+            return panel;
+        }
+
+        private void OpenEmbeddedSlimeVrCalibration()
+        {
+            int height = bootstrap.State.Session != null ? bootstrap.State.Session.profile.heightCm : 0;
+            string error;
+            if (!EmbeddedSlimeVrBridge.TryOpenCalibration(height, out error))
+            {
+                trackingMessage.text = error;
+                return;
+            }
+
+            trackingCompleteButton.interactable = true;
+            trackingMessage.text = "SlimeVR 已打开。完成校准后返回此页面，再点击确认。";
+        }
+
+        private void ConfirmTrackingCalibration()
+        {
+            if (trackingMessage != null)
+                trackingMessage.text = EmbeddedSlimeVrBridge.TryReadState(out var tracking)
+                    ? "SlimeVR：" + tracking.state + "；在线追踪器：" + tracking.trackers.Count(t => t.connected) +
+                        "；骨骼输出：" + (tracking.vmcSkeletonOutputFresh ? "正在更新" : "等待数据")
+                    : "暂时无法读取追踪器状态，可以重新打开校准页检查。";
+            bootstrap.Router.Navigate(AppRoute.Home);
+        }
+
+        private void HandleLoginClicked()
+        {
+            if (nativeBusy) return;
+            if (NativeMobileService.Available)
+            {
+                nativeBusy = true;
+                int generation = ++loginGeneration;
+                loginMessage.text = "正在登录…";
+                NativeMobileService.Instance.Request("login", new NativeRequest
+                { accountId = accountInput.text, password = passwordInput.text }, reply =>
+                {
+                    nativeBusy = false;
+                    if (generation != loginGeneration) return;
+                    if (!reply.ok) { loginMessage.text = reply.error; return; }
+                    HandleAuthenticated(JsonUtility.FromJson<UserSession>(reply.dataJson));
+                });
+                return;
+            }
+            if (!bootstrap.Users.TryAuthenticate(accountInput.text, passwordInput.text, out UserSession session))
+            { loginMessage.text = "账号或密码错误。"; return; }
+            HandleAuthenticated(session);
+        }
+
+        private void HandleAuthenticated(UserSession session)
+        {
+            bootstrap.State.SetSession(session);
+            RefreshHomeSummary();
+            AppRoute next = session.profile.ageYears <= 0 ? AppRoute.BasicProfile :
+                session.intakeReviewRequired ? AppRoute.AdmissionDecision :
+                session.IsReturningUser ? AppRoute.PreTraining :
+                !session.intakeCompleted ? AppRoute.BasicSurvey :
+                session.admissionReviewRequired ? AppRoute.AdmissionDecision :
+                !session.admissionCompleted ? AppRoute.MobileAdmission : AppRoute.PreTraining;
+            session.preTrainingCheckPassed = false;
+            bootstrap.Router.Navigate(next);
+            bootstrap.Training.RestoreForCurrentUser();
+        }
+
+        private GameObject CreateFormPanel(Transform parent, string title, string subtitle, System.Action<Transform> build)
+        {
+            GameObject panel = CreatePanel(title + "Panel", parent, new Color(0.973f, 0.980f, 1f));
+            bool admission = title == "首次动作评估";
+            Text heading = CreateLabel(panel.transform, title, new Vector2(0, admission ? 700 : 330), admission ? 36 : 28);
+            if (admission) heading.fontStyle = FontStyle.Bold;
+            Text description = CreateLabel(panel.transform, subtitle, new Vector2(0, admission ? 640 : 275), admission ? 18 : 15);
+            if (admission) description.fontStyle = FontStyle.Bold;
+            flowMessage = CreateLabel(panel.transform, "", new Vector2(0, admission ? -680 : -360), admission ? 18 : 14);
+            AppRoute route = title == "资料登记" ? AppRoute.BasicProfile : title == "基础问卷" ? AppRoute.BasicSurvey :
+                title == "疼痛记录" ? AppRoute.PainSelect : title == "首次动作评估" ? AppRoute.MobileAdmission :
+                title == "需要专业评估" ? AppRoute.AdmissionDecision : AppRoute.PreTraining;
+            flowMessages[route] = flowMessage;
+            build(panel.transform);
+            return panel;
+        }
+
+        private void CreateProfileForm(Transform parent)
+        {
+            profileInputs = new[] {
+                CreateInput(parent, "年龄（岁）", new Vector2(0, 180), false),
+                CreateInput(parent, "身高（cm）", new Vector2(0, 105), false),
+                CreateInput(parent, "体重（kg）", new Vector2(0, 30), false),
+            };
+            genderButtons = new[]
+            {
+                CreateButton(parent, "性别：男", new Vector2(-145, -50), () => SelectGender("男", 0), 250),
+                CreateButton(parent, "性别：女", new Vector2(145, -50), () => SelectGender("女", 1), 250),
+            };
+            SetSelectedChoice(genderButtons, -1);
+            CreateButton(parent, "保存并继续", new Vector2(0, -145), SaveProfile);
+        }
+
+        private void SelectGender(string gender, int selectedIndex)
+        {
+            selectedGender = gender;
+            SetSelectedChoice(genderButtons, selectedIndex);
+        }
+
+        private void SaveProfile()
+        {
+            if (!int.TryParse(profileInputs[0].text, out int age) || age < 10 || age > 100 ||
+                !int.TryParse(profileInputs[1].text, out int height) || height < 120 || height > 220 ||
+                !int.TryParse(profileInputs[2].text, out int weight) || weight < 35 || weight > 200 || string.IsNullOrEmpty(selectedGender))
+            { ShowFlowMessage("资料无效：请检查年龄、身高、体重范围并选择性别。"); return; }
+            UserSession user = bootstrap.State.Session;
+            user.profile.ageYears = age; user.profile.heightCm = height; user.profile.weightKg = weight; user.profile.gender = selectedGender;
+            bootstrap.Users.Save(user);
+            bootstrap.Router.Navigate(AppRoute.BasicSurvey);
+        }
+
+        private void CreateSurveyForm(Transform parent)
+        {
+            situationButtons = new[]
+            {
+                CreateButton(parent, "情况：预防 / 保持健康", new Vector2(0, 195), () => SelectSituation(0)),
+                CreateButton(parent, "情况：曾有相关问题", new Vector2(0, 125), () => SelectSituation(1)),
+                CreateButton(parent, "情况：目前急性不适", new Vector2(0, 55), () => SelectSituation(2)),
+            };
+            symptomButtons = new[]
+            {
+                CreateButton(parent, "症状：没感觉", new Vector2(0, -25), () => SelectSymptom(0)),
+                CreateButton(parent, "症状：腰疼 / 腿疼 / 腿麻 / 放射痛", new Vector2(0, -95), () => SelectSymptom(1)),
+                CreateButton(parent, "症状：无力（暂停流程）", new Vector2(0, -165), () => SelectSymptom(2)),
+            };
+            surveySelectionLabel = CreateLabel(parent, "当前选择：尚未选择", new Vector2(0, -315), 14);
+            CreateButton(parent, "保存并继续", new Vector2(0, -245), SaveSurvey);
+            RefreshSurveySelection();
+        }
+
+        private void SelectSituation(int index)
+        {
+            selectedSituation = index == 0 ? "prevention" : index == 1 ? "history" : "acute";
+            RefreshSurveySelection();
+        }
+
+        private void SelectSymptom(int index)
+        {
+            selectedSymptom = index == 0 ? "无感觉" : index == 1 ? "疼痛或麻木" : "无力";
+            RefreshSurveySelection();
+        }
+
+        private void RefreshSurveySelection()
+        {
+            SetSelectedChoice(situationButtons, selectedSituation == "prevention" ? 0 : selectedSituation == "history" ? 1 : selectedSituation == "acute" ? 2 : -1);
+            SetSelectedChoice(symptomButtons, selectedSymptom == "无感觉" ? 0 : selectedSymptom == "疼痛或麻木" ? 1 : selectedSymptom == "无力" ? 2 : -1);
+            if (surveySelectionLabel != null)
+                surveySelectionLabel.text = "当前选择：" + GetSituationLabel(selectedSituation) + "；" + (string.IsNullOrEmpty(selectedSymptom) ? "未选症状" : selectedSymptom);
+        }
+
+        private static string GetSituationLabel(string situation)
+        {
+            switch (situation)
+            {
+                case "prevention": return "预防 / 保持健康";
+                case "history": return "曾有相关问题";
+                case "acute": return "目前急性不适";
+                default: return "未选情况";
+            }
+        }
+
+        private static void SetSelectedChoice(Button[] choices, int selectedIndex)
+        {
+            if (choices == null) return;
+            for (int i = 0; i < choices.Length; i++)
+            {
+                if (choices[i] != null && choices[i].targetGraphic != null)
+                {
+                    Color normal = i == selectedIndex ? new Color(0.12f, 0.39f, 0.78f) : new Color(0.22f, 0.74f, 0.97f);
+                    ColorBlock colors = choices[i].colors;
+                    colors.normalColor = normal;
+                    colors.highlightedColor = i == selectedIndex ? new Color(0.18f, 0.47f, 0.86f) : new Color(0.30f, 0.78f, 0.98f);
+                    colors.pressedColor = new Color(0.10f, 0.32f, 0.68f);
+                    colors.selectedColor = normal;
+                    choices[i].colors = colors;
+                }
+            }
+        }
+
+        private void SaveSurvey()
+        {
+            if (string.IsNullOrEmpty(selectedSituation) || string.IsNullOrEmpty(selectedSymptom)) { ShowFlowMessage("请先选择当前情况和症状。"); return; }
+            UserSession user = bootstrap.State.Session;
+            user.basicSituation = selectedSituation; user.symptoms = new[] { selectedSymptom };
+            user.userTags = BuildUserTags(user);
+            if (selectedSymptom == "无力" || selectedSituation == "acute")
+            {
+                user.intakeReviewRequired = true;
+                bootstrap.Users.Save(user);
+                bootstrap.Router.Navigate(AppRoute.AdmissionDecision);
+                return;
+            }
+            bootstrap.Users.Save(user); bootstrap.Router.Navigate(AppRoute.PainSelect);
+        }
+
+        private void CreatePainForm(Transform parent)
+        {
+            string[] parts = { "左腰部", "右腰部", "左大臂", "右大臂", "左臀部", "右臀部", "左腿", "右腿" };
+            string[] keys = { "left_waist", "right_waist", "left_upper_arm", "right_upper_arm", "left_hip", "right_hip", "left_leg", "right_leg" };
+            painPartButtons = new Button[parts.Length];
+            for (int i = 0; i < parts.Length; i++)
+            {
+                string key = keys[i];
+                painPartButtons[i] = CreateButton(parent, parts[i], new Vector2((i % 2 == 0 ? -145 : 145), 185 - (i / 2) * 65), () => TogglePainPart(key), 250);
+            }
+            noPainButton = CreateButton(parent, "没有疼痛", new Vector2(0, -72), SelectNoPain);
+            selectedPainPartLabel = CreateLabel(parent, "已选部位：未选择（可多选）", new Vector2(0, -130), 15);
+            selectedPainPartLabel.rectTransform.sizeDelta = new Vector2(760, 38);
+            painScoreLabel = CreateLabel(parent, "选中部位后设置疼痛程度：3 / 10", new Vector2(0, -180), 16);
+            CreateButton(parent, "疼痛评分 −", new Vector2(-145, -238), () => ChangePainScore(-1), 250);
+            CreateButton(parent, "疼痛评分 +", new Vector2(145, -238), () => ChangePainScore(1), 250);
+            CreateButton(parent, "记录并继续", new Vector2(0, -305), SavePain);
+            flowMessage.rectTransform.anchoredPosition = new Vector2(0, -390);
+            RefreshPainSelectionUi(keys, parts);
+        }
+
+        private void SavePain()
+        {
+            if (selectedPainParts.Count == 0 && !painFree)
+            {
+                ShowFlowMessage("请选择疼痛部位，或选择“没有疼痛”。");
+                return;
+            }
+
+            UserSession user = bootstrap.State.Session;
+            user.painParts = selectedPainParts.ToArray();
+            user.painLevels = new int[selectedPainParts.Count];
+            for (int i = 0; i < selectedPainParts.Count; i++)
+                user.painLevels[i] = painLevelsByPart[selectedPainParts[i]];
+            user.painFree = painFree;
+            user.latestPainLevel = user.painLevels.Length > 0 ? Mathf.Max(user.painLevels) : 0;
+            user.userTags = BuildUserTags(user);
+            user.intakeCompleted = true;
+            bootstrap.Users.AppendPainRecord(user, new PainHistoryRecord
+            {
+                id = "intake:" + System.DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(),
+                recordedAt = System.DateTimeOffset.UtcNow.ToString("O"),
+                painLevel = user.latestPainLevel,
+                source = "AdmissionQuestionnaire",
+                painParts = user.painParts,
+            });
+            bootstrap.Router.Navigate(AppRoute.MobileAdmission);
+        }
+
+        private static string[] BuildUserTags(UserSession user)
+        {
+            if (user == null) return System.Array.Empty<string>();
+            var tags = new List<string>();
+            if (user.latestPainLevel >= 7) tags.Add("准入疼痛较高");
+            else if (user.latestPainLevel > 0 && user.latestPainLevel <= 3) tags.Add("腰部疼痛指数低");
+            if (user.flexionResponse == "relieved") tags.Add("屈曲方向偏好");
+            if (user.extensionResponse == "relieved") tags.Add("伸展方向偏好");
+            return tags.Distinct().ToArray();
+        }
+
+        private void TogglePainPart(string partKey)
+        {
+            painFree = false;
+            if (selectedPainParts.Contains(partKey) && selectedPainPart == partKey)
+            {
+                selectedPainParts.Remove(partKey);
+                painLevelsByPart.Remove(partKey);
+                selectedPainPart = selectedPainParts.Count > 0 ? selectedPainParts[selectedPainParts.Count - 1] : "";
+            }
+            else if (selectedPainParts.Contains(partKey))
+            {
+                selectedPainPart = partKey;
+                selectedPain = painLevelsByPart[partKey];
+            }
+            else
+            {
+                selectedPainParts.Add(partKey);
+                painLevelsByPart[partKey] = selectedPain;
+                selectedPainPart = partKey;
+            }
+
+            if (!string.IsNullOrEmpty(selectedPainPart) && painLevelsByPart.ContainsKey(selectedPainPart))
+                selectedPain = painLevelsByPart[selectedPainPart];
+            RefreshPainSelectionUi(
+                new[] { "left_waist", "right_waist", "left_upper_arm", "right_upper_arm", "left_hip", "right_hip", "left_leg", "right_leg" },
+                new[] { "左腰部", "右腰部", "左大臂", "右大臂", "左臀部", "右臀部", "左腿", "右腿" });
+        }
+
+        private void SelectNoPain()
+        {
+            selectedPainParts.Clear();
+            painLevelsByPart.Clear();
+            selectedPainPart = "";
+            painFree = true;
+            RefreshPainSelectionUi(
+                new[] { "left_waist", "right_waist", "left_upper_arm", "right_upper_arm", "left_hip", "right_hip", "left_leg", "right_leg" },
+                new[] { "左腰部", "右腰部", "左大臂", "右大臂", "左臀部", "右臀部", "左腿", "右腿" });
+        }
+
+        private void RefreshPainSelectionUi(string[] keys, string[] labels)
+        {
+            List<string> selectedLabels = new List<string>();
+            for (int i = 0; i < painPartButtons.Length; i++)
+            {
+                bool selected = selectedPainParts.Contains(keys[i]);
+                bool active = selected && keys[i] == selectedPainPart;
+                Color normal = active ? new Color(0.10f, 0.37f, 0.78f) : selected ? new Color(0.20f, 0.58f, 0.88f) : new Color(0.91f, 0.95f, 0.99f);
+                Color highlighted = active ? new Color(0.14f, 0.43f, 0.84f) : selected ? new Color(0.30f, 0.67f, 0.92f) : new Color(0.83f, 0.91f, 0.98f);
+                SetButtonColors(painPartButtons[i], normal, highlighted, active ? Color.white : selected ? Color.white : new Color(0.10f, 0.18f, 0.30f));
+                if (selected)
+                    selectedLabels.Add(labels[i] + "（" + painLevelsByPart[keys[i]] + "/10）");
+            }
+
+            selectedPainPartLabel.text = selectedLabels.Count == 0
+                ? painFree ? "已选部位：没有疼痛" : "已选部位：未选择（可多选）"
+                : "已选部位：" + string.Join("、", selectedLabels);
+            painScoreLabel.text = string.IsNullOrEmpty(selectedPainPart)
+                ? painFree ? "没有疼痛，无需设置评分" : "选中部位后设置疼痛程度：" + selectedPain + " / 10"
+                : "当前编辑：" + labels[System.Array.IndexOf(keys, selectedPainPart)] + "，疼痛程度：" + selectedPain + " / 10";
+            if (noPainButton != null)
+                SetButtonColors(noPainButton, painFree ? new Color(0.10f, 0.37f, 0.78f) : new Color(0.91f, 0.95f, 0.99f), new Color(0.30f, 0.67f, 0.92f), painFree ? Color.white : new Color(0.10f, 0.18f, 0.30f));
+        }
+
+        private void ChangePainScore(int delta)
+        {
+            if (string.IsNullOrEmpty(selectedPainPart))
+            {
+                ShowFlowMessage("请先选择要记录疼痛程度的部位。");
+                return;
+            }
+            selectedPain = Mathf.Clamp(selectedPain + delta, 1, 10);
+            painLevelsByPart[selectedPainPart] = selectedPain;
+            RefreshPainSelectionUi(
+                new[] { "left_waist", "right_waist", "left_upper_arm", "right_upper_arm", "left_hip", "right_hip", "left_leg", "right_leg" },
+                new[] { "左腰部", "右腰部", "左大臂", "右大臂", "左臀部", "右臀部", "左腿", "右腿" });
+        }
+
+        private static void SetButtonColors(Button button, Color normal, Color highlighted, Color textColor)
+        {
+            if (button == null) return;
+            ColorBlock colors = button.colors;
+            colors.normalColor = normal;
+            colors.highlightedColor = highlighted;
+            colors.pressedColor = new Color(0.08f, 0.30f, 0.66f);
+            colors.selectedColor = normal;
+            button.colors = colors;
+            Text label = button.GetComponentInChildren<Text>();
+            if (label != null) label.color = textColor;
+        }
+
+        private void CreateAdmissionForm(Transform parent)
+        {
+            const float verticalShift = 180f;
+            flexionResponseButtons = CreateMovementAssessment(parent, true, 225f + verticalShift, "测试项 1 · 站立位前屈（FIS）", "双腿伸直，连续尝试用手摸脚尖；按产品流程完成 10 次。", new Color(0.22f, 0.55f, 0.91f));
+            flexionPhaseButtons = lastCreatedPhaseButtons;
+            extensionResponseButtons = CreateMovementAssessment(parent, false, -285f + verticalShift, "测试项 2 · 站立位后伸（EIS）", "双手托腰，以手为支点连续后仰；按产品流程完成 10 次。", new Color(0.08f, 0.61f, 0.56f));
+            extensionPhaseButtons = lastCreatedPhaseButtons;
+            Button finishButton = CreateButton(parent, "完成首次评估", new Vector2(0, -645), FinishAdmission, 560, 64);
+            Text finishLabel = finishButton.GetComponentInChildren<Text>();
+            if (finishLabel != null) { finishLabel.fontSize = 26; finishLabel.fontStyle = FontStyle.Bold; }
+            flowMessage.rectTransform.anchoredPosition = new Vector2(0, -720);
+        }
+
+        private Button[] lastCreatedPhaseButtons;
+
+        private Button[] CreateMovementAssessment(Transform parent, bool flexion, float top, string title, string instruction, Color accent)
+        {
+            Text countLabel = CreateLabel(parent, "实际完成：0 次", new Vector2(-100, top + 52), 18);
+            countLabel.rectTransform.sizeDelta = new Vector2(340, 34);
+            System.Action<int> updateCount = delta =>
+            {
+                int count = Mathf.Clamp((flexion ? flexionCompletedCount : extensionCompletedCount) + delta, 0, 10);
+                if (flexion) flexionCompletedCount = count; else extensionCompletedCount = count;
+                countLabel.text = "实际完成：" + count + " 次";
+            };
+            CreateButton(parent, "−", new Vector2(170, top + 52), () => updateCount(-1), 80, 38);
+            CreateButton(parent, "+", new Vector2(270, top + 52), () => updateCount(1), 80, 38);
+            Text sectionTitle = CreateLabel(parent, title, new Vector2(0, top), 25);
+            sectionTitle.fontStyle = FontStyle.Bold;
+            sectionTitle.rectTransform.sizeDelta = new Vector2(760, 42);
+            Text repetitions = CreateLabel(parent, instruction, new Vector2(0, top - 46), 18);
+            repetitions.fontStyle = FontStyle.Bold;
+            repetitions.rectTransform.sizeDelta = new Vector2(760, 34);
+            Text responseQuestion = CreateLabel(parent, "动作后的疼痛反应", new Vector2(0, top - 82), 20);
+            responseQuestion.fontStyle = FontStyle.Bold;
+            responseQuestion.rectTransform.sizeDelta = new Vector2(760, 34);
+
+            string[] responses = { "是，明显缓解", "否，无变化", "加重" };
+            Button[] responseButtons = new Button[responses.Length];
+            for (int i = 0; i < responses.Length; i++)
+            {
+                int responseIndex = i;
+                responseButtons[i] = CreateButton(parent, responses[i], new Vector2(0, top - 120 - i * 44),
+                    () => SelectAdmissionResponse(flexion, responseIndex), 560, 40);
+                Text responseLabel = responseButtons[i].GetComponentInChildren<Text>();
+                if (responseLabel != null) { responseLabel.fontSize = 22; responseLabel.fontStyle = FontStyle.Bold; }
+                SetButtonColors(responseButtons[i], new Color(0.95f, 0.97f, 0.99f), new Color(0.88f, 0.93f, 0.98f), new Color(0.16f, 0.20f, 0.26f));
+            }
+
+            Text phaseTitle = CreateLabel(parent, "补充观察（可选）：疼痛最先出现阶段", new Vector2(0, top - 266), 18);
+            phaseTitle.fontStyle = FontStyle.Bold;
+            phaseTitle.rectTransform.sizeDelta = new Vector2(760, 30);
+            string[] phases = { "起始阶段", "中间阶段", "末端阶段", "全程无痛" };
+            Button[] phaseButtons = new Button[phases.Length];
+            for (int i = 0; i < phases.Length; i++)
+            {
+                int phaseIndex = i;
+                Vector2 pos = new Vector2(i % 2 == 0 ? -145 : 145, top - 302 - (i / 2) * 42);
+                phaseButtons[i] = CreateButton(parent, phases[i], pos,
+                    () => SelectAdmissionPhase(flexion, phaseIndex), 250, 38);
+                Text phaseLabel = phaseButtons[i].GetComponentInChildren<Text>();
+                if (phaseLabel != null) { phaseLabel.fontSize = 20; phaseLabel.fontStyle = FontStyle.Bold; }
+                SetButtonColors(phaseButtons[i], new Color(0.95f, 0.97f, 0.99f), new Color(0.88f, 0.93f, 0.98f), new Color(0.16f, 0.20f, 0.26f));
+            }
+
+            Text scoreLabel = CreateLabel(parent, "疼痛程度：未评分 / 10", new Vector2(0, top - 394), 20);
+            scoreLabel.fontStyle = FontStyle.Bold;
+            scoreLabel.rectTransform.sizeDelta = new Vector2(760, 32);
+            CreatePainSlider(parent, new Vector2(0, top - 438), accent,
+                value => SetAdmissionPain(flexion, value));
+            Text lowLabel = CreateLabel(parent, "1 轻微", new Vector2(-250, top - 468), 16);
+            lowLabel.rectTransform.sizeDelta = new Vector2(100, 28);
+            lowLabel.alignment = TextAnchor.MiddleLeft;
+            lowLabel.color = new Color(0.42f, 0.48f, 0.56f);
+            Text highLabel = CreateLabel(parent, "10 剧痛", new Vector2(250, top - 468), 16);
+            highLabel.rectTransform.sizeDelta = new Vector2(100, 28);
+            highLabel.alignment = TextAnchor.MiddleRight;
+            highLabel.color = new Color(0.42f, 0.48f, 0.56f);
+            if (flexion)
+            {
+                flexionScoreLabel = scoreLabel;
+            }
+            else
+            {
+                extensionScoreLabel = scoreLabel;
+            }
+
+            lastCreatedPhaseButtons = phaseButtons;
+            return responseButtons;
+        }
+
+        private Text flexionScoreLabel;
+        private Text extensionScoreLabel;
+
+        private void FinishAdmission()
+        {
+            if (string.IsNullOrEmpty(flexionResponse) || string.IsNullOrEmpty(extensionResponse) ||
+                !flexionPainRated || !extensionPainRated)
+            {
+                ShowFlowMessage("请分别完成 FIS 和 EIS 的疼痛反应选择与疼痛评分。疼痛最先出现阶段为可选项。");
+                return;
+            }
+
+            if (flexionCompletedCount < 5 || extensionCompletedCount < 5)
+            {
+                ShowFlowMessage("请记录两个测试实际完成的次数（每项5至10次），未完成时可以稍后继续。");
+                return;
+            }
+            UserSession user = bootstrap.State.Session;
+            user.flexionCompletions = flexionCompletedCount;
+            user.extensionCompletions = extensionCompletedCount;
+            user.flexionPainLevel = flexionAdmissionPain;
+            user.extensionPainLevel = extensionAdmissionPain;
+            user.flexionResponse = flexionResponse;
+            user.extensionResponse = extensionResponse;
+            user.flexionPainPhase = flexionPainPhase;
+            user.extensionPainPhase = extensionPainPhase;
+            user.admissionCompletedAt = System.DateTimeOffset.Now.ToString("o");
+            List<string> tags = new List<string>(user.userTags ?? System.Array.Empty<string>());
+            tags.RemoveAll(tag => tag == "屈曲方向偏好" || tag == "伸展方向偏好");
+            if (extensionResponse == "relieved" && flexionResponse != "relieved") tags.Add("伸展方向偏好");
+            else if (flexionResponse == "relieved" && extensionResponse != "relieved") tags.Add("屈曲方向偏好");
+            user.userTags = tags.ToArray();
+            user.admissionReviewRequired = Mathf.Max(flexionAdmissionPain, extensionAdmissionPain) >= 8;
+            user.admissionCompleted = true;
+            bootstrap.Users.Save(user);
+            if (user.admissionReviewRequired) { bootstrap.Router.Navigate(AppRoute.AdmissionDecision); return; }
+            bootstrap.Router.Navigate(AppRoute.Home);
+        }
+
+        private void SelectAdmissionResponse(bool flexion, int index)
+        {
+            string value = index == 0 ? "relieved" : index == 1 ? "unchanged" : "worsened";
+            if (flexion) flexionResponse = value; else extensionResponse = value;
+            RefreshAdmissionChoiceColors();
+        }
+
+        private void SelectAdmissionPhase(bool flexion, int index)
+        {
+            string value = index == 0 ? "start" : index == 1 ? "middle" : index == 2 ? "end" : "pain_free";
+            if (flexion) flexionPainPhase = flexionPainPhase == value ? null : value;
+            else extensionPainPhase = extensionPainPhase == value ? null : value;
+            RefreshAdmissionChoiceColors();
+        }
+
+        private Slider CreatePainSlider(Transform parent, Vector2 position, Color accent, System.Action<int> onValueChanged)
+        {
+            GameObject root = new GameObject("PainScoreSlider", typeof(RectTransform), typeof(Slider));
+            root.transform.SetParent(parent, false);
+            RectTransform rootRect = root.GetComponent<RectTransform>();
+            rootRect.sizeDelta = new Vector2(560, 32);
+            rootRect.anchoredPosition = position;
+
+            Image background = CreateSliderImage(root.transform, "Background", new Color(0.87f, 0.90f, 0.94f));
+            RectTransform backgroundRect = background.rectTransform;
+            backgroundRect.anchorMin = new Vector2(0, 0.38f);
+            backgroundRect.anchorMax = new Vector2(1, 0.62f);
+            backgroundRect.offsetMin = Vector2.zero;
+            backgroundRect.offsetMax = Vector2.zero;
+
+            GameObject fillArea = new GameObject("Fill Area", typeof(RectTransform));
+            fillArea.transform.SetParent(root.transform, false);
+            RectTransform fillAreaRect = fillArea.GetComponent<RectTransform>();
+            fillAreaRect.anchorMin = Vector2.zero;
+            fillAreaRect.anchorMax = Vector2.one;
+            fillAreaRect.offsetMin = new Vector2(0, 10);
+            fillAreaRect.offsetMax = new Vector2(0, -10);
+            Image fill = CreateSliderImage(fillArea.transform, "Fill", accent);
+            fill.rectTransform.anchorMin = Vector2.zero;
+            fill.rectTransform.anchorMax = Vector2.one;
+            fill.rectTransform.offsetMin = Vector2.zero;
+            fill.rectTransform.offsetMax = Vector2.zero;
+
+            GameObject handleArea = new GameObject("Handle Slide Area", typeof(RectTransform));
+            handleArea.transform.SetParent(root.transform, false);
+            RectTransform handleAreaRect = handleArea.GetComponent<RectTransform>();
+            handleAreaRect.anchorMin = Vector2.zero;
+            handleAreaRect.anchorMax = Vector2.one;
+            handleAreaRect.offsetMin = new Vector2(16, 0);
+            handleAreaRect.offsetMax = new Vector2(-16, 0);
+            Image handle = CreateSliderImage(handleArea.transform, "Handle", accent);
+            RectTransform handleRect = handle.rectTransform;
+            handleRect.sizeDelta = new Vector2(30, 30);
+            handleRect.anchorMin = new Vector2(0, 0.5f);
+            handleRect.anchorMax = new Vector2(0, 0.5f);
+
+            Slider slider = root.GetComponent<Slider>();
+            slider.direction = Slider.Direction.LeftToRight;
+            slider.minValue = 1;
+            slider.maxValue = 10;
+            slider.wholeNumbers = true;
+            slider.fillRect = fill.rectTransform;
+            slider.handleRect = handleRect;
+            slider.targetGraphic = handle;
+            ColorBlock sliderColors = slider.colors;
+            sliderColors.normalColor = accent;
+            sliderColors.highlightedColor = Color.Lerp(accent, Color.white, 0.15f);
+            sliderColors.pressedColor = Color.Lerp(accent, Color.black, 0.15f);
+            sliderColors.selectedColor = accent;
+            slider.colors = sliderColors;
+            slider.value = 1;
+            slider.onValueChanged.AddListener(value => onValueChanged(Mathf.RoundToInt(value)));
+            root.AddComponent<PainSliderInteractionFeedback>().Initialize(slider, onValueChanged);
+            return slider;
+        }
+
+        private static Image CreateSliderImage(Transform parent, string name, Color color)
+        {
+            GameObject imageObject = new GameObject(name, typeof(RectTransform), typeof(Image));
+            imageObject.transform.SetParent(parent, false);
+            Image image = imageObject.GetComponent<Image>();
+            image.color = color;
+            return image;
+        }
+
+        private void SetAdmissionPain(bool flexion, int value)
+        {
+            if (flexion)
+            {
+                flexionPainRated = true;
+                flexionAdmissionPain = value;
+                flexionScoreLabel.text = "疼痛程度：" + value + " / 10";
+            }
+            else
+            {
+                extensionPainRated = true;
+                extensionAdmissionPain = value;
+                extensionScoreLabel.text = "疼痛程度：" + value + " / 10";
+            }
+        }
+
+        private void RefreshAdmissionChoiceColors()
+        {
+            RefreshChoiceColors(flexionResponseButtons, flexionResponse == "relieved" ? 0 : flexionResponse == "unchanged" ? 1 : flexionResponse == "worsened" ? 2 : -1, new Color(0.22f, 0.55f, 0.91f));
+            RefreshChoiceColors(extensionResponseButtons, extensionResponse == "relieved" ? 0 : extensionResponse == "unchanged" ? 1 : extensionResponse == "worsened" ? 2 : -1, new Color(0.08f, 0.61f, 0.56f));
+            RefreshChoiceColors(flexionPhaseButtons, PhaseIndex(flexionPainPhase), new Color(0.22f, 0.55f, 0.91f));
+            RefreshChoiceColors(extensionPhaseButtons, PhaseIndex(extensionPainPhase), new Color(0.08f, 0.61f, 0.56f));
+        }
+
+        private static int PhaseIndex(string phase)
+        {
+            return phase == "start" ? 0 : phase == "middle" ? 1 : phase == "end" ? 2 : phase == "pain_free" ? 3 : -1;
+        }
+
+        private static void RefreshChoiceColors(Button[] buttons, int selectedIndex, Color accent)
+        {
+            if (buttons == null) return;
+            for (int i = 0; i < buttons.Length; i++)
+            {
+                Color background = i == selectedIndex ? accent : new Color(0.95f, 0.97f, 0.99f);
+                SetButtonColors(buttons[i], background, Color.Lerp(background, accent, 0.25f), i == selectedIndex ? Color.white : new Color(0.16f, 0.20f, 0.26f));
+            }
+        }
+
+        private void CreateReviewForm(Transform parent)
+        {
+            CreateLabel(parent, "本地演示不会自动联网通知医生。请先遵循专业人员的建议，不要通过重新登录绕过此提示。", new Vector2(0, 110), 16);
+            CreateButton(parent, "退出登录", new Vector2(0, -5), () => bootstrap.State.ClearSession());
+        }
+
+        private void CreatePreTrainingForm(Transform parent)
+        {
+            preTrainingPainLabel = CreateLabel(parent, "当前疼痛评分：" + selectedPain + " / 10", new Vector2(0, 205), 22);
+            preTrainingPainLabel.fontStyle = FontStyle.Bold;
+            preTrainingPainLabel.rectTransform.sizeDelta = new Vector2(760, 44);
+
+            Button decreasePainButton = CreateButton(parent, "疼痛 −", new Vector2(-145, 140),
+                () => ChangePreTrainingPain(-1), 250, 58);
+            Button increasePainButton = CreateButton(parent, "疼痛 +", new Vector2(145, 140),
+                () => ChangePreTrainingPain(1), 250, 58);
+            StylePreTrainingButton(decreasePainButton);
+            StylePreTrainingButton(increasePainButton);
+
+            Text symptomPrompt = CreateLabel(parent, "请选择本次症状变化", new Vector2(0, 55), 20);
+            symptomPrompt.fontStyle = FontStyle.Bold;
+            symptomPrompt.rectTransform.sizeDelta = new Vector2(760, 42);
+
+            string[] symptomLabels = { "好转 / 不变", "稍微加重", "明显加重" };
+            string[] symptomValues = { "stable", "slightly_worse", "worse" };
+            preTrainingSymptomButtons = new Button[symptomLabels.Length];
+            for (int i = 0; i < symptomLabels.Length; i++)
+            {
+                string symptomValue = symptomValues[i];
+                preTrainingSymptomButtons[i] = CreateButton(parent, symptomLabels[i],
+                    new Vector2(0, -10 - i * 70),
+                    () => SelectPreTrainingSymptom(symptomValue), 560, 58);
+            }
+            RefreshPreTrainingSymptomSelection();
+
+            Button confirmButton = CreateButton(parent, "确认并继续", new Vector2(0, -260),
+                SavePreTraining, 560, 64);
+            StylePreTrainingButton(confirmButton);
+        }
+
+        private void ChangePreTrainingPain(int delta)
+        {
+            selectedPain = Mathf.Clamp(selectedPain + delta, 0, 10);
+            if (preTrainingPainLabel != null)
+            {
+                preTrainingPainLabel.text = "当前疼痛评分：" + selectedPain + " / 10";
+            }
+        }
+
+        private void SelectPreTrainingSymptom(string value)
+        {
+            selectedPreTrainingSymptom = value;
+            RefreshPreTrainingSymptomSelection();
+        }
+
+        private void RefreshPreTrainingSymptomSelection()
+        {
+            if (preTrainingSymptomButtons == null) return;
+            int selectedIndex = selectedPreTrainingSymptom == "stable" ? 0 :
+                selectedPreTrainingSymptom == "slightly_worse" ? 1 : selectedPreTrainingSymptom == "worse" ? 2 : -1;
+            string[] captions = { "好转 / 不变", "稍微加重", "明显加重" };
+            for (int i = 0; i < preTrainingSymptomButtons.Length; i++)
+            {
+                Button button = preTrainingSymptomButtons[i];
+                bool selected = i == selectedIndex;
+                Color accent = selected ? new Color(0.12f, 0.40f, 0.82f) : new Color(0.95f, 0.97f, 0.99f);
+                SetButtonColors(button, accent, Color.Lerp(accent, new Color(0.12f, 0.40f, 0.82f), 0.18f),
+                    selected ? Color.white : new Color(0.10f, 0.17f, 0.27f));
+                Text label = button.GetComponentInChildren<Text>();
+                if (label != null)
+                {
+                    label.text = selected ? "✓  " + captions[i] : captions[i];
+                    label.fontSize = 22;
+                    label.fontStyle = FontStyle.Bold;
+                }
+            }
+        }
+
+        private static void StylePreTrainingButton(Button button)
+        {
+            if (button == null) return;
+            Text label = button.GetComponentInChildren<Text>();
+            if (label != null)
+            {
+                label.fontSize = 22;
+                label.fontStyle = FontStyle.Bold;
+            }
+        }
+
+        private void SavePreTraining()
+        {
+            if (string.IsNullOrEmpty(selectedPreTrainingSymptom)) { ShowFlowMessage("请选择本次症状变化。"); return; }
+            UserSession user = bootstrap.State.Session; user.latestPainLevel = selectedPain; user.symptomChange = selectedPreTrainingSymptom;
+            user.preTrainingRecordedAt = System.DateTimeOffset.UtcNow.ToString("O");
+            user.preTrainingEventId = "pre:" + user.preTrainingRecordedAt;
+            user.preTrainingCheckPassed = selectedPain <= 7 && selectedPreTrainingSymptom != "worse";
+            bootstrap.Users.AppendPainRecord(user, new PainHistoryRecord
+            {
+                id = user.preTrainingEventId,
+                recordedAt = user.preTrainingRecordedAt,
+                painLevel = selectedPain,
+                source = "DailyQuestionnaire",
+                painParts = user.painParts ?? System.Array.Empty<string>(),
+            });
+            if (!user.preTrainingCheckPassed) { ShowFlowMessage("本次检查未通过（疼痛需 ≤7 且症状不能明显加重）。请暂停训练并寻求专业建议。"); return; }
+            homeMessage.text = "训练前检查已记录，可以进入本次训练。";
+            bootstrap.Router.Navigate(AppRoute.Home);
+        }
+
+        private void ShowFlowMessage(string message)
+        {
+            if (flowMessages.TryGetValue(bootstrap.State.Route, out Text messageText) && messageText != null)
+                messageText.text = message;
+        }
+
+        private void StartTraining(string sceneName, string actionId)
+        {
+            UserSession user = bootstrap.State.Session;
+            if (user == null) { bootstrap.Router.Navigate(AppRoute.Login); return; }
+            if (bootstrap.Training.HasPendingFeedback && bootstrap.Training.CurrentPlan.accountId == user.accountId)
+            { ShowPostTrainingSurvey(); return; }
+            if (!user.preTrainingCheckPassed) { bootstrap.Router.Navigate(AppRoute.PreTraining); return; }
+            if (nativeBusy) return;
+            if (NativeMobileService.Available)
+            {
+                nativeBusy = true;
+                arTrainingMessage.text = "正在获取本次医生处方…";
+                string account = user.accountId;
+                NativeMobileService.Instance.Request("plan", new NativeRequest { accountId = account }, reply =>
+                {
+                    nativeBusy = false;
+                    if (bootstrap.State.Session?.accountId != account) return;
+                    if (!reply.ok) { arTrainingMessage.text = reply.error; return; }
+                    LaunchPlan(JsonUtility.FromJson<TrainingPlan>(reply.dataJson));
+                });
+                return;
+            }
+            string coach = actionId == "bird_dog" ? "BirdDogPractice" : "DeadBugPractice";
+            bool male = user.profile.gender == "男" || user.profile.gender == "male";
+            coach = SpineFlowTrainingSession.ResolveSceneForGender(coach, male);
+            LaunchPlan(new TrainingPlan
+            {
+                accountId = user.accountId, patientId = user.profile.patientId ?? user.accountId,
+                gender = male ? "male" : "female", actionId = actionId, targetScene = coach,
+                preTrainingEventId = user.preTrainingEventId,
+                actions = new[]
+                {
+                    new TrainingAction { actionId = actionId + "_coach", arTaskType = "coach_training", sets = 1, reps = 4, sceneName = coach },
+                    new TrainingAction { actionId = actionId + "_game", arTaskType = "game_training", sceneName = sceneName }
+                }
+            });
+        }
+
+        private void LaunchPlan(TrainingPlan plan)
+        {
+            HideAppShell();
+            if (bootstrap.Training.StartTraining(plan)) return;
+            ShowAppShell();
+            if (arTrainingMessage != null) arTrainingMessage.text = "无法启动训练，请检查处方和场景配置。";
+        }
+
+        private static Canvas CreateCanvas(Transform persistentParent)
+        {
+            GameObject canvasObject = new GameObject("AppCanvas");
+            canvasObject.transform.SetParent(persistentParent, false);
+            Canvas canvas = canvasObject.AddComponent<Canvas>();
+            canvas.renderMode = RenderMode.ScreenSpaceOverlay;
+            CanvasScaler scaler = canvasObject.AddComponent<CanvasScaler>();
+            scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
+            scaler.referenceResolution = new Vector2(1080, 1920);
+            scaler.screenMatchMode = CanvasScaler.ScreenMatchMode.MatchWidthOrHeight;
+            scaler.matchWidthOrHeight = 0.5f;
+            canvasObject.AddComponent<GraphicRaycaster>();
+            return canvas;
+        }
+
+        private void EnsureEventSystem()
+        {
+            EventSystem eventSystem = EventSystem.current;
+            if (eventSystem == null)
+            {
+                GameObject eventSystemObject = new GameObject("EventSystem");
+                eventSystem = eventSystemObject.AddComponent<EventSystem>();
+            }
+
+            appEventSystem = eventSystem;
+            eventSystem.enabled = true;
+            InputSystemUIInputModule inputModule = eventSystem.GetComponent<InputSystemUIInputModule>();
+            if (inputModule == null)
+            {
+                inputModule = eventSystem.gameObject.AddComponent<InputSystemUIInputModule>();
+            }
+
+            // Ensure the active EventSystem has a complete set of pointer and click actions.
+            if (inputModule.point == null || inputModule.leftClick == null)
+            {
+                inputModule.AssignDefaultActions();
+            }
+
+            BaseInputModule[] modules = eventSystem.GetComponents<BaseInputModule>();
+            for (int i = 0; i < modules.Length; i++)
+            {
+                modules[i].enabled = modules[i] == inputModule;
+            }
+        }
+
+        private void SetAppEventSystemEnabled(bool enabled)
+        {
+            if (appEventSystem == null) return;
+            appEventSystem.enabled = enabled;
+            BaseInputModule[] modules = appEventSystem.GetComponents<BaseInputModule>();
+            for (int i = 0; i < modules.Length; i++)
+                modules[i].enabled = enabled;
+        }
+
+        private void EnsureCameraIfNeeded()
+        {
+            if (shellCamera != null) return;
+            GameObject cameraObject = new GameObject("AppShell Camera");
+            shellCamera = cameraObject.AddComponent<Camera>();
+            shellCamera.clearFlags = CameraClearFlags.SolidColor;
+            shellCamera.backgroundColor = new Color(0.973f, 0.980f, 1f);
+            shellCamera.cullingMask = 0;
+            shellCamera.depth = -10;
+        }
+
+        private static GameObject CreatePanel(string name, Transform parent, Color color)
+        {
+            GameObject panel = new GameObject(name, typeof(RectTransform), typeof(Image));
+            panel.transform.SetParent(parent, false);
+            RectTransform rect = panel.GetComponent<RectTransform>();
+            rect.anchorMin = Vector2.zero;
+            rect.anchorMax = Vector2.one;
+            rect.offsetMin = Vector2.zero;
+            rect.offsetMax = Vector2.zero;
+            color.a = 1f;
+            panel.GetComponent<Image>().color = color;
+            panel.GetComponent<Image>().raycastTarget = false;
+            return panel;
+        }
+
+        private static Text CreateLabel(Transform parent, string value, Vector2 position, int fontSize)
+        {
+            GameObject labelObject = new GameObject("Label", typeof(RectTransform), typeof(Text));
+            labelObject.transform.SetParent(parent, false);
+            RectTransform rect = labelObject.GetComponent<RectTransform>();
+            rect.sizeDelta = new Vector2(760, 55);
+            rect.anchoredPosition = position;
+            Text label = labelObject.GetComponent<Text>();
+            label.text = value;
+            label.font = AppBootstrap.Instance != null && AppBootstrap.Instance.uiFont != null
+                ? AppBootstrap.Instance.uiFont : Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+            // The original shell was authored with desktop-sized coordinates
+            // but very small mobile typography.  Keep call sites readable and
+            // apply one consistent accessibility multiplier here.
+            label.fontSize = Mathf.RoundToInt(fontSize * 1.28f);
+            label.alignment = TextAnchor.MiddleCenter;
+            label.color = new Color(0.08f, 0.10f, 0.14f);
+            label.raycastTarget = false;
+            return label;
+        }
+
+        private static InputField CreateInput(Transform parent, string placeholder, Vector2 position, bool password)
+        {
+            GameObject inputObject = new GameObject("Input", typeof(RectTransform), typeof(Image), typeof(InputField));
+            inputObject.transform.SetParent(parent, false);
+            RectTransform rect = inputObject.GetComponent<RectTransform>();
+            rect.sizeDelta = new Vector2(680, 78);
+            rect.anchoredPosition = position;
+            Image fieldImage = inputObject.GetComponent<Image>();
+            fieldImage.color = Color.white;
+            Outline outline = inputObject.AddComponent<Outline>();
+            outline.effectColor = new Color(0.77f, 0.81f, 0.87f);
+            outline.effectDistance = new Vector2(1f, -1f);
+            InputField input = inputObject.GetComponent<InputField>();
+            input.targetGraphic = fieldImage;
+            input.transition = Selectable.Transition.ColorTint;
+            ColorBlock colors = input.colors;
+            colors.normalColor = Color.white;
+            colors.highlightedColor = new Color(0.96f, 0.98f, 1f);
+            colors.pressedColor = new Color(0.90f, 0.95f, 1f);
+            colors.selectedColor = new Color(0.96f, 0.98f, 1f);
+            input.colors = colors;
+            inputObject.AddComponent<InputFieldFocusFeedback>().Initialize(fieldImage, outline);
+
+            GameObject textObject = new GameObject("Text", typeof(RectTransform), typeof(Text));
+            textObject.transform.SetParent(inputObject.transform, false);
+            RectTransform textRect = textObject.GetComponent<RectTransform>();
+            textRect.anchorMin = Vector2.zero;
+            textRect.anchorMax = Vector2.one;
+            textRect.offsetMin = new Vector2(15f, 5f);
+            textRect.offsetMax = new Vector2(-15f, -5f);
+            Text text = textObject.GetComponent<Text>();
+            text.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+            text.fontSize = 26;
+            text.color = Color.black;
+            text.alignment = TextAnchor.MiddleLeft;
+            text.raycastTarget = false;
+            text.supportRichText = false;
+            input.textComponent = text;
+            input.contentType = password ? InputField.ContentType.Password : InputField.ContentType.Standard;
+            Text placeholderText = CreateLabel(inputObject.transform, placeholder, Vector2.zero, 21);
+            placeholderText.color = new Color(0.35f, 0.35f, 0.35f);
+            input.placeholder = placeholderText;
+            RectTransform placeholderRect = placeholderText.rectTransform;
+            placeholderRect.anchorMin = Vector2.zero;
+            placeholderRect.anchorMax = Vector2.one;
+            placeholderRect.offsetMin = new Vector2(15f, 5f);
+            placeholderRect.offsetMax = new Vector2(-15f, -5f);
+            placeholderText.alignment = TextAnchor.MiddleLeft;
+            inputObject.GetComponent<Image>().raycastTarget = true;
+            return input;
+        }
+
+        private static Button CreateButton(Transform parent, string caption, Vector2 position, UnityEngine.Events.UnityAction action)
+        {
+            return CreateButton(parent, caption, position, action, 560);
+        }
+
+        private static Button CreateButton(Transform parent, string caption, Vector2 position, UnityEngine.Events.UnityAction action, float width)
+        {
+            return CreateButton(parent, caption, position, action, width, 76);
+        }
+
+        private static Button CreateButton(Transform parent, string caption, Vector2 position, UnityEngine.Events.UnityAction action, float width, float height)
+        {
+            GameObject buttonObject = new GameObject(caption, typeof(RectTransform), typeof(Image), typeof(Button));
+            buttonObject.transform.SetParent(parent, false);
+            RectTransform rect = buttonObject.GetComponent<RectTransform>();
+            rect.sizeDelta = new Vector2(width, height);
+            rect.anchoredPosition = position;
+            buttonObject.GetComponent<Image>().color = Color.white;
+            Button button = buttonObject.GetComponent<Button>();
+            button.targetGraphic = buttonObject.GetComponent<Image>();
+            buttonObject.GetComponent<Image>().raycastTarget = true;
+            ColorBlock buttonColors = button.colors;
+            buttonColors.normalColor = new Color(0.22f, 0.74f, 0.97f);
+            buttonColors.highlightedColor = new Color(0.30f, 0.78f, 0.98f);
+            buttonColors.pressedColor = new Color(0.12f, 0.39f, 0.78f);
+            buttonColors.selectedColor = buttonColors.normalColor;
+            buttonColors.disabledColor = new Color(0.62f, 0.68f, 0.76f);
+            button.colors = buttonColors;
+            button.onClick.AddListener(action);
+            Text label = CreateLabel(buttonObject.transform, caption, Vector2.zero, 23);
+            label.color = Color.white;
+            label.raycastTarget = false;
+            return button;
+        }
+    }
+
+    internal sealed class InputFieldFocusFeedback : MonoBehaviour, ISelectHandler, IDeselectHandler
+    {
+        private Image image;
+        private Outline outline;
+
+        public void Initialize(Image targetImage, Outline targetOutline)
+        {
+            image = targetImage;
+            outline = targetOutline;
+        }
+
+        public void OnSelect(BaseEventData eventData)
+        {
+            if (image != null) image.color = new Color(0.96f, 0.98f, 1f);
+            if (outline != null)
+            {
+                outline.effectColor = new Color(0.36f, 0.61f, 0.93f);
+                outline.effectDistance = new Vector2(2f, -2f);
+            }
+        }
+
+        public void OnDeselect(BaseEventData eventData)
+        {
+            if (image != null) image.color = Color.white;
+            if (outline != null)
+            {
+                outline.effectColor = new Color(0.77f, 0.81f, 0.87f);
+                outline.effectDistance = new Vector2(1f, -1f);
+            }
+        }
+    }
+
+    internal sealed class PainSliderInteractionFeedback : MonoBehaviour, IPointerUpHandler
+    {
+        private Slider slider;
+        private System.Action<int> onValueChanged;
+
+        public void Initialize(Slider targetSlider, System.Action<int> callback)
+        {
+            slider = targetSlider;
+            onValueChanged = callback;
+        }
+
+        public void OnPointerUp(PointerEventData eventData)
+        {
+            if (slider != null && onValueChanged != null)
+                onValueChanged(Mathf.RoundToInt(slider.value));
+        }
+    }
+}

@@ -241,7 +241,6 @@ public class SegmentedCoachController : MonoBehaviour
         "transition visually continuous even when the imported clips do not " +
         "share an identical boundary pose.")]
     [Min(0f)] [SerializeField] private float segmentTransitionBlendSeconds = 0.12f;
-    [Min(0f)] [SerializeField] private float restAfterReturnSeconds = 4f;
     [Tooltip("The first two coach-led repetitions keep a longer follow-along window. " +
         "The last two repetitions use the shorter self-practice rhythm.")]
     [Min(1f)] [SerializeField] private float guidedHoldWindowMultiplier = 1.5f;
@@ -297,8 +296,6 @@ public class SegmentedCoachController : MonoBehaviour
     private ICoachMotionBackend motionBackend;
     private CoachMotionBackendType backendType;
     private KeyframeCoachMotionBackend keyframeBackend; // 留引用以便 Dispose
-    private CoachMotionPackage introductionTransitionPackage;
-    private KeyframeCoachMotionBackend introductionTransitionBackend;
 
     private static readonly HumanBodyBones[] LeftArmBones =
     {
@@ -456,7 +453,11 @@ public class SegmentedCoachController : MonoBehaviour
         }
 
         float leniency = Mathf.Max(0.1f, segments[currentSegmentIndex].scoreLeniency);
-        float duration = Mathf.Max(1f, segments[currentSegmentIndex].scoringDuration);
+        float duration = CurrentSegmentKind == TrainingSegmentKind.ReturnTransition
+            ? 0.5f
+            : CurrentSegmentKind == TrainingSegmentKind.CoreAction
+                ? Mathf.Max(3f, segments[currentSegmentIndex].scoringDuration)
+                : Mathf.Max(1f, segments[currentSegmentIndex].scoringDuration);
         if (CurrentSegmentKind == TrainingSegmentKind.CoreAction && currentRepeat < 2)
         {
             duration *= Mathf.Max(1f, guidedHoldWindowMultiplier);
@@ -518,12 +519,8 @@ public class SegmentedCoachController : MonoBehaviour
         CountCurrentPlanEntry();
         if (CurrentSegmentKind == TrainingSegmentKind.ReturnTransition)
         {
-            bool recordedAlternating = RecordedAlternatingCoachMode.IsRecordedScene(
-                gameObject.scene.name);
-            float configuredRest = recordedAlternating
-                ? 1f
-                : restAfterReturnSeconds;
-            float restDuration = Mathf.Max(configuredRest,
+            bool lastRepetition = completedRepetitionCount >= TotalRepetitions;
+            float restDuration = lastRepetition ? 0f : Mathf.Max(0.5f,
                 FindObjectOfType<VoicePromptManager>()?.LessonRestDuration ?? 0f);
             CoachSegmentEvent restEvent = new CoachSegmentEvent(
                 currentSegmentIndex,
@@ -532,7 +529,7 @@ public class SegmentedCoachController : MonoBehaviour
                 CurrentSegmentKind,
                 GetSegmentLabel(currentSegmentIndex));
             CoachEventBus.PublishRestStarted(restEvent, restDuration);
-            if (!skipRequested)
+            if (!skipRequested && !lastRepetition)
             {
                 RequestVoicePhase(restEvent, CoachVoicePhase.RestGuidance);
             }
@@ -559,7 +556,8 @@ public class SegmentedCoachController : MonoBehaviour
                 RequestVoicePhase(
                     selfPracticeEvent,
                     CoachVoicePhase.SelfPracticeTransition);
-                float transitionWindow = 4.6f;
+                AudioClip transitionClip = VoicePromptManager.LoadCoachClip("Coach_self_practice_transition");
+                float transitionWindow = transitionClip != null ? transitionClip.length + 0.1f : 0f;
                 while (!pendingVoicePhaseCompleted && transitionWindow > 0f &&
                     !skipRequested)
                 {
@@ -580,40 +578,7 @@ public class SegmentedCoachController : MonoBehaviour
 
     private void PlaySegment(int index)
     {
-        if (CurrentSegmentKind == TrainingSegmentKind.CoreAction && GetPracticeLessonClipName(index) != null)
-        {
-            lessonRoutine = StartCoroutine(PrepareRepetition(index));
-            return;
-        }
         BeginSegment(index);
-    }
-
-    private IEnumerator PrepareRepetition(int index)
-    {
-        preparingRepetition = true;
-        motionBackend.Freeze();
-        string action = VoicePromptManager.GetPracticeActionKey();
-        bool alternating = action == "deadbug" || action == "birddog";
-        // The coached repetitions name the target limbs directly. Numeric
-        // countdown language is reserved for the self-practice repetitions.
-        string key = alternating
-            ? currentRepeat < 2 ? $"side{(index / 2) % 2 + 1}" : null
-            : currentRepeat < 2 ? $"count{currentRepeat + 1}" : "prepare";
-        AudioClip cue = VoicePromptManager.LoadCoachClip($"Coach_{action}_{key}");
-        CoachEventBus.InvokeSafely(OnSegmentStarted, new PracticeSegmentPlaybackInfo(
-            index, currentRepeat, currentSetIndex, "准备", CurrentSegmentKind, segments[index].coachGuidanceLimbs));
-        var context = new CoachSegmentEvent(index, currentSetIndex, currentRepeat, CurrentSegmentKind, "准备");
-        if (cue != null) RequestVoicePhase(context, CoachVoicePhase.SegmentCue, cue);
-        float remaining = cue != null ? cue.length + 0.15f : 0f;
-        while (remaining > 0f && !skipRequested)
-        {
-            if (!isPaused && !MobileCoachControls.IsPaused) remaining -= Time.unscaledDeltaTime;
-            yield return null;
-        }
-        preparingRepetition = false;
-        lessonRoutine = null;
-        if (skipRequested) { skipRequested = false; ContinueAfterCurrentPlanEntry(); }
-        else BeginSegment(index);
     }
 
     private void BeginSegment(int index)
@@ -658,7 +623,11 @@ public class SegmentedCoachController : MonoBehaviour
             return;
         }
 
-        AudioClip clip = segments[index].voiceClip;
+        string action = VoicePromptManager.GetPracticeActionKey();
+        bool alternating = action == "deadbug" || action == "birddog";
+        AudioClip clip = alternating && CurrentSegmentKind == TrainingSegmentKind.CoreAction
+            ? VoicePromptManager.LoadCoachClip($"Coach_{action}_side{(index / 2) % 2 + 1}")
+            : segments[index].voiceClip;
         if (clip == null)
         {
             string clipName = segments[index].voiceClipName;
@@ -731,6 +700,7 @@ public class SegmentedCoachController : MonoBehaviour
 
     private void ContinueAfterHeldSegment()
     {
+        isHolding = false;
         motionBackend?.Resume();
         CountCurrentPlanEntry();
         ContinueAfterCurrentPlanEntry();
@@ -901,7 +871,7 @@ public class SegmentedCoachController : MonoBehaviour
     /// This deliberately does not create a training plan or publish completion.
     /// The caller owns the lesson timing and starts the real session afterwards.
     /// </summary>
-    public bool PlayDemonstrationPreview(float seconds, Action completed)
+    public bool PlayDemonstrationPreview(float seconds, Action completed, Action secondRepetition = null)
     {
         EnsureDefaultBackend();
         if (motionBackend == null || !motionBackend.IsReady || segments == null || segments.Count == 0)
@@ -914,7 +884,7 @@ public class SegmentedCoachController : MonoBehaviour
         // The preview follows the authored motion timeline.  The legacy
         // parameter is retained for scene/prefab compatibility, but must not
         // compress or stretch a recording to a fixed wall-clock duration.
-        lessonRoutine = StartCoroutine(DemonstrationPreviewRoutine(generation, completed));
+        lessonRoutine = StartCoroutine(DemonstrationPreviewRoutine(generation, completed, secondRepetition));
         return true;
     }
 
@@ -931,8 +901,6 @@ public class SegmentedCoachController : MonoBehaviour
             lessonRoutine = null;
         }
 
-        introductionTransitionBackend?.Dispose();
-        introductionTransitionBackend = null;
 
         if (!hasStarted && motionBackend != null && motionBackend.IsReady &&
             motionBackend.SegmentCount > 0)
@@ -943,114 +911,34 @@ public class SegmentedCoachController : MonoBehaviour
         }
     }
 
-    private IEnumerator DemonstrationPreviewRoutine(int generation, Action completed)
+    private IEnumerator DemonstrationPreviewRoutine(int generation, Action completed, Action secondRepetition)
     {
         bool wasEnabled = coachAnimator == null || coachAnimator.enabled;
         CacheDeadBugPreparationArms();
         if (coachAnimator != null && backendType == CoachMotionBackendType.Animator) coachAnimator.enabled = true;
 
-        // Recorded Dead Bug excerpts intentionally start in the lying
-        // preparation pose. Play the original standing-to-lying recording
-        // first so the patient gets time to lie down before the new lesson.
-        if (introductionTransitionPackage != null &&
-            introductionTransitionPackage.IsValid(out _))
+        int segmentCount = motionBackend.SegmentCount;
+        string action = VoicePromptManager.GetPracticeActionKey();
+        bool alternating = action == "deadbug" || action == "birddog";
+        // Two continuous recorded repetitions: opposite sides for alternating
+        // exercises, or the same up/down pair twice for the other exercises.
+        for (int repetition = 0; repetition < 2; repetition++)
         {
-            introductionTransitionBackend?.Dispose();
-            introductionTransitionBackend = new KeyframeCoachMotionBackend(
-                coachAnimator, introductionTransitionPackage);
-            if (introductionTransitionBackend.IsReady)
+            if (repetition == 1) secondRepetition?.Invoke();
+            int firstSegment = alternating && segmentCount >= 6 ? 1 + repetition * 2 : 1;
+            for (int i = firstSegment; i <= firstSegment + 1 && i < segmentCount - 1; i++)
             {
-                introductionTransitionBackend.PlaySegment(0);
-                while (!introductionTransitionBackend.HasReachedSegmentEnd())
+                if (generation != lessonGeneration) yield break;
+                motionBackend.PlaySegment(i);
+                while (!motionBackend.HasReachedSegmentEnd())
                 {
-                    if (generation != lessonGeneration)
-                    {
-                        introductionTransitionBackend.Dispose();
-                        introductionTransitionBackend = null;
-                        yield break;
-                    }
-
-                    if (MobileCoachControls.IsPaused) introductionTransitionBackend.Freeze();
-                    else
-                    {
-                        introductionTransitionBackend.Resume();
-                        introductionTransitionBackend.Tick(Time.unscaledDeltaTime);
-                    }
+                    if (generation != lessonGeneration) yield break;
+                    if (MobileCoachControls.IsPaused) motionBackend.Freeze();
+                    else { motionBackend.Resume(); motionBackend.Tick(Time.unscaledDeltaTime); }
                     yield return null;
                 }
-                introductionTransitionBackend.SnapToSegmentEnd();
-                introductionTransitionBackend.Freeze();
-            }
-            introductionTransitionBackend.Dispose();
-            introductionTransitionBackend = null;
-
-            // Leave the new recorded preparation pose on screen while the
-            // patient finishes lying down. The original ready countdown and
-            // the recorded preparation cue run after the lesson preview.
-            if (motionBackend != null && motionBackend.IsReady &&
-                motionBackend.SegmentCount > 0)
-            {
-                motionBackend.PlaySegment(0);
                 motionBackend.SnapToSegmentEnd();
                 motionBackend.Freeze();
-                float preparationWait = 11f;
-                while (preparationWait > 0f)
-                {
-                    if (generation != lessonGeneration)
-                    {
-                        yield break;
-                    }
-                    if (!MobileCoachControls.IsPaused)
-                    {
-                        preparationWait -= Time.unscaledDeltaTime;
-                    }
-                    yield return null;
-                }
-            }
-        }
-
-        int segmentCount = Mathf.Max(1, motionBackend.SegmentCount);
-        for (int i = 0; i < segmentCount; i++)
-        {
-            if (generation != lessonGeneration)
-            {
-                yield break;
-            }
-            // The 10-node scenes contain four practice repetitions. Demonstrate
-            // one complete right/left pair, then the authored finish, without
-            // rehearsing the same two sides a second time.
-            string action = VoicePromptManager.GetPracticeActionKey();
-            if (segmentCount == 10 && i == 5 && (action == "deadbug" || action == "birddog")) i = 9;
-            Debug.Log($"[CoachDemo] scene={gameObject.scene.name} segment={i} label={segments[i].label}");
-            motionBackend.PlaySegment(i);
-            // Tick the backend with unscaled frame time so the source frame
-            // timestamps (including pauses/holds authored in the recording)
-            // remain the sole timing source.  Observation and scoring are not
-            // involved in this lesson-only preview.
-            while (!motionBackend.HasReachedSegmentEnd())
-            {
-                if (generation != lessonGeneration)
-                {
-                    yield break;
-                }
-                if (MobileCoachControls.IsPaused) motionBackend.Freeze();
-                else { motionBackend.Resume(); motionBackend.Tick(Time.unscaledDeltaTime); }
-                yield return null;
-            }
-            motionBackend.SnapToSegmentEnd();
-            motionBackend.Freeze();
-            if (i > 0 && i < segmentCount - 1 && (i & 1) == 1)
-            {
-                float hold = Mathf.Max(1f, segments[i].scoringDuration);
-                while (hold > 0f)
-                {
-                if (generation != lessonGeneration)
-                {
-                    yield break;
-                }
-                    if (!MobileCoachControls.IsPaused) hold -= Time.unscaledDeltaTime;
-                    yield return null;
-                }
             }
         }
         // Show the authored preparation pose throughout the intact countdown.
@@ -1483,18 +1371,9 @@ public class SegmentedCoachController : MonoBehaviour
             this);
     }
 
-    public void SetIntroductionTransitionPackage(CoachMotionPackage package)
-    {
-        introductionTransitionBackend?.Dispose();
-        introductionTransitionBackend = null;
-        introductionTransitionPackage = package;
-    }
-
     public void ReturnIdle()
     {
         if (lessonRoutine != null) { StopCoroutine(lessonRoutine); lessonRoutine = null; }
-        introductionTransitionBackend?.Dispose();
-        introductionTransitionBackend = null;
         preparingRepetition = false;
         motionBackend?.ReturnIdle();
 

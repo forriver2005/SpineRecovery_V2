@@ -91,6 +91,7 @@ public sealed class SpineFlowTrainingSession : MonoBehaviour
         public int sets;
         public int reps;
         public string motionPackageUri;
+        public int holdSeconds = -1;
     }
 
     [Serializable]
@@ -239,6 +240,7 @@ public sealed class SpineFlowTrainingSession : MonoBehaviour
 
     private static SpineFlowTrainingSession instance;
 
+    private bool unifiedSession;
     private StartPayload startPayload;
     private ModeMeasurement coachMeasurement;
     private ModeMeasurement gameMeasurement;
@@ -572,6 +574,57 @@ public sealed class SpineFlowTrainingSession : MonoBehaviour
         return new SpineFlowTrainingVolume(action.sets, action.reps);
     }
 
+    public static bool BeginUnifiedTraining(SpineRecovery.App.TrainingPlan plan)
+    {
+        CreatePersistentSession();
+        instance.unifiedSession = true;
+        var actions = new List<PlannedAction>();
+        foreach (var action in plan.actions)
+        {
+            actions.Add(new PlannedAction
+            {
+                actionId = action.actionId, actionName = action.actionName,
+                arTaskType = action.arTaskType, level = action.level,
+                sets = action.sets, reps = action.reps, motionPackageUri = action.motionPackageUri,
+                holdSeconds = action.holdSeconds
+            });
+        }
+        instance.startPayload = new StartPayload
+        {
+            protocolVersion = ProtocolVersion, messageType = StartMessage,
+            sessionId = plan.sessionId, userId = plan.patientId ?? plan.accountId,
+            targetScene = plan.targetScene,
+            userProfile = new UserProfilePayload { gender = plan.gender },
+            trainingPlan = new TrainingPlanPayload { recommendedActions = actions.ToArray() }
+        };
+        if (!instance.HasValidStartPayload()) return false;
+        instance.ResetMeasurementsForNewSession();
+        instance.PublishPendingMotionPackage();
+        MobileSessionAccepted?.Invoke();
+        return true;
+    }
+
+    public static string CaptureUnifiedResult()
+    {
+        return instance != null && instance.unifiedSession && instance.HasValidStartPayload()
+            ? instance.BuildResultJson() : null;
+    }
+
+    public static int PlannedCoachHoldSeconds => instance != null ? instance.FindPlannedAction("coach")?.holdSeconds ?? -1 : -1;
+
+    public static void EndUnifiedTraining()
+    {
+        if (instance == null || !instance.unifiedSession) return;
+        instance.startPayload = null;
+        instance.ResetMeasurementsForNewSession();
+    }
+
+    private void SaveUnifiedCheckpoint()
+    {
+        if (unifiedSession && SpineRecovery.App.AppBootstrap.Instance != null)
+            SpineRecovery.App.AppBootstrap.Instance.Training.SaveCheckpoint(BuildResultJson());
+    }
+
     public static void RefreshMobileLaunchFromIntent()
     {
         if (instance != null)
@@ -647,6 +700,7 @@ public sealed class SpineFlowTrainingSession : MonoBehaviour
         instance.coachTimelineStatus = timelineStatus;
         instance.coachEndReason = endReason;
         instance.coachOutcomeSet = true;
+        instance.SaveUnifiedCheckpoint();
     }
 
     public static void BeginGameTraining(string level)
@@ -685,10 +739,12 @@ public sealed class SpineFlowTrainingSession : MonoBehaviour
                 instance.gamePausedSecondsAtStart),
             instance.pendingGameLevel);
         instance.gameTiming = false;
+        instance.SaveUnifiedCheckpoint();
     }
 
     public static bool TryReturnToMobile()
     {
+        if (instance != null && instance.unifiedSession) return false;
         if (instance != null &&
             instance.HasValidStartPayload() &&
             instance.TrySendResultToMobile())
@@ -998,17 +1054,17 @@ public sealed class SpineFlowTrainingSession : MonoBehaviour
 
     private string BuildResultJson()
     {
-        if (coachOutcomeSet && coachMeasurement != null)
+        if (coachOutcomeSet && coachMeasurement != null && (!unifiedSession || gameMeasurement == null))
         {
             return BuildCoachResultJson();
         }
 
         bool hasCompleteScoreSummary =
-            coachMeasurement != null && coachMeasurement.HasScoreSummary &&
-            gameMeasurement != null && gameMeasurement.HasScoreSummary;
+            gameMeasurement != null && gameMeasurement.HasScoreSummary &&
+            (unifiedSession || (coachMeasurement != null && coachMeasurement.HasScoreSummary));
         bool hasCompletePoseEvidence =
             hasCompleteScoreSummary &&
-            coachMeasurement.IsAcceptable &&
+            (coachMeasurement == null || coachMeasurement.IsAcceptable) &&
             gameMeasurement.IsAcceptable;
         ResultPayload result = new ResultPayload
         {
@@ -1032,25 +1088,16 @@ public sealed class SpineFlowTrainingSession : MonoBehaviour
             simulated = false,
             durationSeconds = TotalMeasuredDuration(),
             overallScore = hasCompleteScoreSummary
-                ? CombineModeScores(
-                    coachMeasurement.averageScore,
-                    gameMeasurement.averageScore)
+                ? (coachMeasurement == null ? gameMeasurement.averageScore : CombineModeScores(
+                    coachMeasurement.averageScore, gameMeasurement.averageScore))
                 : 0,
             rawOverallScore = hasCompleteScoreSummary
-                ? CombineModeScores(
-                    coachMeasurement.rawAverageScore,
-                    gameMeasurement.rawAverageScore)
+                ? (coachMeasurement == null ? gameMeasurement.rawAverageScore : CombineModeScores(
+                    coachMeasurement.rawAverageScore, gameMeasurement.rawAverageScore))
                 : 0,
             scoreMappingVersion = ScoreMappingVersion,
             abnormalEvents = new string[0]
         };
-
-        if (!hasCompleteScoreSummary)
-        {
-            result.actionResults = new ActionResultPayload[0];
-            result.gameResults = new GameResultPayload[0];
-            return JsonUtility.ToJson(result);
-        }
 
         List<ActionResultPayload> actions = new List<ActionResultPayload>();
         List<GameResultPayload> games = new List<GameResultPayload>();
@@ -1058,6 +1105,7 @@ public sealed class SpineFlowTrainingSession : MonoBehaviour
         {
             string mode = ResolveMode(action);
             ModeMeasurement measurement = mode == "coach" ? coachMeasurement : gameMeasurement;
+            if (measurement == null) continue;
             actions.Add(BuildActionResult(action, mode, measurement));
             if (mode == "game")
             {
@@ -1074,7 +1122,7 @@ public sealed class SpineFlowTrainingSession : MonoBehaviour
     {
         bool hasGameMeasurement = gameMeasurement != null;
         bool hasCompletePoseEvidence =
-            coachMeasurement.IsAcceptable &&
+            (coachMeasurement == null || coachMeasurement.IsAcceptable) &&
             (!hasGameMeasurement || gameMeasurement.IsAcceptable);
         List<ActionResultPayload> actions = new List<ActionResultPayload>();
         List<GameResultPayload> games = new List<GameResultPayload>();
@@ -1295,10 +1343,9 @@ public sealed class SpineFlowTrainingSession : MonoBehaviour
             startPayload.messageType != StartMessage ||
             string.IsNullOrWhiteSpace(startPayload.sessionId) ||
             string.IsNullOrWhiteSpace(startPayload.userId) ||
-            string.IsNullOrWhiteSpace(startPayload.requestToken) ||
-            startPayload.callback == null ||
-            startPayload.callback.packageName != MobilePackage ||
-            startPayload.callback.action != ResultAction ||
+            (!unifiedSession && (string.IsNullOrWhiteSpace(startPayload.requestToken) ||
+            startPayload.callback == null || startPayload.callback.packageName != MobilePackage ||
+            startPayload.callback.action != ResultAction)) ||
             startPayload.trainingPlan == null ||
             startPayload.trainingPlan.recommendedActions == null ||
             startPayload.trainingPlan.recommendedActions.Length != 2)
@@ -1372,6 +1419,7 @@ public sealed class SpineFlowTrainingSession : MonoBehaviour
 
     private void ReadStartPayloadFromAndroidIntent()
     {
+        if (unifiedSession || SpineRecovery.App.AppBootstrap.Instance != null) return;
 #if UNITY_ANDROID && !UNITY_EDITOR
         try
         {

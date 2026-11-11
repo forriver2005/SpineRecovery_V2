@@ -68,9 +68,10 @@ public sealed class CoachFlowPresentation : MonoBehaviour
         }
 
         bool showHold = coach.HasStarted && !coach.IsComplete &&
+            !coach.IsPreparingRepetition &&
             coach.IsHoldingAtSegment &&
             coach.CurrentSegmentKind == TrainingSegmentKind.CoreAction &&
-            coach.CurrentRepeat >= 2;
+            coach.CurrentHoldRemaining > 0f;
         if (!showHold)
         {
             dimRoot?.SetActive(false);

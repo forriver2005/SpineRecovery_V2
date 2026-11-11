@@ -1,0 +1,104 @@
+apply plugin: 'com.android.library'
+**APPLY_PLUGINS**
+
+// Unity 2022.3 ships AGP 7.4.2. Newer AndroidX Lifecycle 2.10 metadata
+// contains multiplatform variants that this toolchain cannot disambiguate;
+// GeckoView only uses APIs available in the stable 2.6.2 line.
+configurations.all {
+    resolutionStrategy.eachDependency { details ->
+        if (details.requested.group == 'androidx.lifecycle') {
+            details.useVersion '2.6.2'
+            details.because 'Keep AndroidX Lifecycle compatible with Unity 2022.3 AGP 7.4.2'
+        }
+        if (details.requested.group == 'com.fasterxml.jackson.core') {
+            details.useVersion '2.13.5'
+            details.because 'Keep Jackson bytecode compatible with Unity 2022.3 Jetifier'
+        }
+        if (details.requested.group == 'androidx.core') {
+            details.useVersion '1.13.1'
+            details.because 'Keep AndroidX Core AAR metadata compatible with Unity 2022.3 AGP 7.4.2'
+        }
+        if (details.requested.group == 'androidx.annotation') {
+            details.useVersion '1.4.0'
+            details.because 'Keep AndroidX Annotation metadata compatible with Unity 2022.3 AGP 7.4.2'
+        }
+        if (details.requested.group == 'org.yaml' && details.requested.name == 'snakeyaml') {
+            details.useVersion '1.31'
+            details.because 'SlimeVR/Jackson runtime calls the SnakeYAML 1.x ParserImpl(StreamReader) constructor'
+        }
+    }
+}
+
+dependencies {
+    implementation project(':mobileData')
+    implementation fileTree(dir: 'libs', include: ['*.jar'])
+**DEPS**
+    // Embedded SlimeVR runtime dependencies copied from SpineFlowMobile's
+    // slimevr-android-runtime and slimevr-core Gradle modules.
+    implementation 'androidx.activity:activity:1.8.2'
+    implementation 'androidx.core:core-ktx:1.13.1'
+    implementation 'org.mozilla.geckoview:geckoview:153.0.20260810162159'
+    implementation 'com.github.mik3y:usb-serial-for-android:3.7.0'
+    implementation 'com.google.flatbuffers:flatbuffers-java:22.10.26'
+    implementation 'commons-cli:commons-cli:1.11.0'
+    implementation 'com.fasterxml.jackson.core:jackson-databind:2.13.5'
+    implementation 'com.fasterxml.jackson.dataformat:jackson-dataformat-yaml:2.13.5'
+    implementation 'com.github.jonpeterson:jackson-module-model-versioning:1.2.2'
+    implementation 'org.apache.commons:commons-math3:3.6.1'
+    implementation 'org.apache.commons:commons-lang3:3.20.0'
+    implementation 'org.apache.commons:commons-collections4:4.5.0'
+    implementation 'com.illposed.osc:javaosc-core:0.8'
+    implementation 'org.java-websocket:Java-WebSocket:1.6.0'
+    implementation 'org.jetbrains.kotlinx:kotlinx-serialization-json:1.10.0'
+    implementation 'com.mayakapps.kache:kache:2.1.0'
+    implementation 'org.jetbrains.kotlinx:kotlinx-coroutines-core:1.9.0'
+    implementation 'org.jetbrains.kotlin:kotlin-reflect:2.2.10'
+    implementation 'org.jetbrains.kotlin:kotlin-stdlib:2.3.21'
+    implementation 'com.melloware:jintellitype:1.5.6'
+    implementation 'com.github.loucass003:EspflashKotlin:v0.11.0'
+    implementation 'com.github.SlimeVR:oscquery-kt:566a0cba58'
+    implementation 'io.ktor:ktor-client-core:2.3.13'
+    implementation 'io.ktor:ktor-client-cio:2.3.13'
+}
+
+android {
+    namespace "com.unity3d.player"
+    ndkPath "**NDKPATH**"
+    ndkVersion "**NDKVERSION**"
+    compileSdkVersion **APIVERSION**
+    // Unity 2022's bundled D8 is compatible with the stable 36.0.0 toolchain.
+    buildToolsVersion '36.0.0'
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_11
+        targetCompatibility JavaVersion.VERSION_11
+    }
+
+    defaultConfig {
+        minSdkVersion **MINSDKVERSION**
+        targetSdkVersion **TARGETSDKVERSION**
+        ndk {
+            abiFilters **ABIFILTERS**
+            debugSymbolLevel **DEBUGSYMBOLLEVEL**
+        }
+        consumerProguardFiles 'proguard-unity.txt'**USER_PROGUARD**
+**DEFAULT_CONFIG_SETUP**
+    }
+
+    lint {
+        abortOnError false
+    }
+    aaptOptions {
+        noCompress = **BUILTIN_NOCOMPRESS** + unityStreamingAssets.tokenize(', ')
+        ignoreAssetsPattern = "!.svn:!.git:!.ds_store:!*.scc:!CVS:!thumbs.db:!picasa.ini:!*~"
+    }**PACKAGING**
+
+    packagingOptions {
+        resources {
+            excludes += ['META-INF/INDEX.LIST', 'META-INF/io.netty.versions.properties', 'META-INF/DEPENDENCIES', 'META-INF/LICENSE', 'META-INF/LICENSE.txt', 'META-INF/NOTICE', 'META-INF/NOTICE.txt']
+        }
+    }
+}
+**IL_CPP_BUILD_SETUP**
+**SOURCE_BUILD_SETUP**
+**EXTERNAL_SOURCES**

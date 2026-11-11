@@ -1,0 +1,64 @@
+pluginManagement {
+    repositories {
+        **ARTIFACTORYREPOSITORY**
+        gradlePluginPortal()
+        google()
+        mavenCentral()
+    }
+}
+
+include ':launcher', ':unityLibrary'
+include ':mobileData'
+project(':mobileData').projectDir = file('native/mobileData')
+**INCLUDES**
+
+// Apply the AndroidX compatibility rule to both launcher and unityLibrary.
+// The dependency conflict is reported by launcher:releaseRuntimeClasspath.
+gradle.beforeProject { project ->
+    project.configurations.all {
+        resolutionStrategy.eachDependency { details ->
+            if (details.requested.group == 'androidx.lifecycle') {
+                details.useVersion '2.6.2'
+                details.because 'Keep AndroidX Lifecycle compatible with Unity 2022.3 AGP 7.4.2'
+            }
+            if (details.requested.group == 'com.fasterxml.jackson.core') {
+                details.useVersion '2.13.5'
+                details.because 'Keep Jackson bytecode compatible with Unity 2022.3 Jetifier'
+            }
+            if (details.requested.group == 'androidx.core') {
+                details.useVersion '1.13.1'
+                details.because 'Keep AndroidX Core AAR metadata compatible with Unity 2022.3 AGP 7.4.2'
+            }
+            if (details.requested.group == 'androidx.annotation') {
+                details.useVersion '1.4.0'
+                details.because 'Keep AndroidX Annotation metadata compatible with Unity 2022.3 AGP 7.4.2'
+            }
+            if (details.requested.group == 'org.yaml' && details.requested.name == 'snakeyaml') {
+                details.useVersion '1.31'
+                details.because 'SlimeVR/Jackson runtime calls the SnakeYAML 1.x ParserImpl(StreamReader) constructor'
+            }
+        }
+    }
+}
+
+dependencyResolutionManagement {
+    repositoriesMode.set(RepositoriesMode.PREFER_SETTINGS)
+    repositories {
+        **ARTIFACTORYREPOSITORY**
+        // Unity 2022.3 uses Gradle/AGP 7.5/7.4. AndroidX packages such as
+        // GeckoView's lifecycle 2.10 publish newer Gradle module metadata
+        // with multiplatform variants that this toolchain cannot disambiguate.
+        // Resolve Google's Android artifacts through their Maven POM instead.
+        maven {
+            url 'https://dl.google.com/dl/android/maven2/'
+            metadataSources {
+                mavenPom()
+                artifact()
+            }
+        }
+        mavenCentral()
+        maven { url 'https://jitpack.io' }
+        maven { url 'https://maven.mozilla.org/maven2/' }
+        flatDir { dirs "${project(':unityLibrary').projectDir}/libs" }
+    }
+}

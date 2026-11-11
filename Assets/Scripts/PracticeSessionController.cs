@@ -268,6 +268,24 @@ public class PracticeSessionController : MonoBehaviour
         }
     }
 
+    private void Start()
+    {
+        string scene = gameObject.scene.name;
+        bool tutorial = CoachModeNavigation.ConsumeTutorial(scene, out string difficulty);
+        if (!tutorial && !IsCurrentCoachScene(scene)) return;
+        orientationMode = CoachOrientationMode.FollowUser;
+        if (tutorial) SetCoachingDifficultyKey(difficulty);
+        StartPractice();
+    }
+
+    public static bool IsCurrentCoachScene(string scene)
+    {
+        if (scene.StartsWith("male", System.StringComparison.Ordinal)) scene = scene.Substring(4);
+        return scene == "DeadBugPractice" || scene == "BirdDogPractice" ||
+            scene == "HipThrustPractice" || scene == "SideBridgePractice" ||
+            scene == "CatCamelPractice" || scene == "CurlUpPractice";
+    }
+
     private void OnDestroy()
     {
         SpineFlowTrainingSession.MobileSessionAccepted -= ApplyPlannedTrainingVolume;
@@ -666,7 +684,8 @@ public class PracticeSessionController : MonoBehaviour
 
                     introductionDemonstrationFinished = true;
                     TryFinishSynchronizedIntroduction(generation);
-                });
+                },
+                () => voicePromptManager?.PlayLessonSecondPart());
         if (!demonstrationStarted)
         {
             introductionDemonstrationFinished = true;
@@ -812,7 +831,6 @@ public class PracticeSessionController : MonoBehaviour
             return;
         }
 
-        poseScorer?.AnnounceInitialFollowInstruction();
     }
 
     private void CaptureIntroductionRendererStates()

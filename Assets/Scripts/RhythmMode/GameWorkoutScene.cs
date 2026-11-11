@@ -116,6 +116,16 @@ public sealed class GameWorkoutScene : MonoBehaviour
         }
         var toggle = ButtonAt("动作串", uiRoot.transform, new Vector2(24, -24), new Vector2(210, 100), TogglePanel);
         toggle.gameObject.SetActive(!hideWorkoutToggle);
+        var app = SpineRecovery.App.AppBootstrap.Instance;
+        if (app != null && app.Training.CurrentPlan != null)
+        {
+            ButtonAt("返回手机首页", uiRoot.transform, new Vector2(245, -24), new Vector2(220, 100), () =>
+            {
+                session.Cancel();
+                StopTraining();
+                app.Training.FinishAndReturn();
+            });
+        }
         summary = toggle.GetComponentInChildren<TMP_Text>();
         summary.fontSize = 25;
         panel = Rect("Workout Panel", uiRoot.transform, new Vector2(24, -135), new Vector2(440, 650)).gameObject;

@@ -1479,7 +1479,7 @@ namespace SpineRecovery.App
             { ShowPostTrainingSurvey(); return; }
             if (!user.preTrainingCheckPassed) { bootstrap.Router.Navigate(AppRoute.PreTraining); return; }
             if (nativeBusy) return;
-            if (NativeMobileService.Available)
+            if (NativeMobileService.Available && user.profile.activationBound)
             {
                 nativeBusy = true;
                 arTrainingMessage.text = "正在获取本次医生处方…";

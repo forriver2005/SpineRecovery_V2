@@ -170,6 +170,12 @@ public sealed class SpineFlowTrainingSession : MonoBehaviour
     [Serializable]
     private sealed class GameResultPayload
     {
+        public string playedGameId;
+        public int plannedRepetitions;
+        public float trackingCoverage;
+        public float creditedSeconds;
+        public float targetSeconds;
+        public bool assessmentAvailable;
         public string gameId;
         public string gameName;
         public int score;
@@ -193,6 +199,7 @@ public sealed class SpineFlowTrainingSession : MonoBehaviour
         public string sessionId;
         public string userId;
         public string requestToken;
+        public long prescriptionOrderId;
         public string status;
         public string endReason;
         public string createdAt;
@@ -214,6 +221,8 @@ public sealed class SpineFlowTrainingSession : MonoBehaviour
 
     private sealed class ModeMeasurement
     {
+        public string playedGameId;
+        public TrainingQualitySummary gameAssessment;
         public int averageScore;
         public int rawAverageScore;
         public int bestScore;
@@ -728,6 +737,7 @@ public sealed class SpineFlowTrainingSession : MonoBehaviour
         {
             return;
         }
+        if (instance.gameMeasurement?.gameAssessment != null) return;
 
         instance.gameMeasurement = BuildGameMeasurement(
             scores,
@@ -738,6 +748,30 @@ public sealed class SpineFlowTrainingSession : MonoBehaviour
                 instance.gameTiming,
                 instance.gamePausedSecondsAtStart),
             instance.pendingGameLevel);
+        instance.gameTiming = false;
+        instance.SaveUnifiedCheckpoint();
+    }
+
+    public static void SaveUnifiedGameAssessment(
+        string playedGameId, string difficulty, TrainingQualitySummary summary, int validSamples)
+    {
+        if (instance == null || !instance.unifiedSession || !instance.HasValidStartPayload()) return;
+        int score = summary.HasAssessment ? summary.Score : 0;
+        instance.gameMeasurement = new ModeMeasurement
+        {
+            playedGameId = playedGameId,
+            gameAssessment = summary,
+            averageScore = score,
+            rawAverageScore = score,
+            bestScore = score,
+            rawBestScore = score,
+            scoreSampleCount = validSamples,
+            completedRepetitions = summary.Qualified,
+            durationSeconds = instance.gameTiming
+                ? instance.ElapsedSeconds(instance.gameStartedAt, true, instance.gamePausedSecondsAtStart)
+                : instance.gameMeasurement?.durationSeconds ?? Mathf.CeilToInt((float)summary.ObservedSeconds),
+            level = difficulty
+        };
         instance.gameTiming = false;
         instance.SaveUnifiedCheckpoint();
     }
@@ -1071,6 +1105,7 @@ public sealed class SpineFlowTrainingSession : MonoBehaviour
             sessionId = startPayload.sessionId,
             userId = startPayload.userId,
             requestToken = startPayload.requestToken,
+            prescriptionOrderId = SpineRecovery.App.AppBootstrap.Instance?.Training.CurrentPlan?.prescriptionOrderId ?? 0,
             createdAt = DateTimeOffset.Now.ToString("o", CultureInfo.InvariantCulture),
             status = hasCompleteScoreSummary ? "COMPLETED" : "INTERRUPTED",
             endReason = hasCompleteScoreSummary ? "NORMAL_COMPLETION" : "INSUFFICIENT_MEASUREMENT",
@@ -1156,6 +1191,7 @@ public sealed class SpineFlowTrainingSession : MonoBehaviour
             sessionId = startPayload.sessionId,
             userId = startPayload.userId,
             requestToken = startPayload.requestToken,
+            prescriptionOrderId = SpineRecovery.App.AppBootstrap.Instance?.Training.CurrentPlan?.prescriptionOrderId ?? 0,
             createdAt = DateTimeOffset.Now.ToString("o", CultureInfo.InvariantCulture),
             // The envelope carries a usable result record. timelineStatus carries
             // whether the playback itself completed or was stopped early.
@@ -1273,6 +1309,12 @@ public sealed class SpineFlowTrainingSession : MonoBehaviour
             : actionId;
         return new GameResultPayload
         {
+            playedGameId = measurement.playedGameId,
+            plannedRepetitions = measurement.gameAssessment?.Planned ?? SafeRepetitionProduct(action.sets, action.reps),
+            trackingCoverage = measurement.gameAssessment?.Coverage ?? 0f,
+            creditedSeconds = (float)(measurement.gameAssessment?.CreditedSeconds ?? 0),
+            targetSeconds = (float)(measurement.gameAssessment?.TargetSeconds ?? 0),
+            assessmentAvailable = measurement.gameAssessment?.HasAssessment ?? measurement.HasScoreSummary,
             gameId = baseId + "_challenge",
             gameName = string.IsNullOrWhiteSpace(action.actionName)
                 ? "Dead Bug Challenge"
@@ -1567,6 +1609,7 @@ public sealed class SpineFlowTrainingSession : MonoBehaviour
     private void ResetMeasurementsForNewSession()
     {
         coachMeasurement = null;
+        coachOutcomeSet = false;
         gameMeasurement = null;
         coachTiming = false;
         gameTiming = false;

@@ -35,7 +35,7 @@ namespace SpineRecovery.App
             CurrentPlan = saved.plan;
             CurrentResult = saved.result;
             // A restarted process cannot continue an in-memory tracking attempt.
-            if (CurrentResult != null && !CurrentResult.completed)
+            if (CurrentResult != null && !CurrentResult.completed && string.IsNullOrEmpty(CurrentResult.endReason))
             {
                 CurrentResult.endReason = "PROCESS_RESTART";
                 CurrentResult.feedbackPending = true;

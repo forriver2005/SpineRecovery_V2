@@ -15,6 +15,7 @@ public sealed class GameTrainingAssessment : MonoBehaviour
     TrainingBridgeAttempt[] bridgeAttempts;
     AvatarMotionSource motion;
     int lastPacket,segmentIndex=-1;
+    int validSamples;
     float lastPacketTime=float.NegativeInfinity;
     double segmentDuration,segmentObserved,segmentQualified,endpointGood,endpointConfirmedAt;
     bool segmentUp,finishing;
@@ -68,6 +69,7 @@ public sealed class GameTrainingAssessment : MonoBehaviour
         motion=FindObjectOfType<AvatarMotionSource>();
         lastPacket=motion!=null?motion.LastPacketframeCounterInFrame:0;
         lastPacketTime=float.NegativeInfinity;IsCollecting=true;IsFinished=false;
+        validSamples=0;
     }
 
     // Observe input during pauses too: an old packet must never become fresh on resume.
@@ -114,6 +116,7 @@ public sealed class GameTrainingAssessment : MonoBehaviour
         // A stalled rendering frame cannot manufacture seconds of patient evidence.
         // Its elapsed time remains in the denominator, but no pose is extrapolated.
         bool usable=tracked && dt<=.1001;
+        if (usable) validSamples++;
         float quality=rules!=null?rules.TrackingQuality:0;
         for(int i=0;i<bridgePlan.Length;i++)
         {
@@ -194,6 +197,7 @@ public sealed class GameTrainingAssessment : MonoBehaviour
         var limbs=Entry.scorer.LastLimbScores;
         var a=Limb(limbs,first);var b=Limb(limbs,second);
         bool tracked=Fresh&&hasTargets&&a.validSegmentCount>0&&b.validSegmentCount>0&&seconds<=.1001;
+        if (tracked) validSamples++;
         // The weaker active limb owns the quality: a stationary left arm cannot
         // be hidden by a good right leg or three inactive limbs.
         float quality=Mathf.Min(a.rawScore,b.rawScore);
@@ -266,6 +270,7 @@ public sealed class GameTrainingAssessment : MonoBehaviour
     }
     public void Finish()
     {
+        if (IsFinished) return;
         if(minimumMotion!=null)for(int i=0;i<Summary.Planned;i++)
         {
             var range=maximumMotion[i]-minimumMotion[i];
@@ -277,5 +282,6 @@ public sealed class GameTrainingAssessment : MonoBehaviour
                 Summary.CapMovementQuality(i,100*Mathf.InverseLerp(.35f,.70f,Mathf.Min(range.x,range.y)));
         }
         IsCollecting=false;IsFinished=true;
+        SpineFlowTrainingSession.SaveUnifiedGameAssessment(Entry.actionId, Entry.menu.SelectedDifficultyKey, Summary, validSamples);
     }
 }

@@ -123,6 +123,7 @@ object TrainingSyncClient {
     /** 单条记录的请求体 JSON（resultJson 原样 + feedback 附加 + SF-08 pre 关联），供 buildUploadBody/拆批共用。 */
     internal fun sessionJsonOf(record: TrainingHistoryRecord): JSONObject {
         val session = JSONObject(record.resultJson)
+        if (session.optLong("prescriptionOrderId") <= 0L) session.remove("prescriptionOrderId")
         record.feedback?.let { feedback ->
             session.put(
                 "feedback",

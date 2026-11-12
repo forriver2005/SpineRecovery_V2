@@ -101,10 +101,19 @@ object UnifiedMobileBridge {
             history = records, painHistory = painRecords
         )
         users.saveUser(saved)
-        main.post { sync.onUserChanged(syncable(saved)) }
+        val feedbackSubmitted = records.any { record ->
+            !record.feedbackPending && record.feedback != null &&
+                old.history.none { it.sessionId == record.sessionId && it.feedback == record.feedback && !it.feedbackPending }
+        }
+        main.post { sync.onUserChanged(syncable(saved), immediate = feedbackSubmitted) }
     }
 
-    @JvmStatic fun foreground() { main.post { sync.onForeground() } }
+    @JvmStatic fun foreground() {
+        main.post {
+            users.activeAccountId()?.let { sync.onUserChanged(syncable(users.loadUser(it)), immediate = true) }
+            sync.onForeground()
+        }
+    }
 
     @JvmStatic fun logout() { identityGeneration.incrementAndGet(); users.saveActiveAccountId(null) }
 
@@ -181,6 +190,7 @@ object UnifiedMobileBridge {
                 require(checked is AccountLoginResult.Allowed) { (checked as AccountLoginResult.Blocked).message }
                 require(identityGeneration.get() == generation) { "登录请求已取消" }
                 users.saveActiveAccountId(account)
+                foreground()
                 return JSONObject(load(account))
             }
             "previewActivation" -> {
@@ -337,11 +347,15 @@ object UnifiedMobileBridge {
         "女", "female" -> UserGender.Female
         else -> UserGender.Unspecified
     }
-    private fun syncable(user: DemoUserData): DemoUserData = user.copy(
+    private fun syncable(user: DemoUserData): DemoUserData {
+        val patientId = PatientCredentials.credential(context, user.accountId)?.patientId
+        return user.copy(
         history = user.history.filter { it.endReason != "LEGACY_IMPORT" &&
-            (it.planJson.isBlank() || (it.endReason.isNotBlank() && !it.feedbackPending)) },
+            (it.planJson.isBlank() || (it.endReason.isNotBlank() && !it.feedbackPending &&
+                patientId != null && runCatching { JSONObject(it.resultJson).optString("userId") }.getOrNull() == patientId)) },
         painHistory = user.painHistory.filterNot { it.id.startsWith("imported:") }
-    )
+        )
+    }
     private fun objects(array: JSONArray?): List<JSONObject> =
         if (array == null) emptyList() else (0 until array.length()).map { array.getJSONObject(it) }
     private fun strings(array: JSONArray?): List<String> =

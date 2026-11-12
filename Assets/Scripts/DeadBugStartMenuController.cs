@@ -1190,7 +1190,7 @@ public class DeadBugStartMenuController : MonoBehaviour
                 label.rectTransform.anchorMax = Vector2.one;
                 label.rectTransform.offsetMin = new Vector2(20f, 10f);
                 label.rectTransform.offsetMax = new Vector2(-20f, -10f);
-                label.text = game && prescribed ? "完成处方，返回手机端" : replay
+                label.text = game && prescribed ? "完成处方，进入游戏" : replay
                     ? "还需要学习，再来一次教练模式"
                     : IsGameUnavailableForCurrentPractice()
                         ? "我已学会，进入游戏模式（尚未开放）"
@@ -1200,11 +1200,7 @@ public class DeadBugStartMenuController : MonoBehaviour
                 {
                     bool available = prescribed || !IsGameUnavailableForCurrentPractice();
                     choice.onClick = new Button.ButtonClickedEvent();
-                    if (prescribed)
-                    {
-                        choice.onClick.AddListener(training.FinishAndReturn);
-                    }
-                    else if (available)
+                    if (available)
                     {
                         choice.onClick.AddListener(() => CoachModeNavigation.OpenGameFromCoach());
                     }

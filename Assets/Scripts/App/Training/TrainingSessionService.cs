@@ -27,6 +27,7 @@ namespace SpineRecovery.App
         public TrainingHistoryRecord CurrentResult { get; private set; }
         public event Action<TrainingPlan> TrainingStarted;
         public bool HasPendingFeedback => CurrentResult != null && CurrentResult.feedbackPending;
+        public bool IsPrescribedTraining => CurrentPlan != null && CurrentPlan.prescriptionOrderId > 0;
 
         private void Awake()
         {
@@ -60,11 +61,26 @@ namespace SpineRecovery.App
                 plan.actionId == "hip_thrust" ? CoachModeNavigation.HipThrustGameScene :
                 plan.actionId == "side_bridge" ? CoachModeNavigation.SideBridgeGameScene :
                 CoachModeNavigation.DeadBugGameScene;
-            if (!Application.CanStreamedLevelBeLoaded(gameScene)) return false;
+            string targetScene = gameScene;
+            if (plan.prescriptionOrderId > 0)
+            {
+                TrainingAction coach = Array.Find(plan.actions, action => action?.arTaskType == "coach_training");
+                if (coach == null || coach.holdSeconds < 0 || coach.holdSeconds > 600) return false;
+                switch (plan.actionId)
+                {
+                    case "dead_bug": targetScene = CoachModeNavigation.DeadBugCoachScene; break;
+                    case "bird_dog": targetScene = CoachModeNavigation.BirdDogCoachScene; break;
+                    default: return false;
+                }
+            }
+            if (!Application.CanStreamedLevelBeLoaded(targetScene)) return false;
             if (HasPendingFeedback && CurrentPlan.accountId == plan.accountId) return false;
             // Clone once so later UI/config edits cannot change the active prescription.
             plan = JsonUtility.FromJson<TrainingPlan>(JsonUtility.ToJson(plan));
-            plan.targetScene = gameScene;
+            if (string.IsNullOrWhiteSpace(plan.patientId)) plan.patientId = plan.accountId;
+            plan.targetScene = targetScene;
+            if (plan.prescriptionOrderId > 0)
+                Array.Find(plan.actions, action => action?.arTaskType == "coach_training").sceneName = targetScene;
             Array.Find(plan.actions, action => action?.arTaskType == "game_training").sceneName = gameScene;
             plan.sessionId = Guid.NewGuid().ToString("N");
             plan.startedAt = DateTimeOffset.UtcNow.ToString("O");

@@ -656,6 +656,8 @@ public class PracticeSessionController : MonoBehaviour
                 1,
                 4);
         coachActionController.SetTrainingVolume(volume.sets, volume.repetitionsPerSet);
+        bool prescribed = SpineRecovery.App.AppBootstrap.Instance?.Training?.IsPrescribedTraining == true;
+        coachActionController.SetPrescribedHoldSeconds(prescribed ? SpineFlowTrainingSession.PlannedCoachHoldSeconds : -1);
     }
 
     private void BeginPracticeIntroduction()

@@ -270,6 +270,7 @@ public class SegmentedCoachController : MonoBehaviour
     private bool isHolding;         // frozen at a segment-end pose during the timeline window
     private bool isComplete;        // whole action (all sets) done
     private float holdRemaining;
+    private int prescribedHoldSeconds = -1;
     private bool skipRequested;
     private int currentSetIndex;
     private int currentSegmentIndex;
@@ -458,7 +459,16 @@ public class SegmentedCoachController : MonoBehaviour
             : CurrentSegmentKind == TrainingSegmentKind.CoreAction
                 ? Mathf.Max(3f, segments[currentSegmentIndex].scoringDuration)
                 : Mathf.Max(1f, segments[currentSegmentIndex].scoringDuration);
-        if (CurrentSegmentKind == TrainingSegmentKind.CoreAction && currentRepeat < 2)
+        if (CurrentSegmentKind == TrainingSegmentKind.CoreAction && prescribedHoldSeconds >= 0)
+        {
+            duration = prescribedHoldSeconds;
+            if (duration == 0f)
+            {
+                ContinueAfterHeldSegment();
+                return;
+            }
+        }
+        else if (CurrentSegmentKind == TrainingSegmentKind.CoreAction && currentRepeat < 2)
         {
             duration *= Mathf.Max(1f, guidedHoldWindowMultiplier);
         }
@@ -479,7 +489,11 @@ public class SegmentedCoachController : MonoBehaviour
             currentRepeat,
             CurrentSegmentKind,
             label);
-        RequestVoicePhase(segmentEvent, CoachVoicePhase.HoldGuidance);
+        AudioClip holdClip = prescribedHoldSeconds >= 0 && CurrentSegmentKind == TrainingSegmentKind.CoreAction
+            ? VoicePromptManager.LoadCoachClip($"Coach_{VoicePromptManager.GetPracticeActionKey()}_hold")
+            : null;
+        if (holdClip == null || holdClip.length <= duration)
+            RequestVoicePhase(segmentEvent, CoachVoicePhase.HoldGuidance);
         holdAdvanceRoutine = StartCoroutine(AutoAdvanceHeldSegment(duration));
     }
 
@@ -1254,6 +1268,11 @@ public class SegmentedCoachController : MonoBehaviour
         }
 
         return targetPose;
+    }
+
+    public void SetPrescribedHoldSeconds(int seconds)
+    {
+        if (!hasStarted) prescribedHoldSeconds = seconds;
     }
 
     public void SetTrainingVolume(int sets, int repetitions)

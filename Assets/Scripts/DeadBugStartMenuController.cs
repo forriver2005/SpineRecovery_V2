@@ -213,6 +213,7 @@ public class DeadBugStartMenuController : MonoBehaviour
     private void ConfigurePracticeStartPresentation()
     {
         if (!IsPracticeCoachMode) return;
+        if (PracticeSessionController.IsCurrentCoachScene(gameObject.scene.name)) return;
         string key = VoicePromptManager.GetPracticeActionKey();
         string title = key == "deadbug" ? "死虫式" : key == "birddog" ? "鸟狗式" :
             key == "hipthrust" ? "臀桥" : key == "catcamel" ? "卧位猫式" :

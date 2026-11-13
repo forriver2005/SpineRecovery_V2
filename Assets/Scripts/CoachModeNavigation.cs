@@ -21,6 +21,19 @@ public static class CoachModeNavigation
     private static string replayPracticeScene;
     private static string replayGameScene;
     private static string preferredGameScene;
+    private static string tutorialScene;
+    private static string tutorialDifficulty;
+
+    public static bool IsOpeningTutorial(string scene) => tutorialScene == scene;
+
+    public static bool ConsumeTutorial(string scene, out string difficulty)
+    {
+        difficulty = tutorialDifficulty;
+        if (tutorialScene != scene) return false;
+        tutorialScene = null;
+        tutorialDifficulty = null;
+        return true;
+    }
 
     public static bool HasReplayGameReturn => !string.IsNullOrWhiteSpace(replayGameScene);
 
@@ -65,6 +78,7 @@ public static class CoachModeNavigation
                 coachScene = BirdDogCoachScene;
                 return true;
             case HipThrustGameScene:
+            case "HipThrust_RingBridge_Hold30":
             case "HipThrust_RingBridge_Recorded":
             case "HipThrustMinimal":
             case "HipTrustGaming":
@@ -104,8 +118,9 @@ public static class CoachModeNavigation
         preferredGameScene = IsConcreteGameScene(source)
             ? source
             : ResolveDefaultGameScene(coachScene);
+        tutorialDifficulty = UnityEngine.Object.FindObjectOfType<DeadBugStartMenuController>(true)?.SelectedDifficultyKey ?? "standard";
+        tutorialScene = SpineFlowTrainingSession.ResolveSceneForMobileSession(coachScene);
         UnityEngine.Object.FindObjectOfType<GameWorkoutSession>(true)?.Cancel();
-        DeadBugStartMenuController.ShowPracticeStartOnNextLoad();
         LoadScene(coachScene);
     }
 

@@ -27,11 +27,6 @@ public static class RecordedAlternatingCoachMode
         {
             var coach = root.GetComponentInChildren<SegmentedCoachController>(true);
             if (coach == null) continue;
-            // The recorded dead-bug excerpts begin in the lying preparation
-            // pose. Keep the original standing-to-lying source motion as a
-            // short patient preparation prelude before switching to them.
-            coach.SetIntroductionTransitionPackage(
-                deadBug ? BuildIntroductionTransition(JsonUtility.FromJson<CoachMotionPackage>(source.text)) : null);
             coach.SetMotionBackend(package);
             foreach (var sceneRoot in scene.GetRootGameObjects())
             {
@@ -70,30 +65,6 @@ public static class RecordedAlternatingCoachMode
                 Segment(deadBug ? "左臂和右腿放下" : "左臂和右腿伸展", second, PoseGuidanceRegionMask.LeftArm | PoseGuidanceRegionMask.RightLeg),
                 Segment(deadBug ? "手脚收回" : "收回支撑", secondReturn, PoseGuidanceRegionMask.None),
                 Segment("放松结束", new[]{Copy(first[0],0)}, PoseGuidanceRegionMask.None)
-            }
-        };
-    }
-
-    public static CoachMotionPackage BuildIntroductionTransition(CoachMotionPackage source)
-    {
-        if (source == null || source.segments == null || source.segments.Length == 0 ||
-            source.segments[0].frames == null || source.segments[0].frames.Length == 0)
-        {
-            return null;
-        }
-
-        CoachMotionFrame[] transition = Slice(source.segments[0].frames, 0f, 6.5f);
-        return new CoachMotionPackage
-        {
-            actionId = source.actionId,
-            packageId = source.packageId + "_introduction",
-            packageVersion = source.packageVersion,
-            displayName = source.displayName,
-            sourceClipName = source.sourceClipName,
-            fps = source.fps,
-            segments = new[]
-            {
-                Segment("站立到仰卧准备", transition, PoseGuidanceRegionMask.None)
             }
         };
     }

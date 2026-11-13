@@ -343,8 +343,7 @@ public class VoicePromptManager : MonoBehaviour
     private string correctionCandidate;
     private float correctionStableSeconds;
     private AudioClip pendingCorrection;
-    public float LessonRestDuration => (ResolveRestGuidanceClip() != null ? ResolveRestGuidanceClip().length : 0f) +
-        (pendingCorrection != null ? pendingCorrection.length : 0f) + 0.1f;
+    public float LessonRestDuration => pendingCorrection != null ? pendingCorrection.length + 0.1f : 0f;
 
     public void ClearLessonCorrection()
     {
@@ -468,8 +467,7 @@ public class VoicePromptManager : MonoBehaviour
             case CoachVoicePhase.RestGuidance:
                 AudioClip correction = pendingCorrection;
                 pendingCorrection = null;
-                yield return PlayAndWait(voiceSource, ResolveRestGuidanceClip(), voiceVolume);
-                if (!phaseCancelRequested) yield return PlayAndWait(voiceSource, correction, voiceVolume);
+                yield return PlayAndWait(voiceSource, correction, voiceVolume);
                 break;
             case CoachVoicePhase.SelfPracticeTransition:
                 AudioClip selfPractice = Resources.Load<AudioClip>(
@@ -673,12 +671,6 @@ public class VoicePromptManager : MonoBehaviour
         // tracked-user model is revealed when formal patient playback begins.
         showCoach?.Invoke();
         yield return WaitRealtime(introductionVisualLeadSeconds);
-        AudioClip recordedLieDown = LoadPracticeLessonClip("recorded_lie_down");
-        if (recordedLieDown != null)
-        {
-            yield return PlayIntroductionClipOrFallback(recordedLieDown);
-            yield return WaitRealtime(recordedPreparationWaitSeconds);
-        }
         AudioClip lessonSetup = LoadPracticeLessonClip("lesson");
         if (lessonSetup != null)
         {
@@ -702,9 +694,15 @@ public class VoicePromptManager : MonoBehaviour
         BeginSequence(PromptKind.PracticeIntroduction, LessonCountdownSequence(completed));
     }
 
+    public void PlayLessonSecondPart()
+    {
+        AudioClip clip = LoadPracticeLessonClip("lesson_second");
+        if (clip != null && activePrompt == PromptKind.None)
+            BeginSequence(PromptKind.PracticeIntroduction, SinglePromptSequence(clip, voiceVolume));
+    }
+
     private IEnumerator LessonCountdownSequence(Action completed)
     {
-        yield return PlayIntroductionClipOrFallback(readyCountdown);
         AudioClip recordedPreparation = LoadPracticeLessonClip("recorded_prepare");
         if (recordedPreparation != null)
         {

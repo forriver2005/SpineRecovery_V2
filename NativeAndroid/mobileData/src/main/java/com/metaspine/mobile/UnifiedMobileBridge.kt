@@ -221,7 +221,12 @@ object UnifiedMobileBridge {
                     "请重新完成本次训练前检查"
                 }
                 val credential = requireNotNull(PatientCredentials.credential(context, account)) { "请先激活医生档案" }
-                val refreshed = TrainingDirectiveCoordinator(TrainingDirectiveStore(context)).refresh(account, credential)
+                val directive = PatientDirectiveClient.fetch(credential.patientToken).getOrThrow()
+                if (directive.optInt("directiveVersion") == 2) {
+                    return UnifiedPrescriptionV2.prepare(context, account, user, credential, directive, preEvent)
+                }
+                val refreshed = TrainingDirectiveCoordinator(TrainingDirectiveStore(context),
+                    fetchDirective = { Result.success(directive) }).refresh(account, credential)
                 require(refreshed is DirectiveRefreshResult.Ready) {
                     when (refreshed) {
                         is DirectiveRefreshResult.NotTrainable -> refreshed.message

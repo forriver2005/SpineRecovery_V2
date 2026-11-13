@@ -17,6 +17,7 @@ public class CoachActionController : MonoBehaviour
     public bool IsActionPaused => isPaused;
     public bool IsHoldingPose => isDifficultyHold;
     public float HoldElapsedSeconds { get; private set; }
+    public int CompletedActionRepetitions { get; private set; }
     public int CurrentTotalScoredSegments { get; private set; } = 1;
     public double[] AssessmentDurations { get; private set; } = new double[0];
     public float SegmentSeconds(string state,float speed)
@@ -528,45 +529,55 @@ public class CoachActionController : MonoBehaviour
 
         int pairCount = Mathf.Min(upSegmentStates.Length, downSegmentStates.Length);
         int safeLoopCount = Mathf.Max(1, profile.loopCount);
-        int totalScoredSegments = Mathf.Max(1, safeLoopCount * pairCount * 2);
+        int prescribedHold = SpineFlowTrainingSession.PlannedPrescriptionGameHoldSeconds;
+        var dose = SpineFlowTrainingSession.GetPlannedTrainingVolume("game", 1, safeLoopCount * pairCount);
+        int repetitions = prescribedHold >= 0 ? dose.TotalRepetitions : safeLoopCount * pairCount;
+        float upHold = prescribedHold >= 0 ? prescribedHold : profile.holdSeconds;
+        float downHold = prescribedHold >= 0 ? 0f : profile.holdSeconds;
+        if (prescribedHold >= 0)
+            Debug.Log($"[PrescriptionGame] {gameObject.scene.name}: {dose.sets} sets x {dose.repetitionsPerSet} reps, hold={upHold}s");
+        int totalScoredSegments = Mathf.Max(1, repetitions * 2);
         CurrentTotalScoredSegments = totalScoredSegments;
-        AssessmentDurations=new double[safeLoopCount*pairCount];
+        AssessmentDurations=new double[repetitions];
         for(int i=0;i<AssessmentDurations.Length;i++)
             AssessmentDurations[i]=SegmentSeconds(upSegmentStates[i%pairCount],profile.upSpeed)+
                 SegmentSeconds(downSegmentStates[i%pairCount],profile.downSpeed);
+        CompletedActionRepetitions = 0;
         int completedScoredSegments = 0;
 
         ScoringSessionStarted?.Invoke();
         ScoringProgressChanged?.Invoke(0f);
 
-        for (int loop = 0; loop < safeLoopCount && hasStarted; loop++)
+        for (int repetition = 0; repetition < repetitions && hasStarted; repetition++)
         {
-            for (int pair = 0; pair < pairCount && hasStarted; pair++)
-            {
-                yield return PlaySegmentToEnd(
-                    upSegmentStates[pair],
-                    profile.upSpeed,
-                    (float)completedScoredSegments / totalScoredSegments,
-                    1f / totalScoredSegments);
-                completedScoredSegments++;
-                ScoringCheckpointInfo upCheckpoint = new ScoringCheckpointInfo(
-                    upSegmentStates[pair], loop, safeLoopCount, pair, true, profile.holdSeconds);
-                ScoringCheckpointStarted?.Invoke(upCheckpoint);
-                if (profile.holdSeconds > 0f) yield return HoldCurrentPose(profile.holdSeconds);
-                ScoringCheckpointEnded?.Invoke(upCheckpoint);
+            int pair = repetition % pairCount;
+            int loop = repetition / (prescribedHold >= 0 ? dose.repetitionsPerSet : pairCount);
+            int loopCount = prescribedHold >= 0 ? dose.sets : safeLoopCount;
+            int repetitionInSet = prescribedHold >= 0 ? repetition % dose.repetitionsPerSet : pair;
+            yield return PlaySegmentToEnd(
+                upSegmentStates[pair],
+                profile.upSpeed,
+                (float)completedScoredSegments / totalScoredSegments,
+                1f / totalScoredSegments);
+            completedScoredSegments++;
+            ScoringCheckpointInfo upCheckpoint = new ScoringCheckpointInfo(
+                upSegmentStates[pair], loop, loopCount, repetitionInSet, true, upHold);
+            ScoringCheckpointStarted?.Invoke(upCheckpoint);
+            if (upHold > 0f) yield return HoldCurrentPose(upHold);
+            ScoringCheckpointEnded?.Invoke(upCheckpoint);
 
-                yield return PlaySegmentToEnd(
-                    downSegmentStates[pair],
-                    profile.downSpeed,
-                    (float)completedScoredSegments / totalScoredSegments,
-                    1f / totalScoredSegments);
-                completedScoredSegments++;
-                ScoringCheckpointInfo downCheckpoint = new ScoringCheckpointInfo(
-                    downSegmentStates[pair], loop, safeLoopCount, pair, false, profile.holdSeconds);
-                ScoringCheckpointStarted?.Invoke(downCheckpoint);
-                if (profile.holdSeconds > 0f) yield return HoldCurrentPose(profile.holdSeconds);
-                ScoringCheckpointEnded?.Invoke(downCheckpoint);
-            }
+            yield return PlaySegmentToEnd(
+                downSegmentStates[pair],
+                profile.downSpeed,
+                (float)completedScoredSegments / totalScoredSegments,
+                1f / totalScoredSegments);
+            completedScoredSegments++;
+            ScoringCheckpointInfo downCheckpoint = new ScoringCheckpointInfo(
+                downSegmentStates[pair], loop, loopCount, repetitionInSet, false, downHold);
+            ScoringCheckpointStarted?.Invoke(downCheckpoint);
+            if (downHold > 0f) yield return HoldCurrentPose(downHold);
+            ScoringCheckpointEnded?.Invoke(downCheckpoint);
+            CompletedActionRepetitions++;
         }
 
         if (hasStarted)

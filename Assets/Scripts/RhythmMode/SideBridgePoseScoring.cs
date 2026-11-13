@@ -101,8 +101,14 @@ public sealed class SideBridgePoseScoring : MonoBehaviour
     void SelectRepetition(int index)
     {
         activeRepetition=index;activeCycle=transport.Hold30Timeline!=null?transport.Hold30Timeline.Repetitions[index].cycle:0;
-        bool dynamic=transport.PrescriptionDose!=null&&transport.PrescriptionDose.preserveRecordedTiming;
-        float goal=dynamic?RecordedHoldTargets[activeCycle]:30;
+        var timeline=transport.Hold30Timeline;
+        bool dynamic=timeline!=null&&timeline.UsesRecordedTiming;
+        float goal=dynamic?RecordedHoldTargets[activeCycle]:HipThrustHold30Timeline.HoldSeconds;
+        if(timeline!=null&&!dynamic)
+        {
+            var repetition=timeline.Repetitions[index];
+            goal=(float)(repetition.lower-repetition.top);
+        }
         Rule.BeginRepetition(goal,goal,!dynamic);
         signal.Reset();history.Clear();bias=biasSum=biasSeconds=0;
     }

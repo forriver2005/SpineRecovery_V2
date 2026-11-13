@@ -1,4 +1,4 @@
-﻿using System.Collections;
+using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UI;
@@ -573,6 +573,8 @@ public class PracticeSessionController : MonoBehaviour
     /// </summary>
     public void StartPractice()
     {
+        if (SpineRecovery.App.AppBootstrap.Instance?.Training.AllowsPrescriptionCoach(gameObject.scene.name) == false)
+            return;
         if (!difficultyConfigured)
         {
             // 还没配置难度，显示难度选择界面
@@ -2047,6 +2049,8 @@ public class PracticeSessionController : MonoBehaviour
             motionRecorder.RequestFinish();
         }
 
+        // Score finalization must precede the checkpoint regardless of event subscription order.
+        poseScorer?.SealTrainingMeasurement();
         SpineFlowTrainingSession.CompleteCoachTraining(
             poseScorer != null ? poseScorer.SessionScores : null,
             poseScorer != null ? poseScorer.MaximumUserMotionDegrees : 0f,

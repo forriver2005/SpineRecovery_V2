@@ -14,6 +14,9 @@ namespace SpineRecovery.App
         public string sceneName;
         public string motionPackageUri;
         public int holdSeconds = -1;
+        public string prescriptionAssetPath;
+        public long prescriptionItemId;
+        public int prescriptionPosition;
     }
 
     [Serializable]
@@ -27,6 +30,7 @@ namespace SpineRecovery.App
         public string preTrainingEventId;
         public long prescriptionOrderId;
         public string prescriptionJson;
+        public int prescriptionContractVersion;
         public string actionId;
         public string targetScene;
         public TrainingAction[] actions = Array.Empty<TrainingAction>();

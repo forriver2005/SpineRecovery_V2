@@ -30,12 +30,20 @@ public sealed class GameWorkoutScene : MonoBehaviour
 
     private void Awake()
     {
-        if (GameTestMenu.EnabledForBuild && System.Array.IndexOf(GameTestMenu.Scenes, gameObject.scene.name) >= 0)
+        var training = SpineRecovery.App.AppBootstrap.Instance?.Training;
+        if (training?.IsV2Prescription == true)
+        {
+            var calibration = scorer.GetComponent<SupineGameCalibration>();
+            if (calibration != null) calibration.skipCalibrationForPreview = false;
+        }
+        if (training?.IsV2Prescription != true && GameTestMenu.EnabledForBuild &&
+            System.Array.IndexOf(GameTestMenu.Scenes, gameObject.scene.name) >= 0)
             gameObject.AddComponent<GameTestMenu>().Initialize(this);
         var assessment=gameObject.AddComponent<GameTrainingAssessment>();
         assessment.Initialize(this);
         session = GameWorkoutSession.Instance;
-        menu.TrainingStartAllowed = () => session.AllowsStart(this) && (taiko == null || taiko.CanStart);
+        menu.TrainingStartAllowed = () => session.AllowsStart(this) && (taiko == null || taiko.CanStart) &&
+            (training?.AllowsPrescriptionGame(gameObject.scene.name) ?? true);
         menu.TrainingStarted += OnStarted;
         if (taiko != null) taiko.Completed += OnCompleted;
         else coach.ActionCompleted += OnCompleted;
@@ -58,7 +66,15 @@ public sealed class GameWorkoutScene : MonoBehaviour
     }
 
     private void OnStarted() { IsPlaying = true; session.OnSetStarted(this); Refresh(); }
-    private void OnCompleted() { IsPlaying = false; session.OnSetCompleted(this); Refresh(); }
+    private void OnCompleted()
+    {
+        IsPlaying = false;
+        session.OnSetCompleted(this);
+        if (SpineRecovery.App.AppBootstrap.Instance?.Training.AllowsPrescriptionGame(gameObject.scene.name) == true)
+            SpineFlowTrainingSession.MarkPrescriptionGameCompleted(
+                taiko != null ? taiko.CompletedDemonstrations : coach.CompletedActionRepetitions);
+        Refresh();
+    }
     private void Update()
     {
         if (IsPlaying && menu.IsTrainingMenuVisible) { IsPlaying = false; Refresh(); }
@@ -115,7 +131,8 @@ public sealed class GameWorkoutScene : MonoBehaviour
             ((RectTransform)uiRoot.transform).sizeDelta = ((RectTransform)gameCanvas.transform).rect.size;
         }
         var toggle = ButtonAt("动作串", uiRoot.transform, new Vector2(24, -24), new Vector2(210, 100), TogglePanel);
-        toggle.gameObject.SetActive(!hideWorkoutToggle);
+        toggle.gameObject.SetActive(!hideWorkoutToggle &&
+            SpineRecovery.App.AppBootstrap.Instance?.Training.IsV2Prescription != true);
         var app = SpineRecovery.App.AppBootstrap.Instance;
         if (app != null && app.Training.CurrentPlan != null)
         {

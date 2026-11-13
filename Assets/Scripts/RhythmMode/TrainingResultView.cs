@@ -40,8 +40,20 @@ public sealed class TrainingResultView : MonoBehaviour
         repetitions=Metric("合格次数",new Vector2(0,-220));
         var buttonRect=Box("Return",root.transform,new Vector2(0,-390),new Vector2(360,68),new Color(.40f,.31f,.67f));
         var button=buttonRect.gameObject.AddComponent<Button>();button.targetGraphic=buttonRect.GetComponent<Image>();
-        button.onClick.AddListener(()=>{oldEnd.SetActive(false);assessment.Entry.StopTraining();});
-        var caption=Label("返回选择",new Vector2(0,-390),new Vector2(350,65),30);caption.raycastTarget=false;
+        var training = SpineRecovery.App.AppBootstrap.Instance?.Training;
+        bool prescribed = training?.IsV2Prescription == true;
+        button.onClick.AddListener(() =>
+        {
+            if (prescribed)
+            {
+                training.ContinuePrescription();
+                return;
+            }
+            oldEnd.SetActive(false);
+            assessment.Entry.StopTraining();
+        });
+        string buttonText = prescribed ? (training.HasNextPrescriptionItem ? "下一项训练" : "完成训练") : "返回选择";
+        var caption=Label(buttonText,new Vector2(0,-390),new Vector2(350,65),30);caption.raycastTarget=false;
         root.SetActive(false);
     }
     TMP_Text Metric(string label,Vector2 position)

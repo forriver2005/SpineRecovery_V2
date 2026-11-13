@@ -34,6 +34,15 @@ public sealed class HipThrustPrescriptionDose : MonoBehaviour
     void RefreshDisplay()
     {
         if(menu==null || !menu.IsTrainingMenuVisible) return;
+        int prescribedHold = SpineFlowTrainingSession.PlannedPrescriptionGameHoldSeconds;
+        if (prescribedHold >= 0)
+        {
+            var volume = SpineFlowTrainingSession.GetPlannedTrainingVolume("game", 1, 1);
+            if (menu.TimesText != null) menu.TimesText.text = volume.sets.ToString();
+            if (menuDescription != null)
+                menuDescription.text = $"处方 {volume.sets} 组 × {volume.repetitionsPerSet} 次 · 保持 {prescribedHold} 秒";
+            return;
+        }
         if(menu.TimesText!=null) menu.TimesText.text=Total.ToString();
         if(menuDescription!=null) menuDescription.text=Label;
     }

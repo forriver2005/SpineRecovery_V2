@@ -1190,7 +1190,8 @@ public class DeadBugStartMenuController : MonoBehaviour
                 label.rectTransform.anchorMax = Vector2.one;
                 label.rectTransform.offsetMin = new Vector2(20f, 10f);
                 label.rectTransform.offsetMax = new Vector2(-20f, -10f);
-                label.text = game && prescribed ? "完成处方，进入游戏" : replay
+                label.text = game && training?.IsV2Prescription == true ? "进入本项游戏" :
+                    game && prescribed ? "完成处方，进入游戏" : replay
                     ? "还需要学习，再来一次教练模式"
                     : IsGameUnavailableForCurrentPractice()
                         ? "我已学会，进入游戏模式（尚未开放）"
@@ -1634,7 +1635,7 @@ public class DeadBugStartMenuController : MonoBehaviour
 
         // The practice card is labeled "组数". Show sets for both phone and
         // standalone practice; the game card keeps its repetition meaning.
-        timesText.text = IsPracticeCoachMode
+        timesText.text = IsPracticeCoachMode || SpineRecovery.App.AppBootstrap.Instance?.Training.IsV2Prescription == true
             ? volume.sets.ToString()
             : volume.repetitionsPerSet.ToString();
     }

@@ -20,9 +20,12 @@ public static class RecordedAlternatingCoachMode
         bool deadBug = scene.name == "DeadBugPractice";
         bool birdDog = scene.name == "BirdDogPractice";
         if (!deadBug && !birdDog) return;
+        string prescribedPath = SpineFlowTrainingSession.CurrentPrescriptionAssetPath;
         var source = Resources.Load<TextAsset>(deadBug ? "ActionLibrary/Motions/clip_29" : "CoachMotions/BirdDogRecordedSides");
-        if (source == null) return;
-        var package = Build(JsonUtility.FromJson<CoachMotionPackage>(source.text), deadBug);
+        string json = string.IsNullOrEmpty(prescribedPath) ? source?.text : System.IO.File.ReadAllText(prescribedPath);
+        if (string.IsNullOrEmpty(json)) return;
+        var recording = JsonUtility.FromJson<CoachMotionPackage>(json);
+        var package = recording.segments.Length == 1 ? Build(recording, deadBug) : recording;
         foreach (var root in scene.GetRootGameObjects())
         {
             var coach = root.GetComponentInChildren<SegmentedCoachController>(true);

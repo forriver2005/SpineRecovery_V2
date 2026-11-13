@@ -63,7 +63,12 @@ public sealed class HipThrustRuleScoring : MonoBehaviour
         progressTolerance=GameDifficultyPolicy.BridgeProgressTolerance(difficulty);
         if(sideBridge!=null) sideBridge.Begin(difficulty);
         bool continuous=transport.Hold30Timeline!=null&&!transport.Hold30Timeline.UsesRecordedTiming;
-        Rule.ContinuousHold=continuous;if(continuous)Rule.SetFullScoreSeconds(30);
+        Rule.ContinuousHold=continuous;
+        if(continuous)
+        {
+            var first=transport.Hold30Timeline.Repetitions[0];
+            Rule.SetFullScoreSeconds((float)(first.lower-first.top));
+        }
         motion=FindObjectOfType<AvatarMotionSource>();
         lastCounter=motion!=null?motion.LastPacketframeCounterInFrame:0;
         lastFrameAt=float.NegativeInfinity;

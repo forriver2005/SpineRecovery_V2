@@ -127,8 +127,10 @@ public static class LumbarCoachMode
         LumbarCoachProfile profile = ForScene(scene.name);
         if (profile == null) return;
         TextAsset source = Resources.Load<TextAsset>("ActionLibrary/Motions/clip_" + profile.clip);
-        CoachMotionPackage package = source != null
-            ? BuildPackage(profile, JsonUtility.FromJson<CoachMotionPackage>(source.text)) : null;
+        string prescribedPath = SpineFlowTrainingSession.CurrentPrescriptionAssetPath;
+        string json = string.IsNullOrEmpty(prescribedPath) ? source?.text : System.IO.File.ReadAllText(prescribedPath);
+        var recorded = string.IsNullOrEmpty(json) ? null : JsonUtility.FromJson<CoachMotionPackage>(json);
+        var package = recorded?.segments?.Length == 1 ? BuildPackage(profile, recorded) : recorded;
         if (package == null || !package.IsValid(out _))
         {
             Debug.LogError($"{profile.displayName}教练录制不可用。");

@@ -135,7 +135,12 @@ public static class CoachModeNavigation
             return;
         }
 
-        gameScene = ResolvePreferredGameScene(source, gameScene);
+        var training = SpineRecovery.App.AppBootstrap.Instance?.Training;
+        if (training?.IsV2Prescription == true)
+        {
+            if (!training.AllowsPrescriptionGame(gameScene)) return;
+        }
+        else gameScene = ResolvePreferredGameScene(source, gameScene);
         StopCurrentPractice();
         LoadScene(gameScene);
     }

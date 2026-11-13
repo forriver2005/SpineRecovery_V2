@@ -21,7 +21,7 @@ public sealed class HipThrustHold30Timeline
     public bool PreservesSourceGaps { get; }
     public const float WrapSeconds=.5f;
 
-    public HipThrustHold30Timeline(HipThrustPhaseTimeline source, int count, bool preserveRecordedTiming=false, bool skipRecordedPlateauAfterHold=false, bool preserveSourceGaps=false)
+    public HipThrustHold30Timeline(HipThrustPhaseTimeline source, int count, bool preserveRecordedTiming=false, bool skipRecordedPlateauAfterHold=false, bool preserveSourceGaps=false, float holdSeconds=HoldSeconds)
     {
         if (count < 1 || count > 2000) throw new ArgumentOutOfRangeException(nameof(count), "处方总次数必须为 1–2000。");
         source.Validate(); this.source=source; fps=source.sourceClip.frameRate;
@@ -35,7 +35,7 @@ public sealed class HipThrustHold30Timeline
             int index=i%source.cycles.Length; var cycle=source.cycles[index];
             int peak=PeakFrame(source, index);
             double top=start+((UsesRecordedTiming?cycle.holdStartFrame:peak)-cycle.liftStartFrame)/(double)fps;
-            double hold=UsesRecordedTiming?(cycle.lowerStartFrame-cycle.holdStartFrame)/(double)fps:HoldSeconds;
+            double hold=UsesRecordedTiming?(cycle.lowerStartFrame-cycle.holdStartFrame)/(double)fps:holdSeconds;
             double end=top+hold+(cycle.lowerEndFrame-(UsesRecordedTiming||skipPlateau?cycle.lowerStartFrame:peak))/(double)fps;
             Repetitions[i]=new Repetition(index,peak,start,top,end,hold); start=end;
             if(PreservesSourceGaps && i<count-1)

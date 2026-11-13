@@ -119,11 +119,14 @@ public sealed class HipThrustRingBridgeView : MonoBehaviour
         }
         phaseProgress.anchorMax = new Vector2(phase < 0 ? 0 : CurrentSample.progress, 1);
         phaseProgress.GetComponent<Image>().color = phase < 0 ? Color.white : PhaseColors[phase];
+        int plannedRepetitions = SpineFlowTrainingSession.PlannedPrescriptionGameHoldSeconds >= 0
+            ? SpineFlowTrainingSession.GetPlannedTrainingVolume("game", 1, 1).TotalRepetitions
+            : transport.Hold30Timeline?.Repetitions.Length ?? transport.PrescriptionDose?.Total ?? 0;
         if (ruleHint != null)
         {
             ruleHint.text = transport.RuleScoring.sideBridge!=null&&!transport.IsRunning?"跟随倒计时准备动作":transport.RuleScoring.Status;
             if (transport.PrescriptionDose != null && transport.RuleScoring.sideBridge==null)
-                ruleHint.text = $"示范 {transport.CompletedDemonstrations}/{transport.PrescriptionDose.Total} 次 · " + ruleHint.text;
+                ruleHint.text = $"示范 {transport.CompletedDemonstrations}/{plannedRepetitions} 次 · " + ruleHint.text;
         }
         if(assessmentPanel!=null)
         {
@@ -132,7 +135,7 @@ public sealed class HipThrustRingBridgeView : MonoBehaviour
             bool ready=started&&transport.RuleScoring.InputFresh&&transport.RuleScoring.calibration!=null&&transport.RuleScoring.calibration.IsCalibrated;
             qualityMetric.text=ready?$"动作质量 {side.TrackingQuality:0} / 100":"动作质量 — / 100";
             holdMetric.text=started?$"{(rule.RequiresContinuousHold?"连续有效":"有效保持")} {rule.DisplayHoldSeconds:0.0} / {rule.TargetHoldSeconds:0.0} 秒":"有效保持 · 准备开始计时";
-            repetitionMetric.text=$"合格 {(started?rule.QualifiedRounds:0)}/{transport.PrescriptionDose.Total} 次 · 示范 {(started?transport.CompletedDemonstrations:0)}/{transport.PrescriptionDose.Total} 次";
+            repetitionMetric.text=$"合格 {(started?rule.QualifiedRounds:0)}/{plannedRepetitions} 次 · 示范 {(started?transport.CompletedDemonstrations:0)}/{plannedRepetitions} 次";
             holdProgress.anchorMax=new Vector2(started&&rule.TargetHoldSeconds>0?Mathf.Clamp01(rule.DisplayHoldSeconds/rule.TargetHoldSeconds):0,1);
         }
     }

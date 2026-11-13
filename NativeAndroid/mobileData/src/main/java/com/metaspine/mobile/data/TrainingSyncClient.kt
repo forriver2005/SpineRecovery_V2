@@ -123,6 +123,7 @@ object TrainingSyncClient {
     /** 单条记录的请求体 JSON（resultJson 原样 + feedback 附加 + SF-08 pre 关联），供 buildUploadBody/拆批共用。 */
     internal fun sessionJsonOf(record: TrainingHistoryRecord): JSONObject {
         val session = JSONObject(record.resultJson)
+        UnifiedPrescriptionV2.result(record, session)?.let { return it }
         if (session.optLong("prescriptionOrderId") <= 0L) session.remove("prescriptionOrderId")
         record.feedback?.let { feedback ->
             session.put(
@@ -157,6 +158,21 @@ object TrainingSyncClient {
         val data = json.optJSONObject("data")
         val uploaded = data?.optInt("uploaded", 0) ?: 0
         val skipped = data?.optInt("skipped", 0) ?: 0
+        val sessions = body.getJSONArray("sessions")
+        val expected = (0 until sessions.length()).map { sessions.getJSONObject(it) }
+            .filter { it.optInt("protocolVersion") == 2 }
+            .map { row ->
+                val result = PrescriptionResultV2.parse(row)
+                result.toReceipt(requireNotNull(result.userId))
+            }
+        if (expected.isNotEmpty()) {
+            val receipts = requireNotNull(data?.optJSONArray("resultReceipts")) { "缺少 V2 结果回执" }
+            val acknowledged = (0 until receipts.length())
+                .mapNotNull { ResultReceipt.fromJson(receipts.getJSONObject(it)) }
+            check(acknowledged.size == expected.size && acknowledged.toSet() == expected.toSet()) {
+                "V2 结果回执与本次上传不一致"
+            }
+        }
         // Skipped records remain failures: the coordinator must not silently discard them.
         if (skipped > 0) throw RuntimeException("服务器跳过 $skipped 条记录（uploaded=$uploaded）")
         uploaded

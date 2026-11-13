@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
@@ -922,10 +922,15 @@ public partial class PoseScorer : MonoBehaviour
         });
     }
 
-    private void HandleAllComplete()
+    public void SealTrainingMeasurement()
     {
         FinalizeContinuousObservation();
         continuousObservationActive = false;
+    }
+
+    private void HandleAllComplete()
+    {
+        SealTrainingMeasurement();
         hapticFeedback?.StopAllHaptics();
         sessionMotionEvidence.Stop();
         // The final transition can be shorter than the queued completion cue.

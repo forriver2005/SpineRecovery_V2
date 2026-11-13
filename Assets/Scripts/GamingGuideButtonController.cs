@@ -12,6 +12,11 @@ public sealed class GamingGuideButtonController : MonoBehaviour
     private void Awake()
     {
         guideButton = GetComponent<Button>();
+        if (SpineRecovery.App.AppBootstrap.Instance?.Training.IsV2Prescription == true)
+        {
+            gameObject.SetActive(false);
+            return;
+        }
         guideButton.onClick.AddListener(OpenGuide);
     }
 

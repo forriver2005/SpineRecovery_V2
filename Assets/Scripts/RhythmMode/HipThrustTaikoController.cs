@@ -96,7 +96,8 @@ public sealed class HipThrustTaikoController : MonoBehaviour
     public HipThrustRuleScoring RuleScoring => ruleScoring;
     public HipThrustPrescriptionDose PrescriptionDose => hold30Dose;
     public HipThrustHold30Timeline Hold30Timeline => hold30Timeline;
-    public bool CanStart => hold30Dose == null || hold30Dose.Total > 0;
+    public bool CanStart => SpineFlowTrainingSession.PlannedPrescriptionGameHoldSeconds >= 0
+        ? phaseTimeline != null : hold30Dose == null || hold30Dose.Total > 0;
     public int CompletedDemonstrations { get; private set; }
     public float PresentationPhaseDuration(HipThrustPhaseTimeline.Sample sample)
     {
@@ -205,7 +206,15 @@ public sealed class HipThrustTaikoController : MonoBehaviour
         int repetitions = cycleCount;
         if (repetitionsText != null && int.TryParse(repetitionsText.text, out int requested)) repetitions = requested;
         passes = Mathf.Clamp(Mathf.CeilToInt(repetitions / (float)cycleCount), 1, 3);
-        hold30Timeline = hold30Dose != null ? new HipThrustHold30Timeline(phaseTimeline, hold30Dose.Total, hold30Dose.preserveRecordedTiming, hold30Dose.skipRecordedPlateauAfterHold, hold30Dose.preserveSourceGaps) : null;
+        int prescribedHold = SpineFlowTrainingSession.PlannedPrescriptionGameHoldSeconds;
+        if (prescribedHold >= 0)
+        {
+            var volume = SpineFlowTrainingSession.GetPlannedTrainingVolume("game", 1, 1);
+            hold30Timeline = new HipThrustHold30Timeline(phaseTimeline, volume.TotalRepetitions,
+                skipRecordedPlateauAfterHold: true, holdSeconds: prescribedHold);
+            Debug.Log($"[PrescriptionGame] {ActionDisplayName}: {volume.sets} sets x {volume.repetitionsPerSet} reps, hold={prescribedHold}s");
+        }
+        else hold30Timeline = hold30Dose != null ? new HipThrustHold30Timeline(phaseTimeline, hold30Dose.Total, hold30Dose.preserveRecordedTiming, hold30Dose.skipRecordedPlateauAfterHold, hold30Dose.preserveSourceGaps) : null;
         CompletedDemonstrations = 0;
         if (ruleScoring != null) ruleScoring.Begin(startMenu.SelectedDifficultyKey);
         elapsed = 0d;

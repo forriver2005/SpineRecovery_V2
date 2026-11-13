@@ -92,6 +92,9 @@ public sealed class SpineFlowTrainingSession : MonoBehaviour
         public int reps;
         public string motionPackageUri;
         public int holdSeconds = -1;
+        public string prescriptionAssetPath;
+        public long prescriptionItemId;
+        public int prescriptionPosition;
     }
 
     [Serializable]
@@ -147,6 +150,9 @@ public sealed class SpineFlowTrainingSession : MonoBehaviour
         public int overallScore;
         public int rawOverallScore;
         public string trainingMode;
+        public long prescriptionItemId;
+        public int prescriptionPosition;
+        public bool prescriptionModeCompleted;
         public int plannedRepetitions;
         public int completedRepetitions;
         public int durationSeconds;
@@ -155,6 +161,7 @@ public sealed class SpineFlowTrainingSession : MonoBehaviour
         public int bestScore;
         public int rawBestScore;
         public int scoreSampleCount;
+        public bool scoreAvailable;
         public string trackingQuality;
         public string timelineStatus;
         public string scoreMappingVersion;
@@ -250,6 +257,11 @@ public sealed class SpineFlowTrainingSession : MonoBehaviour
     private static SpineFlowTrainingSession instance;
 
     private bool unifiedSession;
+    private PlannedAction[] unifiedActions;
+    private int unifiedActionOffset;
+    private bool prescriptionGameCompleted;
+    private readonly List<ActionResultPayload> previousPrescriptionActions = new List<ActionResultPayload>();
+    private readonly List<GameResultPayload> previousPrescriptionGames = new List<GameResultPayload>();
     private StartPayload startPayload;
     private ModeMeasurement coachMeasurement;
     private ModeMeasurement gameMeasurement;
@@ -595,16 +607,24 @@ public sealed class SpineFlowTrainingSession : MonoBehaviour
                 actionId = action.actionId, actionName = action.actionName,
                 arTaskType = action.arTaskType, level = action.level,
                 sets = action.sets, reps = action.reps, motionPackageUri = action.motionPackageUri,
-                holdSeconds = action.holdSeconds
+                holdSeconds = action.holdSeconds,
+                prescriptionAssetPath = action.prescriptionAssetPath,
+                prescriptionItemId = action.prescriptionItemId,
+                prescriptionPosition = action.prescriptionPosition
             });
         }
+        instance.unifiedActions = actions.ToArray();
+        instance.unifiedActionOffset = 0;
+        instance.previousPrescriptionActions.Clear();
+        instance.previousPrescriptionGames.Clear();
+        instance.prescriptionGameCompleted = false;
         instance.startPayload = new StartPayload
         {
             protocolVersion = ProtocolVersion, messageType = StartMessage,
             sessionId = plan.sessionId, userId = plan.patientId ?? plan.accountId,
             targetScene = plan.targetScene,
             userProfile = new UserProfilePayload { gender = plan.gender },
-            trainingPlan = new TrainingPlanPayload { recommendedActions = actions.ToArray() }
+            trainingPlan = new TrainingPlanPayload { recommendedActions = new[] { actions[0], actions[1] } }
         };
         if (!instance.HasValidStartPayload()) return false;
         instance.ResetMeasurementsForNewSession();
@@ -617,6 +637,45 @@ public sealed class SpineFlowTrainingSession : MonoBehaviour
     {
         return instance != null && instance.unifiedSession && instance.HasValidStartPayload()
             ? instance.BuildResultJson() : null;
+    }
+
+    public static string CurrentPrescriptionAssetPath =>
+        instance?.FindPlannedAction("coach")?.prescriptionAssetPath;
+
+    public static bool CurrentPrescriptionCoachCompleted => instance != null && instance.coachOutcomeSet &&
+        instance.coachTimelineStatus == CoachTimelineStatus.Completed;
+
+    public static bool CurrentPrescriptionGameCompleted => instance != null && instance.prescriptionGameCompleted;
+
+    public static int PlannedPrescriptionGameHoldSeconds =>
+        SpineRecovery.App.AppBootstrap.Instance?.Training.IsV2Prescription == true
+            ? instance?.FindPlannedAction("game")?.holdSeconds ?? -1 : -1;
+
+    public static void MarkPrescriptionGameCompleted(int completedRepetitions)
+    {
+        if (instance == null || SpineRecovery.App.AppBootstrap.Instance?.Training.IsV2Prescription != true ||
+            !CurrentPrescriptionCoachCompleted ||
+            completedRepetitions != GetPlannedTrainingVolume("game", 1, 1).TotalRepetitions) return;
+        instance.prescriptionGameCompleted = true;
+        instance.SaveUnifiedCheckpoint();
+    }
+
+    public static void AdvanceUnifiedPrescription(int offset)
+    {
+        var session = instance;
+        var actions = session.startPayload.trainingPlan.recommendedActions;
+        session.previousPrescriptionActions.Add(session.BuildActionResult(actions[0], "coach", session.coachMeasurement));
+        session.previousPrescriptionActions.Add(session.BuildActionResult(actions[1], "game",
+            session.gameMeasurement ?? CreateUnavailableMeasurement("game")));
+        if (session.gameMeasurement != null)
+            session.previousPrescriptionGames.Add(session.BuildGameResult(actions[1], session.gameMeasurement));
+        session.unifiedActionOffset = offset;
+        session.prescriptionGameCompleted = false;
+        session.startPayload.trainingPlan.recommendedActions =
+            new[] { session.unifiedActions[offset], session.unifiedActions[offset + 1] };
+        session.ResetMeasurementsForNewSession();
+        session.PublishPendingMotionPackage();
+        session.SaveUnifiedCheckpoint();
     }
 
     public static int PlannedCoachHoldSeconds => instance != null ? instance.FindPlannedAction("coach")?.holdSeconds ?? -1 : -1;
@@ -722,6 +781,7 @@ public sealed class SpineFlowTrainingSession : MonoBehaviour
         // A replay replaces only the game attempt; the completed practice
         // measurement remains part of this phone-launched training session.
         instance.gameMeasurement = null;
+        instance.prescriptionGameCompleted = false;
         instance.gameStartedAt = Time.realtimeSinceStartup;
         instance.gamePausedSecondsAtStart = MobileCoachControls.TotalPausedSeconds;
         instance.gameTiming = true;
@@ -1088,6 +1148,9 @@ public sealed class SpineFlowTrainingSession : MonoBehaviour
 
     private string BuildResultJson()
     {
+        if (unifiedSession && unifiedActions != null && unifiedActions[0].prescriptionItemId > 0)
+            return BuildUnifiedPrescriptionResultJson();
+
         if (coachOutcomeSet && coachMeasurement != null && (!unifiedSession || gameMeasurement == null))
         {
             return BuildCoachResultJson();
@@ -1151,6 +1214,47 @@ public sealed class SpineFlowTrainingSession : MonoBehaviour
         result.actionResults = actions.ToArray();
         result.gameResults = games.ToArray();
         return JsonUtility.ToJson(result);
+    }
+
+    private string BuildUnifiedPrescriptionResultJson()
+    {
+        var actions = new List<ActionResultPayload>(previousPrescriptionActions);
+        var games = new List<GameResultPayload>(previousPrescriptionGames);
+        var current = startPayload.trainingPlan.recommendedActions;
+        if (coachMeasurement != null)
+            actions.Add(BuildActionResult(current[0], "coach", coachMeasurement));
+        if (gameMeasurement != null || prescriptionGameCompleted)
+            actions.Add(BuildActionResult(current[1], "game", gameMeasurement ?? CreateUnavailableMeasurement("game")));
+        if (gameMeasurement != null)
+            games.Add(BuildGameResult(current[1], gameMeasurement));
+        bool completed = prescriptionGameCompleted && unifiedActionOffset + 2 == unifiedActions.Length;
+        int duration = 0, score = 0, raw = 0, measured = 0;
+        foreach (var action in actions)
+        {
+            duration += action.durationSeconds;
+            if (action.scoreSampleCount < MinimumAcceptedSamples) continue;
+            measured++;
+            score += action.averageScore;
+            raw += action.rawAverageScore;
+        }
+        return JsonUtility.ToJson(new ResultPayload
+        {
+            sessionId = startPayload.sessionId,
+            userId = startPayload.userId,
+            prescriptionOrderId = SpineRecovery.App.AppBootstrap.Instance.Training.CurrentPlan.prescriptionOrderId,
+            createdAt = SpineRecovery.App.AppBootstrap.Instance.Training.CurrentPlan.startedAt,
+            status = completed ? "COMPLETED" : "INTERRUPTED",
+            endReason = completed ? "NORMAL_COMPLETION" : "INCOMPLETE_PRESCRIPTION",
+            completed = completed,
+            durationSeconds = duration,
+            overallScore = measured == 0 ? 0 : Mathf.RoundToInt((float)score / measured),
+            rawOverallScore = measured == 0 ? 0 : Mathf.RoundToInt((float)raw / measured),
+            detailStatus = measured == 0 ? MissingDetail : ScoreSummaryDetail,
+            scoreMappingVersion = ScoreMappingVersion,
+            actionResults = actions.ToArray(),
+            gameResults = games.ToArray(),
+            abnormalEvents = Array.Empty<string>()
+        });
     }
 
     private string BuildCoachResultJson()
@@ -1278,14 +1382,20 @@ public sealed class SpineFlowTrainingSession : MonoBehaviour
             overallScore = measurement.averageScore,
             rawOverallScore = measurement.rawAverageScore,
             trainingMode = mode,
+            prescriptionItemId = action.prescriptionItemId,
+            prescriptionPosition = action.prescriptionPosition,
+            prescriptionModeCompleted = mode == "coach" ? coachOutcomeSet &&
+                coachTimelineStatus == CoachTimelineStatus.Completed : prescriptionGameCompleted,
             plannedRepetitions = SafeRepetitionProduct(action.sets, action.reps),
-            completedRepetitions = measurement.completedRepetitions,
+            completedRepetitions = mode == "game" && prescriptionGameCompleted && action.prescriptionItemId > 0
+                ? SafeRepetitionProduct(action.sets, action.reps) : measurement.completedRepetitions,
             durationSeconds = measurement.durationSeconds,
             averageScore = measurement.averageScore,
             rawAverageScore = measurement.rawAverageScore,
             bestScore = measurement.bestScore,
             rawBestScore = measurement.rawBestScore,
             scoreSampleCount = measurement.scoreSampleCount,
+            scoreAvailable = measurement.gameAssessment?.HasAssessment ?? measurement.HasScoreSummary,
             trackingQuality = measurement.trackingQuality,
             timelineStatus = coachOutcomeSet
                 ? CoachTimelineStatusToWire(coachTimelineStatus)

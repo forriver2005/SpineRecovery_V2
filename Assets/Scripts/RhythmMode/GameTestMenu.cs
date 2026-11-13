@@ -26,7 +26,7 @@ public sealed class GameTestMenu : MonoBehaviour
     public Button[] GameButtons { get; private set; }
     public bool IsPaused => entry != null && (entry.taiko != null ? entry.taiko.IsPaused : entry.coach.IsActionPaused);
     GameWorkoutScene entry;
-    GameObject root, panel, menuToggle;
+    GameObject root, panel, menuToggle, skipCalibration;
     RectTransform safeArea;
     Button resume;
     TMP_Text heading, connection;
@@ -53,6 +53,10 @@ public sealed class GameTestMenu : MonoBehaviour
         safeArea.GetComponent<Image>().raycastTarget = false;
         menuToggle = MakeButton("动作选择", safeArea, new Vector2(-160, -70), new Vector2(250, 76), Open).gameObject;
         var toggleRect = (RectTransform)menuToggle.transform; toggleRect.anchorMin = toggleRect.anchorMax = new Vector2(1, 1);
+        skipCalibration = MakeButton("跳过校准，直接开始", safeArea, new Vector2(-210, 65), new Vector2(380, 80), StartWithoutCalibration).gameObject;
+        var skipRect = (RectTransform)skipCalibration.transform;
+        skipRect.anchorMin = skipRect.anchorMax = new Vector2(1, 0);
+        skipCalibration.GetComponent<Image>().color = new Color(.08f, .35f, .8f);
         var shade = Box("Action Selection", root.transform, Vector2.zero, Vector2.zero, new Color(.025f, .025f, .09f, .94f));
         shade.anchorMin = Vector2.zero; shade.anchorMax = Vector2.one; shade.offsetMin = shade.offsetMax = Vector2.zero;
         panel = shade.gameObject;
@@ -86,6 +90,7 @@ public sealed class GameTestMenu : MonoBehaviour
         bool visible = opened || IsPaused;
         panel.SetActive(visible);
         menuToggle.SetActive(entry.menu.IsTrainingMenuVisible && !visible);
+        skipCalibration.SetActive(entry.menu.IsTrainingMenuVisible && !visible && !entry.scorer.CanStartTraining);
         if (!visible) return;
         heading.text = loading ? "正在切换动作…" : IsPaused ? "已暂停 · 选择动作" : "选择测试动作";
         resume.GetComponentInChildren<TMP_Text>().text = IsPaused ? "继续训练" : "关闭";
@@ -104,6 +109,14 @@ public sealed class GameTestMenu : MonoBehaviour
         if (!entry.menu.IsTrainingMenuVisible && !IsPaused) entry.StopTraining();
         opened = true;
         SynchronizePause();
+    }
+    void StartWithoutCalibration()
+    {
+        var calibration = entry.scorer.GetComponent<SupineGameCalibration>();
+        if (calibration == null) return;
+        calibration.skipCalibrationForPreview = true;
+        entry.scorer.BeginCalibration();
+        if (!GameWorkoutSession.Instance.IsRunning) entry.menu.StartTraining();
     }
     public void Close() { if (loading) return; opened = false; if (IsPaused) TogglePause(); SynchronizePause(); }
     void TogglePause() { if (entry.taiko != null) entry.taiko.TogglePause(); else entry.coach.TogglePause(); }

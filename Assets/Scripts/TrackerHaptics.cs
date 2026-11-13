@@ -564,6 +564,17 @@ public sealed class CoachHapticFeedbackController : MonoBehaviour
 #if UNITY_ANDROID && !UNITY_EDITOR
     private static string ReadAndroidTrackerBindings()
     {
+        if (SpineRecovery.App.AppBootstrap.Instance != null)
+        {
+            if (!SpineRecovery.App.EmbeddedSlimeVrBridge.TryReadState(out var state, imuOnly: true))
+                throw new InvalidOperationException("无法读取内嵌 SlimeVR 追踪器状态");
+            return JsonUtility.ToJson(new SlimeVrHapticTrackerResponse
+            {
+                apiVersion = 1,
+                trackers = state.trackers
+            });
+        }
+
         using (AndroidJavaClass unityPlayer =
             new AndroidJavaClass("com.unity3d.player.UnityPlayer"))
         using (AndroidJavaObject activity =

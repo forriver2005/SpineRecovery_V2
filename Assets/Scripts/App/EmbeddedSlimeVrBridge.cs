@@ -19,7 +19,7 @@ namespace SpineRecovery.App
             public SlimeVrHapticTrackerSnapshot[] trackers;
         }
 
-        public static bool TryReadState(out RuntimeState state)
+        public static bool TryReadState(out RuntimeState state, bool imuOnly = false)
         {
             state = null;
 #if UNITY_ANDROID && !UNITY_EDITOR
@@ -40,10 +40,13 @@ namespace SpineRecovery.App
                         vmcSkeletonOutputFresh = snapshot.Call<bool>("getVmcSkeletonOutputFresh"),
                         trackers = new SlimeVrHapticTrackerSnapshot[trackers.Call<int>("size")]
                     };
+                    var selectedTrackers = new System.Collections.Generic.List<SlimeVrHapticTrackerSnapshot>();
                     for (int i = 0; i < state.trackers.Length; i++)
                     {
                         using (var tracker = trackers.Call<AndroidJavaObject>("get", i))
-                            state.trackers[i] = new SlimeVrHapticTrackerSnapshot
+                        {
+                            if (imuOnly && !tracker.Call<bool>("isImu")) continue;
+                            selectedTrackers.Add(new SlimeVrHapticTrackerSnapshot
                             {
                                 hardwareId = tracker.Call<string>("getHardwareId"),
                                 trackerNum = tracker.Call<int>("getTrackerNum"),
@@ -52,8 +55,10 @@ namespace SpineRecovery.App
                                 bodyPosition = tracker.Call<string>("getBodyPosition"),
                                 status = tracker.Call<string>("getStatus"),
                                 connected = tracker.Call<bool>("getConnected")
-                            };
+                            });
+                        }
                     }
+                    state.trackers = selectedTrackers.ToArray();
                     return true;
                 }
             }

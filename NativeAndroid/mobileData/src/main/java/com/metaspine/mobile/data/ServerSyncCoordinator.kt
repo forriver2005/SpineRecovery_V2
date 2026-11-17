@@ -67,10 +67,15 @@ class ServerSyncCoordinator(
      * 用户状态变更入口（Step 5 由 MainActivity.saveUser 调用）。
      * 防抖 5s：saveUser 调用频繁，只对最终状态做一次 diff。
      */
-    fun onUserChanged(user: DemoUserData) {
+    fun onUserChanged(user: DemoUserData, immediate: Boolean = false) {
         if (user.accountId in forgottenAccountIds) return
         val accountId = user.accountId
         debounceJobs[accountId]?.cancel()
+        if (immediate) {
+            debounceJobs.remove(accountId)
+            enqueueUserDiff(user)
+            return
+        }
         debounceJobs[accountId] = scope.launch {
             delay(5_000)
             enqueueUserDiff(user)

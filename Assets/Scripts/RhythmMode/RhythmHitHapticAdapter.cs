@@ -1,10 +1,11 @@
 using UnityEngine;
 
-/// <summary>Maps hit rhythm notes to exactly one corresponding distal tracker.</summary>
+/// <summary>Maps confirmed HITs to their limb tracker, or exclusively the waist in hip thrust.</summary>
 public sealed class RhythmHitHapticAdapter : MonoBehaviour
 {
     [SerializeField] private RhythmModeController rhythmController;
     [SerializeField] private CoachHapticFeedbackController hapticController;
+    private HipThrustTaikoController hipThrustController;
 
     private void Awake()
     {
@@ -14,7 +15,12 @@ public sealed class RhythmHitHapticAdapter : MonoBehaviour
     private void OnEnable()
     {
         ResolveReferences();
-        if (rhythmController != null)
+        if (hipThrustController != null)
+        {
+            hipThrustController.HitResolved -= HandleHipThrustHit;
+            hipThrustController.HitResolved += HandleHipThrustHit;
+        }
+        else if (rhythmController != null)
         {
             rhythmController.NoteResolved -= HandleNoteResolved;
             rhythmController.NoteResolved += HandleNoteResolved;
@@ -23,6 +29,7 @@ public sealed class RhythmHitHapticAdapter : MonoBehaviour
 
     private void OnDisable()
     {
+        if (hipThrustController != null) hipThrustController.HitResolved -= HandleHipThrustHit;
         if (rhythmController != null)
         {
             rhythmController.NoteResolved -= HandleNoteResolved;
@@ -33,6 +40,8 @@ public sealed class RhythmHitHapticAdapter : MonoBehaviour
 
     private void ResolveReferences()
     {
+        if (hipThrustController == null)
+            hipThrustController = FindObjectOfType<HipThrustTaikoController>(true);
         if (rhythmController == null)
         {
             rhythmController = FindObjectOfType<RhythmModeController>(true);
@@ -51,7 +60,7 @@ public sealed class RhythmHitHapticAdapter : MonoBehaviour
 
     private void HandleNoteResolved(RhythmNoteResult result)
     {
-        if (!result.IsHit || hapticController == null)
+        if (!result.IsHit || hapticController == null || hipThrustController != null)
         {
             return;
         }
@@ -74,5 +83,11 @@ public sealed class RhythmHitHapticAdapter : MonoBehaviour
                 hapticController.PulseOnce(TrackerWearLocation.Abdomen);
                 break;
         }
+    }
+
+    private void HandleHipThrustHit(bool hit)
+    {
+        if (hit && hapticController != null)
+            hapticController.PulseOnce(TrackerWearLocation.Abdomen);
     }
 }

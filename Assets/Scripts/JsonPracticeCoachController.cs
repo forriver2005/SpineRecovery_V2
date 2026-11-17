@@ -6,13 +6,20 @@ using UnityEngine;
 public sealed class JsonPracticeCoachController : MonoBehaviour
 {
     public event Action<SegmentHoldInfo> OnSegmentHold;
+    public event Action<PracticeSegmentPlaybackInfo> OnSegmentStarted;
     public event Action OnAllComplete;
+    public event Action<CoachTimelineStatus, CoachEndReason> OnTimelineStopped;
 
     private CoachMotionPackage package;
     private KeyframeCoachMotionBackend backend;
     private Coroutine playbackRoutine;
-    private bool waitingForAdvance;
+    private bool phaseHoldActive;
+    private bool skipRequested;
+    private bool isPaused;
     private bool complete;
+    private int voicePhaseRequestSequence;
+    private int pendingVoicePhaseRequestId;
+    private bool pendingVoicePhaseCompleted = true;
     private int setIndex;
     private int segmentIndex;
     private int repeatIndex;
@@ -30,7 +37,8 @@ public sealed class JsonPracticeCoachController : MonoBehaviour
     public int TotalSets => Mathf.Max(1, package?.setCount ?? 1);
     public int TotalSegments => package?.segments?.Length ?? 0;
     public bool IsComplete => complete;
-    public bool IsHoldingAtSegment => waitingForAdvance;
+    public bool IsHoldingAtSegment => phaseHoldActive;
+    public bool IsPaused => isPaused || MobileCoachControls.IsPaused;
 
     public void Initialize(
         Animator animator,
@@ -46,7 +54,10 @@ public sealed class JsonPracticeCoachController : MonoBehaviour
         backend?.Dispose();
         backend = null;
 
-        waitingForAdvance = false;
+        phaseHoldActive = false;
+        skipRequested = false;
+        isPaused = false;
+        pendingVoicePhaseCompleted = true;
         complete = false;
         setIndex = 0;
         segmentIndex = 0;
@@ -58,6 +69,66 @@ public sealed class JsonPracticeCoachController : MonoBehaviour
         presentationController = FindObjectOfType<DeadBugStartMenuController>(true);
 
         Debug.Log($"[JsonPracticeCoachController] 已初始化，package='{package.actionId}'，推迟创建 backend 直到播放时");
+    }
+
+    private void OnEnable()
+    {
+        CoachEventBus.CoachHardStopRequested += HandleHardStopRequested;
+        CoachEventBus.CoachVoicePhaseCompleted += HandleVoicePhaseCompleted;
+    }
+
+    private void OnDisable()
+    {
+        CoachEventBus.CoachHardStopRequested -= HandleHardStopRequested;
+        CoachEventBus.CoachVoicePhaseCompleted -= HandleVoicePhaseCompleted;
+        if (!complete && playbackRoutine != null)
+        {
+            StopTimeline(
+                CoachTimelineStatus.Interrupted,
+                CoachEndReason.TechnicalError);
+        }
+    }
+
+    private void HandleVoicePhaseCompleted(int requestId)
+    {
+        if (requestId == pendingVoicePhaseRequestId)
+        {
+            pendingVoicePhaseCompleted = true;
+        }
+    }
+
+    private int RequestVoicePhase(
+        CoachSegmentEvent segment,
+        CoachVoicePhase phase,
+        AudioClip clip = null,
+        string clipName = null)
+    {
+        int requestId = ++voicePhaseRequestSequence;
+        pendingVoicePhaseRequestId = requestId;
+        pendingVoicePhaseCompleted = false;
+        bool dispatched = CoachEventBus.PublishVoicePhaseRequested(
+            new CoachVoicePhaseRequest(
+                requestId,
+                segment,
+                phase,
+                clip,
+                clipName));
+        if (!dispatched)
+        {
+            pendingVoicePhaseCompleted = true;
+        }
+        return requestId;
+    }
+
+    private void CancelPendingVoicePhase()
+    {
+        if (pendingVoicePhaseCompleted)
+        {
+            return;
+        }
+
+        CoachEventBus.CancelVoicePhase(pendingVoicePhaseRequestId);
+        pendingVoicePhaseCompleted = true;
     }
 
     /// <summary>
@@ -82,6 +153,7 @@ public sealed class JsonPracticeCoachController : MonoBehaviour
 
     public void PlayAction()
     {
+        EnsureBackendReady();
         if (backend == null || !backend.IsReady)
         {
             Debug.LogError("JsonPracticeCoachController needs a valid motion package.", this);
@@ -93,7 +165,10 @@ public sealed class JsonPracticeCoachController : MonoBehaviour
             StopCoroutine(playbackRoutine);
         }
 
-        waitingForAdvance = false;
+        phaseHoldActive = false;
+        skipRequested = false;
+        isPaused = false;
+        pendingVoicePhaseCompleted = true;
         complete = false;
         setIndex = 0;
         segmentIndex = 0;
@@ -125,7 +200,9 @@ public sealed class JsonPracticeCoachController : MonoBehaviour
             StopCoroutine(playbackRoutine);
         }
 
-        waitingForAdvance = false;
+        phaseHoldActive = false;
+        skipRequested = false;
+        isPaused = false;
         complete = false;
         setIndex = 0;
         segmentIndex = 0;
@@ -139,39 +216,58 @@ public sealed class JsonPracticeCoachController : MonoBehaviour
 
     public void AdvanceToNext()
     {
-        if (waitingForAdvance)
-        {
-            waitingForAdvance = false;
-        }
+        // Explicit user skip. Normal progression is owned by the playback clock.
+        skipRequested = true;
     }
 
     public void TogglePause()
     {
-        if (Time.timeScale > 0f)
+        bool pause = !IsPaused;
+        MobileCoachControls mobileControls =
+            FindObjectOfType<MobileCoachControls>(true);
+        mobileControls?.SetPaused(pause);
+        isPaused = pause;
+        if (pause)
         {
-            Time.timeScale = 0f;
             backend?.Freeze();
         }
         else
         {
-            Time.timeScale = 1f;
             backend?.Resume();
         }
     }
 
     public void StopPractice()
     {
+        StopTimeline(CoachTimelineStatus.EndedEarly, CoachEndReason.UserEnded);
+        CancelPracticeIntroduction();
+        motionRecorder?.CancelRecording();
+        backend?.ReturnIdle();
+    }
+
+    public void StopTimeline(CoachTimelineStatus status, CoachEndReason reason)
+    {
+        if (complete || playbackRoutine == null) return;
         if (playbackRoutine != null)
         {
             StopCoroutine(playbackRoutine);
             playbackRoutine = null;
         }
-        waitingForAdvance = false;
-        complete = false;
+        phaseHoldActive = false;
+        skipRequested = true;
+        isPaused = false;
+        CancelPendingVoicePhase();
         CancelPracticeIntroduction();
         motionRecorder?.CancelRecording();
-        backend?.ReturnIdle();
-        Time.timeScale = 1f;
+        complete = true;
+        backend?.Freeze();
+        if (reason == CoachEndReason.SafetyStop ||
+            reason == CoachEndReason.HeadsetDisconnected)
+        {
+            CoachEventBus.PublishSafetyStopped(reason);
+        }
+        CoachEventBus.PublishSessionCompleted(status, reason);
+        CoachEventBus.InvokeSafely(OnTimelineStopped, status, reason);
     }
 
     public void ReturnIdle() => StopPractice();
@@ -197,7 +293,8 @@ public sealed class JsonPracticeCoachController : MonoBehaviour
             if (introductionPlayed)
             {
                 Debug.Log("[JsonPracticeCoachController] 开始播放介绍和倒数");
-                // 等待介绍完成（BeginFormalPlayback 会被调用）
+                // VoicePromptManager calls BeginFormalPlayback only after all
+                // original introduction clips have finished.
                 yield break;
             }
         }
@@ -348,28 +445,121 @@ public sealed class JsonPracticeCoachController : MonoBehaviour
                 for (repeatIndex = 0; repeatIndex < repeatCount; repeatIndex++)
                 {
                     backend.PlaySegment(segmentIndex);
-                    while (!backend.HasReachedSegmentEnd())
+                    TrainingSegmentKind segmentKind = ResolveSegmentKind(
+                        segmentIndex,
+                        package.segments.Length,
+                        segment.applyFormalActionScoreMapping);
+                    string label = string.IsNullOrEmpty(segment.label)
+                        ? segment.sourceStateName
+                        : segment.label;
+                    PracticeSegmentPlaybackInfo playbackInfo =
+                        new PracticeSegmentPlaybackInfo(
+                            segmentIndex,
+                            repeatIndex,
+                            setIndex,
+                            label,
+                            segmentKind,
+                            CoachGuidanceLimb.None);
+                    CoachEventBus.InvokeSafely(OnSegmentStarted, playbackInfo);
+                    CoachSegmentEvent segmentEvent = new CoachSegmentEvent(
+                        segmentIndex,
+                        setIndex,
+                        repeatIndex,
+                        segmentKind,
+                        label);
+                    CoachEventBus.PublishSegmentStarted(segmentEvent);
+                    if (!string.IsNullOrWhiteSpace(segment.voiceClipName))
                     {
-                        backend.Tick(Time.deltaTime);
+                        RequestVoicePhase(
+                            segmentEvent,
+                            CoachVoicePhase.SegmentCue,
+                            null,
+                            segment.voiceClipName);
+                    }
+                    while (!backend.HasReachedSegmentEnd() && !skipRequested)
+                    {
+                        if (!isPaused && !MobileCoachControls.IsPaused)
+                        {
+                            backend.Tick(Time.unscaledDeltaTime);
+                        }
                         yield return null;
                     }
 
                     backend.SnapToSegmentEnd();
                     backend.Freeze();
-                    waitingForAdvance = true;
-                    OnSegmentHold?.Invoke(new SegmentHoldInfo(
+                    if (segmentKind == TrainingSegmentKind.Finish)
+                    {
+                        if (skipRequested)
+                        {
+                            CancelPendingVoicePhase();
+                        }
+                        else
+                        {
+                            RequestVoicePhase(
+                                segmentEvent,
+                                CoachVoicePhase.FinishCue);
+                        }
+                        while (isPaused || MobileCoachControls.IsPaused)
+                        {
+                            yield return null;
+                        }
+                        // A skip applies to this phase only. Clear it before
+                        // the next authored phase so one button press cannot
+                        // cascade through the remainder of the timeline.
+                        skipRequested = false;
+                        continue;
+                    }
+
+                    phaseHoldActive = true;
+                    CoachEventBus.InvokeSafely(OnSegmentHold, new SegmentHoldInfo(
                         segmentIndex,
                         repeatIndex,
                         setIndex,
-                        string.IsNullOrEmpty(segment.label) ? segment.sourceStateName : segment.label,
+                        label,
                         Mathf.Max(0.1f, segment.scoreLeniency),
                         Mathf.Max(1f, segment.scoringDuration),
-                        segment.applyFormalActionScoreMapping,
+                        segmentKind,
                         segment.poseGuidanceRule));
-                    while (waitingForAdvance)
+                    if (skipRequested)
                     {
+                        CancelPendingVoicePhase();
+                    }
+                    else
+                    {
+                        RequestVoicePhase(segmentEvent, CoachVoicePhase.HoldGuidance);
+                    }
+                    float remaining = Mathf.Max(1f, segment.scoringDuration);
+                    while (!skipRequested && remaining > 0f)
+                    {
+                        if (!isPaused && !MobileCoachControls.IsPaused)
+                        {
+                            remaining -= Time.unscaledDeltaTime;
+                        }
                         yield return null;
                     }
+                    if (segmentKind == TrainingSegmentKind.ReturnTransition)
+                    {
+                        const float restDuration = 4f;
+                        CoachEventBus.PublishRestStarted(segmentEvent, restDuration);
+                        if (!skipRequested)
+                        {
+                            RequestVoicePhase(
+                                segmentEvent,
+                                CoachVoicePhase.RestGuidance);
+                        }
+                        float rest = restDuration;
+                        while (!skipRequested && rest > 0f)
+                        {
+                            if (!isPaused && !MobileCoachControls.IsPaused)
+                            {
+                                rest -= Time.unscaledDeltaTime;
+                            }
+                            yield return null;
+                        }
+                    }
+                    CancelPendingVoicePhase();
+                    phaseHoldActive = false;
+                    skipRequested = false;
                     backend.Resume();
                 }
             }
@@ -378,12 +568,34 @@ public sealed class JsonPracticeCoachController : MonoBehaviour
         complete = true;
         playbackRoutine = null;
         motionRecorder?.RequestFinish();
-        OnAllComplete?.Invoke();
+        CoachEventBus.PublishSessionCompleted(
+            CoachTimelineStatus.Completed,
+            CoachEndReason.NormalCompletion);
+        CoachEventBus.InvokeSafely(OnAllComplete);
+    }
+
+    private static TrainingSegmentKind ResolveSegmentKind(
+        int index,
+        int count,
+        bool formalScore)
+    {
+        if (index == 0) return TrainingSegmentKind.Preparation;
+        if (index == count - 1) return TrainingSegmentKind.Finish;
+        return formalScore ? TrainingSegmentKind.CoreAction : TrainingSegmentKind.ReturnTransition;
     }
 
     private void OnDestroy()
     {
-        Time.timeScale = 1f;
         backend?.Dispose();
+    }
+
+    private void HandleHardStopRequested(CoachEndReason reason)
+    {
+        CoachTimelineStatus status = reason == CoachEndReason.SafetyStop
+                ? CoachTimelineStatus.SafetyStopped
+                : reason == CoachEndReason.UserEnded
+                    ? CoachTimelineStatus.EndedEarly
+                    : CoachTimelineStatus.Interrupted;
+        StopTimeline(status, reason);
     }
 }

@@ -58,6 +58,13 @@ public class DeadBugCountdownController : MonoBehaviour
         countdownRoutine = StartCoroutine(CountdownThenPlay(actionStateName));
     }
 
+    public void CancelCountdown()
+    {
+        if (countdownRoutine != null) StopCoroutine(countdownRoutine);
+        countdownRoutine = null;
+        HideCountdown();
+    }
+
     private IEnumerator CountdownThenPlay(string actionStateName)
     {
         int safeCountdownSeconds = countdownEnabled ? Mathf.Max(0, countdownSeconds) : 0;

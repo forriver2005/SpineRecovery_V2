@@ -95,6 +95,11 @@ public class ScorePopup : MonoBehaviour
         ShowTimedScore("平均分", score, feedback);
     }
 
+    public void ShowUnmeasured()
+    {
+        ShowTimedText("本段未测量\n<size=45%>缺少有效追踪数据</size>");
+    }
+
     public static string FormatLiveScoreText(float score)
     {
         return $"实时分数：{FormalActionScoreMappingSettings.RoundForDisplay(score)}";
@@ -127,6 +132,14 @@ public class ScorePopup : MonoBehaviour
 
     private void ShowTimedScore(string label, float score, string feedback)
     {
+        string text = label == "平均分" ? FormatAverageScoreText(score, feedback) :
+            $"{label}：{FormalActionScoreMappingSettings.RoundForDisplay(score)}" +
+            (string.IsNullOrWhiteSpace(feedback) ? "" : $"\n<size=45%>{feedback}</size>");
+        ShowTimedText(text);
+    }
+
+    private void ShowTimedText(string text)
+    {
         if (!PrepareForDisplay())
         {
             return;
@@ -135,7 +148,7 @@ public class ScorePopup : MonoBehaviour
         StopDisplayRoutine();
         IsShowing = true;
         displayRoutine = StartCoroutine(
-            DisplayScoreRoutine(label, score, feedback));
+            DisplayScoreRoutine(text));
     }
 
     private bool PrepareForDisplay()
@@ -173,17 +186,9 @@ public class ScorePopup : MonoBehaviour
         canvasGroup.blocksRaycasts = false;
     }
 
-    private IEnumerator DisplayScoreRoutine(
-        string label,
-        float score,
-        string feedback)
+    private IEnumerator DisplayScoreRoutine(string text)
     {
-        scoreText.text = label == "平均分"
-            ? FormatAverageScoreText(score, feedback)
-            : string.IsNullOrWhiteSpace(feedback)
-                ? $"{label}：{FormalActionScoreMappingSettings.RoundForDisplay(score)}"
-                : $"{label}：{FormalActionScoreMappingSettings.RoundForDisplay(score)}\n" +
-                  $"<size=45%>{feedback}</size>";
+        scoreText.text = text;
 
         ShowCanvas();
 

@@ -22,7 +22,7 @@ public sealed class MobileDisplayModeBootstrap : MonoBehaviour
     private void Awake()
     {
         SceneManager.sceneLoaded += HandleSceneLoaded;
-        ApplyPolicy();
+        ApplyPolicy(SceneManager.GetActiveScene());
     }
 
     private void OnDestroy()
@@ -32,11 +32,16 @@ public sealed class MobileDisplayModeBootstrap : MonoBehaviour
 
     private void HandleSceneLoaded(Scene scene, LoadSceneMode mode)
     {
-        ApplyPolicy();
+        ApplyPolicy(scene);
     }
 
-    private void ApplyPolicy()
+    private void ApplyPolicy(Scene scene)
     {
+        if (scene.name == "AppShell")
+        {
+            SpineRecovery.App.ScreenOrientationService.SetPortrait();
+            return;
+        }
         ApplyOrientation();
         if (forceScreenSpaceCanvases) ConvertCanvasesToScreenSpace();
         EnsureTouchEventSystem();

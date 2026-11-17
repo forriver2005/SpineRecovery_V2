@@ -2,7 +2,7 @@ Shader "SpineRecovery/BodyPartHighlightOverlay"
 {
     Properties
     {
-        _Color ("Highlight Color", Color) = (0, 1, 0, 0.95)
+        _Color ("Highlight Color", Color) = (0.14, 0.96, 0.34, 0.88)
         _Pulse ("Pulse", Range(0, 2)) = 1
     }
 
@@ -17,7 +17,7 @@ Shader "SpineRecovery/BodyPartHighlightOverlay"
 
         Pass
         {
-            Blend SrcAlpha One
+            Blend SrcAlpha OneMinusSrcAlpha
             Cull Back
             ZWrite Off
             ZTest LEqual

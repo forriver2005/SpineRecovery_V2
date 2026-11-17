@@ -4,6 +4,7 @@
 *.hlsl text eol=lf
 *.cginc text eol=lf
 *.json text eol=lf
+*.coachrecording -text
 *.xml text eol=lf
 *.gradle text eol=lf
 *.meta text eol=lf

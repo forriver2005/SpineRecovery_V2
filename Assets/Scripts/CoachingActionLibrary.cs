@@ -4,8 +4,7 @@ using UnityEngine;
 using UnityEngine.SceneManagement;
 using UnityEngine.UI;
 
-// CoachingChoose keeps its original preview model and camera; this replaces its old
-// three-action training selector with an offline library of recorded motions.
+// Plays recorded motions in the dedicated ActionLibrary scene.
 public sealed class CoachingActionLibrary : MonoBehaviour
 {
     [Serializable]
@@ -24,28 +23,38 @@ public sealed class CoachingActionLibrary : MonoBehaviour
         public float viewAngle;
     }
 
-    private const string SceneName = "CoachingChoose";
+    private const string SceneName = "ActionLibrary";
     private static string returnScene;
     private static Scene retainedPracticeScene;
     private static GameObject[] retainedPracticeRoots;
     private static bool[] retainedRootActiveStates;
 
-    private readonly Color background = Color.black;
-    private readonly Color panelColor = Color.black;
     private readonly Color cardColor = new Color(0.12f, 0.12f, 0.12f, 1f);
     private readonly Color selectedColor = new Color(0.22f, 0.22f, 0.22f, 1f);
 
     private Entry[] entries;
     private Image[] cards;
-    private TMP_Text selectedName;
-    private TMP_Text statusText;
-    private TMP_FontAsset font;
-    private Camera previewCamera;
+    [SerializeField] private TMP_Text selectedName;
+    [SerializeField] private TMP_Text statusText;
+    [SerializeField] private Button backButton;
+    [SerializeField] private RectTransform listContent;
+    [SerializeField] private Button rowTemplate;
+    [SerializeField] private RawImage previewImage;
+    [SerializeField] private Camera previewCamera;
+    [SerializeField] private GameObject coachPreview;
+    private Button startPracticeButton;
     private Animator coachAnimator;
     private RenderTexture previewTexture;
     private TextAsset loadedMotion;
     private KeyframeCoachMotionBackend player;
     private int selectedIndex = -1;
+    private Vector3 previewTarget;
+    private Vector3 previewBaseDirection;
+    private float previewDistance;
+    private float previewYaw;
+    private float previewPitch;
+    private bool previewMouseDragging;
+    private Vector2 previousMousePosition;
 
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.BeforeSceneLoad)]
     private static void Register()
@@ -56,8 +65,8 @@ public sealed class CoachingActionLibrary : MonoBehaviour
         retainedRootActiveStates = null;
         SceneManager.activeSceneChanged -= RememberSourceScene;
         SceneManager.activeSceneChanged += RememberSourceScene;
-        SceneManager.sceneLoaded -= Install;
-        SceneManager.sceneLoaded += Install;
+        SceneManager.sceneLoaded -= OnSceneLoaded;
+        SceneManager.sceneLoaded += OnSceneLoaded;
     }
 
     private static void RememberSourceScene(Scene from, Scene to)
@@ -70,20 +79,19 @@ public sealed class CoachingActionLibrary : MonoBehaviour
 
     private static bool IsPracticeScene(string sceneName)
     {
-        return sceneName == "DeadBugPractice" ||
+        return RecordedAlternatingCoachMode.IsRecordedScene(sceneName) || LumbarCoachMode.ForScene(sceneName) != null ||
+            sceneName == "DeadBugPractice" ||
             sceneName == "BirdDogPractice" ||
-            sceneName == "maleDeadBugPractice" ||
-            sceneName == "maleBirdDogPractice";
+            sceneName == "maleDeadBugPracticeOld" ||
+            sceneName == "maleBirdDogPracticeOld" ||
+            sceneName == "HipThrustPractice" ||
+            sceneName == "maleHipThrustPractice";
     }
 
-    private static void Install(Scene scene, LoadSceneMode mode)
+    private static void OnSceneLoaded(Scene scene, LoadSceneMode mode)
     {
-        if (scene.name == SceneName && FindObjectOfType<CoachingActionLibrary>() == null)
+        if (scene.name == SceneName)
         {
-            GameObject host = new GameObject(nameof(CoachingActionLibrary));
-            SceneManager.MoveGameObjectToScene(host, scene);
-            host.AddComponent<CoachingActionLibrary>();
-
             if (retainedPracticeScene.IsValid() && retainedPracticeScene.isLoaded)
             {
                 retainedPracticeRoots = retainedPracticeScene.GetRootGameObjects();
@@ -130,30 +138,9 @@ public sealed class CoachingActionLibrary : MonoBehaviour
             ? JsonUtility.FromJson<Catalog>(catalogAsset.text)?.items
             : null;
 
-        GameObject menu = FindInLibraryScene("ActionMenu");
-        GameObject preview = FindInLibraryScene("DeadBUgPreview");
-        if (menu == null || preview == null)
-        {
-            Debug.LogError("Action library could not find the CoachingChoose menu or coach preview.");
-            return;
-        }
-
-        font = FindChineseFont();
-        coachAnimator = preview.GetComponentInChildren<Animator>(true);
-        DisableOldSelector(menu);
+        coachAnimator = coachPreview.GetComponentInChildren<Animator>(true);
         PreparePreview();
-        GameObject libraryCanvas = new GameObject(
-            "ActionLibraryCanvas",
-            typeof(RectTransform), typeof(Canvas), typeof(CanvasScaler), typeof(GraphicRaycaster));
-        SceneManager.MoveGameObjectToScene(libraryCanvas, SceneManager.GetSceneByName(SceneName));
-        Canvas canvas = libraryCanvas.GetComponent<Canvas>();
-        canvas.renderMode = RenderMode.ScreenSpaceOverlay;
-        canvas.sortingOrder = 100;
-        CanvasScaler scaler = libraryCanvas.GetComponent<CanvasScaler>();
-        scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
-        scaler.referenceResolution = new Vector2(1920f, 1080f);
-        scaler.screenMatchMode = CanvasScaler.ScreenMatchMode.Expand;
-        BuildInterface(libraryCanvas.transform);
+        BindInterface();
 
         if (entries == null || entries.Length == 0)
         {
@@ -176,6 +163,7 @@ public sealed class CoachingActionLibrary : MonoBehaviour
 
     private void Update()
     {
+        UpdatePreviewDrag();
         if (player == null || !player.IsReady)
         {
             return;
@@ -202,159 +190,173 @@ public sealed class CoachingActionLibrary : MonoBehaviour
         }
     }
 
-    private static TMP_FontAsset FindChineseFont()
-    {
-        foreach (TMP_Text label in FindObjectsOfType<TMP_Text>(true))
-        {
-            if (label.font != null && label.font.name.Contains("SourceHanSans"))
-            {
-                return label.font;
-            }
-        }
-        return TMP_Settings.defaultFontAsset;
-    }
-
-    private static GameObject FindInLibraryScene(string objectName)
-    {
-        Scene scene = SceneManager.GetSceneByName(SceneName);
-        foreach (GameObject root in scene.GetRootGameObjects())
-        {
-            foreach (Transform child in root.GetComponentsInChildren<Transform>(true))
-            {
-                if (child.name == objectName) return child.gameObject;
-            }
-        }
-        return null;
-    }
-
-    private static void DisableOldSelector(GameObject menu)
-    {
-        CoachingActionSelectionController selector = menu.GetComponent<CoachingActionSelectionController>();
-        if (selector != null) selector.enabled = false;
-        CoachActionController oldCoach = menu.GetComponent<CoachActionController>();
-        if (oldCoach != null) oldCoach.enabled = false;
-        MobileCoachControls oldControls = menu.GetComponent<MobileCoachControls>();
-        if (oldControls != null) oldControls.enabled = false;
-
-        foreach (Transform child in menu.transform)
-        {
-            child.gameObject.SetActive(false);
-        }
-    }
-
     private void PreparePreview()
     {
-        foreach (Camera camera in FindObjectsOfType<Camera>(true))
+        previewTexture = new RenderTexture(1120, 980, 24, RenderTextureFormat.ARGB32)
         {
-            if (camera.gameObject.scene.name != SceneName) continue;
-            if (camera.name == "DeadBugPreviewCamera")
-            {
-                previewCamera = camera;
-                previewCamera.gameObject.SetActive(true);
-                previewCamera.enabled = true;
-            }
-            else if (camera.name == "BirdDogPreviewCamera" || camera.name == "HipThrustPreviewCamera")
-            {
-                camera.enabled = false;
-            }
-            else if (camera.name == "Main Camera")
-            {
-                camera.gameObject.SetActive(true);
-                camera.enabled = true;
-                camera.clearFlags = CameraClearFlags.SolidColor;
-                camera.backgroundColor = Color.black;
-                camera.cullingMask = 0;
-            }
-        }
-
-        GameObject birdDog = FindInLibraryScene("BirdDogPreview");
-        if (birdDog != null) birdDog.SetActive(false);
-        GameObject hipThrust = FindInLibraryScene("HipThrustPreview");
-        if (hipThrust != null) hipThrust.SetActive(false);
-
-        if (previewCamera != null)
-        {
-            previewTexture = new RenderTexture(1120, 980, 24, RenderTextureFormat.ARGB32)
-            {
-                name = "ActionLibraryCoachPreview"
-            };
-            previewCamera.targetTexture = previewTexture;
-            previewCamera.clearFlags = CameraClearFlags.SolidColor;
-            previewCamera.backgroundColor = Color.black;
-        }
+            name = "ActionLibraryCoachPreview"
+        };
+        previewCamera.targetTexture = previewTexture;
+        previewImage.texture = previewTexture;
     }
 
-    private void BuildInterface(Transform canvas)
+    private void UpdatePreviewDrag()
     {
-        RectTransform root = Rect(canvas, "ActionLibraryUI", 0, 0, 1920, 1080);
-        root.anchorMin = new Vector2(0.5f, 0.5f);
-        root.anchorMax = new Vector2(0.5f, 0.5f);
-        root.pivot = new Vector2(0.5f, 0.5f);
-        Panel(root, "Background", 0, 0, 1920, 1080, background);
-        Panel(root, "ListPanel", 48, 75, 560, 900, panelColor);
-        Panel(root, "PreviewPanel", 640, 75, 1232, 900, panelColor);
-
-        Button back = ButtonAt(root, "返回", 48, 990, 170, 62);
-        back.onClick.AddListener(GoBack);
-        Label(root, "动作库", 260, 987, 650, 68, 48, TextAlignmentOptions.Left);
-        selectedName = Label(root, "", 680, 895, 1120, 58, 40, TextAlignmentOptions.Center);
-        statusText = Label(root, "", 680, 127, 1120, 50, 27, TextAlignmentOptions.Center);
-
-        if (previewTexture != null)
+        if (Input.touchCount > 0)
         {
-            RectTransform imageRect = Rect(root, "教练动作", 750, 75, 1100, 962);
-            RawImage image = imageRect.gameObject.AddComponent<RawImage>();
-            image.texture = previewTexture;
-            image.color = Color.white;
-            image.raycastTarget = false;
-            selectedName.transform.SetAsLastSibling();
-            statusText.transform.SetAsLastSibling();
-        }
-        else
-        {
-            statusText.text = "教练预览相机不可用";
+            previewMouseDragging = false;
+            Touch touch = Input.GetTouch(0);
+            if (touch.phase == TouchPhase.Began)
+            {
+                previewMouseDragging = IsPreviewDragPosition(touch.position);
+            }
+            else if (previewMouseDragging && (touch.phase == TouchPhase.Moved || touch.phase == TouchPhase.Stationary))
+            {
+                OrbitPreview(touch.deltaPosition);
+            }
+            else if (touch.phase == TouchPhase.Ended || touch.phase == TouchPhase.Canceled)
+            {
+                previewMouseDragging = false;
+            }
+            return;
         }
 
-        RectTransform viewport = Rect(root, "动作列表", 68, 95, 520, 860);
-        Image viewportImage = viewport.gameObject.AddComponent<Image>();
-        viewportImage.color = new Color(0f, 0f, 0f, 0.001f);
-        viewport.gameObject.AddComponent<RectMask2D>();
-        ScrollRect scroll = viewport.gameObject.AddComponent<ScrollRect>();
-        scroll.horizontal = false;
-        scroll.vertical = true;
-        scroll.movementType = ScrollRect.MovementType.Clamped;
-        scroll.scrollSensitivity = 35f;
-        scroll.viewport = viewport;
+        Vector2 mousePosition = Input.mousePosition;
+        if (Input.GetMouseButtonDown(0))
+        {
+            previewMouseDragging = IsPreviewDragPosition(mousePosition);
+            previousMousePosition = mousePosition;
+        }
+        else if (previewMouseDragging && Input.GetMouseButton(0))
+        {
+            OrbitPreview(mousePosition - previousMousePosition);
+            previousMousePosition = mousePosition;
+        }
+        if (Input.GetMouseButtonUp(0)) previewMouseDragging = false;
+    }
 
+    private bool IsPreviewDragPosition(Vector2 screenPosition)
+    {
+        RectTransform previewRect = previewImage.rectTransform;
+        if (!RectTransformUtility.RectangleContainsScreenPoint(previewRect, screenPosition, null)) return false;
+        return startPracticeButton == null ||
+            !RectTransformUtility.RectangleContainsScreenPoint((RectTransform)startPracticeButton.transform, screenPosition, null);
+    }
+
+    private void BindInterface()
+    {
+        backButton.onClick.AddListener(GoBack);
+        CreateStartPracticeButton();
         int count = entries?.Length ?? 0;
-        RectTransform content = Rect(viewport, "内容", 0, 0, 520, Mathf.Max(860, count * 84));
-        content.anchorMin = new Vector2(0f, 1f);
-        content.anchorMax = new Vector2(0f, 1f);
-        content.pivot = new Vector2(0f, 1f);
-        content.anchoredPosition = Vector2.zero;
-        scroll.content = content;
-
+        listContent.sizeDelta = new Vector2(520f, Mathf.Max(860, count * 84));
         cards = new Image[count];
         for (int i = 0; i < count; i++)
         {
             int index = i;
-            RectTransform row = Rect(content, entries[i].id, 0, -i * 84, 510, 76);
-            row.anchorMin = new Vector2(0f, 1f);
-            row.anchorMax = new Vector2(0f, 1f);
-            row.pivot = new Vector2(0f, 1f);
-            cards[i] = row.gameObject.AddComponent<Image>();
+            Button button = i < listContent.childCount
+                ? listContent.GetChild(i).GetComponent<Button>()
+                : Instantiate(rowTemplate, listContent);
+            button.gameObject.name = entries[i].id;
+            button.gameObject.SetActive(true);
+            ((RectTransform)button.transform).anchoredPosition = new Vector2(0f, -i * 84f);
+            button.GetComponentInChildren<TMP_Text>().text = entries[i].displayName;
+            cards[i] = button.GetComponent<Image>();
             cards[i].color = cardColor;
-            Button button = row.gameObject.AddComponent<Button>();
-            button.transition = Selectable.Transition.None;
             button.onClick.AddListener(() => Select(index));
-            Label(row, entries[i].displayName, 20, 8, 470, 60, 32, TextAlignmentOptions.Left);
+        }
+        for (int i = count; i < listContent.childCount; i++)
+        {
+            listContent.GetChild(i).gameObject.SetActive(false);
         }
     }
 
-    private void Select(int index)
+    private void CreateStartPracticeButton()
     {
-        if (index < 0 || index >= entries.Length || coachAnimator == null)
+        GameObject buttonObject = new GameObject(
+            "StartPracticeButton", typeof(RectTransform), typeof(CanvasRenderer),
+            typeof(Image), typeof(Button));
+        buttonObject.transform.SetParent(previewImage.transform, false);
+
+        RectTransform rect = (RectTransform)buttonObject.transform;
+        rect.anchorMin = rect.anchorMax = new Vector2(1f, 0f);
+        rect.pivot = new Vector2(1f, 0f);
+        rect.anchoredPosition = new Vector2(-32f, 32f);
+        rect.sizeDelta = new Vector2(240f, 76f);
+
+        Image background = buttonObject.GetComponent<Image>();
+        background.color = new Color(0.10f, 0.38f, 0.31f, 0.98f);
+        startPracticeButton = buttonObject.GetComponent<Button>();
+        startPracticeButton.targetGraphic = background;
+        startPracticeButton.transition = Selectable.Transition.None;
+        startPracticeButton.interactable = false;
+        background.color = new Color(0.28f, 0.28f, 0.28f, 0.95f);
+        startPracticeButton.onClick.AddListener(StartSelectedPractice);
+
+        TMP_Text templateText = rowTemplate.GetComponentInChildren<TMP_Text>(true);
+        GameObject labelObject = new GameObject(
+            "Label", typeof(RectTransform), typeof(CanvasRenderer), typeof(TextMeshProUGUI));
+        labelObject.transform.SetParent(buttonObject.transform, false);
+        RectTransform labelRect = (RectTransform)labelObject.transform;
+        labelRect.anchorMin = Vector2.zero;
+        labelRect.anchorMax = Vector2.one;
+        labelRect.offsetMin = Vector2.zero;
+        labelRect.offsetMax = Vector2.zero;
+
+        TextMeshProUGUI label = labelObject.GetComponent<TextMeshProUGUI>();
+        label.font = templateText.font;
+        label.fontSharedMaterial = templateText.fontSharedMaterial;
+        label.fontSize = 28f;
+        label.color = Color.white;
+        label.alignment = TextAlignmentOptions.Center;
+        label.text = "开始练习";
+        label.raycastTarget = false;
+    }
+
+    private static string ResolvePracticeScene(Entry entry)
+    {
+        if (entry == null) return null;
+
+        LumbarCoachProfile lumbar = LumbarCoachMode.ForAction(entry.id) ??
+            LumbarCoachMode.ForAction(entry.displayName);
+        if (lumbar != null) return lumbar.sceneName;
+
+        switch (entry.id)
         {
+            case "hip_thrust": return "HipThrustPractice";
+            case "clip_09": return "HipThrustPractice";
+            case "clip_10":
+            case "clip_11":
+            case "clip_13": return LumbarCoachMode.ForAction("side_bridge")?.sceneName;
+            case "dead_bug": return "DeadBugPractice";
+            case "clip_29": return "DeadBugPractice";
+            case "bird_dog": return "BirdDogPractice";
+            case "clip_30": return "BirdDogPractice";
+            default: return null;
+        }
+    }
+
+    private void RefreshStartPracticeButton()
+    {
+        string sceneName = selectedIndex >= 0 && selectedIndex < entries.Length
+            ? ResolvePracticeScene(entries[selectedIndex]) : null;
+        bool available = !string.IsNullOrEmpty(sceneName) &&
+            Application.CanStreamedLevelBeLoaded(sceneName);
+        startPracticeButton.interactable = available;
+        startPracticeButton.targetGraphic.color = available
+            ? new Color(0.10f, 0.38f, 0.31f, 0.98f)
+            : new Color(0.28f, 0.28f, 0.28f, 0.95f);
+    }
+
+    private void StartSelectedPractice()
+    {
+        if (selectedIndex < 0 || selectedIndex >= entries.Length) return;
+
+        string destination = ResolvePracticeScene(entries[selectedIndex]);
+        if (string.IsNullOrEmpty(destination)) return;
+        if (!Application.CanStreamedLevelBeLoaded(destination))
+        {
+            statusText.text = "对应的教练模式场景不可用";
+            startPracticeButton.interactable = false;
             return;
         }
 
@@ -366,13 +368,38 @@ public sealed class CoachingActionLibrary : MonoBehaviour
             loadedMotion = null;
         }
 
+        returnScene = null;
+        retainedPracticeScene = default;
+        retainedPracticeRoots = null;
+        retainedRootActiveStates = null;
+        DeadBugStartMenuController.ShowPracticeStartOnNextLoad();
+        SceneManager.LoadScene(destination, LoadSceneMode.Single);
+    }
+
+    private void Select(int index)
+    {
+        if (index < 0 || index >= entries.Length || coachAnimator == null)
+        {
+            return;
+        }
+
+        player?.Dispose();
+        player = null;
+        startPracticeButton.interactable = false;
+        if (loadedMotion != null)
+        {
+            Resources.UnloadAsset(loadedMotion);
+            loadedMotion = null;
+        }
+
         selectedIndex = index;
         for (int i = 0; i < cards.Length; i++)
         {
             cards[i].color = i == selectedIndex ? selectedColor : cardColor;
         }
-        selectedName.text = entries[index].displayName;
+        selectedName.text = "";
         statusText.text = "";
+        RefreshStartPracticeButton();
 
         loadedMotion = Resources.Load<TextAsset>(entries[index].motionPath);
         if (loadedMotion == null)
@@ -477,8 +504,25 @@ public sealed class CoachingActionLibrary : MonoBehaviour
                 depth + Mathf.Abs(Vector3.Dot(offset, screenRight)) / (tangent * aspect));
         }
 
+        previewTarget = target;
+        previewBaseDirection = viewDirection;
+        previewDistance = distance * 1.08f;
+        previewYaw = 0f;
+        previewPitch = 0f;
         previewCamera.transform.SetPositionAndRotation(
-            target + viewDirection * (distance * 1.08f), rotation);
+            target + viewDirection * previewDistance, rotation);
+    }
+
+    internal void OrbitPreview(Vector2 delta)
+    {
+        previewYaw += delta.x * 0.35f;
+        previewPitch = Mathf.Clamp(previewPitch - delta.y * 0.25f, -70f, 70f);
+        Vector3 direction = Quaternion.Euler(previewPitch, previewYaw, 0f) * previewBaseDirection;
+        Vector3 up = Vector3.ProjectOnPlane(Vector3.up, direction).normalized;
+        if (up.sqrMagnitude < 0.5f) up = Vector3.forward;
+        previewCamera.transform.SetPositionAndRotation(
+            previewTarget + direction * previewDistance,
+            Quaternion.LookRotation(-direction, up));
     }
 
     private static void GoBack()
@@ -542,54 +586,12 @@ public sealed class CoachingActionLibrary : MonoBehaviour
             }
         }
 
+        UnityEngine.Object.FindObjectOfType<DeadBugStartMenuController>(true)
+            ?.ShowPracticeControlsAfterNavigation();
+
         retainedPracticeScene = default;
         retainedPracticeRoots = null;
         retainedRootActiveStates = null;
     }
 
-    private static RectTransform Rect(Transform parent, string name, float x, float y, float width, float height)
-    {
-        GameObject go = new GameObject(name, typeof(RectTransform));
-        RectTransform rect = go.GetComponent<RectTransform>();
-        rect.SetParent(parent, false);
-        rect.anchorMin = Vector2.zero;
-        rect.anchorMax = Vector2.zero;
-        rect.pivot = Vector2.zero;
-        rect.anchoredPosition = new Vector2(x, y);
-        rect.sizeDelta = new Vector2(width, height);
-        return rect;
-    }
-
-    private static Image Panel(Transform parent, string name, float x, float y, float width, float height, Color color)
-    {
-        Image panel = Rect(parent, name, x, y, width, height).gameObject.AddComponent<Image>();
-        panel.color = color;
-        panel.raycastTarget = false;
-        return panel;
-    }
-
-    private TMP_Text Label(Transform parent, string value, float x, float y, float width, float height,
-        int size, TextAlignmentOptions alignment)
-    {
-        TMP_Text label = Rect(parent, value, x, y, width, height).gameObject.AddComponent<TextMeshProUGUI>();
-        label.font = font;
-        label.fontSize = size;
-        label.color = Color.white;
-        label.alignment = alignment;
-        label.enableWordWrapping = false;
-        label.raycastTarget = false;
-        label.text = value;
-        return label;
-    }
-
-    private Button ButtonAt(Transform parent, string value, float x, float y, float width, float height)
-    {
-        RectTransform rect = Rect(parent, value, x, y, width, height);
-        Image image = rect.gameObject.AddComponent<Image>();
-        image.color = selectedColor;
-        Button button = rect.gameObject.AddComponent<Button>();
-        button.transition = Selectable.Transition.None;
-        Label(rect, value, 0, 0, width, height, 32, TextAlignmentOptions.Center);
-        return button;
-    }
 }

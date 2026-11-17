@@ -29,7 +29,9 @@ public enum PoseGuidanceExercise
 {
     Generic,
     DeadBug,
-    BirdDog
+    BirdDog,
+    HipThrust,
+    SideBridge
 }
 
 [Serializable]

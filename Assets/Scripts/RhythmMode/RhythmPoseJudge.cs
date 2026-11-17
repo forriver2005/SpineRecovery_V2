@@ -5,9 +5,6 @@ public sealed class RhythmPoseJudge : MonoBehaviour
     [Header("References")]
     [SerializeField] private DeadBugGamingPoseScorer poseScorer;
 
-    [Header("Pose Thresholds")]
-    [Range(0f, 100f)] [SerializeField] private float successThreshold = 40f;
-
     [Header("Waist Evaluation")]
     [Min(1f)] [SerializeField] private float waistPerfectAngle = 10f;
     [Min(5f)] [SerializeField] private float waistZeroScoreAngle = 48f;
@@ -15,9 +12,18 @@ public sealed class RhythmPoseJudge : MonoBehaviour
     private AnatomicalLimbScores limbScores;
     private float waistScore;
     private bool hasWaistTracking;
+    GameTrainingAssessment assessment;
 
-    public float SuccessThreshold => successThreshold;
+    string Difficulty => poseScorer!=null?poseScorer.SelectedDifficultyKey:"standard";
+    public float SuccessThreshold => GameDifficultyPolicy.HitThreshold(Difficulty);
     public Animator CoachAnimator => poseScorer != null ? poseScorer.CoachAnimator : null;
+
+    public void ConfigurePoseScorer(DeadBugGamingPoseScorer scorer)
+    {
+        Unsubscribe();
+        poseScorer = scorer;
+        Subscribe();
+    }
 
     private void OnEnable()
     {
@@ -37,16 +43,62 @@ public sealed class RhythmPoseJudge : MonoBehaviour
 
     public bool TryHit(RhythmBodyTarget target, out float poseScore)
     {
-        poseScore = GetScore(target);
-        if (!HasTracking(target) || poseScore < successThreshold)
+        return IsTargetReached(target, out poseScore);
+    }
+
+    /// <summary>
+    /// Evaluates whether the requested game target is currently reached.
+    /// This is the pose predicate used by both game hit sampling and any
+    /// continuous coaching feedback; it does not apply note timing.
+    /// </summary>
+    public bool IsTargetReached(RhythmBodyTarget target, out float poseScore)
+    {
+        if(assessment==null)assessment=FindObjectOfType<GameTrainingAssessment>();
+        return IsTargetReached(target,assessment!=null?assessment.CaptureHitReference():null,out poseScore);
+    }
+
+    public RhythmMovementRange CaptureTarget(string state)
+    {
+        if(poseScorer==null)return null;
+        var reference=new RhythmMovementRange();reference.Begin(poseScorer,state);return reference;
+    }
+
+    public bool TryHit(RhythmBodyTarget target,RhythmMovementRange reference,out float poseScore)
+    {
+        return IsTargetReached(target, reference, out poseScore);
+    }
+
+    /// <summary>
+    /// Evaluates the target pose without note timing or HIT resolution.
+    /// </summary>
+    public bool IsTargetReached(RhythmBodyTarget target,RhythmMovementRange reference,out float poseScore)
+    {
+        poseScore=0;
+        if(!HasTracking(target))return false;
+        if(reference==null)
         {
-            return false;
+            // Waist/legacy presentations retain their own pose measurement.
+            if(target!=RhythmBodyTarget.Waist)return false;
+            poseScore=GetScore(target);return poseScore>=SuccessThreshold;
         }
-        return true;
+        // The note owns its extension pose throughout the arrival window. The
+        // live coach may already be returning or starting the opposite pair.
+        return reference.TryEndpoint(poseScorer,target,out float progress,out poseScore)&&
+            progress>=GameDifficultyPolicy.MinimumExtension(Difficulty,target)&&poseScore>=SuccessThreshold;
+    }
+
+    public bool IsTargetAtRest(RhythmBodyTarget target,RhythmMovementRange reference,out float poseScore)
+    {
+        poseScore=0;
+        if(!HasTracking(target)||reference==null)return false;
+        return reference.TryRestEndpoint(poseScorer,target,out float progress,out poseScore)&&
+            progress<=1f-GameDifficultyPolicy.MinimumExtension(Difficulty,target)&&
+            poseScore>=SuccessThreshold;
     }
 
     public float GetScore(RhythmBodyTarget target)
     {
+        if(poseScorer==null||!poseScorer.IsSessionActive||poseScorer.IsScoringPaused||!poseScorer.HasFreshInput||!poseScorer.HasMatchingFloorPosture)return 0;
         switch (target)
         {
             case RhythmBodyTarget.LeftHand: return limbScores.leftArm.score;
@@ -59,6 +111,9 @@ public sealed class RhythmPoseJudge : MonoBehaviour
 
     private bool HasTracking(RhythmBodyTarget target)
     {
+        // Pending notes check posture against their captured target, even if the
+        // coach has already moved into the opposite pair or the outro.
+        if(poseScorer==null||!poseScorer.IsSessionActive||poseScorer.IsScoringPaused||!poseScorer.HasFreshInput)return false;
         switch (target)
         {
             case RhythmBodyTarget.LeftHand: return limbScores.leftArm.validSegmentCount > 0;

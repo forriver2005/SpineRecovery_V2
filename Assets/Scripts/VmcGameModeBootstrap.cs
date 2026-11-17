@@ -140,7 +140,8 @@ public sealed class VmcGameModeSourceBridge : MonoBehaviour
             return;
         }
 
-        source.SetAvailable(receiver.GetAvailable() > 0);
+        source.SetAvailable(!receiver.Freeze && receiver.GetAvailable() > 0);
+        if(receiver.Freeze)return;
         if (receiver.LastBonePacketCounterInFrame > 0)
         {
             source.ReportFrame(

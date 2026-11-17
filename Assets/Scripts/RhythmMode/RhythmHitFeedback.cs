@@ -4,6 +4,7 @@ using UnityEngine;
 
 public sealed class RhythmHitFeedback : MonoBehaviour
 {
+    [SerializeField] private RhythmSkinCVisuals visualSkin;
     [Header("Replaceable Visual Assets")]
     [Tooltip("Optional success effect prefab. Its particle systems are played automatically.")]
     [SerializeField] private GameObject successEffectPrefab;
@@ -57,6 +58,12 @@ public sealed class RhythmHitFeedback : MonoBehaviour
 
     public void Play(RhythmNoteResult result, Color targetColor, Color hitTextColor)
     {
+        if (visualSkin != null)
+        {
+            if (result.IsHit) PlayHitAudio();
+            visualSkin.PlayResult(result);
+            return;
+        }
         if (result.Judgement == RhythmJudgement.Miss)
         {
             PlayMiss(result.LocalHitPosition);

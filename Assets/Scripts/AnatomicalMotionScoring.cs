@@ -110,7 +110,8 @@ public sealed class AnatomicalMotionScoringEngine
 
     public void SetStandingCalibration(
         IReadOnlyDictionary<HumanBodyBones, Vector3> userDirections,
-        IReadOnlyDictionary<HumanBodyBones, Vector3> coachDirections)
+        IReadOnlyDictionary<HumanBodyBones, Vector3> coachDirections,
+        float maximumCorrectionDegrees = 180f)
     {
         userCalibrationAlignments.Clear();
         if (userDirections == null || coachDirections == null) return;
@@ -118,9 +119,11 @@ public sealed class AnatomicalMotionScoringEngine
         {
             if (!coachDirections.TryGetValue(entry.Key, out Vector3 coachDirection)) continue;
             if (entry.Value.sqrMagnitude < 0.5f || coachDirection.sqrMagnitude < 0.5f) continue;
-            userCalibrationAlignments[entry.Key] = Quaternion.FromToRotation(
+            Quaternion alignment = Quaternion.FromToRotation(
                 entry.Value.normalized,
                 coachDirection.normalized);
+            userCalibrationAlignments[entry.Key] = Quaternion.RotateTowards(
+                Quaternion.identity, alignment, Mathf.Max(0f, maximumCorrectionDegrees));
         }
         ResetSession();
     }
@@ -165,6 +168,13 @@ public sealed class AnatomicalMotionScoringEngine
         AddSegment(animator, HumanBodyBones.RightLowerLeg, HumanBodyBones.RightFoot, worldToBody, result);
         AddOrientation(animator, HumanBodyBones.Head, worldToBody, result);
         return result;
+    }
+    public Dictionary<HumanBodyBones,Vector3> CaptureAlignedPose(Animator animator)
+    {
+        var pose=CaptureRawPose(animator);
+        foreach(var bone in new List<HumanBodyBones>(pose.Keys))
+            if(userCalibrationAlignments.TryGetValue(bone,out var alignment))pose[bone]=alignment*pose[bone];
+        return pose;
     }
 
     public AnatomicalPoseScore Evaluate(Animator userAnimator, Animator coachAnimator, float deltaTime)
@@ -529,7 +539,7 @@ public sealed class AnatomicalMotionScoringEngine
         return values.Count > 0 ? values[values.Count - 1].score : 0f;
     }
 
-    private static bool TryGetBodyFrame(Animator animator, out Quaternion frame)
+    public static bool TryGetBodyFrame(Animator animator, out Quaternion frame)
     {
         frame = Quaternion.identity;
         Transform hips = animator.GetBoneTransform(HumanBodyBones.Hips);

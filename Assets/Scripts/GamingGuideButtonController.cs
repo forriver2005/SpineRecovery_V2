@@ -12,6 +12,11 @@ public sealed class GamingGuideButtonController : MonoBehaviour
     private void Awake()
     {
         guideButton = GetComponent<Button>();
+        if (SpineRecovery.App.AppBootstrap.Instance?.Training.IsV2Prescription == true)
+        {
+            gameObject.SetActive(false);
+            return;
+        }
         guideButton.onClick.AddListener(OpenGuide);
     }
 
@@ -25,7 +30,14 @@ public sealed class GamingGuideButtonController : MonoBehaviour
 
     public void OpenGuide()
     {
-        GamingGuideNavigation.SetReturnScene(SceneManager.GetActiveScene().name);
+        string currentScene = SceneManager.GetActiveScene().name;
+        if (CoachModeNavigation.IsSupportedGameScene(currentScene))
+        {
+            CoachModeNavigation.OpenCoachFromGame(currentScene);
+            return;
+        }
+
+        GamingGuideNavigation.SetReturnScene(currentScene);
         SceneManager.LoadScene(guideSceneName);
     }
 }

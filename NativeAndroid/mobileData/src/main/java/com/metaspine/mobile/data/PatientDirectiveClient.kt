@@ -38,13 +38,28 @@ object PatientDirectiveClient {
         )
     }
 
+    suspend fun postV2Receipt(token: String, order: AdmissionPrescriptionV2, phase: String): JSONObject =
+        request("POST", RECEIPT_PATH, token, JSONObject()
+            .put("orderId", order.orderId)
+            .put("directiveVersion", 2)
+            .put("phase", phase)
+            .put("resourceManifestSha256", order.resourceManifestSha256)).getOrThrow().also { receipt ->
+            require(receipt.optLong("orderId") == order.orderId &&
+                receipt.optInt("directiveVersion") == 2 && receipt.optString("phase") == phase &&
+                receipt.optString("resourceManifestSha256") == order.resourceManifestSha256 &&
+                receipt.optString("receivedAt").isNotBlank() &&
+                (phase != "assets_ready" || receipt.optString("assetsReadyAt").isNotBlank())) {
+                "处方回执与本次处方不一致"
+            }
+        }
+
     private suspend fun request(
         method: String,
         path: String,
         patientToken: String,
         body: JSONObject?
     ): Result<JSONObject> = patientRequestResult {
-        val response = PatientHttpTransport.shared.request(path, method, patientToken, body?.toString())
+        val response = PatientHttpTransport.shared.request(path, method, patientToken, body?.toString(), directiveVersion = method == "GET")
         response.requireSuccess("训练指令请求失败，HTTP "+response.status)
         val json = runCatching { JSONObject(response.text) }.getOrNull()
         if (json == null || json.optInt("code", -1) != 0) {

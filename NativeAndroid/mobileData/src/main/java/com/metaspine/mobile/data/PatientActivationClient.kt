@@ -92,8 +92,15 @@ object PatientActivationClient {
 
     internal fun parseRedeem(data: JSONObject): ActivationRedeemResult {
         val identity = data.getJSONObject("identity")
-        val items = data.getJSONObject("prescription").getJSONArray("items")
-        require(items.length() == 1) { "激活凭据首张处方动作数量异常" }
+        val prescription = data.getJSONObject("prescription")
+        val items = prescription.getJSONArray("items")
+        if (prescription.optInt("prescriptionContractVersion") == 2) {
+            val order = AdmissionPrescriptionV2.fromActivationJson(prescription)
+            require(order.computeManifestSha256() == order.resourceManifestSha256) { "首张处方资源清单校验失败" }
+        } else {
+            require(items.length() == 1) { "激活凭据首张处方动作数量异常" }
+        }
+        // Existing binding UI shows the first item only. Execution fetches the entire current directive.
         val item = items.getJSONObject(0)
         val doctorUsername = data.optJSONObject("doctor")?.optString("username").orEmpty()
         return ActivationRedeemResult(

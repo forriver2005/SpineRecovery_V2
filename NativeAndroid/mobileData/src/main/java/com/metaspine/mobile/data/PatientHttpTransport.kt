@@ -32,7 +32,8 @@ internal class PatientHttpTransport(
         body: String? = null,
         connectTimeoutMs: Int = 10_000,
         readTimeoutMs: Int = 15_000,
-        readErrorStatuses: Set<Int> = emptySet()
+        readErrorStatuses: Set<Int> = emptySet(),
+        directiveVersion: Boolean = false
     ): Response = withContext(Dispatchers.IO) {
         val context = currentCoroutineContext()
         context.ensureActive()
@@ -46,6 +47,7 @@ internal class PatientHttpTransport(
             connection.connectTimeout = connectTimeoutMs
             connection.readTimeout = readTimeoutMs
             connection.setRequestProperty("Accept", "application/json")
+            if (directiveVersion) connection.setRequestProperty("X-SpineFlow-Directive-Version", "2")
             token?.takeIf(String::isNotBlank)?.let {
                 connection.setRequestProperty("Authorization", "Bearer $it")
             }

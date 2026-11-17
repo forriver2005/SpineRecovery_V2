@@ -19,7 +19,7 @@ public class SceneSwitcher : MonoBehaviour
     public static string TestGamingSceneName => TestGamingScene;
     private const string HipThrustScene = "HipThrust";
     private const string PlayBackScene = "PlayBack";
-    private const string CoachingChooseScene = "CoachingChoose";
+    private const string ActionLibraryScene = "ActionLibrary";
     private const string GamingChooseScene = "GamingChoose";
     private bool returnInProgress;
 
@@ -128,16 +128,19 @@ public class SceneSwitcher : MonoBehaviour
 
     public void LoadBirdDogGamingScene()
     {
+        if (IsCoachWithoutGame() && !CoachModeNavigation.HasReplayGameReturn) return;
         LoadSceneForCurrentMobileSession(ResolveReplayReturnScene(
-            BirdDogGamingScene,
-            ReplaySessionContext.ReturnGamingScene));
+            CoachModeNavigation.BirdDogGameScene,
+            ReplaySessionContext.ReturnGamingScene,
+            true));
     }
 
     public void LoadBirdDogPracticeScene()
     {
         LoadSceneForCurrentMobileSession(ResolveReplayReturnScene(
-            BirdDogPracticeScene,
-            ReplaySessionContext.ReturnPracticeScene));
+            CoachModeNavigation.BirdDogCoachScene,
+            ReplaySessionContext.ReturnPracticeScene,
+            false));
     }
 
     public void LoadDeadBugScene()
@@ -147,26 +150,49 @@ public class SceneSwitcher : MonoBehaviour
 
     public void LoadDeadBugGamingScene()
     {
+        if (IsCoachWithoutGame() && !CoachModeNavigation.HasReplayGameReturn) return;
         LoadSceneForCurrentMobileSession(ResolveReplayReturnScene(
-            DeadBugGamingScene,
-            ReplaySessionContext.ReturnGamingScene));
+            CoachModeNavigation.DeadBugGameScene,
+            ReplaySessionContext.ReturnGamingScene,
+            true));
     }
 
     public void LoadTestGamingScene()
     {
+        if (IsCoachWithoutGame()) return;
         LoadSceneForCurrentMobileSession(TestGamingScene);
     }
 
     public void LoadHipThrustScene()
     {
-        LoadSceneForCurrentMobileSession(HipThrustScene);
+        LoadSceneForCurrentMobileSession(ResolveReplayReturnScene(
+            CoachModeNavigation.HipThrustGameScene,
+            ReplaySessionContext.ReturnGamingScene,
+            true));
     }
 
     public void LoadDeadBugPracticeScene()
     {
         LoadSceneForCurrentMobileSession(ResolveReplayReturnScene(
-            DeadBugPracticeScene,
-            ReplaySessionContext.ReturnPracticeScene));
+            CoachModeNavigation.DeadBugCoachScene,
+            ReplaySessionContext.ReturnPracticeScene,
+            false));
+    }
+
+    public void LoadHipThrustPracticeScene()
+    {
+        LoadSceneForCurrentMobileSession(ResolveReplayReturnScene(
+            CoachModeNavigation.HipThrustCoachScene,
+            ReplaySessionContext.ReturnPracticeScene,
+            false));
+    }
+
+    public void LoadSideBridgePracticeScene()
+    {
+        LoadSceneForCurrentMobileSession(ResolveReplayReturnScene(
+            CoachModeNavigation.SideBridgeCoachScene,
+            ReplaySessionContext.ReturnPracticeScene,
+            false));
     }
 
     public void LoadPlayBackScene()
@@ -174,11 +200,11 @@ public class SceneSwitcher : MonoBehaviour
         LoadSceneForCurrentMobileSession(PlayBackScene);
     }
 
-    public void LoadCoachingChooseScene()
+    public void LoadActionLibraryScene()
     {
         if (!CoachingActionLibrary.OpenFromPractice())
         {
-            LoadSceneForCurrentMobileSession(CoachingChooseScene);
+            LoadSceneForCurrentMobileSession(ActionLibraryScene);
         }
     }
 
@@ -189,7 +215,7 @@ public class SceneSwitcher : MonoBehaviour
 
     /// <summary>
     /// 加载统一练习场景（testPractice），传入动作 ID 进行配置。
-    /// 用于从其他场景（如 CoachingChoose）跳转到数据驱动的练习场景。
+    /// 用于从其他场景（如 ActionLibrary）跳转到数据驱动的练习场景。
     /// </summary>
     /// <param name="actionId">动作 ID，如 "deadbug", "birddog"</param>
     public void LoadUnifiedPracticeScene(string actionId)
@@ -243,13 +269,32 @@ public class SceneSwitcher : MonoBehaviour
         SceneManager.LoadScene(SpineFlowTrainingSession.ResolveSceneForMobileSession(sceneName));
     }
 
-    private static string ResolveReplayReturnScene(string fallback, string replayTarget)
+    private static bool IsCoachWithoutGame()
     {
-        return string.Equals(
-                   SceneManager.GetActiveScene().name,
-                   PlayBackScene,
-                   System.StringComparison.OrdinalIgnoreCase) &&
-               !string.IsNullOrWhiteSpace(replayTarget)
+        string scene = SceneManager.GetActiveScene().name;
+        return LumbarCoachMode.ForScene(scene) != null ||
+            (scene == PlayBackScene && LumbarCoachMode.ForScene(ReplaySessionContext.ReturnPracticeScene) != null);
+    }
+
+    private static string ResolveReplayReturnScene(
+        string fallback,
+        string replayTarget,
+        bool gaming)
+    {
+        if (!string.Equals(
+                SceneManager.GetActiveScene().name,
+                PlayBackScene,
+                System.StringComparison.OrdinalIgnoreCase))
+        {
+            return fallback;
+        }
+
+        if (CoachModeNavigation.TryConsumeReplayReturnScene(gaming, out string coachRoute))
+        {
+            return coachRoute;
+        }
+
+        return !string.IsNullOrWhiteSpace(replayTarget)
             ? replayTarget
             : fallback;
     }

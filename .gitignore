@@ -8,6 +8,8 @@
 /[Uu]ser[Ss]ettings/
 /[Mm]emoryCaptures/
 /[Rr]ecordings/
+/tmp/
+/output/
 
 # IDE generated files
 /.vs/
@@ -41,5 +43,5 @@ Thumbs.db
 *.unitypackage
 
 # Local AI project memory
-/.codex/CODEX.md
+/.codex/
 

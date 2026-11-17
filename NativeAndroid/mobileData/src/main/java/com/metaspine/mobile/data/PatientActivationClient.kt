@@ -23,7 +23,8 @@ data class BoundPatientIdentity(
 data class ActivationRedeemResult(
     val patientId: String,
     val identity: BoundPatientIdentity,
-    val prescription: AdmissionPrescriptionItem
+    val prescription: AdmissionPrescriptionItem,
+    val prescriptionV2: AdmissionPrescriptionV2
 )
 
 /**
@@ -75,12 +76,13 @@ object PatientActivationClient {
         .put("installationId", installationId)
         .put("accountId", accountId.trim().lowercase())
 
-    suspend fun preview(activationCode: String, installationId: String): Result<ActivationPreview> =
-        request("POST", PREVIEW_PATH, buildPreviewBody(activationCode, installationId))
+    suspend fun preview(activationCode: String, installationId: String,
+        origin: String = SpineFlowServerConfig.BASE_URL): Result<ActivationPreview> =
+        request("POST", PREVIEW_PATH, buildPreviewBody(activationCode, installationId), origin)
             .mapCatching(::parsePreview)
 
-    suspend fun redeem(body: JSONObject): Result<ActivationRedeemResult> =
-        request("POST", REDEEM_PATH, body).mapCatching(::parseRedeem)
+    suspend fun redeem(body: JSONObject, origin: String = SpineFlowServerConfig.BASE_URL): Result<ActivationRedeemResult> =
+        request("POST", REDEEM_PATH, body, origin).mapCatching(::parseRedeem)
 
     internal fun parsePreview(data: JSONObject): ActivationPreview = ActivationPreview(
         displayName = data.getString("displayName"),
@@ -92,16 +94,8 @@ object PatientActivationClient {
 
     internal fun parseRedeem(data: JSONObject): ActivationRedeemResult {
         val identity = data.getJSONObject("identity")
-        val prescription = data.getJSONObject("prescription")
-        val items = prescription.getJSONArray("items")
-        if (prescription.optInt("prescriptionContractVersion") == 2) {
-            val order = AdmissionPrescriptionV2.fromActivationJson(prescription)
-            require(order.computeManifestSha256() == order.resourceManifestSha256) { "首张处方资源清单校验失败" }
-        } else {
-            require(items.length() == 1) { "激活凭据首张处方动作数量异常" }
-        }
-        // Existing binding UI shows the first item only. Execution fetches the entire current directive.
-        val item = items.getJSONObject(0)
+        val prescriptionV2 = parsePrescriptionV2(data.getJSONObject("prescription"))
+        val first = prescriptionV2.items.first()
         val doctorUsername = data.optJSONObject("doctor")?.optString("username").orEmpty()
         return ActivationRedeemResult(
             patientId = data.getString("patientId"),
@@ -111,14 +105,22 @@ object PatientActivationClient {
                 doctorUsername = doctorUsername
             ),
             prescription = AdmissionPrescriptionItem(
-                actionId = item.getString("actionId"),
-                actionName = item.getString("actionName"),
-                sets = item.getInt("sets"),
-                reps = item.getInt("reps"),
-                holdSeconds = item.getInt("holdSeconds")
-            )
+                actionId = first.actionId,
+                actionName = first.actionName,
+                sets = first.sets,
+                reps = first.reps,
+                holdSeconds = first.holdSeconds
+            ),
+            prescriptionV2 = prescriptionV2
         )
     }
+
+    /**
+     * 完整 V2 首方：1–10 项有序、每项带冻结资源身份；不再限制单项。
+     * A02 的条目 ID 字段名是 `id`，且没有下载路径；D01 使用 `itemId` 并提供下载路径。
+     */
+    internal fun parsePrescriptionV2(json: JSONObject): AdmissionPrescriptionV2 =
+        AdmissionPrescriptionV2.fromActivationJson(json)
 
     /**
      * 失败文案（设计 §8.8）。
@@ -145,9 +147,10 @@ object PatientActivationClient {
     private suspend fun request(
         method: String,
         path: String,
-        body: JSONObject? = null
+        body: JSONObject? = null,
+        origin: String = SpineFlowServerConfig.BASE_URL
     ): Result<JSONObject> = patientRequestResult {
-        val response = PatientHttpTransport.shared.request(path, method, body = body?.toString())
+        val response = PatientHttpTransport(origin = { origin }).request(path, method, body = body?.toString())
         response.requireSuccess("激活请求失败，HTTP "+response.status)
         val json = JSONObject(response.text)
         check(json.optInt("code", -1) == 0) { json.optString("message", "服务器返回错误") }

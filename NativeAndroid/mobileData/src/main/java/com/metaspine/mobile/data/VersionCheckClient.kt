@@ -5,16 +5,14 @@ import java.net.URLEncoder
 import com.metaspine.mobile.unified.BuildConfig
 
 object SpineFlowServerConfig {
-    // MainActivity.onCreate 从 PatientCredentials 载入开发覆盖值；Release 仍固定构建期 Origin。
+    // Old local origins remain scope aliases; all builds use pinned LAN discovery.
     @Volatile
     var baseUrlOverride: String? = null
 
     val BASE_URL: String
         get() = ServerOriginPolicy.normalize(
-            baseUrlOverride?.takeIf { it.isNotBlank() } ?: BuildConfig.SERVER_BASE_URL,
-            BuildConfig.SERVER_BASE_URL,
-            BuildConfig.DEBUG
-        ) ?: error("服务器地址未配置或不属于受信 HTTPS 域名")
+            baseUrlOverride?.takeIf { it.isNotBlank() } ?: BuildConfig.SERVER_BASE_URL
+        ) ?: error("仅支持医院局域网服务器地址")
 }
 
 data class VersionInfo(

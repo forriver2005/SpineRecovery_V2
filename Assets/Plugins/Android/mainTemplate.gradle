@@ -66,8 +66,8 @@ android {
     ndkPath "**NDKPATH**"
     ndkVersion "**NDKVERSION**"
     compileSdkVersion **APIVERSION**
-    // Unity 2022's bundled D8 is compatible with the stable 36.0.0 toolchain.
-    buildToolsVersion '36.0.0'
+    // Unity 2022.3 AGP 7.4.2 requires build tools 33.x
+    buildToolsVersion '33.0.2'
 
     compileOptions {
         sourceCompatibility JavaVersion.VERSION_11

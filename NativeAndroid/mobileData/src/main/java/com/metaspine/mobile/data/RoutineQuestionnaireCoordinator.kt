@@ -32,12 +32,12 @@ class RoutineQuestionnaireCoordinator(
                     sendPending(scope, credential, row, current)
                 }
             }
-            val listing = RoutineQuestionnaireParser.open(api.open(credential.patientToken))
+            val listing = RoutineQuestionnaireParser.open(scopedApi(scope).open(credential.patientToken))
             if (!current() || !store.matches(scope)) return@withLock RoutineRefresh(emptyList(), "账号已切换", false)
             val old = store.read(scope).associateBy { it.task.taskId }
             val downloaded = mutableListOf<LocalRoutineTask>()
             for (summary in listing.items) {
-                val detail = try { RoutineQuestionnaireParser.detail(api.detail(credential.patientToken, summary.taskId), summary.taskId) }
+                val detail = try { RoutineQuestionnaireParser.detail(scopedApi(scope).detail(credential.patientToken, summary.taskId), summary.taskId) }
                 catch (e: ApiHttpException) {
                     if (e.httpStatus in setOf(409, 410)) continue else throw e
                 }
@@ -114,25 +114,31 @@ class RoutineQuestionnaireCoordinator(
 
     private suspend fun sendPending(scope: RoutineScope, credential: PatientServerCredential, row: LocalRoutineTask, current: () -> Boolean) {
         try {
-            val result = api.submit(credential.patientToken, row.task.taskId, JSONObject(requireNotNull(row.pendingBody)))
+            val result = scopedApi(scope).submit(credential.patientToken, row.task.taskId, JSONObject(requireNotNull(row.pendingBody)))
             RoutineQuestionnaireParser.exact(result, setOf("taskId", "recordId", "status", "completedAt"))
             require(RoutineQuestionnaireParser.integer(result, "taskId") == row.task.taskId && result.get("status") == "completed")
-            RoutineQuestionnaireParser.integer(result, "recordId")
+            val recordId = RoutineQuestionnaireParser.integer(result, "recordId")
             val time = RoutineQuestionnaireParser.timestamp(result, "completedAt")
-            if (current()) store.put(scope, listOf(row.copy(completedAt = time, pendingBody = null, availability = "completed", problem = null, retryAt = 0)))
+            if (current()) check(store.put(scope, listOf(row.copy(
+                completedAt = time, recordId = recordId, submissionStatus = "completed",
+                confirmedSubmissionBody = row.pendingBody, pendingBody = null,
+                availability = "completed", problem = null, problemCode = null, fieldErrors = null, retryAt = 0
+            )))) { "问卷提交收据未能保存，原请求仍需重试" }
         } catch (e: CancellationException) { throw e }
         catch (e: Exception) {
             if (e is ApiHttpException && e.httpStatus in setOf(401, 403)) throw e
             val blocked = (e as? ApiHttpException)?.httpStatus in setOf(400, 409, 410, 413, 422)
             if (current()) store.put(scope, listOf(row.copy(
                 problem = if (blocked) "服务器拒绝本次提交（任务过期、状态变化或答案不合法），请联系工作人员；草稿保留" else null,
+                problemCode = (e as? ApiHttpException)?.errorCode,
+                fieldErrors = (e as? ApiHttpException)?.fieldErrors,
                 retryAt = now() + delayMillis(e, row.attempts + 1), attempts = row.attempts + 1)))
             if (e is ApiHttpException && e.httpStatus == 429) throw e
         }
     }
     private suspend fun sendReceipt(scope: RoutineScope, credential: PatientServerCredential, row: LocalRoutineTask, current: () -> Boolean) {
         try {
-            val data = api.receipt(credential.patientToken, row.task.taskId, row.receiptId)
+            val data = scopedApi(scope).receipt(credential.patientToken, row.task.taskId, row.receiptId)
             RoutineQuestionnaireParser.exact(data, setOf("taskId", "deliveredAt"))
             require(RoutineQuestionnaireParser.integer(data, "taskId") == row.task.taskId)
             val at = RoutineQuestionnaireParser.timestamp(data, "deliveredAt")
@@ -143,6 +149,8 @@ class RoutineQuestionnaireCoordinator(
             if (current()) store.put(scope, listOf(row.copy(retryAt = now() + delayMillis(e, row.attempts + 1), attempts = row.attempts + 1)))
         }
     }
+    private fun scopedApi(scope: RoutineScope) = api.atOrigin(scope.origin.ifBlank { SpineFlowServerConfig.BASE_URL })
+
     private fun delayMillis(error: Exception, attempt: Int): Long =
         ((error as? ApiHttpException)?.retryAfterSeconds?.coerceIn(1, 3600)?.times(1000))
             ?: (5000L * (1L shl attempt.coerceIn(0, 9))).coerceAtMost(3600000)

@@ -114,7 +114,6 @@ namespace SpineRecovery.App
         private Text avatarLetter;
         private Text greeting;
         private Badge trackerBadge;
-        private Badge activationBadge;
         private Badge monthlyBadge;
         private RowRefs monthlyRow;
         private Image monthlyNewDot;
@@ -127,6 +126,8 @@ namespace SpineRecovery.App
         {
             getState = stateProvider;
             RectTransform root = QuestionnaireUi.CreateScreen(canvasParent, "HomePanel", Refresh, out GameObject panel);
+            // Keep the header below the phone camera cutout while preserving the design spacing.
+            root.anchoredPosition = new Vector2(0f, -18f);
 
             Image avatar = QuestionnaireUi.Box(root, "Avatar", QuestionnaireUi.SecondaryButton, 26f, 20f, 81.5f, 52f, 52f);
             avatarLetter = QuestionnaireUi.Label(avatar.transform, "?", 24, GlyphBlue, TextAnchor.MiddleCenter,
@@ -136,22 +137,21 @@ namespace SpineRecovery.App
 
             BuildTrainingButton(root, actions.EnterTraining);
 
-            RectTransform card = QuestionnaireUi.Card(root, 20f, 267f, CardWidth, 268f);
+            RectTransform card = QuestionnaireUi.Card(root, 20f, 267f, CardWidth, 204f);
             BuildRow(card, 0, "追踪器连接与校准", "训练前先连接并校准传感器", DrawTracker, actions.OpenTracker, 56f, out trackerBadge);
-            BuildRow(card, 1, "激活档案", "首次使用需要完成激活", DrawPersonCard, actions.OpenActivation, 56f, out activationBadge);
-            BuildRow(card, 2, "训练历史", "查看每次训练的记录", DrawClock, actions.OpenHistory, 0f, out _);
-            monthlyRow = BuildRow(card, 3, "月度问卷", "每月一次，了解恢复情况", DrawClipboard, actions.OpenMonthly, 68f, out monthlyBadge);
-            for (int i = 0; i < 3; i++)
+            BuildRow(card, 1, "训练历史", "查看每次训练的记录", DrawClock, actions.OpenHistory, 0f, out _);
+            monthlyRow = BuildRow(card, 2, "月度问卷", "每月一次，了解恢复情况", DrawClipboard, actions.OpenMonthly, 68f, out monthlyBadge);
+            for (int i = 0; i < 2; i++)
             {
                 QuestionnaireUi.Box(card, "Divider", QuestionnaireUi.Divider, 0.5f, 0f,
                     RowsTop + RowHeight * (i + 1) - 0.5f, CardWidth, 1f);
             }
             monthlyNewDot = QuestionnaireUi.Box(card, "MonthlyNewDot", QuestionnaireUi.DangerText, 6f,
-                333f, RowsTop + RowHeight * 3f + 6f, 12f, 12f);
+                333f, RowsTop + RowHeight * 2f + 6f, 12f, 12f);
             monthlyNewDot.gameObject.SetActive(false);
 
             Message = QuestionnaireUi.Label(root, "", 13, QuestionnaireUi.Muted, TextAnchor.UpperLeft,
-                FontStyle.Normal, 20f, 551f, 350f, 60f);
+                FontStyle.Normal, 20f, 487f, 350f, 60f);
 
             RectTransform footer = QuestionnaireUi.Footer(root, 68f);
             Button logout = QuestionnaireUi.MakeButton(footer, "Logout", Color.clear, 0.5f, 115f, 12f, 160f, 44f,
@@ -179,7 +179,6 @@ namespace SpineRecovery.App
             avatarLetter.text = name.Length > 0 ? name.Substring(0, 1).ToUpperInvariant() : "?";
             greeting.text = "你好，" + name;
             trackerBadge.Set(state.Calibrated ? "已校准" : "未校准", state.Calibrated ? BadgeKind.Done : BadgeKind.Pending);
-            activationBadge.Set(state.Activated ? "已激活" : "未激活", state.Activated ? BadgeKind.Done : BadgeKind.Pending);
             ApplyMonthlyStatus(state.MonthlyStatus);
         }
 

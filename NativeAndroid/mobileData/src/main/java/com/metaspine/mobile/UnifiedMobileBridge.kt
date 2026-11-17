@@ -8,6 +8,7 @@ import com.metaspine.mobile.data.*
 import kotlinx.coroutines.*
 import org.json.JSONArray
 import org.json.JSONObject
+import java.io.File
 import java.time.OffsetDateTime
 import java.util.UUID
 import java.util.concurrent.atomic.AtomicInteger
@@ -23,13 +24,24 @@ object UnifiedMobileBridge {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     private val identityGeneration = AtomicInteger()
     private val main = Handler(Looper.getMainLooper())
+    private data class PendingPlan(val token: String, val account: String, val generation: Int, val operation: Long,
+        val credential: PatientServerCredential, val binding: BindingScope,
+        val coordinator: TrainingDirectiveCoordinator?,
+        val prepared: DirectiveRefreshResult.Prepared?, val local: Boolean,
+        val localOrder: DownloadedOrder? = null)
+    private var pendingPlan: PendingPlan? = null
 
     @JvmStatic @Synchronized fun initialize(host: Context) {
         if (::context.isInitialized) return
         context = host.applicationContext
+        LocalServerDiscovery.initialize(context)
         users = DemoUserStore(context)
-        SpineFlowServerConfig.baseUrlOverride = PatientCredentials.serverUrlOverride(context)
-        sync = ServerSyncCoordinator(context, scope)
+        // A LAN route never rewrites the user's saved logical origin or credential preferences.
+        SpineFlowServerConfig.baseUrlOverride = null
+        sync = ServerSyncCoordinator(context, scope) { accountId ->
+            // P2.4 启动重算：按账号加载可同步状态（过滤 LEGACY_IMPORT / imported / 种子数据）。
+            runCatching { syncable(users.loadUser(accountId)) }.getOrNull()
+        }
         loginGuard = AccountLoginGuard(context, users, sync::forgetAccount)
         loginGuard.recoverPendingDeletions()
         routineStore = RoutineQuestionnaireStore(context)
@@ -63,31 +75,46 @@ object UnifiedMobileBridge {
             input.optInt(prefix + "PainLevel")
         )
         val records = objects(input.optJSONArray("trainingHistory")).map { row ->
-            val feedback = row.optString("feedback").split(" / ", limit = 2)
+            val feedback = if (row.optString("feedbackFeeling").isNotBlank() && row.optString("feedbackDifficulty").isNotBlank())
+                PostTrainingFeedback(row.getString("feedbackFeeling"), row.getString("feedbackDifficulty"), row.optString("feedbackRecordedAt"))
+                else old.history.find { it.sessionId == row.getString("sessionId") }?.feedback
             TrainingHistoryRecord(row.getString("sessionId"), row.optString("completedAt"),
                 row.optString("resultJson"),
-                feedback.takeIf { row.optString("feedback").isNotBlank() }?.let {
-                    PostTrainingFeedback(it[0], it.getOrElse(1) { "" })
-                }, row.optString("preTrainingEventId"), row.optString("planJson"),
-                row.optBoolean("feedbackPending"), row.optString("endReason"), row.optString("replaySessionId"))
+                feedback, row.optString("preTrainingEventId"), row.optString("planJson"),
+                row.optBoolean("feedbackPending"), row.optString("endReason"), row.optString("replaySessionId"),
+                row.optString("networkResultJson"), row.optString("networkResultError"), row.optString("actionId"))
         }
+
         val painRecords = objects(input.optJSONArray("painHistory")).map { row ->
-            PainHistoryRecord(row.getString("id"), row.getString("recordedAt"), row.optInt("painLevel"),
+            val previous = old.painHistory.find { it.id == row.getString("id") }
+            val captured = row.optJSONArray("points")
+            val originalPoints = if (row.optBoolean("pointsCaptured") && captured != null)
+                objects(captured).map { point ->
+                    PainPoint(point.getString("bodyPart"), point.optString("bodyPartLabel"),
+                        point.optString("view"), point.getInt("painLevel").also { require(it in 0..10) })
+                } else previous?.painPoints.orEmpty()
+            val record = PainHistoryRecord(row.getString("id"), row.getString("recordedAt"),
+                row.getInt("painLevel").also { require(it in 0..10) },
                 PainRecordSource.entries.firstOrNull { it.name == row.optString("source") }
-                    ?: PainRecordSource.DailyQuestionnaire,
-                strings(row.optJSONArray("painParts")).map { part ->
-                    points.find { it.bodyPart == part } ?: PainPoint(part, part, "front", row.optInt("painLevel"))
-                })
+                    ?: PainRecordSource.DailyQuestionnaire, originalPoints,
+                strings(row.optJSONArray("painParts")), row.optBoolean("pointsCaptured"), row.optBoolean("painFree"))
+            require(previous == null || previous == record) { "疼痛历史不能改写" }
+            record
         }
+        val currentProfile = UserProfile(profile.optInt("heightCm"), profile.optInt("weightKg"),
+            gender(profile.optString("gender")), profile.optInt("ageYears"))
+        val healthEvents = HealthEventBridge.captureProfile(
+            HealthEventBridge.merge(old.healthEventsJson, input.optJSONArray("healthEvents")), old.profile, currentProfile)
+        fun latestAnswers(type: String): JSONObject? = objects(JSONArray(healthEvents))
+            .lastOrNull { it.getString("type") == type }?.let { JSONObject(it.getString("answersJson")) }
+        val capturedIntake = latestAnswers("admissionIntake")
+        val capturedSurvey = latestAnswers("admissionSurvey")
         val saved = old.copy(
             lifecycle = if (input.optInt("lifecycle") == 1) UserLifecycle.ReturningUser else UserLifecycle.AdmissionPending,
-            profile = UserProfile(profile.optInt("heightCm"), profile.optInt("weightKg"),
-                gender(profile.optString("gender")), profile.optInt("ageYears")),
-            admissionSurvey = if (input.optBoolean("intakeCompleted"))
-                AdmissionSurvey(input.optInt("latestPainLevel"), input.optBoolean("intakeReviewRequired")) else old.admissionSurvey,
-            admissionIntake = if (input.optBoolean("intakeCompleted"))
-                AdmissionIntake(input.optString("basicSituation"), strings(input.optJSONArray("symptoms")).firstOrNull().orEmpty(),
-                    strings(input.optJSONArray("goals"))) else old.admissionIntake,
+            profile = currentProfile,
+            admissionSurvey = capturedSurvey?.let { AdmissionSurvey(it.getInt("painLevel"), it.getBoolean("requiresClinicalReview")) } ?: old.admissionSurvey,
+            admissionIntake = capturedIntake?.let { AdmissionIntake(it.getString("situation"), it.getString("symptom"), strings(it.optJSONArray("goals"))) } ?: old.admissionIntake,
+            intakeReviewRequired = input.optBoolean("intakeReviewRequired", old.intakeReviewRequired),
             latestPreTrainingCheck = input.optString("preTrainingRecordedAt").takeIf { it.isNotBlank() }?.let {
                 old.latestPreTrainingCheck?.takeIf { check -> check.recordedAt == it }
                     ?: DailyCheck(input.optInt("latestPainLevel"), input.optString("symptomChange"), false,
@@ -98,24 +125,43 @@ object UnifiedMobileBridge {
                 MobileAdmissionAssessment(movement(AdmissionMovementType.Flexion, "flexion"),
                     movement(AdmissionMovementType.Extension, "extension"), input.optString("admissionCompletedAt"))
                 else old.mobileAdmissionAssessment,
-            history = records, painHistory = painRecords
+            history = records, painHistory = painRecords,
+            healthEventsJson = healthEvents,
+            syncBindingKey = old.syncBindingKey.ifBlank { BindingScopeStore.load(context, id)?.storageKey().orEmpty() },
+            monthlyHistoryJson = input.optJSONArray("monthlyHistory")?.toString() ?: old.monthlyHistoryJson,
+            trackingCalibratedAt = input.optString("trackingCalibratedAt", old.trackingCalibratedAt),
+            imuCalibrationState = if (input.optString("trackingCalibratedAt").isNotBlank()) ImuCalibrationState.Calibrated else old.imuCalibrationState
         )
+        // Mark before saving: a crash between commits rechecks the old state instead of losing new facts.
+        sync.markDirty(id)
         users.saveUser(saved)
-        val feedbackSubmitted = records.any { record ->
-            !record.feedbackPending && record.feedback != null &&
-                old.history.none { it.sessionId == record.sessionId && it.feedback == record.feedback && !it.feedbackPending }
+        main.post { sync.onUserChanged(syncable(saved)) }
+
+        // P5.7：识别并提交 V2 训练结果（protocolVersion = 2）到 V2 上传通道
+        for (record in records) {
+            val resultJson = record.resultJson.takeIf { it.isNotBlank() } ?: continue
+            val resultObj = runCatching { JSONObject(resultJson) }.getOrNull() ?: continue
+            val protocolVersion = resultObj.optInt("protocolVersion", 1)
+
+            if (protocolVersion == 2) {
+                // V2 格式：解析并提交到 V2 结果存储
+                val patientId = PatientCredentials.credential(context, id)?.patientId
+                if (patientId != null) {
+                    try {
+                        val v2Result = PrescriptionResultV2.parse(resultObj, patientId)
+                        sync.submitResult(id, v2Result)
+                    } catch (error: ResultInputException) {
+                        android.util.Log.w("UnifiedMobileBridge",
+                            "V2 结果解析失败: sessionId=${record.sessionId}, error=${error.message}")
+                    }
+                }
+            }
         }
-        main.post { sync.onUserChanged(syncable(saved), immediate = feedbackSubmitted) }
     }
 
-    @JvmStatic fun foreground() {
-        main.post {
-            users.activeAccountId()?.let { sync.onUserChanged(syncable(users.loadUser(it)), immediate = true) }
-            sync.onForeground()
-        }
-    }
+    @JvmStatic fun foreground() { main.post { sync.onForeground() } }
 
-    @JvmStatic fun logout() { identityGeneration.incrementAndGet(); users.saveActiveAccountId(null) }
+    @JvmStatic fun logout() { identityGeneration.incrementAndGet(); pendingPlan = null; users.saveActiveAccountId(null) }
 
     @JvmStatic fun openLegacyImport(account: String) {
         require(users.activeAccountId() == account) { "请先登录要导入的账号" }
@@ -181,6 +227,22 @@ object UnifiedMobileBridge {
         }
     }
 
+    private fun activationOrigin(account: String): String {
+        val configured = SpineFlowServerConfig.BASE_URL
+        val binding = BindingScopeStore.load(context, account)
+        require(binding == null || LocalServerDiscovery.registerBinding(binding)) {
+            "当前服务器不是账号绑定医院，本地数据已保留"
+        }
+        val pending = PatientCredentials.activationPending(context, account)
+        if (pending != null && pending.origin.isNotBlank()) {
+            require(LocalServerDiscovery.acceptsOrigin(pending.origin, pending.serviceId, pending.hospitalKey)) {
+                "请连接原医院后重试激活，本地数据已保留"
+            }
+            return pending.origin
+        }
+        return binding?.origin ?: configured
+    }
+
     private suspend fun execute(command: String, body: JSONObject, generation: Int): JSONObject {
         val account = body.optString("accountId").trim().lowercase()
         when (command) {
@@ -190,44 +252,232 @@ object UnifiedMobileBridge {
                 require(checked is AccountLoginResult.Allowed) { (checked as AccountLoginResult.Blocked).message }
                 require(identityGeneration.get() == generation) { "登录请求已取消" }
                 users.saveActiveAccountId(account)
-                foreground()
                 return JSONObject(load(account))
             }
             "previewActivation" -> {
+                val origin = activationOrigin(account)
+                val operation = LocalServerDiscovery.prepareOperation(origin)
+                ServiceIdentityClient.requireHospital(ServiceIdentityClient.fetch(origin).getOrThrow())
+                require(LocalServerDiscovery.isCurrentOperation(operation)) { "网络连接已变化，请重试激活预览" }
                 val preview = PatientActivationClient.preview(body.getString("code"),
-                    PatientCredentials.installationId(context)).getOrThrow()
+                    PatientCredentials.installationId(context), origin).getOrThrow()
+                require(identityGeneration.get() == generation && LocalServerDiscovery.isCurrentOperation(operation)) {
+                    "激活预览请求已失效，请重试"
+                }
                 return JSONObject().put("message", "请确认：${preview.displayName}，${preview.idCardMasked}，医生 ${preview.doctorUsername}")
             }
             "activate" -> {
                 val code = PatientActivationClient.normalizeInput(body.getString("code"))
                 require(PatientActivationClient.isComplete(code)) { "请输入有效的11位建档手机号" }
-                val pending = PatientCredentials.activationPending(context, account)
+                val origin = activationOrigin(account)
+                val configuredOrigin = SpineFlowServerConfig.BASE_URL
+                val operation = LocalServerDiscovery.prepareOperation(origin)
+                val serviceIdentity = ServiceIdentityClient.requireHospital(
+                    ServiceIdentityClient.fetch(origin).getOrThrow())
+                require(SpineFlowServerConfig.BASE_URL == configuredOrigin && LocalServerDiscovery.isCurrentOperation(operation)) {
+                    "医院连接已变化，请重试"
+                }
+                val priorScope = BindingScopeStore.load(context, account)
+                val existingPending = PatientCredentials.activationPending(context, account)
                     ?: PendingActivationBinding(PatientActivationClient.newRequestId(), code,
                         PatientActivationClient.newProposedToken(), PatientCredentials.installationId(context), account)
+                require(existingPending.origin.isBlank() ||
+                    (existingPending.origin == origin && existingPending.serviceId == serviceIdentity.serviceId &&
+                        existingPending.hospitalKey == serviceIdentity.hospitalKey)) { "请连接原医院后重试激活" }
+                val pending = existingPending.copy(origin = origin, serviceId = serviceIdentity.serviceId,
+                    hospitalKey = serviceIdentity.hospitalKey)
                 require(pending.activationCode == code) { "有未确认的激活请求，请先使用原手机号重试" }
                 check(PatientCredentials.saveActivationPending(context, pending)) { "激活请求未能安全保存" }
                 val redeemed = PatientActivationClient.redeem(PatientActivationClient.buildRedeemBody(
                     pending.requestId, pending.activationCode, pending.proposedToken, pending.installationId, account
-                )).getOrThrow()
+                ), origin).getOrThrow()
+                // P2.7：网络回包在途期间若发生登出/切换（identityGeneration 变化），
+                // 不得把旧请求的凭据落到当前身份上。
+                require(identityGeneration.get() == generation && SpineFlowServerConfig.BASE_URL == configuredOrigin &&
+                    LocalServerDiscovery.isCurrentOperation(operation) &&
+                    BindingScopeStore.load(context, account) == priorScope) { "激活请求已取消，请重试" }
+                val sameBinding = priorScope?.matchesOriginAndPatient(origin, redeemed.patientId) == true &&
+                    priorScope.matchesHospital(serviceIdentity) &&
+                    PatientCredentials.credential(context, account)?.patientToken == pending.proposedToken
+                val nextGeneration = if (sameBinding) priorScope!!.credentialGeneration
+                    else BindingScopeStore.nextGeneration(context, account)
+                val newScope = BindingScope(
+                    origin = origin,
+                    serviceId = serviceIdentity.serviceId,
+                    hospitalKey = serviceIdentity.hospitalKey,
+                    hospitalName = serviceIdentity.hospitalName,
+                    patientId = redeemed.patientId,
+                    accountId = account,
+                    credentialGeneration = nextGeneration
+                )
+                check(LocalServerDiscovery.registerBinding(newScope)) { "医院身份不匹配，本地数据已保留" }
+                // P2.7：换绑（Origin/医院/患者变化）时旧队列属于旧绑定，绝不能用新 PAT
+                // 发往新医院——作废旧队列与在途回包；同院重放仅作废在途回包，保留合法未确认任务。
+                val bindingChanged = priorScope != null && (priorScope.origin != newScope.origin ||
+                    priorScope.serviceId != newScope.serviceId ||
+                    priorScope.hospitalKey != newScope.hospitalKey ||
+                    priorScope.patientId != newScope.patientId)
+                sync.invalidateInflight(account)
+                // P4.2：旧绑定的处方回执任务不得被新 PAT 重放。代际已变，这里只做物理清理。
+                priorScope?.let { PrescriptionReceiptStore(context).clearScope(it) }
                 check(PatientCredentials.saveActivatedCredential(context, account,
-                    PatientServerCredential(redeemed.patientId, pending.proposedToken), redeemed.prescription, redeemed.identity))
+                    PatientServerCredential(redeemed.patientId, pending.proposedToken), redeemed.prescription,
+                    redeemed.identity, redeemed.prescriptionV2, newScope))
+                LocalServerDiscovery.markBindingVerified(newScope)
+                val local = users.loadUser(account)
+                users.saveUser(HealthEventBridge.rebind(local, newScope.storageKey()))
                 sync.resumeAfterCredentialsUpdate(syncable(users.loadUser(account)))
                 return JSONObject(load(account))
             }
+            "refreshDirective" -> {
+                val credential = requireNotNull(PatientCredentials.credential(context, account))
+                val binding = requireNotNull(BindingScopeStore.load(context, account))
+                require(LocalServerDiscovery.registerBinding(binding)) { "当前服务器不是账号绑定医院，本地数据已保留" }
+                val operation = LocalServerDiscovery.prepareOperation(binding.origin)
+                val current = { candidate: BindingScope ->
+                    identityGeneration.get() == generation && users.activeAccountId() == account &&
+                        candidate.matches(BindingScopeStore.load(context, account)) &&
+                        LocalServerDiscovery.matchesBinding(candidate, SpineFlowServerConfig.BASE_URL, credential.patientId) &&
+                        LocalServerDiscovery.isCurrentOperation(operation) &&
+                        PatientCredentials.credential(context, account) == credential
+                }
+                require(current(binding)) { "医院绑定已变化" }
+                val received = TrainingDirectiveCoordinator(
+                    storage = TrainingDirectiveStore(context), receipts = PrescriptionReceiptStore(context),
+                    isCurrent = current
+                ).receiveOnly(account, credential, binding)
+                require(received is DirectiveRefreshResult.Received) {
+                    when (received) {
+                        is DirectiveRefreshResult.Unavailable -> received.message
+                        is DirectiveRefreshResult.CredentialRejected -> received.message
+                        else -> "医生指令暂未更新"
+                    }
+                }
+                val snapshot = received.snapshot
+                return JSONObject().put("state", snapshot.state.wireValue)
+                    .put("receiptPending", received.receiptPending)
+                    .put("snapshotJson", snapshot.toStoreJson().toString())
+                    .put("prescriptionJson", snapshot.prescription?.prescription?.toJson()?.toString().orEmpty())
+            }
+            "confirmPlan" -> {
+                val plan = requireNotNull(pendingPlan) { "本次训练准备已失效" }
+                fun current(): Boolean = pendingPlan === plan && plan.account == account &&
+                    plan.generation == generation && identityGeneration.get() == generation &&
+                    LocalServerDiscovery.isCurrentOperation(plan.operation) && users.activeAccountId() == account &&
+                    plan.binding.matches(BindingScopeStore.load(context, account)) &&
+                    PatientCredentials.credential(context, account) == plan.credential &&
+                    LocalServerDiscovery.matchesBinding(plan.binding, SpineFlowServerConfig.BASE_URL,
+                        plan.credential.patientId)
+                require(current() && plan.token == body.getString("planToken") && body.getBoolean("consumerConfirmed")) {
+                    "训练资源尚未完成交接"
+                }
+                if (plan.local) {
+                    val latest = requireNotNull(plan.coordinator).receiveOnly(account, plan.credential, plan.binding)
+                    require(latest is DirectiveRefreshResult.Received &&
+                        isSameLocalTrainingOrder(requireNotNull(plan.localOrder), latest.snapshot)) {
+                        "医生处方已变化或训练已暂停，请重新进入"
+                    }
+                } else {
+                    val coordinator = requireNotNull(plan.coordinator)
+                    val prepared = requireNotNull(plan.prepared)
+                    val confirmed = coordinator.confirmReady(plan.credential, prepared, true)
+                    require(confirmed is DirectiveRefreshResult.Ready) { "本次处方暂不可训练，请重新进入" }
+                }
+                require(current()) { "本次训练准备已失效，请重新进入" }
+                pendingPlan = null
+                return JSONObject().put("planToken", plan.token).put("ready", true)
+            }
             "plan" -> {
+                pendingPlan = null
                 val user = users.loadUser(account)
                 val preEvent = user.latestPreTrainingCheck?.recordedAt?.takeIf { it.isNotBlank() }?.let { "pre:$it" }
                 require(preEvent != null && user.history.none { it.preTrainingEventId == preEvent }) {
                     "请重新完成本次训练前检查"
                 }
                 val credential = requireNotNull(PatientCredentials.credential(context, account)) { "请先激活医生档案" }
-                val directive = PatientDirectiveClient.fetch(credential.patientToken).getOrThrow()
-                if (directive.optInt("directiveVersion") == 2) {
-                    return UnifiedPrescriptionV2.prepare(context, account, user, credential, directive, preEvent)
+                // 处方文件只按当前绑定作用域存取；作用域与 PAT 患者不一致时不得交接。
+                val bindingScope = requireNotNull(BindingScopeStore.load(context, account)) {
+                    "医院绑定信息缺失，请重新激活医生档案"
                 }
-                val refreshed = TrainingDirectiveCoordinator(TrainingDirectiveStore(context),
-                    fetchDirective = { Result.success(directive) }).refresh(account, credential)
-                require(refreshed is DirectiveRefreshResult.Ready) {
+                require(LocalServerDiscovery.registerBinding(bindingScope) &&
+                    LocalServerDiscovery.matchesBinding(bindingScope, SpineFlowServerConfig.BASE_URL, credential.patientId)) {
+                    "医院绑定已变更，请重新激活医生档案"
+                }
+                val operation = LocalServerDiscovery.prepareOperation(bindingScope.origin)
+                val isCurrent: (BindingScope) -> Boolean = { candidate ->
+                    identityGeneration.get() == generation && users.activeAccountId() == account &&
+                        candidate.matches(BindingScopeStore.load(context, account)) &&
+                        LocalServerDiscovery.matchesBinding(candidate, SpineFlowServerConfig.BASE_URL, credential.patientId) &&
+                        LocalServerDiscovery.isCurrentOperation(operation) &&
+                        PatientCredentials.credential(context, account) == credential
+                }
+
+                // Built-in doctor actions use the scenes bundled in the APK. Receive only the
+                // prescription metadata and dose; do not download the motion package.
+                val localCoordinator = TrainingDirectiveCoordinator(
+                    storage = TrainingDirectiveStore(context),
+                    receipts = PrescriptionReceiptStore(context),
+                    isCurrent = isCurrent
+                )
+                val locallyReceived = localCoordinator.receiveOnly(account, credential, bindingScope)
+                require(locallyReceived is DirectiveRefreshResult.Received) {
+                    when (locallyReceived) {
+                        is DirectiveRefreshResult.Unavailable -> locallyReceived.message
+                        is DirectiveRefreshResult.CredentialRejected -> locallyReceived.message
+                        is DirectiveRefreshResult.NotTrainable -> locallyReceived.message
+                        else -> "无法获取本次医生处方，请重试"
+                    }
+                }
+                require(locallyReceived.snapshot.state == TrainingDirectiveState.Ready) {
+                    locallyReceived.snapshot.message.ifBlank { "本次处方暂不可训练，请重新进入" }
+                }
+                run {
+                    val localOrder = locallyReceived.snapshot.prescription
+                    val localItem = localOrder?.singleItem
+                    val localDefinition = localItem?.let { LocalActionCatalog.find(it.actionId) }
+                    if (localOrder != null && localItem != null && localDefinition != null &&
+                        LocalActionCatalog.isLocallyExecutable(localItem.actionId)) {
+                        require(isCurrent(bindingScope)) { "医院绑定或网络连接已变化，请重新进入训练" }
+                        val payload = TrainingStartPayload.forLocalPrescription(
+                            user,
+                            if (user.isReturningUser) DemoFlowType.ReturningUser else DemoFlowType.FirstAdmission,
+                            credential.patientId,
+                            localOrder,
+                            bindingScope
+                        )
+                        val source = JSONObject(payload.toJson())
+                        val actions = source.getJSONObject("trainingPlan").getJSONArray("recommendedActions")
+                        val coachScene = requireNotNull(localDefinition.coachScene(user.profile?.gender == UserGender.Male))
+                        val gameScene = requireNotNull(localDefinition.gameScene)
+                        objects(actions).forEach { row ->
+                            row.put("sceneName", if (row.getString("arTaskType") == "coach_training") coachScene else gameScene)
+                        }
+                        val sessionId = UUID.randomUUID().toString()
+                        val planToken = UUID.randomUUID().toString()
+                        require(isCurrent(bindingScope)) { "医院绑定或网络连接已变化，请重新进入训练" }
+                        pendingPlan = PendingPlan(planToken, account, generation, operation, credential,
+                            bindingScope, localCoordinator, null, true, localOrder)
+                        val startedAt = java.time.Instant.now().truncatedTo(java.time.temporal.ChronoUnit.MILLIS).toString()
+                        return JSONObject().put("sessionId", sessionId).put("requestToken", sessionId)
+                            .put("planToken", planToken).put("startedAt", startedAt).put("accountId", account)
+                            .put("patientId", credential.patientId).put("gender", user.profile?.gender?.wireValue)
+                            .put("actionId", localItem.actionId).put("targetScene", coachScene).put("actions", actions)
+                            .put("prescriptionOrderId", localOrder.orderId)
+                            .put("prescriptionJson", source.getJSONObject("trainingPlan").toString())
+                            .put("preTrainingEventId", user.latestPreTrainingCheck?.recordedAt?.takeIf { it.isNotBlank() }?.let { "pre:$it" }.orEmpty())
+                    }
+                }
+
+                val assetStore = PrescriptionAssetStore.forContext(context, bindingScope)
+                val coordinator = TrainingDirectiveCoordinator(
+                    storage = TrainingDirectiveStore(context),
+                    receipts = PrescriptionReceiptStore(context),
+                    assets = assetStore,
+                    handoffGate = { handoff -> TrainingStartPayload.capabilityGaps(handoff.order) },
+                    isCurrent = isCurrent
+                )
+                val refreshed = coordinator.prepare(account, credential, bindingScope)
+                require(refreshed is DirectiveRefreshResult.Prepared) {
                     when (refreshed) {
                         is DirectiveRefreshResult.NotTrainable -> refreshed.message
                         is DirectiveRefreshResult.NotActivated -> refreshed.message
@@ -236,32 +486,65 @@ object UnifiedMobileBridge {
                         else -> "无法获取本次医生处方"
                     }
                 }
-                val order = requireNotNull(refreshed.snapshot.trainableOrder())
+                val handoff = requireNotNull(refreshed.handoff) { "处方资源尚未完成校验，请重新下拉处方" }
+                require(identityGeneration.get() == generation &&
+                    bindingScope.matches(BindingScopeStore.load(context, account)) &&
+                    LocalServerDiscovery.matchesBinding(bindingScope, SpineFlowServerConfig.BASE_URL, credential.patientId) &&
+                    LocalServerDiscovery.isCurrentOperation(operation)) { "医院绑定已变化" }
                 val payload = TrainingStartPayload.forPrescription(user,
                     if (user.isReturningUser) DemoFlowType.ReturningUser else DemoFlowType.FirstAdmission,
-                    credential.patientId, order)
-                val source = JSONObject(payload.toJson())
-                val action = requireNotNull(order.singleItem)
-                val coachScene = when (action.actionId) {
-                    "bird_dog" -> if (user.profile?.gender == UserGender.Male) "maleBirdDogPractice" else "BirdDogPractice"
-                    else -> if (user.profile?.gender == UserGender.Male) "maleDeadBugPractice" else "DeadBugPractice"
+                    credential.patientId, handoff) { file ->
+                    PrescriptionAssetStore.readableContentUriFor(context, file)?.toString()
                 }
-                val gameScene = if (action.actionId == "bird_dog") "BirdDogMinimal" else "SpineV2Minimal"
+                val source = JSONObject(payload.toJson())
+                val order = handoff.order
+                val action = requireNotNull(order.singleItem)
+                val mapped = LocalActionCatalog.find(action.actionId)
+                val coachScene = mapped?.coachScene(user.profile?.gender == UserGender.Male)
+                    ?: if (action.actionId == "bird_dog") {
+                        if (user.profile?.gender == UserGender.Male) "maleBirdDogPractice" else "BirdDogPractice"
+                    } else {
+                        if (user.profile?.gender == UserGender.Male) "maleDeadBugPractice" else "DeadBugPractice"
+                    }
+                val gameScene = mapped?.gameScene
+                    ?: if (action.actionId == "bird_dog") "BirdDogMinimal" else "SpineV2Minimal"
                 val actions = source.getJSONObject("trainingPlan").getJSONArray("recommendedActions")
                 objects(actions).forEach { it.put("sceneName", if (it.getString("arTaskType") == "coach_training") coachScene else gameScene) }
-                return JSONObject().put("sessionId", UUID.randomUUID().toString()).put("accountId", account)
+                val sessionId = UUID.randomUUID().toString()
+                val planToken = UUID.randomUUID().toString()
+                require(isCurrent(bindingScope)) { "医院绑定或网络连接已变化，请重新进入训练" }
+                pendingPlan = PendingPlan(planToken, account, generation, operation, credential,
+                    bindingScope, coordinator, refreshed, false)
+                val startedAt = java.time.Instant.now().truncatedTo(java.time.temporal.ChronoUnit.MILLIS).toString()
+                return JSONObject().put("sessionId", sessionId).put("requestToken", sessionId)
+                    .put("planToken", planToken).put("startedAt", startedAt).put("accountId", account)
                     .put("patientId", credential.patientId).put("gender", user.profile?.gender?.wireValue)
                     .put("actionId", action.actionId).put("targetScene", coachScene).put("actions", actions)
                     .put("prescriptionOrderId", order.orderId).put("prescriptionJson", source.getJSONObject("trainingPlan").toString())
                     .put("preTrainingEventId", user.latestPreTrainingCheck?.recordedAt?.takeIf { it.isNotBlank() }?.let { "pre:$it" }.orEmpty())
             }
-            "routineRefresh", "routineAnswer", "routineSubmit" -> {
+            "routineRefresh", "routineAnswer", "routineSave", "routineSubmit" -> {
                 val credential = requireNotNull(PatientCredentials.credential(context, account)) { "请先激活医生档案" }
-                val bound = RoutineScope.of(account, credential, SpineFlowServerConfig.BASE_URL)
-                val current = { PatientCredentials.credential(context, account) == credential &&
-                    users.activeAccountId() == account }
+                val binding = requireNotNull(BindingScopeStore.load(context, account))
+                require(LocalServerDiscovery.registerBinding(binding) &&
+                    LocalServerDiscovery.matchesBinding(binding, SpineFlowServerConfig.BASE_URL, credential.patientId))
+                val origin = binding.origin
+                // Local draft editing must remain available while the server is offline.
+                val operation = if (command == "routineRefresh" || command == "routineSubmit")
+                    LocalServerDiscovery.prepareOperation(origin) else null
+                val bound = RoutineScope.of(account, credential, origin, binding)
+                // P2.7：在途回包只有「凭据、活动账号、Origin 均未变」才可写回，
+                // 切源后旧问卷回包不得修改新绑定的答卷/缓存。
+                val current = { identityGeneration.get() == generation && binding.matches(BindingScopeStore.load(context, account)) &&
+                    PatientCredentials.credential(context, account) == credential &&
+                    users.activeAccountId() == account &&
+                    LocalServerDiscovery.matchesBinding(binding, SpineFlowServerConfig.BASE_URL, credential.patientId) &&
+                    (operation == null || LocalServerDiscovery.isCurrentOperation(operation)) }
                 var message = ""
                 if (command == "routineRefresh") message = routine.refresh(bound, credential, current).message
+                if (command == "routineSave") {
+                    routine.saveDraft(bound, body.getLong("taskId"), body.getString("answersJson"), current)
+                }
                 if (command == "routineAnswer") {
                     val taskId = body.getLong("taskId")
                     val row = routineStore.read(bound).find { it.task.taskId == taskId } ?: error("请先刷新问卷")
@@ -304,8 +587,14 @@ object UnifiedMobileBridge {
                 }
             }
             array.put(JSONObject().put("taskId", row.task.taskId).put("name", schema?.title ?: row.task.name)
+                .put("templateCode", row.task.code).put("availableAt", row.task.availableAt)
                 .put("completedAt", row.completedAt.orEmpty()).put("availability", row.availability)
-                .put("problem", row.problem.orEmpty()).put("questions", questions))
+                .put("pendingSubmission", row.pendingBody != null)
+                .put("problem", row.problem.orEmpty()).put("questions", questions)
+                .put("templateVersion", row.task.version).put("schemaJson", JSONObject(row.task.raw).optJSONObject("template")?.optJSONObject("schema")?.toString().orEmpty())
+                .put("answersJson", row.answers).put("recordId", row.recordId ?: JSONObject.NULL)
+                .put("submissionStatus", row.submissionStatus.orEmpty()).put("problemCode", row.problemCode.orEmpty())
+                .put("fieldErrors", row.fieldErrors.orEmpty()))
         }
     })
 
@@ -323,8 +612,8 @@ object UnifiedMobileBridge {
             .put("symptoms", JSONArray(listOfNotNull(user.admissionIntake?.symptom))).put("goals", JSONArray(user.admissionIntake?.goals.orEmpty()))
             .put("painParts", JSONArray(user.latestPainPoints.map { it.bodyPart })).put("painLevels", JSONArray(user.latestPainPoints.map { it.painLevel }))
             .put("painFree", user.latestPainPoints.none { it.painLevel > 0 }).put("latestPainLevel", daily?.prePainLevel ?: user.admissionSurvey?.painLevel ?: 0)
-            .put("symptomChange", daily?.symptomChange.orEmpty()).put("intakeCompleted", user.admissionIntake != null)
-            .put("intakeReviewRequired", user.admissionSurvey?.requiresClinicalReview ?: false)
+            .put("symptomChange", daily?.symptomChange.orEmpty()).put("intakeCompleted", user.admissionSurvey != null)
+            .put("intakeReviewRequired", user.intakeReviewRequired)
             .put("admissionCompleted", assessment != null).put("admissionReviewRequired", assessment?.requiresClinicalReview() ?: false)
             .put("preTrainingCheckPassed", daily?.allowedToTrain == true && user.history.none { it.preTrainingEventId == "pre:${daily.recordedAt}" }).put("preTrainingRecordedAt", daily?.recordedAt.orEmpty())
             .put("preTrainingEventId", daily?.recordedAt?.takeIf { it.isNotBlank() }?.let { "pre:$it" }.orEmpty())
@@ -333,17 +622,27 @@ object UnifiedMobileBridge {
             .put("flexionResponse", assessment?.flexion?.painResponse?.wireValue.orEmpty()).put("extensionResponse", assessment?.extension?.painResponse?.wireValue.orEmpty())
             .put("flexionPainPhase", assessment?.flexion?.firstPainPhase?.wireValue.orEmpty()).put("extensionPainPhase", assessment?.extension?.firstPainPhase?.wireValue.orEmpty())
             .put("flexionCompletions", assessment?.flexion?.completionCount ?: 0).put("extensionCompletions", assessment?.extension?.completionCount ?: 0)
+            .put("healthEvents", JSONArray(user.healthEventsJson))
+            .put("monthlyHistory", JSONArray(user.monthlyHistoryJson))
+            .put("trackingCalibratedAt", user.trackingCalibratedAt)
             .put("painHistory", JSONArray().also { array -> user.painHistory.forEach { row ->
                 array.put(JSONObject().put("id", row.id).put("recordedAt", row.recordedAt).put("painLevel", row.painLevel)
-                    .put("source", row.source.name).put("painParts", JSONArray(row.painPoints.map { it.bodyPart })))
+                    .put("source", row.source.name).put("painParts", JSONArray(row.painParts))
+                    .put("pointsCaptured", row.pointsCaptured).put("painFree", row.painFree)
+                    .put("points", JSONArray(row.painPoints.map { point -> JSONObject()
+                        .put("bodyPart", point.bodyPart).put("bodyPartLabel", point.bodyPartLabel)
+                        .put("view", point.view).put("painLevel", point.painLevel) })))
             } })
             .put("trainingHistory", JSONArray().also { array -> user.history.forEach { row ->
                 val result = runCatching { JSONObject(row.resultJson) }.getOrNull()
                 array.put(JSONObject().put("sessionId", row.sessionId).put("completedAt", row.completedAt).put("resultJson", row.resultJson)
-                    .put("actionId", result?.optJSONArray("actionResults")?.optJSONObject(0)?.optString("actionId").orEmpty())
+                    .put("actionId", row.actionId)
                     .put("preTrainingEventId", row.preTrainingEventId).put("feedback", row.feedback?.let { "${it.feeling} / ${it.difficulty}" }.orEmpty())
+                    .put("feedbackFeeling", row.feedback?.feeling.orEmpty()).put("feedbackDifficulty", row.feedback?.difficulty.orEmpty())
+                    .put("feedbackRecordedAt", row.feedback?.recordedAt.orEmpty())
                     .put("completed", result?.optBoolean("completed") ?: false).put("planJson", row.planJson)
-                    .put("feedbackPending", row.feedbackPending).put("endReason", row.endReason).put("replaySessionId", row.replaySessionId))
+                    .put("feedbackPending", row.feedbackPending).put("endReason", row.endReason).put("replaySessionId", row.replaySessionId)
+                    .put("networkResultJson", row.networkResultJson).put("networkResultError", row.networkResultError))
             } })
     }
 
@@ -352,15 +651,11 @@ object UnifiedMobileBridge {
         "女", "female" -> UserGender.Female
         else -> UserGender.Unspecified
     }
-    private fun syncable(user: DemoUserData): DemoUserData {
-        val patientId = PatientCredentials.credential(context, user.accountId)?.patientId
-        return user.copy(
-        history = user.history.filter { it.endReason != "LEGACY_IMPORT" &&
-            (it.planJson.isBlank() || (it.endReason.isNotBlank() && !it.feedbackPending &&
-                patientId != null && runCatching { JSONObject(it.resultJson).optString("userId") }.getOrNull() == patientId)) },
+    private fun syncable(user: DemoUserData): DemoUserData = user.copy(
+        // Valid checkpoints can leave before session completion; feedback remains a separate S01 event.
+        history = user.history.filter { it.endReason != "LEGACY_IMPORT" && !it.sessionId.startsWith("imported:") },
         painHistory = user.painHistory.filterNot { it.id.startsWith("imported:") }
-        )
-    }
+    )
     private fun objects(array: JSONArray?): List<JSONObject> =
         if (array == null) emptyList() else (0 until array.length()).map { array.getJSONObject(it) }
     private fun strings(array: JSONArray?): List<String> =

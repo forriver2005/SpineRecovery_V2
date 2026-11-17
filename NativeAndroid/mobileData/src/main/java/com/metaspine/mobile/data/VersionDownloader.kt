@@ -1,6 +1,9 @@
 package com.metaspine.mobile.data
 
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.withContext
 import java.io.ByteArrayOutputStream
 import java.net.HttpURLConnection
@@ -13,18 +16,24 @@ object VersionDownloader {
     private const val MAX_CONFIG_BYTES = 10 * 1024 * 1024
 
     suspend fun downloadText(downloadUrl: String, expectedSize: Long? = null): Result<String> = withContext(Dispatchers.IO) {
-        runCatching {
+        patientRequestResult {
             val base = SpineFlowServerConfig.BASE_URL
+            val operation = LocalServerDiscovery.prepareOperation(base)
+            val context = currentCoroutineContext()
             var current = resolveDownloadUrl(base, downloadUrl)
             repeat(4) { hop ->
-                val connection = current.openConnection() as HttpURLConnection
+                context.ensureActive()
+                check(LocalServerDiscovery.isCurrentOperation(operation)) { "网络连接已变化，请重试配置下载" }
+                val connection = LocalServerDiscovery.openConnection(current)
                 try {
+                    context.ensureActive()
                     connection.instanceFollowRedirects = false
                     connection.requestMethod = "GET"
                     connection.connectTimeout = CONNECT_TIMEOUT_MS
                     connection.readTimeout = READ_TIMEOUT_MS
                     connection.setRequestProperty("Accept", "application/json")
                     val status = connection.responseCode
+                    LocalServerDiscovery.validateConnection(connection)
                     if (status in 300..399) {
                         check(hop < 3) { "配置下载重定向过多" }
                         val location = connection.getHeaderField("Location")
@@ -38,6 +47,7 @@ object VersionDownloader {
                         connection.inputStream.use { input ->
                             val buffer = ByteArray(8192)
                             while (true) {
+                                context.ensureActive()
                                 val count = input.read(buffer)
                                 if (count < 0) break
                                 check(bytes.size() + count <= MAX_CONFIG_BYTES) { "配置文件超过大小限制" }
@@ -47,8 +57,15 @@ object VersionDownloader {
                         if (expectedSize != null) {
                             check(bytes.size().toLong() == expectedSize) { "配置文件大小与发布清单不一致" }
                         }
-                        return@runCatching bytes.toString(Charsets.UTF_8.name())
+                        LocalServerDiscovery.validateConnection(connection)
+                        check(LocalServerDiscovery.isCurrentOperation(operation)) { "网络连接已变化，请重试配置下载" }
+                        return@patientRequestResult bytes.toString(Charsets.UTF_8.name())
                     }
+                } catch (cancelled: CancellationException) {
+                    throw cancelled
+                } catch (error: Exception) {
+                    LocalServerDiscovery.invalidateConnection(connection)
+                    throw error
                 } finally {
                     connection.disconnect()
                 }

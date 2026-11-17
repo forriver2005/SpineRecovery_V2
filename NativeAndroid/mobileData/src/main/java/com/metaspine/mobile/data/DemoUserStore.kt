@@ -54,7 +54,8 @@ data class AdmissionIntake(
 
 data class PostTrainingFeedback(
     val feeling: String,
-    val difficulty: String
+    val difficulty: String,
+    val recordedAt: String = ""
 )
 
 enum class PainRecordSource {
@@ -68,7 +69,10 @@ data class PainHistoryRecord(
     val recordedAt: String,
     val painLevel: Int,
     val source: PainRecordSource,
-    val painPoints: List<PainPoint>
+    val painPoints: List<PainPoint>,
+    val painParts: List<String> = painPoints.map { it.bodyPart },
+    val pointsCaptured: Boolean = painPoints.isNotEmpty(),
+    val painFree: Boolean = painLevel == 0
 )
 
 data class TrainingHistoryRecord(
@@ -84,7 +88,10 @@ data class TrainingHistoryRecord(
     val planJson: String = "",
     val feedbackPending: Boolean = false,
     val endReason: String = "",
-    val replaySessionId: String = ""
+    val replaySessionId: String = "",
+    val networkResultJson: String = "",
+    val networkResultError: String = "",
+    val actionId: String = ""
 )
 
 data class RememberedLogin(
@@ -110,7 +117,13 @@ data class DemoUserData(
     val imuCalibrationState: ImuCalibrationState,
     val history: List<TrainingHistoryRecord>,
     val painHistory: List<PainHistoryRecord> = emptyList(),
-    val mobileAdmissionAssessment: MobileAdmissionAssessment? = null
+    val mobileAdmissionAssessment: MobileAdmissionAssessment? = null,
+    val healthEventsJson: String = "[]",
+    val monthlyHistoryJson: String = "[]",
+    val trackingCalibratedAt: String = "",
+    val syncBindingKey: String = "",
+    val syncBaselineJson: String = "{}",
+    val intakeReviewRequired: Boolean = admissionSurvey?.requiresClinicalReview ?: false
 ) {
     val isReturningUser: Boolean
         get() = lifecycle == UserLifecycle.ReturningUser
@@ -494,7 +507,13 @@ class DemoUserStore(
             history = root.optJSONArray("history").toHistoryRecords(),
             painHistory = painHistory,
             mobileAdmissionAssessment = root.optJSONObject("mobileAdmissionAssessment")
-                ?.toMobileAdmissionAssessment()
+                ?.toMobileAdmissionAssessment(),
+            healthEventsJson = root.optJSONArray("healthEvents")?.toString() ?: "[]",
+            monthlyHistoryJson = root.optJSONArray("monthlyHistory")?.toString() ?: "[]",
+            trackingCalibratedAt = root.optString("trackingCalibratedAt"),
+            syncBindingKey = root.optString("syncBindingKey"),
+            syncBaselineJson = root.optJSONObject("syncBaseline")?.toString() ?: "{}",
+            intakeReviewRequired = root.optBoolean("intakeReviewRequired", root.optJSONObject("admissionSurvey")?.optBoolean("requiresClinicalReview") ?: false)
         )
     }
 
@@ -554,10 +573,14 @@ class DemoUserStore(
                             .put("feedbackPending", record.feedbackPending)
                             .put("endReason", record.endReason)
                             .put("replaySessionId", record.replaySessionId)
+                            .put("networkResultJson", record.networkResultJson)
+                            .put("networkResultError", record.networkResultError)
+                            .put("actionId", record.actionId)
                             .put("feedback", record.feedback?.let { feedback ->
                                 JSONObject()
                                     .put("feeling", feedback.feeling)
                                     .put("difficulty", feedback.difficulty)
+                                    .put("recordedAt", feedback.recordedAt)
                             })
                     )
                 }
@@ -570,6 +593,9 @@ class DemoUserStore(
                             .put("recordedAt", record.recordedAt)
                             .put("painLevel", record.painLevel)
                             .put("source", record.source.name)
+                            .put("painParts", JSONArray(record.painParts))
+                            .put("pointsCaptured", record.pointsCaptured)
+                            .put("painFree", record.painFree)
                             .put("painPoints", JSONArray().also { points ->
                                 record.painPoints.forEach { point ->
                                     points.put(
@@ -585,6 +611,12 @@ class DemoUserStore(
                 }
             })
             .put("mobileAdmissionAssessment", mobileAdmissionAssessment?.toJson())
+            .put("healthEvents", JSONArray(healthEventsJson))
+            .put("monthlyHistory", JSONArray(monthlyHistoryJson))
+            .put("trackingCalibratedAt", trackingCalibratedAt)
+            .put("syncBindingKey", syncBindingKey)
+            .put("syncBaseline", JSONObject(syncBaselineJson))
+            .put("intakeReviewRequired", intakeReviewRequired)
     }
 
     private fun JSONArray?.toPainPoints(): List<PainPoint> = buildList {
@@ -617,10 +649,14 @@ class DemoUserStore(
                     feedbackPending = item.optBoolean("feedbackPending"),
                     endReason = item.optString("endReason"),
                     replaySessionId = item.optString("replaySessionId"),
+                    networkResultJson = item.optString("networkResultJson"),
+                    networkResultError = item.optString("networkResultError"),
+                    actionId = item.optString("actionId"),
                     feedback = item.optJSONObject("feedback")?.let { feedback ->
                         PostTrainingFeedback(
                             feeling = feedback.optString("feeling"),
-                            difficulty = feedback.optString("difficulty")
+                            difficulty = feedback.optString("difficulty"),
+                            recordedAt = feedback.optString("recordedAt")
                         )
                     }
                 )
@@ -642,7 +678,12 @@ class DemoUserStore(
                     painLevel = item.optInt("painLevel", 0).coerceIn(0, 10),
                     source = item.optString("source", PainRecordSource.DailyQuestionnaire.name)
                         .toEnumOrDefault(PainRecordSource.DailyQuestionnaire),
-                    painPoints = item.optJSONArray("painPoints").toPainPoints()
+                    painPoints = item.optJSONArray("painPoints").toPainPoints(),
+                    painParts = item.optJSONArray("painParts")?.let { parts ->
+                        (0 until parts.length()).map { parts.getString(it) }
+                    } ?: item.optJSONArray("painPoints").toPainPoints().map { it.bodyPart },
+                    pointsCaptured = item.optBoolean("pointsCaptured", item.optJSONArray("painPoints").toPainPoints().isNotEmpty()),
+                    painFree = item.optBoolean("painFree", item.optInt("painLevel") == 0)
                 )
             )
         }
@@ -671,7 +712,7 @@ class DemoUserStore(
             completionCount = optInt("completionCount", 0).coerceIn(0, 10),
             painResponse = painResponse,
             firstPainPhase = painPhase,
-            painLevel = optInt("painLevel", 1).coerceIn(1, 10)
+            painLevel = getInt("painLevel").also { require(it in 0..10) }
         )
     }
 
@@ -685,7 +726,7 @@ class DemoUserStore(
         .put("completionCount", completionCount.coerceIn(0, 10))
         .put("painResponse", painResponse.wireValue)
         .put("firstPainPhase", firstPainPhase?.wireValue ?: "")
-        .put("painLevel", painLevel.coerceIn(1, 10))
+        .put("painLevel", painLevel.also { require(it in 0..10) })
 
     private inline fun <reified T : Enum<T>> String.toEnumOrDefault(default: T): T {
         return runCatching { enumValueOf<T>(this) }.getOrDefault(default)

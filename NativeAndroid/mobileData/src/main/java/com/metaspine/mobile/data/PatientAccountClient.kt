@@ -11,11 +11,12 @@ object PatientAccountClient {
     suspend fun check(
         credential: PatientServerCredential,
         accountId: String,
-        installationId: String
+        installationId: String,
+        origin: String = SpineFlowServerConfig.BASE_URL
     ): PatientAccountStatus = patientRequestResult {
         val body = JSONObject().put("patientId", credential.patientId)
             .put("accountId", accountId).put("installationId", installationId)
-        val response = PatientHttpTransport.shared.request(
+        val response = PatientHttpTransport(origin = { origin }).request(
             PATH, "POST", credential.patientToken, body.toString(), readErrorStatuses = setOf(410)
         )
         parse(response.status, response.text, credential.patientId)

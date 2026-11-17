@@ -1,43 +1,42 @@
 # SpineRecovery_V2
 
-## 当前游戏
+## 手机网络模式
 
-Build Settings 注册以下五个录制动画场景。原有三个游戏保留，新增两个臀桥评分变体。
+Debug 和 Release 均只支持医院局域网。手机必须连接服务器所在 Wi-Fi；医疗 API、处方资源和版本下载统一通过同网段自动发现及固定服务器证书的 TLS 连接。医院 Wi-Fi 无互联网也可使用；仅蜂窝网络、错误医院、错误证书或找不到服务器时连接失败，不会转向公网。
 
-| 动作 | 场景 | 视觉与阶段 |
-| --- | --- | --- |
-| 鸟狗 | `Assets/Scenes/BirdDog_RingSkinC_Recorded.unity` | RingSkinC；伸展、收回 |
-| 死虫 | `Assets/Scenes/DeadBug_RingSkinC_Recorded.unity` | RingSkinC；伸展、收回 |
-| 臀桥 | `Assets/Scenes/HipThrust_RingBridge_Recorded.unity` | 敲鼓；抬起、保持、放下 |
-| 臀桥 · 新评分 | `Assets/Scenes/HipThrust_RingBridge_NewScoring.unity` | 同一敲鼓视觉与原节奏，换用交付包 A/B 保持评分 |
-| 臀桥 · 保持30秒 | `Assets/Scenes/HipThrust_RingBridge_Hold30.unity` | 同一敲鼓视觉；最高点静止30秒后放下，精确处方次数 |
+构建时必须提供 `spineflowLocalCertificateSha256`，并确认 `spineflowLocalServiceId` 与 `spineflowLocalHospitalKey`。证书指纹是公开配置，可从受信服务器的 `public-config.json` 获取；不要复制私钥到手机工程。缺少或错误格式的指纹会拒绝构建，旧 `spineflowServerUrl` 参数不再支持。
 
-场景均保留起始菜单、校准、难度、倒计时、暂停、计分、结束和动作串流程。右侧教练窗口持续显示实际动画，并与游戏阶段、进度和暂停同步。鸟狗与死虫的全部难度不再插入保持等待，仍在伸展到达时进行原有评分检查。臀桥鼓盘与教练共用对应模式的三阶段时间轴。新评分规则和处方接入方法见 [HIPTHRUST_NEW_RULES.md](HIPTHRUST_NEW_RULES.md)。
+`https://spineflow.local:3001` 是稳定的逻辑入口，不依赖 DNS 解析；真实连接只使用已发现、经过证书及医院身份校验的同网段私有 IPv4 地址。旧私网绑定继续保留原患者、队列键和回执语义。旧公网绑定无法连接，数据保留，需工作人员另行处理，不能直接把其他医院的数据改绑到本机。
 
-## 录制动画与手脚方向
+Tracker 震动 HTTP 也仅允许字面私有 IPv4（可含端口），拒绝公网/域名并禁止重定向。手机其他系统应用的联网不受本工程控制。
 
-资源位于 `Assets/Movements/Recorded20261018/`，全部为 30 fps。完整 FBX 未修改；`*.coachrecording` 是原始 `.motion.json` 改扩展名后的同一内容，来源和校验值见 `*.source.json`。游戏分段及肢体配置见 `*.phases.json`。
+## 构建和验证
 
-| 动作 | 桌面来源 | 使用的原始帧范围 |
-| --- | --- | --- |
-| 鸟狗 | 腰椎第一次记录 / 8_鸟狗 / 1 / 8_v1.fbx | 90–1053 |
-| 死虫 | 腰椎第一次记录 / 7_死虫 / 1 / 7_v1.fbx | 498–1041 |
-| 臀桥 | 第二次膝关节记录 / 5_臀桥 / 1 / 5_v1.fbx | 180–954 |
+原生模块测试示例（在项目根目录；先设置本机 JDK 和 Android SDK 环境）：
 
-每份录制选取四次完整往返，原节奏模式的简单、标准、进阶分别播放 1、2、3 轮；30 秒臀桥变体按处方精确次数采样并冻结最高点。自定义导入器直接从原始 HumanPose 生成完整、准备、四组往返及结束动画，保留采样帧和共享边界，避免 FBX 二次重定向改变腕、掌、踝、足的朝向。
+```powershell
+$hospitalConfig = Get-Content '<受信服务器公开配置路径>/public-config.json' -Raw | ConvertFrom-Json
+& ./Tools/GradleWrapper/gradlew.bat -p NativeAndroid `
+  :mobileData:testDebugUnitTest :mobileData:testReleaseUnitTest `
+  -Pandroid.onlyEnableUnitTestForTheTestedBuildType=false `
+  "-PspineflowLocalCertificateSha256=$($hospitalConfig.certificateSha256)" `
+  "-PspineflowLocalServiceId=$($hospitalConfig.serviceId)" `
+  "-PspineflowLocalHospitalKey=$($hospitalConfig.hospitalKey)"
+& ./Tools/Test-TrackerLanPolicy.ps1
+```
 
-鸟狗原始录制为同侧手脚抬起，因此仅在导入生成动画时通过 `mirrorArmChannels` 交换左右肩、臂、腕和手指的配对肌肉通道。腿部、躯干、原始文件和动作节奏保持不变。实际动画与判定均为第 1/3 次右腿配左手、第 2/4 次左腿配右手；不是仅修改界面标签。臀桥整体绕竖直轴旋转 -90° 以显示侧面，不改变骨骼之间的相对旋转。
+AGP 9 默认只启用被测 build type 的单元测试，上述参数用于同时验证两个变体。[Android 官方版本说明](https://developer.android.com/build/releases/agp-9-0-0-release-notes)
 
-## HIT 触觉反馈
+可选 `Minimal*HttpTest` 通过 `SPINEFLOW_BRIDGE_FIXTURE` 指定独立测试医院夹具，使用仅在 `src/test` 编译的 loopback 适配器，复用业务解析与回执校验；它不绕过正式应用网络限制，也不代表 Android Wi-Fi 发现已实测。两个变体须分别使用新生成的夹具，避免上一轮停训/问卷等状态影响下一轮。未提供夹具或新鲜 Unity 投影时，相应可选测试会跳过。
 
-鸟狗、死虫在命中后向对应前臂或小腿发送一次震动。臀桥只订阅鼓盘实际 HIT 事件，并只发送到 `Abdomen`（腰部/髋部设备绑定）；旧音符事件不会再触发四肢震动。MISS、待机和保持奖励不触发震动。请求沿用 `TrackerHaptics` 的 `/motor?duration_ms=100`。
+完整 APK 需先用 Unity 的 `SpineRecovery.Editor.BuildAndroidApk.PerformBuild` 导出，设置 `SPINE_GRADLE_EXPORT=1`、`SPINE_APK_OUTPUT=<导出目录>`。正式构建还应设 `SPINE_BUILD_CONFIGURATION=Release`，避免使用 Unity Development player。C# 有改动时必须重新导出，不能只更新原生模块。
 
-## 验证
+```powershell
+& ./Tools/Build-Unity2022ExternalApk.ps1 `
+  -GradleProject '<Unity导出目录>' -OutputApk '<输出APK路径>' `
+  -JavaHome '<JDK路径>' -Configuration Release `
+  -CertificateSha256 $hospitalConfig.certificateSha256 `
+  -ServiceId $hospitalConfig.serviceId -HospitalKey $hospitalConfig.hospitalKey
+```
 
-- `Tools > Ring Skin C > Verify Migrated Coach Windows`：实际开始按钮、倒计时、两阶段、全部难度零保持、暂停恢复、对侧配对、预览手脚姿态、完成和返回菜单。
-- `Tools > Ring Skin C > Verify HIT-only Tracker Requests`：通过本机 HTTP 接收端验证真实请求路由、命中/未命中、臀桥腰部独占、重复启停和待机静默，不连接真实设备。
-- `Tools > Recorded Coach > Verify Recorded Bone Orientation`：逐帧检查三个动作的 2,283 帧；鸟狗与解剖配对后的原始手臂通道比较，腿部保持原始朝向。
-- `Tools > Taiko Self > Verify Recorded Visual Skin`：臀桥菜单、三阶段视觉与教练同步、暂停、完成和难度流程。
-- `Tools > Ring Bridge > Verify New Scoring and 30 Second Scenes`：新规则边界、骨骼静止30秒、精确剂量、实际动作串组间转换。报告见 `output/hipthrust-new-rules/`。
-
-两阶段、朝向和震动验证报告及截图位于 `output/two-phase-haptics/`。设备佩戴和实际震感仍需硬件联调。`Tools > Ring Skin C > Organize Game Scenes` 可重新登记当前五个构建场景。素材接入历史见 `Assets/RingSkinC/DEADBUG_INTEGRATION.md`、`Assets/RingBridge/INTEGRATION.md`、`Assets/TaikoSelf/INTEGRATION.md`。
+正式发布需要配置正式签名。导出工程若使用 Android debug 证书，Release 构建需显式传 `-AllowTestSigning`，产物只能标为 Release 测试包；未签名产物不能直接安装。不要用测试证书冒充正式签名。`-Offline` 可使用本机已缓存的构建依赖。

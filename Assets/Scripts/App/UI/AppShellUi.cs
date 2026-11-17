@@ -16,6 +16,20 @@ namespace SpineRecovery.App
         private bool nativeBusy;
         private string previewActivationCode;
         private int loginGeneration;
+        private int sessionIdentityGeneration;
+        private int directiveRefreshGeneration;
+        private bool directiveRefreshPending;
+        private int questionnaireRefreshGeneration;
+        private bool questionnaireRefreshPending;
+        private NativeQuestionnaireTask[] nativeQuestionnaires = System.Array.Empty<NativeQuestionnaireTask>();
+        private NativeQuestionnaireTask activeNativeQuestionnaire;
+        private bool questionnaireOpenRequested;
+        private bool questionnaireSaving;
+        private bool questionnaireDraftDirty;
+        private bool questionnaireBusy;
+        private System.Action questionnaireAfterSave;
+        private int questionnaireStep;
+        private int questionnaireTotal;
         private bool auxiliaryPageOpen;
         private AppRoute auxiliaryReturnRoute;
         private RectTransform safeContent;
@@ -37,6 +51,7 @@ namespace SpineRecovery.App
         private InputField registerConfirmInput;
         private InputField activationCodeInput;
         private InputField[] profileInputs;
+        private AppRoute profileContinueRoute = AppRoute.Home;
         private Text flowMessage;
         private Text painScoreLabel;
         private Text surveySelectionLabel;
@@ -133,11 +148,16 @@ namespace SpineRecovery.App
             GameObject postTrainingStopPanel = CreatePostTrainingStopPanel(safeContent);
             monthlyScreens = new MonthlyQuestionnaireScreens();
             GameObject monthlyJoaPanel = monthlyScreens.BuildJoa(safeContent,
-                () => bootstrap.Router.Navigate(AppRoute.Home),
+                HandleMonthlyBack,
                 HandleMonthlyJoaNext);
             GameObject monthlySfmpqPanel = monthlyScreens.BuildSfMpq(safeContent,
                 HandleMonthlySfmpqBack,
                 FinishMonthlyQuestionnaire);
+            monthlyScreens.AnswersChanged += () =>
+            {
+                if (activeNativeQuestionnaire != null && !questionnaireBusy)
+                    SaveNativeQuestionnaireDraft();
+            };
 
             bootstrap.Router.Initialize(bootstrap.State);
             bootstrap.Router.RegisterPanel(AppRoute.Login, loginPanel);
@@ -195,6 +215,13 @@ namespace SpineRecovery.App
         private void Update()
         {
             if (safeContent != null && Screen.safeArea != lastSafeArea) ApplySafeArea();
+            // Wait for profile/unfinished training pages to finish before opening a login task.
+            if (questionnaireOpenRequested && !questionnaireRefreshPending &&
+                activeNativeQuestionnaire == null && bootstrap?.State?.Route == AppRoute.Home)
+            {
+                questionnaireOpenRequested = false;
+                OpenNextNativeQuestionnaire(true);
+            }
         }
 
         private void ApplySafeArea()
@@ -216,8 +243,19 @@ namespace SpineRecovery.App
 
         private void HandleSessionChanged(UserSession session)
         {
+            sessionIdentityGeneration++;
+            directiveRefreshGeneration++;
+            directiveRefreshPending = false;
+            questionnaireRefreshGeneration++;
+            questionnaireRefreshPending = false;
+            nativeQuestionnaires = System.Array.Empty<NativeQuestionnaireTask>();
+            activeNativeQuestionnaire = null;
+            questionnaireOpenRequested = false;
+            questionnaireSaving = questionnaireDraftDirty = questionnaireBusy = false;
+            questionnaireAfterSave = null;
             if (session == null)
             {
+                nativeBusy = false;
                 loginGeneration++;
                 NativeMobileService.Call("logout");
             }
@@ -225,6 +263,8 @@ namespace SpineRecovery.App
 
         private void OnDestroy()
         {
+            directiveRefreshGeneration++;
+            questionnaireRefreshGeneration++;
             SceneManager.sceneLoaded -= HandleSceneLoaded;
             if (bootstrap != null) bootstrap.State.SessionChanged -= HandleSessionChanged;
         }
@@ -281,27 +321,70 @@ namespace SpineRecovery.App
         private GameObject CreateRegisterPanel(Transform parent)
         {
             GameObject panel = CreatePanel("RegisterPanel", parent, new Color(0.973f, 0.980f, 1f));
-            CreateLabel(panel.transform, "注册账号", new Vector2(0, 250), 30);
-            CreateLabel(panel.transform, "创建账号后可以绑定激活档案。", new Vector2(0, 195), 16);
-            registerAccountInput = CreateInput(panel.transform, "设置账号", new Vector2(0, 115), false);
-            registerPasswordInput = CreateInput(panel.transform, "设置密码", new Vector2(0, 40), true);
-            registerConfirmInput = CreateInput(panel.transform, "再次输入密码", new Vector2(0, -35), true);
-            CreateButton(panel.transform, "注册并继续激活", new Vector2(0, -125), HandleRegisterClicked);
-            CreateButton(panel.transform, "返回登录", new Vector2(0, -195), () => bootstrap.Router.Navigate(AppRoute.Login));
+            GameObject designRoot = new GameObject("RegisterDesign390x884", typeof(RectTransform));
+            designRoot.transform.SetParent(panel.transform, false);
+            RectTransform designRect = designRoot.GetComponent<RectTransform>();
+            designRect.anchorMin = new Vector2(0.5f, 0.5f);
+            designRect.anchorMax = new Vector2(0.5f, 0.5f);
+            designRect.pivot = new Vector2(0.5f, 0.5f);
+            designRect.sizeDelta = new Vector2(LoginDesignWidth, LoginDesignHeight);
+            designRect.anchoredPosition = Vector2.zero;
+            float designScale = Mathf.Min(1080f / LoginDesignWidth, 1920f / LoginDesignHeight);
+            designRoot.transform.localScale = new Vector3(designScale, designScale, 1f);
+            CreateRasterImage(designRoot.transform, "AppUi/RegisterScreen", Vector2.zero,
+                new Vector2(LoginDesignWidth, LoginDesignHeight));
+
+            registerAccountInput = CreateInput(designRoot.transform, "设置账号", LoginDesignPosition(44f, 312f, 302f, 57f), false);
+            registerPasswordInput = CreateInput(designRoot.transform, "设置密码", LoginDesignPosition(44f, 380f, 302f, 57f), true);
+            registerConfirmInput = CreateInput(designRoot.transform, "再次输入密码", LoginDesignPosition(44f, 448f, 302f, 57f), true);
+            registerAccountInput.GetComponent<RectTransform>().sizeDelta = LoginDesignSize(302f, 57f);
+            registerPasswordInput.GetComponent<RectTransform>().sizeDelta = LoginDesignSize(302f, 57f);
+            registerConfirmInput.GetComponent<RectTransform>().sizeDelta = LoginDesignSize(302f, 57f);
+            MakeOverlayInput(registerAccountInput);
+            MakeOverlayInput(registerPasswordInput);
+            MakeOverlayInput(registerConfirmInput);
+
+            Button registerButton = CreateButton(designRoot.transform, "注册并继续激活",
+                LoginDesignPosition(44f, 530f, 302f, 52f), HandleRegisterClicked, 302f, 52f);
+            Button backButton = CreateButton(designRoot.transform, "返回登录",
+                LoginDesignPosition(190f, 604f, 110f, 28f), () => bootstrap.Router.Navigate(AppRoute.Login), 110f, 28f);
+            MakeOverlayButton(registerButton);
+            MakeOverlayButton(backButton);
             return panel;
         }
 
         private GameObject CreateActivationPanel(Transform parent)
         {
             GameObject panel = CreatePanel("ActivationPanel", parent, new Color(0.973f, 0.980f, 1f));
-            CreateLabel(panel.transform, "激活档案", new Vector2(0, 220), 30);
-            CreateLabel(panel.transform, "请输入医生建档时提供的 11 位手机号激活码。", new Vector2(0, 165), 16);
-            activationCodeInput = CreateInput(panel.transform, "激活码（11位手机号）", new Vector2(0, 80), false);
-            activationMessage = CreateLabel(panel.transform, "本地演示会保存绑定状态；正式环境可替换为服务器预览/核销。", new Vector2(0, 15), 14);
-            activationMessage.rectTransform.sizeDelta = new Vector2(760, 70);
-            CreateButton(panel.transform, "确认绑定", new Vector2(0, -75), HandleActivationClicked);
-            CreateButton(panel.transform, "跳过，稍后激活", new Vector2(0, -145), SkipActivation);
-            CreateButton(panel.transform, "返回登录", new Vector2(0, -215), () => bootstrap.State.ClearSession());
+            GameObject designRoot = new GameObject("ActivationDesign390x884", typeof(RectTransform));
+            designRoot.transform.SetParent(panel.transform, false);
+            RectTransform designRect = designRoot.GetComponent<RectTransform>();
+            designRect.anchorMin = new Vector2(0.5f, 0.5f);
+            designRect.anchorMax = new Vector2(0.5f, 0.5f);
+            designRect.pivot = new Vector2(0.5f, 0.5f);
+            designRect.sizeDelta = new Vector2(LoginDesignWidth, LoginDesignHeight);
+            designRect.anchoredPosition = Vector2.zero;
+            float designScale = Mathf.Min(1080f / LoginDesignWidth, 1920f / LoginDesignHeight);
+            designRoot.transform.localScale = new Vector3(designScale, designScale, 1f);
+            CreateRasterImage(designRoot.transform, "AppUi/ActivationScreen", Vector2.zero,
+                new Vector2(LoginDesignWidth, LoginDesignHeight));
+
+            activationCodeInput = CreateInput(designRoot.transform, "激活码（11位手机号）",
+                LoginDesignPosition(44f, 400f, 302f, 57f), false);
+            activationCodeInput.GetComponent<RectTransform>().sizeDelta = LoginDesignSize(302f, 57f);
+            MakeOverlayInput(activationCodeInput);
+            activationMessage = CreateLabel(designRoot.transform, "",
+                LoginDesignPosition(44f, 475f, 302f, 30f), 12);
+            activationMessage.rectTransform.sizeDelta = LoginDesignSize(302f, 30f);
+            activationMessage.alignment = TextAnchor.MiddleLeft;
+            activationMessage.color = new Color(0.35f, 0.40f, 0.48f, 1f);
+
+            Button activateButton = CreateButton(designRoot.transform, "确认绑定",
+                LoginDesignPosition(44f, 522f, 302f, 52f), HandleActivationClicked, 302f, 52f);
+            Button backButton = CreateButton(designRoot.transform, "返回登录",
+                LoginDesignPosition(165f, 598f, 90f, 28f), () => bootstrap.State.ClearSession(), 90f, 28f);
+            MakeOverlayButton(activateButton);
+            MakeOverlayButton(backButton);
             return panel;
         }
 
@@ -327,7 +410,7 @@ namespace SpineRecovery.App
             UserSession session = bootstrap != null && bootstrap.State != null ? bootstrap.State.Session : null;
             if (session == null) return new HomeScreen.State { Name = "" };
 
-            MonthlyQuestionnaireAssignment assignment = bootstrap.MonthlyAssignments != null
+            MonthlyQuestionnaireAssignment assignment = !NativeMobileService.Available && bootstrap.MonthlyAssignments != null
                 ? bootstrap.MonthlyAssignments.GetActive(session.accountId)
                 : null;
             HomeScreen.MonthlyEntryStatus monthlyStatus = HomeScreen.MonthlyEntryStatus.Disabled;
@@ -337,6 +420,8 @@ namespace SpineRecovery.App
                     ? HomeScreen.MonthlyEntryStatus.Open
                     : HomeScreen.MonthlyEntryStatus.New;
             }
+            if (NativeMobileService.Available && nativeQuestionnaires.Any(IsPendingNativeQuestionnaire))
+                monthlyStatus = HomeScreen.MonthlyEntryStatus.Open;
 
             return new HomeScreen.State
             {
@@ -390,6 +475,66 @@ namespace SpineRecovery.App
             JsonUtility.FromJsonOverwrite(JsonUtility.ToJson(user), bootstrap.State.Session);
             RefreshHomeSummary();
             RefreshHistorySummary();
+            RefreshDirectiveSilently();
+            RefreshQuestionnairesSilently(true);
+        }
+
+        private void RefreshQuestionnairesSilently(bool openPending = false)
+        {
+            UserSession session = bootstrap?.State?.Session;
+            if (!NativeMobileService.Available || NativeMobileService.Instance == null ||
+                session?.profile?.activationBound != true) return;
+            if (openPending && activeNativeQuestionnaire == null) questionnaireOpenRequested = true;
+            if (questionnaireRefreshPending) return;
+            string account = session.accountId;
+            int sessionGeneration = loginGeneration;
+            int generation = ++questionnaireRefreshGeneration;
+            questionnaireRefreshPending = true;
+            NativeMobileService.Instance.Request("routineRefresh", new NativeRequest { accountId = account }, reply =>
+            {
+                if (this == null || generation != questionnaireRefreshGeneration ||
+                    sessionGeneration != loginGeneration || bootstrap?.State?.Session?.accountId != account) return;
+                questionnaireRefreshPending = false;
+                if (!reply.ok)
+                {
+                    Debug.LogWarning("[MobileBridge] Background questionnaire refresh did not complete.");
+                    return;
+                }
+                ReadNativeQuestionnaires(reply);
+                if (activeNativeQuestionnaire != null && !questionnaireBusy && !questionnaireSaving)
+                {
+                    var refreshed = nativeQuestionnaires.FirstOrDefault(task => task.taskId == activeNativeQuestionnaire.taskId);
+                    if (refreshed != null)
+                    {
+                        activeNativeQuestionnaire = refreshed;
+                        if (!string.IsNullOrEmpty(refreshed.completedAt)) CompleteNativeQuestionnaire();
+                        else monthlyScreens.SetInteraction(!refreshed.pendingSubmission, true);
+                    }
+                }
+                RefreshHomeSummary();
+            });
+        }
+
+        private void RefreshDirectiveSilently()
+        {
+            UserSession session = bootstrap?.State?.Session;
+            if (!NativeMobileService.Available || NativeMobileService.Instance == null ||
+                session?.profile?.activationBound != true || nativeBusy || directiveRefreshPending) return;
+
+            string account = session.accountId;
+            int sessionGeneration = loginGeneration;
+            int generation = ++directiveRefreshGeneration;
+            directiveRefreshPending = true;
+            // Native code persists the full snapshot. Refreshing it neither creates a
+            // training session nor changes the existing page's messages or authorization.
+            NativeMobileService.Instance.Request("refreshDirective", new NativeRequest { accountId = account }, reply =>
+            {
+                if (this == null || generation != directiveRefreshGeneration ||
+                    sessionGeneration != loginGeneration || bootstrap?.State?.Session?.accountId != account) return;
+                directiveRefreshPending = false;
+                if (!reply.ok)
+                    Debug.LogWarning("[MobileBridge] Background directive refresh did not complete.");
+            });
         }
 
         [System.Serializable] private sealed class ImportedReplayList { public string[] items; }
@@ -553,6 +698,12 @@ namespace SpineRecovery.App
             user.preTrainingCheckPassed = answers.Pain < QuestionnaireUi.PainStopThreshold;
             user.preTrainingRecordedAt = System.DateTimeOffset.UtcNow.ToString("O");
             user.preTrainingEventId = "pre:" + user.preTrainingRecordedAt;
+            HealthEventRecord.Append(user, "preTrainingQuestionnaire", user.preTrainingRecordedAt,
+                new PreTrainingSnapshot
+                {
+                    prePainLevel = answers.Pain, allowedToTrain = user.preTrainingCheckPassed,
+                    recordedAt = user.preTrainingRecordedAt,
+                }, user.preTrainingEventId, answers.Regions, answers.Leg);
             bootstrap.Users.AppendPainRecord(user, new PainHistoryRecord
             {
                 id = user.preTrainingEventId,
@@ -560,6 +711,8 @@ namespace SpineRecovery.App
                 painLevel = answers.Pain,
                 source = "DailyQuestionnaire",
                 painParts = painParts,
+                pointsCaptured = false,
+                painFree = answers.Pain == 0,
             });
             lastPreTrainingParts = painParts;
 
@@ -666,6 +819,12 @@ namespace SpineRecovery.App
                 return;
             }
 
+            if (NativeMobileService.Available)
+            {
+                RefreshQuestionnairesSilently(true);
+                return;
+            }
+
             MonthlyQuestionnaireAssignment assignment = bootstrap.MonthlyAssignments.GetActive(user.accountId);
             if (assignment == null)
             {
@@ -694,6 +853,7 @@ namespace SpineRecovery.App
 
         private void HandleMonthlyJoaNext()
         {
+            if (NativeMobileService.Available) { FinishMonthlyQuestionnaire(); return; }
             if ((activeMonthlyModules & MonthlyQuestionnaireAssignment.ModuleSfMpq) != 0)
             {
                 bootstrap.Router.Navigate(AppRoute.MonthlySfmpq);
@@ -706,6 +866,7 @@ namespace SpineRecovery.App
 
         private void HandleMonthlySfmpqBack()
         {
+            if (NativeMobileService.Available) { HandleMonthlyBack(); return; }
             if ((activeMonthlyModules & MonthlyQuestionnaireAssignment.ModuleJoa) != 0)
             {
                 bootstrap.Router.Navigate(AppRoute.MonthlyJoa);
@@ -718,6 +879,14 @@ namespace SpineRecovery.App
 
         private void FinishMonthlyQuestionnaire()
         {
+            if (NativeMobileService.Available)
+            {
+                if (activeNativeQuestionnaire == null || questionnaireBusy) return;
+                questionnaireBusy = true;
+                monthlyScreens.SetInteraction(false, false);
+                SaveNativeQuestionnaireDraft(SubmitNativeQuestionnaire);
+                return;
+            }
             UserSession user = bootstrap.State.Session;
             if (user == null)
             {
@@ -741,6 +910,131 @@ namespace SpineRecovery.App
             bootstrap.Users.AppendMonthlyRecord(user, record);
             homeMessage.text = "月度问卷已保存到本地。";
             bootstrap.Router.Navigate(AppRoute.Home);
+        }
+
+        private static bool IsPendingNativeQuestionnaire(NativeQuestionnaireTask task)
+        {
+            return task.taskId > 0 && string.IsNullOrEmpty(task.completedAt) &&
+                string.IsNullOrEmpty(task.problem) && (task.availability == "available" || task.pendingSubmission) &&
+                MonthlyQuestionnaireTaskAdapter.Supports(task);
+        }
+
+        private void ReadNativeQuestionnaires(NativeReply reply)
+        {
+            nativeQuestionnaires = JsonUtility.FromJson<NativeQuestionnaireTasks>(reply.dataJson)?.items
+                ?? System.Array.Empty<NativeQuestionnaireTask>();
+        }
+
+        private bool OpenNextNativeQuestionnaire(bool first)
+        {
+            var pending = nativeQuestionnaires.Where(IsPendingNativeQuestionnaire)
+                .OrderBy(task => task.availableAt, System.StringComparer.Ordinal).ThenBy(task => task.taskId).ToArray();
+            if (pending.Length == 0) return false;
+            if (first) { questionnaireStep = 1; questionnaireTotal = pending.Length; }
+            activeNativeQuestionnaire = pending[0];
+            activeMonthlyModules = MonthlyQuestionnaireTaskAdapter.Module(activeNativeQuestionnaire);
+            monthlyScreens.Begin();
+            monthlyScreens.Restore(MonthlyQuestionnaireTaskAdapter.Restore(activeNativeQuestionnaire));
+            monthlyScreens.SetTaskProgress(activeMonthlyModules, questionnaireStep, questionnaireTotal);
+            monthlyScreens.SetJoaNextCaption(pending.Length > 1 ? "下一题" : "完成");
+            monthlyScreens.SetInteraction(!activeNativeQuestionnaire.pendingSubmission, true);
+            bootstrap.Router.Navigate(activeMonthlyModules == MonthlyQuestionnaireAssignment.ModuleJoa
+                ? AppRoute.MonthlyJoa : AppRoute.MonthlySfmpq);
+            return true;
+        }
+
+        private void HandleMonthlyBack()
+        {
+            if (!NativeMobileService.Available) { bootstrap.Router.Navigate(AppRoute.Home); return; }
+            if (activeNativeQuestionnaire == null || questionnaireBusy) return;
+            questionnaireBusy = true;
+            monthlyScreens.SetInteraction(false, false);
+            SaveNativeQuestionnaireDraft(() =>
+            {
+                activeNativeQuestionnaire = null;
+                questionnaireBusy = false;
+                questionnaireOpenRequested = false;
+                bootstrap.Router.Navigate(AppRoute.Home);
+                RefreshHomeSummary();
+            });
+        }
+
+        // Keep one local save in flight. Rapid choices coalesce into the latest complete draft.
+        private void SaveNativeQuestionnaireDraft(System.Action afterSave = null)
+        {
+            if (activeNativeQuestionnaire == null) return;
+            if (afterSave != null) questionnaireAfterSave = afterSave;
+            questionnaireDraftDirty = true;
+            if (questionnaireSaving) return;
+            if (activeNativeQuestionnaire.pendingSubmission)
+            {
+                questionnaireDraftDirty = false;
+                var next = questionnaireAfterSave;
+                questionnaireAfterSave = null;
+                next?.Invoke();
+                return;
+            }
+            questionnaireDraftDirty = false;
+            questionnaireSaving = true;
+            long taskId = activeNativeQuestionnaire.taskId;
+            int identity = sessionIdentityGeneration;
+            string answers = MonthlyQuestionnaireTaskAdapter.AnswersJson(activeNativeQuestionnaire, monthlyScreens.CollectRecord());
+            NativeMobileService.Instance.Request("routineSave", new NativeRequest
+            { accountId = bootstrap.State.Session.accountId, taskId = taskId, answersJson = answers }, reply =>
+            {
+                if (this == null || identity != sessionIdentityGeneration || activeNativeQuestionnaire?.taskId != taskId) return;
+                questionnaireSaving = false;
+                if (!reply.ok)
+                {
+                    questionnaireAfterSave = null;
+                    questionnaireBusy = false;
+                    monthlyScreens.SetInteraction(!activeNativeQuestionnaire.pendingSubmission, true);
+                    Debug.LogWarning("[MobileBridge] Questionnaire draft save did not complete.");
+                    return;
+                }
+                ReadNativeQuestionnaires(reply);
+                activeNativeQuestionnaire = nativeQuestionnaires.First(task => task.taskId == taskId);
+                if (questionnaireDraftDirty) { SaveNativeQuestionnaireDraft(); return; }
+                var next = questionnaireAfterSave;
+                questionnaireAfterSave = null;
+                next?.Invoke();
+            });
+        }
+
+        private void SubmitNativeQuestionnaire()
+        {
+            long taskId = activeNativeQuestionnaire.taskId;
+            int identity = sessionIdentityGeneration;
+            NativeMobileService.Instance.Request("routineSubmit", new NativeRequest
+            { accountId = bootstrap.State.Session.accountId, taskId = taskId }, reply =>
+            {
+                if (this == null || identity != sessionIdentityGeneration || activeNativeQuestionnaire?.taskId != taskId) return;
+                questionnaireBusy = false;
+                if (reply.ok)
+                {
+                    ReadNativeQuestionnaires(reply);
+                    activeNativeQuestionnaire = nativeQuestionnaires.First(task => task.taskId == taskId);
+                    if (!string.IsNullOrEmpty(activeNativeQuestionnaire.completedAt))
+                    {
+                        CompleteNativeQuestionnaire();
+                        return;
+                    }
+                }
+                // The native queue retains the exact request until the server confirms it.
+                monthlyScreens.SetInteraction(!activeNativeQuestionnaire.pendingSubmission, true);
+                Debug.LogWarning("[MobileBridge] Questionnaire submission is not confirmed yet.");
+            });
+        }
+
+        private void CompleteNativeQuestionnaire()
+        {
+            activeNativeQuestionnaire = null;
+            questionnaireBusy = false;
+            questionnaireStep++;
+            if (OpenNextNativeQuestionnaire(false)) return;
+            questionnaireOpenRequested = false;
+            bootstrap.Router.Navigate(AppRoute.Home);
+            RefreshHomeSummary();
         }
 
         private void ShowHistory()
@@ -806,7 +1100,9 @@ namespace SpineRecovery.App
                         previewActivationCode = null;
                         bootstrap.State.SetSession(JsonUtility.FromJson<UserSession>(reply.dataJson));
                         activationMessage.text = "医生档案绑定成功。";
-                        bootstrap.Router.Navigate(AppRoute.Home);
+                        NavigateWithProfile(AppRoute.Home);
+                        RefreshDirectiveSilently();
+                        RefreshQuestionnairesSilently(true);
                     });
                 return;
             }
@@ -822,10 +1118,7 @@ namespace SpineRecovery.App
             session.profile.activationBoundAt = System.DateTimeOffset.UtcNow.ToString("O");
             bootstrap.Users.Save(session);
             if (activationMessage != null) activationMessage.text = "激活成功，已绑定本地演示档案。";
-            // New users no longer go through the first-login questionnaire
-            // chain; enter the training home after activation to match the
-            // login path.
-            bootstrap.Router.Navigate(AppRoute.Home);
+            NavigateWithProfile(AppRoute.Home);
         }
 
         [System.Serializable]
@@ -833,9 +1126,7 @@ namespace SpineRecovery.App
 
         private void SkipActivation()
         {
-            // Skipping activation also enters the training home directly so
-            // the removed first-login questionnaire chain stays unreachable.
-            bootstrap.Router.Navigate(AppRoute.Home);
+            NavigateWithProfile(AppRoute.Home);
         }
 
         [System.Serializable] private sealed class HistoryScore { public int overallScore; }
@@ -989,7 +1280,7 @@ namespace SpineRecovery.App
             {
                 nativeBusy = true;
                 int generation = ++loginGeneration;
-                loginMessage.text = "正在登录…";
+                loginMessage.text = "";
                 NativeMobileService.Instance.Request("login", new NativeRequest
                 { accountId = accountInput.text, password = passwordInput.text }, reply =>
                 {
@@ -1022,7 +1313,7 @@ namespace SpineRecovery.App
             RefreshHomeSummary();
             if (session.IsReturningUser)
             {
-                if (session.profile.ageYears <= 0)
+                if (!NativeMobileService.Available && session.profile.ageYears <= 0)
                 {
                     session.profile.gender = "男"; session.profile.ageYears = 35; session.profile.heightCm = 175; session.profile.weightKg = 70;
                     if (session.latestPainLevel <= 0) session.latestPainLevel = 3;
@@ -1032,17 +1323,41 @@ namespace SpineRecovery.App
                 bootstrap.Users.Save(session);
                 pendingTrainingScene = "";
                 pendingTrainingActionId = "";
-                bootstrap.Router.Navigate(AppRoute.PreTraining);
+                NavigateWithProfile(AppRoute.PreTraining);
             }
             else
             {
-                // New users now enter the training home directly. The
-                // first-login profile/intake/pain/admission questionnaire
-                // chain is removed from this path; the home screen and all
-                // flows reachable from it remain unchanged.
-                bootstrap.Router.Navigate(AppRoute.Home);
+                NavigateWithProfile(AppRoute.Home);
             }
-            bootstrap.Training.RestoreForCurrentUser();
+            if (bootstrap.State.Route != AppRoute.BasicProfile)
+                bootstrap.Training.RestoreForCurrentUser();
+            RefreshDirectiveSilently();
+            RefreshQuestionnairesSilently(true);
+        }
+
+        private void NavigateWithProfile(AppRoute destination)
+        {
+            UserProfile profile = bootstrap.State.Session.profile;
+            string gender = profile?.gender;
+            bool male = gender == "男" || gender == "male";
+            bool female = gender == "女" || gender == "female";
+            if (profile != null && (male || female) &&
+                profile.ageYears >= 10 && profile.ageYears <= 100 &&
+                profile.heightCm >= 120 && profile.heightCm <= 220 &&
+                profile.weightKg >= 35 && profile.weightKg <= 200)
+            {
+                bootstrap.Router.Navigate(destination);
+                return;
+            }
+
+            profileContinueRoute = destination;
+            profileInputs[0].text = profile != null && profile.ageYears > 0 ? profile.ageYears.ToString() : "";
+            profileInputs[1].text = profile != null && profile.heightCm > 0 ? profile.heightCm.ToString() : "";
+            profileInputs[2].text = profile != null && profile.weightKg > 0 ? profile.weightKg.ToString() : "";
+            selectedGender = male ? "男" : female ? "女" : "";
+            SetSelectedChoice(genderButtons, male ? 0 : female ? 1 : -1);
+            flowMessages[AppRoute.BasicProfile].text = "";
+            bootstrap.Router.Navigate(AppRoute.BasicProfile);
         }
 
         private GameObject CreateFormPanel(Transform parent, string title, string subtitle, System.Action<Transform> build)
@@ -1091,9 +1406,12 @@ namespace SpineRecovery.App
                 !int.TryParse(profileInputs[2].text, out int weight) || weight < 35 || weight > 200 || string.IsNullOrEmpty(selectedGender))
             { ShowFlowMessage("资料无效：请检查年龄、身高、体重范围并选择性别。"); return; }
             UserSession user = bootstrap.State.Session;
+            if (user.profile == null) user.profile = new UserProfile();
             user.profile.ageYears = age; user.profile.heightCm = height; user.profile.weightKg = weight; user.profile.gender = selectedGender;
             bootstrap.Users.Save(user);
-            bootstrap.Router.Navigate(AppRoute.BasicSurvey);
+            RefreshHomeSummary();
+            bootstrap.Router.Navigate(profileContinueRoute);
+            bootstrap.Training.RestoreForCurrentUser();
         }
 
         private void CreateSurveyForm(Transform parent)
@@ -1170,6 +1488,13 @@ namespace SpineRecovery.App
             UserSession user = bootstrap.State.Session;
             user.basicSituation = selectedSituation; user.symptoms = new[] { selectedSymptom };
             user.userTags = BuildUserTags(user);
+            user.intakeReviewRequired = selectedSymptom == "无力" || selectedSituation == "acute";
+            HealthEventRecord.Append(user, "admissionIntake", System.DateTimeOffset.UtcNow.ToString("O"),
+                new AdmissionIntakeSnapshot
+                {
+                    situation = selectedSituation, symptom = selectedSymptom,
+                    goals = (string[])(user.goals ?? System.Array.Empty<string>()).Clone(),
+                });
             if (selectedSymptom == "无力" || selectedSituation == "acute")
             {
                 user.intakeReviewRequired = true;
@@ -1218,13 +1543,31 @@ namespace SpineRecovery.App
             user.latestPainLevel = user.painLevels.Length > 0 ? Mathf.Max(user.painLevels) : 0;
             user.userTags = BuildUserTags(user);
             user.intakeCompleted = true;
+            string recordedAt = System.DateTimeOffset.UtcNow.ToString("O");
+            HealthEventRecord.Append(user, "admissionSurvey", recordedAt, new AdmissionSurveySnapshot
+            {
+                painLevel = user.latestPainLevel, requiresClinicalReview = user.intakeReviewRequired,
+            });
+            string[] pointKeys = { "left_waist", "right_waist", "left_upper_arm", "right_upper_arm", "left_hip", "right_hip", "left_leg", "right_leg" };
+            string[] pointLabels = { "左腰部", "右腰部", "左大臂", "右大臂", "左臀部", "右臀部", "左腿", "右腿" };
+            var points = new PainPointSnapshot[selectedPainParts.Count];
+            for (int i = 0; i < points.Length; i++)
+            {
+                int labelIndex = System.Array.IndexOf(pointKeys, selectedPainParts[i]);
+                points[i] = new PainPointSnapshot
+                {
+                    bodyPart = selectedPainParts[i], bodyPartLabel = pointLabels[labelIndex],
+                    painLevel = painLevelsByPart[selectedPainParts[i]],
+                };
+            }
             bootstrap.Users.AppendPainRecord(user, new PainHistoryRecord
             {
-                id = "intake:" + System.DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(),
-                recordedAt = System.DateTimeOffset.UtcNow.ToString("O"),
+                id = "intake:" + System.Guid.NewGuid().ToString("N"),
+                recordedAt = recordedAt,
                 painLevel = user.latestPainLevel,
                 source = "AdmissionQuestionnaire",
-                painParts = user.painParts,
+                painParts = (string[])user.painParts.Clone(),
+                points = points, pointsCaptured = true, painFree = user.painFree,
             });
             bootstrap.Router.Navigate(AppRoute.MobileAdmission);
         }
@@ -1447,7 +1790,7 @@ namespace SpineRecovery.App
             user.extensionResponse = extensionResponse;
             user.flexionPainPhase = flexionPainPhase;
             user.extensionPainPhase = extensionPainPhase;
-            user.admissionCompletedAt = System.DateTimeOffset.Now.ToString("o");
+            user.admissionCompletedAt = System.DateTimeOffset.UtcNow.ToString("O");
             List<string> tags = new List<string>(user.userTags ?? System.Array.Empty<string>());
             tags.RemoveAll(tag => tag == "屈曲方向偏好" || tag == "伸展方向偏好");
             if (extensionResponse == "relieved" && flexionResponse != "relieved") tags.Add("伸展方向偏好");
@@ -1455,6 +1798,23 @@ namespace SpineRecovery.App
             user.userTags = tags.ToArray();
             user.admissionReviewRequired = Mathf.Max(flexionAdmissionPain, extensionAdmissionPain) >= 8;
             user.admissionCompleted = true;
+            HealthEventRecord.Append(user, "mobileAdmissionAssessment", user.admissionCompletedAt,
+                new AdmissionAssessmentSnapshot
+                {
+                    completedAt = user.admissionCompletedAt,
+                    flexion = new AdmissionMovementSnapshot
+                    {
+                        movementType = "fis", completionCount = flexionCompletedCount,
+                        painResponse = flexionResponse, firstPainPhase = flexionPainPhase,
+                        painLevel = flexionAdmissionPain,
+                    },
+                    extension = new AdmissionMovementSnapshot
+                    {
+                        movementType = "eis", completionCount = extensionCompletedCount,
+                        painResponse = extensionResponse, firstPainPhase = extensionPainPhase,
+                        painLevel = extensionAdmissionPain,
+                    },
+                });
             bootstrap.Users.Save(user);
             if (user.admissionReviewRequired) { bootstrap.Router.Navigate(AppRoute.AdmissionDecision); return; }
             bootstrap.Router.Navigate(AppRoute.Home);
@@ -1617,12 +1977,33 @@ namespace SpineRecovery.App
                 nativeBusy = true;
                 arTrainingMessage.text = "正在获取本次医生处方…";
                 string account = user.accountId;
+                int generation = loginGeneration;
+                int identityGeneration = sessionIdentityGeneration;
                 NativeMobileService.Instance.Request("plan", new NativeRequest { accountId = account }, reply =>
                 {
+                    if (this == null || generation != loginGeneration || identityGeneration != sessionIdentityGeneration ||
+                        bootstrap.State.Session?.accountId != account) return;
                     nativeBusy = false;
-                    if (bootstrap.State.Session?.accountId != account) return;
                     if (!reply.ok) { arTrainingMessage.text = reply.error; return; }
-                    LaunchPlan(JsonUtility.FromJson<TrainingPlan>(reply.dataJson));
+                    TrainingPlan plan;
+                    try { plan = JsonUtility.FromJson<TrainingPlan>(reply.dataJson); }
+                    catch (System.ArgumentException) { plan = null; }
+                    if (plan == null || plan.accountId != account || plan.patientId != bootstrap.State.Session.profile?.patientId ||
+                        !plan.CanConsumePrescription())
+                    {
+                        arTrainingMessage.text = "无法启动训练，请检查处方和场景配置。";
+                        return;
+                    }
+                    nativeBusy = true;
+                    NativeMobileService.Instance.Request("confirmPlan", new NativeRequest
+                    { accountId = account, planToken = plan.planToken, consumerConfirmed = true }, confirmed =>
+                    {
+                        if (this == null || generation != loginGeneration || identityGeneration != sessionIdentityGeneration ||
+                            bootstrap.State.Session?.accountId != account) return;
+                        nativeBusy = false;
+                        if (!confirmed.ok) { arTrainingMessage.text = confirmed.error; return; }
+                        LaunchPlan(plan);
+                    });
                 });
                 return;
             }
@@ -1927,7 +2308,9 @@ namespace SpineRecovery.App
             border.cornerRadius = 12f;
             border.borderThickness = 2.2f;
             border.raycastTarget = false;
-            border.SetBorderColor(new Color(1f, 1f, 1f, 0f));
+            // Registration and activation pages need a visible neutral field ring.
+            // The login page hides this ring after creating its raster overlay.
+            border.SetBorderColor(new Color(0.78f, 0.81f, 0.87f, 1f));
             return border;
         }
 

@@ -224,7 +224,7 @@
       "url": "https://packages.unity.cn"
     },
     "com.unity.visualscripting": {
-      "version": "1.9.4",
+      "version": "1.8.0",
       "depth": 0,
       "source": "registry",
       "dependencies": {

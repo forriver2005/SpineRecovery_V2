@@ -2,22 +2,53 @@ plugins {
     id 'com.android.library'
 }
 
+// A LAN build trusts a stable server certificate; its current IP is discovered at runtime.
+def localServerPin = providers.gradleProperty('spineflowLocalCertificateSha256').orElse('').get().trim().toLowerCase()
+def localServiceId = providers.gradleProperty('spineflowLocalServiceId').orElse('hospital-a').get().trim()
+def localHospitalKey = providers.gradleProperty('spineflowLocalHospitalKey').orElse('hospital-a').get().trim()
+if (!(localServerPin ==~ /[0-9a-f]{64}/)) {
+    throw new GradleException('LAN-only builds require spineflowLocalCertificateSha256 (SHA-256 certificate fingerprint)')
+}
+if (!localServiceId || !localHospitalKey) {
+    throw new GradleException('LAN-only builds require a hospital and service identity')
+}
+if (providers.gradleProperty('spineflowServerUrl').isPresent()) {
+    throw new GradleException('spineflowServerUrl is no longer supported; all builds use pinned LAN discovery')
+}
+
 android {
     namespace 'com.metaspine.mobile.unified'
     compileSdk 36
-    defaultConfig { minSdk 29 }
+    defaultConfig {
+        minSdk 29
+        // Scope alias only; the transport uses same-subnet discovery and pinned TLS.
+        buildConfigField 'String', 'SERVER_BASE_URL', '"https://spineflow.local:3001"'
+        buildConfigField 'String', 'LOCAL_DISCOVERY_CERT_SHA256', groovy.json.JsonOutput.toJson(localServerPin)
+        buildConfigField 'String', 'LOCAL_DISCOVERY_SERVICE_ID', groovy.json.JsonOutput.toJson(localServiceId)
+        buildConfigField 'String', 'LOCAL_DISCOVERY_HOSPITAL_KEY', groovy.json.JsonOutput.toJson(localHospitalKey)
+    }
     buildFeatures { buildConfig true }
     buildTypes {
-        debug { buildConfigField 'String', 'SERVER_BASE_URL', '"https://api.metaspine.cn"' }
-        release { buildConfigField 'String', 'SERVER_BASE_URL', '"https://api.metaspine.cn"' }
+        debug { }
+        release { }
     }
     compileOptions {
         sourceCompatibility JavaVersion.VERSION_17
         targetCompatibility JavaVersion.VERSION_17
+    }
+    testOptions {
+        unitTests.returnDefaultValues = true
     }
 }
 
 dependencies {
     implementation 'androidx.core:core-ktx:1.13.1'
     implementation 'org.jetbrains.kotlinx:kotlinx-coroutines-android:1.9.0'
+
+    // 协议/队列单元测试（P0.5）。org.json 在 Android 单元测试中只有空实现，
+    // 必须用真实实现覆盖，才能验证序列化与规范摘要。
+    testImplementation 'junit:junit:4.13.2'
+    testImplementation 'org.json:json:20240303'
+    testImplementation 'org.jetbrains.kotlinx:kotlinx-coroutines-test:1.9.0'
 }
+

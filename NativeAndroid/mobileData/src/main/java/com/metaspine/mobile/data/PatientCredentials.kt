@@ -1,7 +1,6 @@
 package com.metaspine.mobile.data
 
 import android.content.Context
-import com.metaspine.mobile.unified.BuildConfig
 import org.json.JSONObject
 import java.util.UUID
 
@@ -22,7 +21,10 @@ data class PendingActivationBinding(
     val activationCode: String,
     val proposedToken: String,
     val installationId: String,
-    val accountId: String
+    val accountId: String,
+    val origin: String = "",
+    val serviceId: String = "",
+    val hospitalKey: String = ""
 )
 
 /** 本地账号激活状态（设计 §5.3）。 */
@@ -61,10 +63,12 @@ object PatientCredentials {
     private const val KEY_TOKEN_PREFIX = "patient_token_"
     private const val KEY_PATIENT_ID_PREFIX = "patient_id_"
     private const val KEY_PRESCRIPTION_PREFIX = "admission_prescription_"
+    private const val KEY_PRESCRIPTION_V2_PREFIX = "admission_prescription_v2_"
     private const val KEY_ACTIVATION_PENDING_PREFIX = "activation_pending_"
     private const val KEY_IDENTITY_PREFIX = "activation_identity_"
     private const val KEY_INSTALLATION_ID = "installation_id"
     private const val KEY_SERVER_URL = "server_url_override"
+    private const val KEY_BINDING_SCOPE_PREFIX = "binding_scope_"
 
     private fun prefs(context: Context) =
         context.getSharedPreferences(PREFERENCES_NAME, Context.MODE_PRIVATE)
@@ -86,11 +90,30 @@ object PatientCredentials {
 
     private fun accountKey(accountId: String): String = accountId.trim().lowercase()
 
+    fun bindingScope(context: Context, accountId: String): BindingScope? =
+        SecureLocalData.read(prefs(context), KEY_BINDING_SCOPE_PREFIX + accountKey(accountId))?.let {
+            BindingScope.fromJson(JSONObject(it))
+        }
+
+    fun boundAccountIds(context: Context): Set<String> = prefs(context).all.keys
+        .filter { it.startsWith(KEY_PATIENT_ID_PREFIX) }.map { it.removePrefix(KEY_PATIENT_ID_PREFIX) }.toSet()
+
+    fun saveBindingScope(context: Context, scope: BindingScope): Boolean {
+        val key = KEY_BINDING_SCOPE_PREFIX + accountKey(scope.accountId)
+        return prefs(context).edit().putString(key, SecureLocalData.seal(key, scope.toJson().toString())).commit()
+    }
+
+    fun clearBindingScope(context: Context, accountId: String) {
+        check(prefs(context).edit().remove(KEY_BINDING_SCOPE_PREFIX + accountKey(accountId)).commit())
+    }
+
     fun clearAccount(context: Context, accountId: String) {
         val editor = prefs(context).edit()
         listOf(KEY_TOKEN_PREFIX, KEY_PATIENT_ID_PREFIX, KEY_PRESCRIPTION_PREFIX,
-            KEY_ACTIVATION_PENDING_PREFIX, KEY_IDENTITY_PREFIX).forEach { editor.remove(it + accountKey(accountId)) }
+            KEY_PRESCRIPTION_V2_PREFIX, KEY_ACTIVATION_PENDING_PREFIX, KEY_IDENTITY_PREFIX)
+            .forEach { editor.remove(it + accountKey(accountId)) }
         check(editor.commit()) { "患者绑定信息未能清理" }
+        BindingScopeStore.clear(context, accountId)
     }
 
     fun installationId(context: Context): String {
@@ -122,6 +145,9 @@ object PatientCredentials {
             .put("proposedToken", pending.proposedToken)
             .put("installationId", pending.installationId)
             .put("accountId", pending.accountId)
+            .put("origin", pending.origin)
+            .put("serviceId", pending.serviceId)
+            .put("hospitalKey", pending.hospitalKey)
         val key = KEY_ACTIVATION_PENDING_PREFIX + accountKey(pending.accountId)
         return prefs(context).edit()
             .putString(key, SecureLocalData.seal(key, json.toString()))
@@ -138,7 +164,10 @@ object PatientCredentials {
                         activationCode = json.getString("activationCode"),
                         proposedToken = json.getString("proposedToken"),
                         installationId = json.getString("installationId"),
-                        accountId = json.getString("accountId")
+                        accountId = json.getString("accountId"),
+                        origin = json.optString("origin"),
+                        serviceId = json.optString("serviceId"),
+                        hospitalKey = json.optString("hospitalKey")
                     )
                 }.getOrNull()
             }
@@ -152,10 +181,12 @@ object PatientCredentials {
         accountId: String,
         credential: PatientServerCredential,
         prescription: AdmissionPrescriptionItem,
-        identity: BoundPatientIdentity
+        identity: BoundPatientIdentity,
+        prescriptionV2: AdmissionPrescriptionV2? = null,
+        bindingScope: BindingScope? = null
     ): Boolean {
         val key = accountKey(accountId)
-        return prefs(context).edit()
+        val editor = prefs(context).edit()
             .putString(KEY_PATIENT_ID_PREFIX + key,
                 SecureLocalData.seal(KEY_PATIENT_ID_PREFIX + key, credential.patientId))
             .putString(KEY_TOKEN_PREFIX + key,
@@ -165,8 +196,22 @@ object PatientCredentials {
             .putString(KEY_IDENTITY_PREFIX + key,
                 SecureLocalData.seal(KEY_IDENTITY_PREFIX + key, identity.toJson().toString()))
             .remove(KEY_ACTIVATION_PENDING_PREFIX + key)
-            .commit()
+        if (prescriptionV2 != null) {
+            editor.putString(KEY_PRESCRIPTION_V2_PREFIX + key,
+                SecureLocalData.seal(KEY_PRESCRIPTION_V2_PREFIX + key, prescriptionV2.toJson().toString()))
+        }
+        if (bindingScope != null) {
+            require(bindingScope.accountId == key && bindingScope.patientId == credential.patientId)
+            val scopeKey = KEY_BINDING_SCOPE_PREFIX + key
+            editor.putString(scopeKey, SecureLocalData.seal(scopeKey, bindingScope.toJson().toString()))
+        }
+        return editor.commit()
     }
+
+    fun prescriptionV2(context: Context, accountId: String): AdmissionPrescriptionV2? =
+        SecureLocalData.read(prefs(context), KEY_PRESCRIPTION_V2_PREFIX + accountKey(accountId))?.let { raw ->
+            runCatching { AdmissionPrescriptionV2.fromJson(JSONObject(raw)) }.getOrNull()
+        }
 
     fun boundIdentity(context: Context, accountId: String): BoundPatientIdentity? =
         SecureLocalData.read(prefs(context), KEY_IDENTITY_PREFIX + accountKey(accountId))?.let { raw ->
@@ -231,7 +276,7 @@ object PatientCredentials {
 
     fun saveServerUrlOverride(context: Context, url: String?) {
         val normalized = url?.takeIf(String::isNotBlank)?.let {
-            ServerOriginPolicy.normalize(it, BuildConfig.SERVER_BASE_URL, BuildConfig.DEBUG)
+            ServerOriginPolicy.normalize(it)
                 ?: throw IllegalArgumentException("服务器地址必须是受信 Origin")
         }
         prefs(context).edit().apply {
@@ -246,7 +291,7 @@ object PatientCredentials {
     fun serverUrlOverride(context: Context): String? {
         val preferences = prefs(context)
         val old = preferences.getString(KEY_SERVER_URL, null)?.takeIf(String::isNotBlank) ?: return null
-        val normalized = ServerOriginPolicy.normalize(old, BuildConfig.SERVER_BASE_URL, BuildConfig.DEBUG)
+        val normalized = ServerOriginPolicy.normalize(old)
         if (normalized == null) {
             preferences.edit().remove(KEY_SERVER_URL).commit()
             return null
@@ -266,4 +311,6 @@ object PatientCredentials {
         .put("displayName", displayName)
         .put("idCardMasked", idCardMasked)
         .put("doctorUsername", doctorUsername)
+
+    // V2 处方的 JSON 映射统一放在 AdmissionPrescriptionV2.kt（A02/D01 共用同一模型）。
 }

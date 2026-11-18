@@ -44,7 +44,12 @@ internal object UnifiedPrescriptionV2 {
             saved.failWrite(output)
             throw error
         }
-        PatientDirectiveClient.postV2Receipt(credential.patientToken, order, "directive_saved")
+        PatientDirectiveClient.postPrescriptionReceipt(
+            credential.patientToken,
+            order.orderId,
+            PatientDirectiveClient.PHASE_SAVED,
+            order.resourceManifestSha256
+        )
 
         val actions = JSONArray()
         for (item in order.items) {
@@ -96,7 +101,12 @@ internal object UnifiedPrescriptionV2 {
         }
         check(SpineFlowServerConfig.BASE_URL == origin &&
             PatientCredentials.credential(context, account) == credential) { "患者绑定已变更，请重新获取处方" }
-        PatientDirectiveClient.postV2Receipt(credential.patientToken, order, "assets_ready")
+        PatientDirectiveClient.postPrescriptionReceipt(
+            credential.patientToken,
+            order.orderId,
+            PatientDirectiveClient.PHASE_ASSETS_READY,
+            order.resourceManifestSha256
+        )
         return JSONObject()
             .put("accountId", account)
             .put("patientId", credential.patientId)

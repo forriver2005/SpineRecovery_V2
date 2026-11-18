@@ -27,6 +27,7 @@ object UnifiedMobileBridge {
     @JvmStatic @Synchronized fun initialize(host: Context) {
         if (::context.isInitialized) return
         context = host.applicationContext
+        LocalServerDiscovery.initialize(context)
         users = DemoUserStore(context)
         SpineFlowServerConfig.baseUrlOverride = PatientCredentials.serverUrlOverride(context)
         sync = ServerSyncCoordinator(context, scope)
@@ -34,6 +35,7 @@ object UnifiedMobileBridge {
         loginGuard.recoverPendingDeletions()
         routineStore = RoutineQuestionnaireStore(context)
         routine = RoutineQuestionnaireCoordinator(routineStore)
+        foreground()
     }
 
     @JvmStatic fun authenticate(account: String, password: String): Boolean =
@@ -101,11 +103,14 @@ object UnifiedMobileBridge {
             history = records, painHistory = painRecords
         )
         users.saveUser(saved)
+        val finalizedSessionSaved = records.any { record ->
+            record.endReason.isNotBlank() && old.history.none { it.sessionId == record.sessionId && it.endReason == record.endReason }
+        }
         val feedbackSubmitted = records.any { record ->
             !record.feedbackPending && record.feedback != null &&
                 old.history.none { it.sessionId == record.sessionId && it.feedback == record.feedback && !it.feedbackPending }
         }
-        main.post { sync.onUserChanged(syncable(saved), immediate = feedbackSubmitted) }
+        main.post { sync.onUserChanged(syncable(saved), immediate = finalizedSessionSaved || feedbackSubmitted) }
     }
 
     @JvmStatic fun foreground() {
@@ -169,11 +174,17 @@ object UnifiedMobileBridge {
             val response = JSONObject().put("requestId", requestId)
             try {
                 val body = JSONObject(raw)
-                val data = execute(command, body, generation)
+                val data = if (command == "plan") {
+                    withTimeoutOrNull(30_000L) { execute(command, body, generation) }
+                        ?: throw java.io.IOException("获取处方超时，请检查医院网络并重新点击开始训练")
+                } else execute(command, body, generation)
                 response.put("ok", true).put("dataJson", data.toString())
             } catch (cancelled: CancellationException) { throw cancelled }
             catch (error: Exception) {
-                response.put("ok", false).put("error", error.message ?: "操作未完成，请重试")
+                val message = if (command == "plan" && error is java.io.IOException && LocalServerDiscovery.isEnabled)
+                    "获取处方失败，请确认手机和医院服务器已连接同一局域网，再点开始训练重试。"
+                else error.message ?: "操作未完成，请重试"
+                response.put("ok", false).put("error", message)
             }
             Class.forName("com.unity3d.player.UnityPlayer")
                 .getMethod("UnitySendMessage", String::class.java, String::class.java, String::class.java)
@@ -355,10 +366,8 @@ object UnifiedMobileBridge {
     private fun syncable(user: DemoUserData): DemoUserData {
         val patientId = PatientCredentials.credential(context, user.accountId)?.patientId
         return user.copy(
-        history = user.history.filter { it.endReason != "LEGACY_IMPORT" &&
-            (it.planJson.isBlank() || (it.endReason.isNotBlank() && !it.feedbackPending &&
-                patientId != null && runCatching { JSONObject(it.resultJson).optString("userId") }.getOrNull() == patientId)) },
-        painHistory = user.painHistory.filterNot { it.id.startsWith("imported:") }
+            history = user.history.filter { it.isReadyForUpload(patientId) },
+            painHistory = user.painHistory.filterNot { it.id.startsWith("imported:") }
         )
     }
     private fun objects(array: JSONArray?): List<JSONObject> =

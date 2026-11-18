@@ -66,8 +66,8 @@ class PendingSyncStore(context: Context) {
         }
     }
 
-    /** 队首元素（不移除）；空队列返回 null。 */
-    fun peek(accountId: String): JSONObject? = readArray(queueKey(accountId)).optJSONObject(0)
+    /** 先发送患者与训练前问卷数据，训练上传会引用该次问卷。其余批次按原顺序发送。 */
+    fun peek(accountId: String): JSONObject? = nextPatientRequest(readArray(queueKey(accountId)))
 
     fun remove(accountId: String, id: String) {
         val key = queueKey(accountId)
@@ -241,6 +241,14 @@ internal data class QueueCursor(
             )
         }
     }
+}
+
+internal fun nextPatientRequest(queue: JSONArray): JSONObject? {
+    for (index in 0 until queue.length()) {
+        val item = queue.optJSONObject(index) ?: continue
+        if (item.optString("kind") == "sync") return item
+    }
+    return queue.optJSONObject(0)
 }
 
 internal fun queueElement(

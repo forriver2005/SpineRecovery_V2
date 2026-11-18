@@ -15,7 +15,7 @@ import java.nio.charset.CodingErrorAction
 /** Bounded JSON transport. Business status/DTOs and retry decisions belong to each client. */
 internal class PatientHttpTransport(
     private val origin: () -> String = { SpineFlowServerConfig.BASE_URL },
-    private val openConnection: (URL) -> HttpURLConnection = { it.openConnection() as HttpURLConnection }
+    private val openConnection: (URL) -> HttpURLConnection = LocalServerDiscovery::openConnection
 ) {
     data class Response(val status: Int, val bytes: ByteArray, val retryAfterSeconds: Long?) {
         val text: String get() = decodeUtf8(bytes)
@@ -61,6 +61,7 @@ internal class PatientHttpTransport(
             }
             context.ensureActive()
             val status = connection.responseCode
+            LocalServerDiscovery.validateConnection(connection)
             val retryAfter = parseRetryAfterSeconds(connection.getHeaderField("Retry-After"))
             // 401/403/429 etc. remain HTTP errors even with malformed or oversized error pages.
             // Only account-status needs a validated error body (the dedicated 410 contract).
@@ -83,6 +84,10 @@ internal class PatientHttpTransport(
             context.ensureActive()
             decodeUtf8(bytes) // Never silently replace invalid UTF-8 with replacement characters.
             Response(status, bytes, retryAfter)
+        } catch (error: java.io.IOException) {
+            LocalServerDiscovery.invalidateConnection(connection)
+            context.ensureActive()
+            throw error
         } catch (error: Exception) {
             context.ensureActive() // Cancellation must not become an ordinary socket/IO failure.
             throw error

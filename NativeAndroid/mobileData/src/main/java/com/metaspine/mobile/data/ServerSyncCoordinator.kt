@@ -3,6 +3,8 @@ package com.metaspine.mobile.data
 import android.content.Context
 import android.net.ConnectivityManager
 import android.net.Network
+import android.net.NetworkCapabilities
+import android.net.NetworkRequest
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -60,7 +62,10 @@ class ServerSyncCoordinator(
         }
         networkCallback = callback
         // 网络恢复回调（ACCESS_NETWORK_STATE 权限 Manifest 已有）
-        connectivityManager?.registerDefaultNetworkCallback(callback)
+        if (LocalServerDiscovery.isEnabled) {
+            val wifi = NetworkRequest.Builder().addTransportType(NetworkCapabilities.TRANSPORT_WIFI).build()
+            connectivityManager?.registerNetworkCallback(wifi, callback)
+        } else connectivityManager?.registerDefaultNetworkCallback(callback)
     }
 
     /**
@@ -120,7 +125,7 @@ class ServerSyncCoordinator(
                 accountId,
                 "sync",
                 queueElement(
-                    id = "sync:${System.currentTimeMillis()}",
+                    id = "sync:${java.util.UUID.randomUUID()}",
                     kind = "sync",
                     payload = body,
                     cursor = QueueCursor(
@@ -161,7 +166,8 @@ class ServerSyncCoordinator(
                         id = "upload:${chunkSessionIds.sorted().joinToString(",")}",
                         kind = "upload:$chunkIndex",
                         payload = TrainingSyncClient.buildUploadBody(chunk),
-                        cursor = QueueCursor(sessionIds = chunkSessionIds),
+                        cursor = QueueCursor(sessionIds = chunkSessionIds,
+                            qHashes = chunkSessionIds.associate { "post:$it" to "pending" }),
                     ),
                 )
                 chunkIndex += 1
@@ -186,7 +192,7 @@ class ServerSyncCoordinator(
         if (flushJob?.isActive == true) return
         flushJob = scope.launch {
             while (true) {
-                if (!TrainingSyncClient.isOnline(context)) return@launch
+                if (!LocalServerDiscovery.isEnabled && !TrainingSyncClient.isOnline(context)) return@launch
 
                 val next = nextPending() ?: return@launch
                 val accountId = next.first
@@ -293,7 +299,7 @@ class ServerSyncCoordinator(
             .afterUpload(cursor.sessionIds)
             .afterSync(
                 cursor.painIds,
-                cursor.qHashes,
+                cursor.qHashes.filterNot { (key, value) -> value == "pending" && snapshot.questionnaireHashes[key] == "sent" },
                 cursor.profileHash,
                 cursor.lifecycle,
                 cursor.imuCalibrationState,
@@ -309,7 +315,8 @@ class ServerSyncCoordinator(
 internal fun splitOversizeUploadItem(item: JSONObject): List<JSONObject>? {
     val sessions = item.optJSONObject("payload")?.optJSONArray("sessions") ?: return null
     if (sessions.length() < 2) return null
-    val expected = QueueCursor.fromJson(item.optJSONObject("cursor")).sessionIds
+    val cursor = QueueCursor.fromJson(item.optJSONObject("cursor"))
+    val expected = cursor.sessionIds
     val halves = listOf(JSONArray(), JSONArray())
     val ids = listOf(mutableSetOf<String>(), mutableSetOf<String>())
     for (index in 0 until sessions.length()) {
@@ -328,12 +335,21 @@ internal fun splitOversizeUploadItem(item: JSONObject): List<JSONObject>? {
             id = "${item.optString("id")}:$part",
             kind = item.optString("kind"),
             payload = JSONObject().put("sessions", halves[part]),
-            cursor = QueueCursor(sessionIds = ids[part])
+            cursor = QueueCursor(sessionIds = ids[part], qHashes = cursor.qHashes.filterKeys {
+                it.startsWith("post:") && it.removePrefix("post:") in ids[part]
+            })
         )
     }
 }
 
 // ==================== 纯逻辑（JVM 可测） ====================
+
+internal fun TrainingHistoryRecord.isReadyForUpload(patientId: String?): Boolean {
+    if (endReason == "LEGACY_IMPORT") return false
+    if (planJson.isBlank()) return true // Older saved sessions have no plan or end reason.
+    return patientId != null && endReason.isNotBlank() &&
+        runCatching { JSONObject(resultJson).getString("userId") }.getOrNull() == patientId
+}
 
 /** 一次用户状态 diff 的产物。 */
 internal data class PendingDiff(
@@ -368,7 +384,7 @@ internal fun buildPendingDiff(
     // 患者同步增量
     val delta = PatientSyncClient.computeDelta(snapshot, user)
     var syncBody = PatientSyncClient.buildSyncBody(user, delta, patientId)
-    val newQuestionnaireHashes = delta.questionnaireKeys
+    val newQuestionnaireHashes = delta.questionnaireKeys.toMutableMap()
     val newProfileHash = user.profile
         ?.takeIf { delta.profile != null }
         ?.let { PatientSyncClient.stableHash(PatientSyncClient.profileJson(it)) }
@@ -379,8 +395,14 @@ internal fun buildPendingDiff(
 
     // 评审 #5：多条积压训练必须全部携带反馈——此前只取第一条，upload 游标推进后
     // 其余训练的 post_training 问卷永久缺失。改为数组，每条反馈一个事件（eventId 用 sessionId，重试稳定）
-    val feedbacks = uploadRecords.mapNotNull { record ->
+    val feedbacks = user.history.distinctBy { it.sessionId }.filter { record ->
+        val key = "post:${record.sessionId}"
+        !record.feedbackPending && record.feedback != null && TrainingSyncClient.isUploadable(record) &&
+            snapshot.questionnaireHashes[key] != "sent" &&
+            (record.sessionId !in snapshot.syncedSessionIds || snapshot.questionnaireHashes[key] == "pending")
+    }.mapNotNull { record ->
         record.feedback?.let { feedback ->
+            newQuestionnaireHashes["post:${record.sessionId}"] = "sent"
             JSONObject()
                 .put("feeling", feedback.feeling)
                 .put("difficulty", feedback.difficulty)

@@ -2,14 +2,32 @@ plugins {
     id 'com.android.library'
 }
 
+// The local test hospital publishes this public certificate fingerprint.
+// Set spineflowLocalCertificateSha256 to provision a LAN release for this hospital.
+def configuredPin = providers.gradleProperty('spineflowLocalCertificateSha256').orNull
+def testHospitalPin = 'd2074e172263c2999b5b0629e7b7f9a4d814211bb192d6eca3a2c527ff020fef'
+if (configuredPin != null && !(configuredPin ==~ /[a-f0-9]{64}/)) {
+    throw new GradleException('spineflowLocalCertificateSha256 must be a lowercase SHA-256 fingerprint')
+}
 android {
     namespace 'com.metaspine.mobile.unified'
     compileSdk 36
-    defaultConfig { minSdk 29 }
+    defaultConfig {
+        minSdk 29
+        buildConfigField 'String', 'LOCAL_DISCOVERY_SERVICE_ID', '"hospital-a"'
+        buildConfigField 'String', 'LOCAL_DISCOVERY_HOSPITAL_KEY', '"hospital-a"'
+    }
     buildFeatures { buildConfig true }
     buildTypes {
-        debug { buildConfigField 'String', 'SERVER_BASE_URL', '"https://api.metaspine.cn"' }
-        release { buildConfigField 'String', 'SERVER_BASE_URL', '"https://api.metaspine.cn"' }
+        debug {
+            buildConfigField 'String', 'LOCAL_DISCOVERY_CERT_SHA256', groovy.json.JsonOutput.toJson(configuredPin ?: testHospitalPin)
+            // Preserve the local test patient's storage scope. Transport resolves it via pinned Wi-Fi TLS.
+            buildConfigField 'String', 'SERVER_BASE_URL', '"http://127.0.0.1:3101"'
+        }
+        release {
+            buildConfigField 'String', 'LOCAL_DISCOVERY_CERT_SHA256', groovy.json.JsonOutput.toJson(configuredPin ?: '')
+            buildConfigField 'String', 'SERVER_BASE_URL', configuredPin ? '"https://spineflow.local"' : '"https://api.metaspine.cn"'
+        }
     }
     compileOptions {
         sourceCompatibility JavaVersion.VERSION_17

@@ -3,7 +3,6 @@ package com.metaspine.mobile.data
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.ByteArrayOutputStream
-import java.net.HttpURLConnection
 import java.net.URI
 import java.net.URL
 
@@ -17,7 +16,7 @@ object VersionDownloader {
             val base = SpineFlowServerConfig.BASE_URL
             var current = resolveDownloadUrl(base, downloadUrl)
             repeat(4) { hop ->
-                val connection = current.openConnection() as HttpURLConnection
+                val connection = LocalServerDiscovery.openConnection(current)
                 try {
                     connection.instanceFollowRedirects = false
                     connection.requestMethod = "GET"
@@ -25,6 +24,7 @@ object VersionDownloader {
                     connection.readTimeout = READ_TIMEOUT_MS
                     connection.setRequestProperty("Accept", "application/json")
                     val status = connection.responseCode
+                    LocalServerDiscovery.validateConnection(connection)
                     if (status in 300..399) {
                         check(hop < 3) { "配置下载重定向过多" }
                         val location = connection.getHeaderField("Location")
@@ -49,6 +49,9 @@ object VersionDownloader {
                         }
                         return@runCatching bytes.toString(Charsets.UTF_8.name())
                     }
+                } catch (error: java.io.IOException) {
+                    LocalServerDiscovery.invalidateConnection(connection)
+                    throw error
                 } finally {
                     connection.disconnect()
                 }

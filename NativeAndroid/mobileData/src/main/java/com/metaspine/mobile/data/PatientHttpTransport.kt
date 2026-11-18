@@ -48,6 +48,9 @@ internal class PatientHttpTransport(
             connection.readTimeout = readTimeoutMs
             connection.setRequestProperty("Accept", "application/json")
             if (directiveVersion) connection.setRequestProperty("X-SpineFlow-Directive-Version", "2")
+            if (path == PatientDirectiveClient.DIRECTIVE_PATH || path == PatientActivationClient.REDEEM_PATH) {
+                connection.setRequestProperty("X-SpineFlow-Prescription-Format", "builtin")
+            }
             token?.takeIf(String::isNotBlank)?.let {
                 connection.setRequestProperty("Authorization", "Bearer $it")
             }

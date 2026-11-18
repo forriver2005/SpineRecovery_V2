@@ -23,7 +23,7 @@ data class BoundPatientIdentity(
 data class ActivationRedeemResult(
     val patientId: String,
     val identity: BoundPatientIdentity,
-    val prescription: AdmissionPrescriptionItem
+    val prescription: AdmissionPrescriptionItem?
 )
 
 /**
@@ -92,6 +92,15 @@ object PatientActivationClient {
 
     internal fun parseRedeem(data: JSONObject): ActivationRedeemResult {
         val identity = data.getJSONObject("identity")
+        val boundIdentity = BoundPatientIdentity(
+            displayName = identity.getString("displayName"),
+            idCardMasked = identity.getString("idCardMasked"),
+            doctorUsername = data.optJSONObject("doctor")?.optString("username").orEmpty()
+        )
+        val patientId = data.getString("patientId")
+        if (data.has("prescription") && data.isNull("prescription") && data.optString("trainingState") == "unsupported_prescription") {
+            return ActivationRedeemResult(patientId, boundIdentity, null)
+        }
         val prescription = data.getJSONObject("prescription")
         val items = prescription.getJSONArray("items")
         if (prescription.optInt("prescriptionContractVersion") == 2) {
@@ -102,14 +111,9 @@ object PatientActivationClient {
         }
         // Existing binding UI shows the first item only. Execution fetches the entire current directive.
         val item = items.getJSONObject(0)
-        val doctorUsername = data.optJSONObject("doctor")?.optString("username").orEmpty()
         return ActivationRedeemResult(
-            patientId = data.getString("patientId"),
-            identity = BoundPatientIdentity(
-                displayName = identity.getString("displayName"),
-                idCardMasked = identity.getString("idCardMasked"),
-                doctorUsername = doctorUsername
-            ),
+            patientId = patientId,
+            identity = boundIdentity,
             prescription = AdmissionPrescriptionItem(
                 actionId = if (item.has("action")) item.getString("action") else item.getString("actionId"),
                 actionName = item.optString("actionName").ifBlank { item.optString("action") },

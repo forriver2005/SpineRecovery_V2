@@ -4,21 +4,21 @@ import org.json.JSONArray
 import org.json.JSONObject
 
 /** Each supported prescription has a shipped coach and game scene. */
-internal enum class BuiltInExercise(val key: String, val coach: String, val game: String, vararg val names: String) {
-    DEAD_BUG("dead_bug", "DeadBugPractice", "DeadBug_RingSkinC_Recorded", "死虫", "死虫式"),
-    BIRD_DOG("bird_dog", "BirdDogPractice", "BirdDog_RingSkinC_Recorded", "鸟狗", "鸟狗式"),
-    HIP_THRUST("hip_thrust", "HipThrustPractice", "HipThrust_RingBridge_NewScoring", "臀桥"),
-    SIDE_BRIDGE("side_bridge", "SideBridgePractice", "SideBridge_RingBridge_Dynamic", "侧桥");
+internal enum class BuiltInExercise(val key: String, val legacyNumber: String, val coach: String, val game: String, vararg val names: String) {
+    DEAD_BUG("dead_bug", "7", "DeadBugPractice", "DeadBug_RingSkinC_Recorded", "死虫", "死虫式"),
+    BIRD_DOG("bird_dog", "8", "BirdDogPractice", "BirdDog_RingSkinC_Recorded", "鸟狗", "鸟狗式"),
+    HIP_THRUST("hip_thrust", "4", "HipThrustPractice", "HipThrust_RingBridge_NewScoring", "臀桥"),
+    SIDE_BRIDGE("side_bridge", "5", "SideBridgePractice", "SideBridge_RingBridge_Dynamic", "侧桥");
 
     companion object {
         fun forKey(key: String) = entries.singleOrNull { it.key == key }
-        // Older servers used release-specific numbers. Only the exact exercise name identifies those.
+        // Older recordings reused numbers. Require the matching number and display name.
         fun forLegacy(id: String, name: String): BuiltInExercise? =
-            forKey(id) ?: if (id.matches(Regex("[1-9][0-9]{0,5}"))) entries.singleOrNull { name in it.names } else null
+            forKey(id) ?: entries.singleOrNull { it.legacyNumber == id && name in it.names }
     }
 }
 
-/** Preserved only for matching receipts and results created with the previous wire format. */
+/** Frozen release metadata for matching receipts and results; training uses only built-in scenes. */
 data class AdmissionPrescriptionAsset(
     val actionVersionId: Long,
     val variantKey: String,
@@ -58,7 +58,7 @@ data class AdmissionPrescriptionV2(
         val rows = JSONArray(items.map { item ->
             val a = item.asset
             if (a == null) JSONArray(listOf(item.itemId, item.position, item.action, item.sets, item.reps, item.holdSeconds))
-            else JSONArray(listOf(item.itemId, item.position, item.legacyId, a.actionVersionId, a.variantKey,
+            else JSONArray(listOf(item.itemId, item.position, item.legacyId ?: item.action, a.actionVersionId, a.variantKey,
                 a.formatVersion, a.runtimeContractVersion, a.doseProfile, JSONArray(a.supportedModes), a.fileSize,
                 a.sha256, item.sets, item.reps, item.holdSeconds))
         })
@@ -94,7 +94,7 @@ private fun parseItem(json: JSONObject, itemIdKey: String): AdmissionPrescriptio
     val id = if (legacy) json.getString("actionId") else null
     val name = json.optString("actionName")
     val key = if (id == null) json.getString("action") else BuiltInExercise.forLegacy(id, name)?.key ?: id
-    val asset = if (legacy) {
+    val asset = if (legacy || json.has("asset")) {
         val a = json.getJSONObject("asset")
         val modes = a.getJSONArray("supportedModes")
         AdmissionPrescriptionAsset(a.getLong("actionVersionId"), a.getString("variantKey"), a.getInt("formatVersion"),
@@ -109,9 +109,8 @@ private fun AdmissionPrescriptionItemV2.toJson(): JSONObject = JSONObject()
     .put("itemId", itemId).put("position", position).put("actionName", actionName)
     .put("sets", sets).put("reps", reps).put("holdSeconds", holdSeconds)
     .apply {
-        if (asset == null) put("action", action)
-        else {
-            put("actionId", legacyId)
+        if (legacyId == null) put("action", action) else put("actionId", legacyId)
+        if (asset != null) {
             put("asset", JSONObject().put("actionVersionId", asset.actionVersionId).put("variantKey", asset.variantKey)
                 .put("formatVersion", asset.formatVersion).put("runtimeContractVersion", asset.runtimeContractVersion)
                 .put("doseProfile", asset.doseProfile).put("supportedModes", JSONArray(asset.supportedModes))

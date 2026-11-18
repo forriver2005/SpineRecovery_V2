@@ -151,7 +151,7 @@ object PatientCredentials {
         context: Context,
         accountId: String,
         credential: PatientServerCredential,
-        prescription: AdmissionPrescriptionItem,
+        prescription: AdmissionPrescriptionItem?,
         identity: BoundPatientIdentity
     ): Boolean {
         val key = accountKey(accountId)
@@ -160,8 +160,9 @@ object PatientCredentials {
                 SecureLocalData.seal(KEY_PATIENT_ID_PREFIX + key, credential.patientId))
             .putString(KEY_TOKEN_PREFIX + key,
                 SecureLocalData.seal(KEY_TOKEN_PREFIX + key, credential.patientToken))
-            .putString(KEY_PRESCRIPTION_PREFIX + key,
-                SecureLocalData.seal(KEY_PRESCRIPTION_PREFIX + key, prescription.toJson().toString()))
+            .putString(KEY_PRESCRIPTION_PREFIX + key, prescription?.let {
+                SecureLocalData.seal(KEY_PRESCRIPTION_PREFIX + key, it.toJson().toString())
+            })
             .putString(KEY_IDENTITY_PREFIX + key,
                 SecureLocalData.seal(KEY_IDENTITY_PREFIX + key, identity.toJson().toString()))
             .remove(KEY_ACTIVATION_PENDING_PREFIX + key)

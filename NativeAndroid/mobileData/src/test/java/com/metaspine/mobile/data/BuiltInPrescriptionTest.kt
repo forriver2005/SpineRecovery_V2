@@ -26,6 +26,34 @@ class BuiltInPrescriptionTest {
         assertNull(BuiltInExercise.forKey("cat_camel"))
         assertEquals(BuiltInExercise.BIRD_DOG, BuiltInExercise.forLegacy("8", "鸟狗"))
         assertNull(BuiltInExercise.forLegacy("8", "臀部拉伸"))
+        assertNull(BuiltInExercise.forLegacy("5", "臀桥"))
+        assertNull(BuiltInExercise.forLegacy("9", "鸟狗"))
+    }
+
+    @Test fun unsupportedFirstPrescriptionStillBindsPatient() {
+        val response = JSONObject("""{"patientId":"pt_test","identity":{"displayName":"测试","idCardMasked":"***"},
+            "prescription":null,"trainingState":"unsupported_prescription"}""")
+        val binding = PatientActivationClient.parseRedeem(response)
+        assertEquals("pt_test", binding.patientId)
+        assertNull(binding.prescription)
+    }
+
+    @Test fun builtInDirectiveKeepsReceiptAndResultIdentityWithoutDownloadingAFile() {
+        val json = JSONObject(orderJson)
+        val digest = "ad0f5f9a8326e37ed9aee1d815b189d7bb0473473c283b241c4c51a96cc77a92"
+        json.put("resourceManifestSha256", digest)
+        json.getJSONArray("items").getJSONObject(0).put("asset", JSONObject("""
+            {"actionVersionId":3,"variantKey":"single","formatVersion":1,"runtimeContractVersion":1,
+             "doseProfile":"sequence-coach-game-v1","supportedModes":["coach","game"],"fileSize":42,
+             "sha256":"${"e".repeat(64)}"}
+        """))
+        val order = AdmissionPrescriptionV2.fromDirectiveJson(json)
+        assertEquals(digest, order.computeManifestSha256())
+        val frozen = order.toJson().getJSONArray("items").getJSONObject(0)
+        assertEquals("bird_dog", frozen.getString("action"))
+        assertFalse(frozen.has("actionId"))
+        assertFalse(frozen.getJSONObject("asset").has("downloadPath"))
+        assertEquals(order, AdmissionPrescriptionV2.fromJson(order.toJson()))
     }
 
     @Test fun compactResultKeepsItemIdentityWithoutAFileVersion() {

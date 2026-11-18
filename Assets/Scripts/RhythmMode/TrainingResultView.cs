@@ -54,6 +54,27 @@ public sealed class TrainingResultView : MonoBehaviour
         });
         string buttonText = prescribed ? (training.HasNextPrescriptionItem ? "下一项训练" : "完成训练") : "返回选择";
         var caption=Label(buttonText,new Vector2(0,-390),new Vector2(350,65),30);caption.raycastTarget=false;
+        if (prescribed && training.HasNextPrescriptionItem)
+        {
+            buttonRect.anchoredPosition += Vector2.left * 205;
+            caption.rectTransform.anchoredPosition = buttonRect.anchoredPosition;
+            var at = new Vector2(205,-390);
+            var rect = Box("Calibrate", root.transform, at, buttonRect.sizeDelta, button.targetGraphic.color);
+            var calibrate = rect.gameObject.AddComponent<Button>();
+            calibrate.targetGraphic = rect.GetComponent<Image>();
+            Label("校准并继续", at, rect.sizeDelta, 30);
+            var panel = root.AddComponent<BetweenActionCalibrationPanel>();
+            panel.Initialize(assessment.Entry.font, () =>
+            {
+                if (assessment.IsFinished && SpineFlowTrainingSession.CurrentPrescriptionGameCompleted)
+                    training.ContinuePrescription();
+            });
+            calibrate.onClick.AddListener(() =>
+            {
+                if (assessment.IsFinished && SpineFlowTrainingSession.CurrentPrescriptionGameCompleted)
+                    panel.Open();
+            });
+        }
         root.SetActive(false);
     }
     TMP_Text Metric(string label,Vector2 position)

@@ -15,7 +15,7 @@ public final class BetweenActionCalibration {
     private final VRServer server = VRServer.Companion.getInstance();
     private final Set<Tracker> participants = new HashSet<>();
     private volatile int phase = 1; // standing, skiing, complete, or -1 on failure
-    private volatile int remaining = 3;
+    private volatile int remaining = 0;
     private boolean pending, closed;
     private long lastSample, stableSince;
     private final double[] anchor = new double[3];
@@ -42,6 +42,7 @@ public final class BetweenActionCalibration {
     }
 
     private void sample() {
+        if (server.getPauseTracking()) { phase = -1; return; }
         Set<Tracker> assigned = new HashSet<>();
         for (Tracker t : server.getAllTrackers()) {
             if (t.isInternal() || !t.isImu() || t.getTrackerPosition() == null) continue;
@@ -66,7 +67,7 @@ public final class BetweenActionCalibration {
         long now = SystemClock.elapsedRealtime();
         if (!ready || now - lastSample > 600) stableSince = 0;
         lastSample = now;
-        if (!ready) { remaining = 3; return; }
+        if (!ready) { remaining = 0; return; }
         if (stableSince == 0 || Math.abs(angles[0]-anchor[0]) > 6 ||
             Math.abs(angles[1]-anchor[1]) > 6 || Math.abs(angles[2]-anchor[2]) > 6) {
             stableSince = now;
@@ -75,10 +76,20 @@ public final class BetweenActionCalibration {
         long elapsed = now - stableSince;
         remaining = (int)Math.max(0, 3 - elapsed / 1000);
         if (elapsed < 3000) return;
-        if (phase == 1) pose.resetTrackersFull("MetaSpine");
-        else pose.resetTrackersMounting("MetaSpine");
+        if (phase == 1) {
+            pose.resetTrackersFull("MetaSpine");
+        } else {
+            for (Tracker tracker : pose.getSkeleton().getTrackersToReset()) {
+                if (tracker != null && tracker.getNeedReset()) { phase = -1; return; }
+            }
+            pose.resetTrackersMounting("MetaSpine");
+            if (!server.getTrackingChecklistManager().getResetMountingCompleted()) {
+                phase = -1;
+                return;
+            }
+        }
         stableSince = 0;
-        remaining = 3;
+        remaining = 0;
         phase++;
     }
 

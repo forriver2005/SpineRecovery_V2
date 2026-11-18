@@ -111,8 +111,8 @@ object PatientActivationClient {
                 doctorUsername = doctorUsername
             ),
             prescription = AdmissionPrescriptionItem(
-                actionId = item.getString("actionId"),
-                actionName = item.getString("actionName"),
+                actionId = if (item.has("action")) item.getString("action") else item.getString("actionId"),
+                actionName = item.optString("actionName").ifBlank { item.optString("action") },
                 sets = item.getInt("sets"),
                 reps = item.getInt("reps"),
                 holdSeconds = item.getInt("holdSeconds")

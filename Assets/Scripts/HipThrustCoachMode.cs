@@ -22,13 +22,7 @@ public sealed class HipThrustCoachMode : MonoBehaviour
         }
 
         CoachMotionPackage package = SpineFlowTrainingSession.CachedMotionPackage;
-        string prescribedPath = SpineFlowTrainingSession.CurrentPrescriptionAssetPath;
-        if (!string.IsNullOrEmpty(prescribedPath))
-        {
-            var recorded = JsonUtility.FromJson<CoachMotionPackage>(System.IO.File.ReadAllText(prescribedPath));
-            package = recorded.segments.Length == 1 ? BuildPracticePackage(recorded) : recorded;
-        }
-        else if (package == null || !IsHipThrust(package.actionId) ||
+        if (package == null || !IsHipThrust(package.actionId) ||
             package.packageId != "clip_26_teaching")
         {
             TextAsset source = Resources.Load<TextAsset>(MotionResource);

@@ -92,7 +92,6 @@ public sealed class SpineFlowTrainingSession : MonoBehaviour
         public int reps;
         public string motionPackageUri;
         public int holdSeconds = -1;
-        public string prescriptionAssetPath;
         public long prescriptionItemId;
         public int prescriptionPosition;
     }
@@ -608,7 +607,6 @@ public sealed class SpineFlowTrainingSession : MonoBehaviour
                 arTaskType = action.arTaskType, level = action.level,
                 sets = action.sets, reps = action.reps, motionPackageUri = action.motionPackageUri,
                 holdSeconds = action.holdSeconds,
-                prescriptionAssetPath = action.prescriptionAssetPath,
                 prescriptionItemId = action.prescriptionItemId,
                 prescriptionPosition = action.prescriptionPosition
             });
@@ -638,9 +636,6 @@ public sealed class SpineFlowTrainingSession : MonoBehaviour
         return instance != null && instance.unifiedSession && instance.HasValidStartPayload()
             ? instance.BuildResultJson() : null;
     }
-
-    public static string CurrentPrescriptionAssetPath =>
-        instance?.FindPlannedAction("coach")?.prescriptionAssetPath;
 
     public static bool CurrentPrescriptionCoachCompleted => instance != null && instance.coachOutcomeSet &&
         instance.coachTimelineStatus == CoachTimelineStatus.Completed;

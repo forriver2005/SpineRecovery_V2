@@ -3,13 +3,22 @@ package com.metaspine.mobile.data
 import org.json.JSONArray
 import org.json.JSONObject
 
-/**
- * V2 处方的完整冻结模型（技术文档 §8）。
- *
- * A02 首方与 D01 下行处方映射到同一模型：首方 `items[].id` 映射为 [AdmissionPrescriptionItemV2.itemId]，
- * A02 不提供下载路径；该引用为空，直到 D01 下发当前授权路径。
- * 本模型只承载传输事实，不包含剂量改写或执行算法。
- */
+/** Each supported prescription has a shipped coach and game scene. */
+internal enum class BuiltInExercise(val key: String, val coach: String, val game: String, vararg val names: String) {
+    DEAD_BUG("dead_bug", "DeadBugPractice", "DeadBug_RingSkinC_Recorded", "死虫", "死虫式"),
+    BIRD_DOG("bird_dog", "BirdDogPractice", "BirdDog_RingSkinC_Recorded", "鸟狗", "鸟狗式"),
+    HIP_THRUST("hip_thrust", "HipThrustPractice", "HipThrust_RingBridge_NewScoring", "臀桥"),
+    SIDE_BRIDGE("side_bridge", "SideBridgePractice", "SideBridge_RingBridge_Dynamic", "侧桥");
+
+    companion object {
+        fun forKey(key: String) = entries.singleOrNull { it.key == key }
+        // Older servers used release-specific numbers. Only the exact exercise name identifies those.
+        fun forLegacy(id: String, name: String): BuiltInExercise? =
+            forKey(id) ?: if (id.matches(Regex("[1-9][0-9]{0,5}"))) entries.singleOrNull { name in it.names } else null
+    }
+}
+
+/** Preserved only for matching receipts and results created with the previous wire format. */
 data class AdmissionPrescriptionAsset(
     val actionVersionId: Long,
     val variantKey: String,
@@ -18,20 +27,19 @@ data class AdmissionPrescriptionAsset(
     val doseProfile: String,
     val supportedModes: List<String>,
     val fileSize: Long,
-    val sha256: String,
-    /** A02 首方为空；只有 D01 提供当前处方的固定下载路径。 */
-    val downloadPath: String
+    val sha256: String
 )
 
 data class AdmissionPrescriptionItemV2(
     val itemId: Long,
     val position: Int,
-    val actionId: String,
+    val action: String,
     val actionName: String,
     val sets: Int,
     val reps: Int,
     val holdSeconds: Int,
-    val asset: AdmissionPrescriptionAsset
+    val legacyId: String? = null,
+    val asset: AdmissionPrescriptionAsset? = null
 )
 
 data class AdmissionPrescriptionV2(
@@ -46,24 +54,13 @@ data class AdmissionPrescriptionV2(
         .put("resourceManifestSha256", resourceManifestSha256)
         .put("items", JSONArray(items.map { it.toJson() }))
 
-    /**
-     * 固定清单摘要（服务器 `lib/prescription-v2-contract.js` 的 `manifestBytes`）。
-     *
-     * 有序数组 `[2, orderId, [[itemId, position, actionId, actionVersionId, variantKey,
-     * formatVersion, runtimeContractVersion, doseProfile, supportedModes, fileSize, sha256,
-     * sets, reps, holdSeconds], ...]]` 的紧凑 JSON UTF-8 摘要。
-     *
-     * 不是整个 D01 响应 hash，也不是结果摘要；回执 `directive_saved`/`assets_ready` 必须用它。
-     */
     fun computeManifestSha256(): String {
         val rows = JSONArray(items.map { item ->
-            val asset = item.asset
-            JSONArray(listOf(
-                item.itemId, item.position, item.actionId, asset.actionVersionId, asset.variantKey,
-                asset.formatVersion, asset.runtimeContractVersion, asset.doseProfile,
-                JSONArray(asset.supportedModes), asset.fileSize, asset.sha256,
-                item.sets, item.reps, item.holdSeconds
-            ))
+            val a = item.asset
+            if (a == null) JSONArray(listOf(item.itemId, item.position, item.action, item.sets, item.reps, item.holdSeconds))
+            else JSONArray(listOf(item.itemId, item.position, item.legacyId, a.actionVersionId, a.variantKey,
+                a.formatVersion, a.runtimeContractVersion, a.doseProfile, JSONArray(a.supportedModes), a.fileSize,
+                a.sha256, item.sets, item.reps, item.holdSeconds))
         })
         val manifest = JSONArray(listOf(CONTRACT_VERSION, orderId, rows))
         return ResultDigest.sha256Hex(CanonicalJson.canonicalize(manifest))
@@ -74,90 +71,50 @@ data class AdmissionPrescriptionV2(
         const val MIN_ITEMS = 1
         const val MAX_ITEMS = 10
 
-        /**
-         * 解析 V2 处方。外层响应的 directiveVersion 由调用方单独校验；
-         * 此处只负责处方自身版本与条目完整性，任何缺项都直接失败，不截项、不补默认动作。
-         */
-        fun fromJson(json: JSONObject, itemIdKey: String = "itemId"): AdmissionPrescriptionV2 =
-            parse(json, itemIdKey, requireDownloadPath = true)
-
-        /** A02 使用 id，冻结资源身份完整，但不携带下载授权路径。 */
-        fun fromActivationJson(json: JSONObject): AdmissionPrescriptionV2 =
-            parse(json, itemIdKey = "id", requireDownloadPath = false)
-
-        /** D01 使用 itemId，必须携带固定资源的下载路径。 */
-        fun fromDirectiveJson(json: JSONObject): AdmissionPrescriptionV2 =
-            parse(json, itemIdKey = "itemId", requireDownloadPath = true)
-
-        private fun parse(
-            json: JSONObject,
-            itemIdKey: String,
-            requireDownloadPath: Boolean
-        ): AdmissionPrescriptionV2 {
-            val version = json.optInt("prescriptionContractVersion", -1)
-            require(version == CONTRACT_VERSION) { "处方合同版本不支持: $version（需要 2）" }
+        fun fromJson(json: JSONObject, itemIdKey: String = "itemId"): AdmissionPrescriptionV2 {
+            val version = json.getInt("prescriptionContractVersion")
+            require(version == CONTRACT_VERSION) { "处方版本不受支持" }
             val items = json.getJSONArray("items")
-            require(items.length() in MIN_ITEMS..MAX_ITEMS) { "处方动作数量异常: ${items.length()}" }
-            val parsed = (0 until items.length()).map { index ->
-                parseItem(items.getJSONObject(index), itemIdKey, requireDownloadPath)
-            }
-            require(parsed.map { it.position } == parsed.indices.toList()) { "处方条目顺序与 position 不一致" }
-            return AdmissionPrescriptionV2(
-                orderId = json.getLong("orderId"),
-                prescriptionContractVersion = version,
-                resourceManifestSha256 = json.getString("resourceManifestSha256"),
-                items = parsed
-            )
+            require(items.length() in MIN_ITEMS..MAX_ITEMS) { "处方动作数量异常" }
+            val parsed = (0 until items.length()).map { parseItem(items.getJSONObject(it), itemIdKey) }
+            require(parsed.map { it.position } == parsed.indices.toList() &&
+                parsed.all { it.itemId > 0 && it.sets in 1..20 && it.reps in 1..100 && it.holdSeconds in 0..600 } &&
+                parsed.distinctBy { it.itemId }.size == parsed.size &&
+                parsed.all { (it.asset == null) == (parsed.first().asset == null) }) { "处方条目或剂量异常" }
+            return AdmissionPrescriptionV2(json.getLong("orderId"), version, json.getString("resourceManifestSha256"), parsed)
         }
+
+        fun fromActivationJson(json: JSONObject) = fromJson(json, "id")
+        fun fromDirectiveJson(json: JSONObject) = fromJson(json)
     }
 }
 
-internal fun AdmissionPrescriptionItemV2.toJson(): JSONObject = JSONObject()
-    .put("itemId", itemId)
-    .put("position", position)
-    .put("actionId", actionId)
-    .put("actionName", actionName)
-    .put("sets", sets)
-    .put("reps", reps)
-    .put("holdSeconds", holdSeconds)
-    .put("asset", asset.toJson())
-
-private fun parseItem(
-    json: JSONObject,
-    itemIdKey: String,
-    requireDownloadPath: Boolean
-): AdmissionPrescriptionItemV2 {
-    val asset = json.getJSONObject("asset")
-    val modes = asset.getJSONArray("supportedModes")
-    return AdmissionPrescriptionItemV2(
-        itemId = json.getLong(itemIdKey),
-        position = json.getInt("position"),
-        actionId = json.getString("actionId"),
-        actionName = json.getString("actionName"),
-        sets = json.getInt("sets"),
-        reps = json.getInt("reps"),
-        holdSeconds = json.getInt("holdSeconds"),
-        asset = AdmissionPrescriptionAsset(
-            actionVersionId = asset.getLong("actionVersionId"),
-            variantKey = asset.getString("variantKey"),
-            formatVersion = asset.getInt("formatVersion"),
-            runtimeContractVersion = asset.getInt("runtimeContractVersion"),
-            doseProfile = asset.getString("doseProfile"),
-            supportedModes = (0 until modes.length()).map { modes.getString(it) },
-            fileSize = asset.getLong("fileSize"),
-            sha256 = asset.getString("sha256"),
-            downloadPath = if (requireDownloadPath) asset.getString("downloadPath") else ""
-        )
-    )
+private fun parseItem(json: JSONObject, itemIdKey: String): AdmissionPrescriptionItemV2 {
+    val legacy = !json.has("action")
+    val id = if (legacy) json.getString("actionId") else null
+    val name = json.optString("actionName")
+    val key = if (id == null) json.getString("action") else BuiltInExercise.forLegacy(id, name)?.key ?: id
+    val asset = if (legacy) {
+        val a = json.getJSONObject("asset")
+        val modes = a.getJSONArray("supportedModes")
+        AdmissionPrescriptionAsset(a.getLong("actionVersionId"), a.getString("variantKey"), a.getInt("formatVersion"),
+            a.getInt("runtimeContractVersion"), a.getString("doseProfile"), (0 until modes.length()).map { modes.getString(it) },
+            a.getLong("fileSize"), a.getString("sha256"))
+    } else null
+    return AdmissionPrescriptionItemV2(json.getLong(itemIdKey), json.getInt("position"), key, name.ifBlank { key },
+        json.getInt("sets"), json.getInt("reps"), json.getInt("holdSeconds"), id, asset)
 }
 
-internal fun AdmissionPrescriptionAsset.toJson(): JSONObject = JSONObject()
-    .put("actionVersionId", actionVersionId)
-    .put("variantKey", variantKey)
-    .put("formatVersion", formatVersion)
-    .put("runtimeContractVersion", runtimeContractVersion)
-    .put("doseProfile", doseProfile)
-    .put("supportedModes", JSONArray(supportedModes))
-    .put("fileSize", fileSize)
-    .put("sha256", sha256)
-    .put("downloadPath", downloadPath)
+private fun AdmissionPrescriptionItemV2.toJson(): JSONObject = JSONObject()
+    .put("itemId", itemId).put("position", position).put("actionName", actionName)
+    .put("sets", sets).put("reps", reps).put("holdSeconds", holdSeconds)
+    .apply {
+        if (asset == null) put("action", action)
+        else {
+            put("actionId", legacyId)
+            put("asset", JSONObject().put("actionVersionId", asset.actionVersionId).put("variantKey", asset.variantKey)
+                .put("formatVersion", asset.formatVersion).put("runtimeContractVersion", asset.runtimeContractVersion)
+                .put("doseProfile", asset.doseProfile).put("supportedModes", JSONArray(asset.supportedModes))
+                .put("fileSize", asset.fileSize).put("sha256", asset.sha256))
+        }
+    }

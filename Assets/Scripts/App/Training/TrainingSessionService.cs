@@ -123,7 +123,6 @@ namespace SpineRecovery.App
                     coach.sets < 1 || coach.sets > 20 || coach.reps < 1 || coach.reps > 100 ||
                     coach.holdSeconds < 0 || coach.holdSeconds > 600 ||
                     coach.sets != game.sets || coach.reps != game.reps || coach.holdSeconds != game.holdSeconds ||
-                    !File.Exists(coach.prescriptionAssetPath) ||
                     !Application.CanStreamedLevelBeLoaded(coach.sceneName) ||
                     !Application.CanStreamedLevelBeLoaded(game.sceneName)) return false;
             }

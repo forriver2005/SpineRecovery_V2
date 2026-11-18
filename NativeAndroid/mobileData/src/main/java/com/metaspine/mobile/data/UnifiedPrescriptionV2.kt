@@ -1,13 +1,9 @@
 package com.metaspine.mobile.data
 
 import android.content.Context
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
 import org.json.JSONArray
 import org.json.JSONObject
 import java.io.File
-import java.net.HttpURLConnection
-import java.security.MessageDigest
 
 internal object UnifiedPrescriptionV2 {
     suspend fun prepare(
@@ -48,40 +44,12 @@ internal object UnifiedPrescriptionV2 {
 
         val actions = JSONArray()
         for (item in order.items) {
-            val (coach, game) = when (item.actionId) {
-                "dead_bug" -> "DeadBugPractice" to "DeadBug_RingSkinC_Recorded"
-                "bird_dog" -> "BirdDogPractice" to "BirdDog_RingSkinC_Recorded"
-                "hip_thrust" -> "HipThrustPractice" to "HipThrust_RingBridge_NewScoring"
-                "side_bridge" -> "SideBridgePractice" to "SideBridge_RingBridge_Dynamic"
-                else -> error("处方动作暂未接入训练场景：${item.actionName}")
+            val exercise = requireNotNull(BuiltInExercise.forKey(item.action)) {
+                "处方动作暂未接入训练场景：${item.actionName}"
             }
-            require(item.itemId > 0 && item.sets in 1..20 && item.reps in 1..100 && item.holdSeconds in 0..600)
-            require(item.asset.variantKey == "single" && item.asset.formatVersion == 1 &&
-                item.asset.runtimeContractVersion == 1 && item.asset.doseProfile == "sequence-coach-game-v1" &&
-                item.asset.supportedModes == listOf("coach", "game")) { "处方动作资源格式不受支持" }
-            val file = download(folder, origin, credential.patientToken, order.orderId, item)
-            val motion = JSONObject(file.readText())
-            val segments = motion.getJSONArray("segments")
-            require(motion.optInt("formatVersion") == 1 && segments.length() > 0) { "处方动作资源无法播放" }
-            for (index in 0 until segments.length()) {
-                val frames = segments.getJSONObject(index).getJSONArray("frames")
-                require(frames.length() > 0) { "处方动作资源缺少姿态帧" }
-                if (segments.length() == 1) {
-                    val (start, end) = when (item.actionId) {
-                        "dead_bug" -> 6.5 to 21.5
-                        "bird_dog" -> 12.0 to 26.5
-                        "hip_thrust" -> 22.0 to 40.0
-                        else -> 14.0 to 26.0
-                    }
-                    require(frames.getJSONObject(0).getDouble("time") <= start &&
-                        frames.getJSONObject(frames.length() - 1).getDouble("time") >= end) {
-                        "处方录制素材缺少完整动作"
-                    }
-                }
-            }
-            for ((mode, scene) in listOf("coach" to coach, "game" to game)) {
+            for ((mode, scene) in listOf("coach" to exercise.coach, "game" to exercise.game)) {
                 actions.put(JSONObject()
-                    .put("actionId", "${item.actionId}_$mode")
+                    .put("actionId", "${exercise.key}_$mode")
                     .put("actionName", item.actionName)
                     .put("arTaskType", "${mode}_training")
                     .put("level", "standard")
@@ -90,8 +58,7 @@ internal object UnifiedPrescriptionV2 {
                     .put("holdSeconds", item.holdSeconds)
                     .put("prescriptionItemId", item.itemId)
                     .put("prescriptionPosition", item.position)
-                    .put("sceneName", scene)
-                    .put("prescriptionAssetPath", file.absolutePath))
+                    .put("sceneName", scene))
             }
         }
         check(SpineFlowServerConfig.BASE_URL == origin &&
@@ -101,57 +68,12 @@ internal object UnifiedPrescriptionV2 {
             .put("accountId", account)
             .put("patientId", credential.patientId)
             .put("gender", profile.gender.wireValue)
-            .put("actionId", order.items.first().actionId)
+            .put("actionId", order.items.first().action)
             .put("prescriptionOrderId", order.orderId)
             .put("prescriptionContractVersion", 2)
             .put("prescriptionJson", order.toJson().toString())
             .put("preTrainingEventId", preEvent)
             .put("actions", actions)
-    }
-
-    private suspend fun download(
-        folder: File, origin: String, token: String, orderId: Long, item: AdmissionPrescriptionItemV2
-    ): File = withContext(Dispatchers.IO) {
-        val asset = item.asset
-        require(asset.sha256.matches(Regex("[a-f0-9]{64}")) && asset.fileSize in 1..16L * 1024 * 1024)
-        require(asset.downloadPath == "/api/patient/training-directive/orders/$orderId/items/${item.itemId}/asset")
-        val file = File(folder, "${asset.sha256}.json")
-        if (file.isFile && file.length() == asset.fileSize &&
-            MessageDigest.isEqual(MessageDigest.getInstance("SHA-256").digest(file.readBytes()),
-                asset.sha256.chunked(2).map { it.toInt(16).toByte() }.toByteArray())) return@withContext file
-
-        val connection = PatientHttpTransport.resolveUrl(origin, asset.downloadPath).openConnection() as HttpURLConnection
-        val temp = File.createTempFile("asset-", ".part", folder)
-        try {
-            connection.instanceFollowRedirects = false
-            connection.connectTimeout = 10000
-            connection.readTimeout = 30000
-            connection.setRequestProperty("Authorization", "Bearer $token")
-            check(connection.responseCode == 200) { "处方动作资源下载失败" }
-            val digest = MessageDigest.getInstance("SHA-256")
-            var total = 0L
-            connection.inputStream.use { input ->
-                temp.outputStream().use { output ->
-                    val buffer = ByteArray(8192)
-                    while (true) {
-                        val count = input.read(buffer)
-                        if (count < 0) break
-                        total += count
-                        check(total <= asset.fileSize) { "处方动作资源大小不符" }
-                        digest.update(buffer, 0, count)
-                        output.write(buffer, 0, count)
-                    }
-                }
-            }
-            check(total == asset.fileSize && digest.digest().joinToString("") { "%02x".format(it) } == asset.sha256) {
-                "处方动作资源校验失败"
-            }
-            android.system.Os.rename(temp.absolutePath, file.absolutePath)
-            file
-        } finally {
-            connection.disconnect()
-            temp.delete()
-        }
     }
 
     fun result(record: TrainingHistoryRecord, session: JSONObject): JSONObject? {
@@ -185,8 +107,8 @@ internal object UnifiedPrescriptionV2 {
                 modes.all { it.status == ResultSessionStatus.NOT_STARTED } -> ResultSessionStatus.NOT_STARTED
                 else -> ResultSessionStatus.INTERRUPTED
             }
-            ResultItem(item.itemId, item.position, item.actionId, item.asset.actionVersionId, item.asset.variantKey,
-                item.asset.sha256, status, modes)
+            ResultItem(item.itemId, item.position, item.legacyId ?: item.action, item.asset?.actionVersionId,
+                item.asset?.variantKey, item.asset?.sha256, status, modes)
         }
         val completed = items.all { it.status == ResultSessionStatus.COMPLETED }
         val result = PrescriptionResultV2(record.sessionId, record.sessionId, session.getString("userId"),

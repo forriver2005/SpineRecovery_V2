@@ -14,7 +14,6 @@ namespace SpineRecovery.App
         public string sceneName;
         public string motionPackageUri;
         public int holdSeconds = -1;
-        public string prescriptionAssetPath;
         public long prescriptionItemId;
         public int prescriptionPosition;
     }

@@ -66,9 +66,9 @@ data class ResultItem(
     val itemId: Long,
     val position: Int,
     val actionId: String,
-    val actionVersionId: Long,
-    val variantKey: String,
-    val sha256: String,
+    val actionVersionId: Long?,
+    val variantKey: String?,
+    val sha256: String?,
     val status: ResultSessionStatus,
     val modeResults: List<ResultModeResult>
 ) {
@@ -128,10 +128,15 @@ data class PrescriptionResultV2(
             JSONObject()
                 .put("itemId", item.itemId)
                 .put("position", item.position)
-                .put("actionId", item.actionId)
-                .put("actionVersionId", item.actionVersionId)
-                .put("variantKey", item.variantKey)
-                .put("sha256", item.sha256)
+                .apply {
+                    if (item.actionVersionId == null) put("action", item.actionId)
+                    else {
+                        put("actionId", item.actionId)
+                        put("actionVersionId", item.actionVersionId)
+                        put("variantKey", item.variantKey)
+                        put("sha256", item.sha256)
+                    }
+                }
                 .put("status", item.status.wireValue)
                 .put("modeResults", JSONArray(item.modeResults.map { mode ->
                     JSONObject()
@@ -185,6 +190,7 @@ data class PrescriptionResultV2(
             "itemId", "position", "actionId", "actionVersionId", "variantKey",
             "sha256", "status", "modeResults"
         )
+        private val BUILTIN_ITEM_KEYS = setOf("itemId", "position", "action", "status", "modeResults")
         private val MODE_KEYS = setOf(
             "mode", "status", "completedReps", "durationSeconds", "score", "source"
         )
@@ -292,21 +298,22 @@ data class PrescriptionResultV2(
             return (0 until array.length()).map { index ->
                 val item = array.optJSONObject(index)
                     ?: throw invalid("第 ${index + 1} 个训练条目格式不合法")
-                rejectUnknownKeys(item, ITEM_KEYS, "训练条目")
+                val builtIn = item.has("action")
+                rejectUnknownKeys(item, if (builtIn) BUILTIN_ITEM_KEYS else ITEM_KEYS, "训练条目")
                 if (integer(item.opt("position"), 0, (MAX_ITEMS - 1).toLong()) != index.toLong()) {
                     throw invalid("训练条目顺序与处方不一致: 第 ${index + 1} 项")
                 }
-                if (item.opt("variantKey") != "single") {
+                if (!builtIn && item.opt("variantKey") != "single") {
                     throw invalid("训练条目变体不受支持")
                 }
                 val itemId = integer(item.opt("itemId"), 1, Long.MAX_VALUE)
                     ?: throw invalid("训练条目编号不合法")
-                val actionId = (item.opt("actionId") as? String)
-                    ?.takeIf { it.isNotBlank() && it.length <= 128 }
+                val actionId = (item.opt(if (builtIn) "action" else "actionId") as? String)
+                    ?.takeIf { if (builtIn) BuiltInExercise.forKey(it) != null else it.isNotBlank() && it.length <= 128 }
                     ?: throw invalid("训练条目动作标识不合法")
-                val actionVersionId = integer(item.opt("actionVersionId"), 1, Long.MAX_VALUE)
+                val actionVersionId = if (builtIn) null else integer(item.opt("actionVersionId"), 1, Long.MAX_VALUE)
                     ?: throw invalid("训练条目动作版本不合法")
-                val sha256 = (item.opt("sha256") as? String)
+                val sha256 = if (builtIn) null else (item.opt("sha256") as? String)
                     ?.takeIf(SHA256::matches)
                     ?: throw invalid("训练条目资源摘要不合法")
 
@@ -334,7 +341,7 @@ data class PrescriptionResultV2(
                     position = index,
                     actionId = actionId,
                     actionVersionId = actionVersionId,
-                    variantKey = "single",
+                    variantKey = if (builtIn) null else "single",
                     sha256 = sha256,
                     status = itemStatus,
                     modeResults = modes

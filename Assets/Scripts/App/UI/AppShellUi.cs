@@ -19,6 +19,8 @@ namespace SpineRecovery.App
         private int sessionIdentityGeneration;
         private Text routineMessage;
         private bool auxiliaryPageOpen;
+        private string auxiliarySceneName;
+        private bool auxiliaryReturnInProgress;
         private AppRoute auxiliaryReturnRoute;
         private RectTransform safeContent;
         private Rect lastSafeArea;
@@ -178,14 +180,48 @@ namespace SpineRecovery.App
         private void HandleSceneLoaded(Scene scene, LoadSceneMode mode)
         {
             if (mode == LoadSceneMode.Additive) return;
-            if (scene.name != "AppShell") { HideAppShell(); return; }
+            if (scene.name != "AppShell")
+            {
+                // Starting a practice from the library is no longer auxiliary browsing.
+                if (scene.name != auxiliarySceneName) ClearAuxiliaryNavigation();
+                HideAppShell();
+                return;
+            }
             ShowAppShell();
             AppRoute route = bootstrap.State.Session == null ? AppRoute.Login :
                 auxiliaryPageOpen ? auxiliaryReturnRoute : AppRoute.Home;
             bool auxiliary = auxiliaryPageOpen;
-            auxiliaryPageOpen = false;
+            ClearAuxiliaryNavigation();
             bootstrap.Router.Navigate(route);
             if (!auxiliary) bootstrap.Training.RestoreForCurrentUser();
+        }
+
+        internal bool IsBrowsingAuxiliaryScene => auxiliaryPageOpen &&
+            SceneManager.GetActiveScene().name == auxiliarySceneName;
+
+        internal bool TryReturnFromAuxiliaryPage()
+        {
+            if (!IsBrowsingAuxiliaryScene) return false;
+            if (auxiliaryReturnInProgress) return true;
+            auxiliaryReturnInProgress = true;
+            try
+            {
+                ScreenOrientationService.SetPortrait();
+                SceneManager.LoadScene("AppShell", LoadSceneMode.Single);
+                return true;
+            }
+            catch
+            {
+                auxiliaryReturnInProgress = false;
+                throw;
+            }
+        }
+
+        private void ClearAuxiliaryNavigation()
+        {
+            auxiliaryPageOpen = false;
+            auxiliarySceneName = null;
+            auxiliaryReturnInProgress = false;
         }
 
         private void Update()
@@ -537,12 +573,14 @@ namespace SpineRecovery.App
 
         private void OpenActionLibrary()
         {
-            if (!Application.CanStreamedLevelBeLoaded("CoachingChoose")) return;
+            if (!Application.CanStreamedLevelBeLoaded("ActionLibrary")) return;
             auxiliaryReturnRoute = bootstrap.State.Route;
             auxiliaryPageOpen = true;
+            auxiliarySceneName = "ActionLibrary";
+            auxiliaryReturnInProgress = false;
             HideAppShell();
             ScreenOrientationService.SetLandscape();
-            SceneManager.LoadScene("CoachingChoose", LoadSceneMode.Single);
+            SceneManager.LoadScene("ActionLibrary", LoadSceneMode.Single);
         }
 
         [System.Serializable] private sealed class ImportedReplayList { public string[] items; }
@@ -564,6 +602,8 @@ namespace SpineRecovery.App
             ReplaySessionContext.SetCommitted(replayId);
             auxiliaryReturnRoute = AppRoute.History;
             auxiliaryPageOpen = true;
+            auxiliarySceneName = "PlayBack";
+            auxiliaryReturnInProgress = false;
             HideAppShell();
             ScreenOrientationService.SetLandscape();
             SceneManager.LoadScene("PlayBack", LoadSceneMode.Single);

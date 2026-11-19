@@ -2323,7 +2323,9 @@ namespace SpineRecovery.App
                 // source PNG is now imported at 2x). Keep live glyphs at the
                 // same visual size as the artwork instead of the old 30px
                 // value, which rendered typed text oversized and soft.
-                input.textComponent.fontSize = 18;
+                input.textComponent.font = AppBootstrap.Instance != null && AppBootstrap.Instance.uiFont != null
+                    ? AppBootstrap.Instance.uiFont : Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+                input.textComponent.fontSize = 17;
                 input.textComponent.alignByGeometry = false;
                 input.textComponent.horizontalOverflow = HorizontalWrapMode.Overflow;
                 input.textComponent.verticalOverflow = VerticalWrapMode.Truncate;
@@ -2468,8 +2470,12 @@ namespace SpineRecovery.App
             textRect.offsetMin = new Vector2(48f, 4f);
             textRect.offsetMax = new Vector2(-16f, -4f);
             Text text = textObject.GetComponent<Text>();
-            text.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
-            text.fontSize = 18;
+            // Use the same imported UI font as the authored phone screens.
+            // LegacyRuntime.ttf is a bitmap-style fallback and becomes soft
+            // after the portrait design root is scaled on Android.
+            text.font = AppBootstrap.Instance != null && AppBootstrap.Instance.uiFont != null
+                ? AppBootstrap.Instance.uiFont : Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+            text.fontSize = 17;
             text.color = Color.black;
             text.alignment = TextAnchor.MiddleLeft;
             text.alignByGeometry = false;
@@ -2512,7 +2518,10 @@ namespace SpineRecovery.App
             maskRect.anchorMax = new Vector2(0.5f, 0.5f);
             maskRect.pivot = new Vector2(0.5f, 0.5f);
             maskRect.anchoredPosition = new Vector2(-2.5f, 0f);
-            maskRect.sizeDelta = new Vector2(235f, 40f);
+            // Keep the mask inside the field so it never paints over the
+            // rounded border. The previous height reached the authored ring
+            // and made focus look like a blue/white filled strip.
+            maskRect.sizeDelta = new Vector2(235f, 34f);
             Image valueMask = valueMaskObject.GetComponent<Image>();
             valueMask.color = Color.white;
             valueMask.raycastTarget = false;
@@ -2702,7 +2711,7 @@ namespace SpineRecovery.App
                 border.SetBorderColor(focused
                     ? new Color(0.08f, 0.32f, 0.72f, 1f)
                     : new Color(1f, 1f, 1f, 0f));
-                border.borderThickness = focused ? 5.5f : 0f;
+                border.borderThickness = focused ? 3.2f : 0f;
             }
             if (placeholderMask != null)
                 placeholderMask.enabled = focused || (input != null && !string.IsNullOrEmpty(input.text));

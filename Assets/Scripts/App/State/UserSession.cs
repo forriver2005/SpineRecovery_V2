@@ -51,6 +51,7 @@ namespace SpineRecovery.App
         public bool preTrainingCheckPassed;
         public string preTrainingRecordedAt;
         public string preTrainingEventId;
+        public string trackingCalibratedAt;
         public int flexionPainLevel;
         public int extensionPainLevel;
         public string flexionResponse;

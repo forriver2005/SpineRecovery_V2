@@ -16,6 +16,8 @@ namespace SpineRecovery.App
         private bool nativeBusy;
         private string previewActivationCode;
         private int loginGeneration;
+        private int sessionIdentityGeneration;
+        private Text routineMessage;
         private bool auxiliaryPageOpen;
         private AppRoute auxiliaryReturnRoute;
         private RectTransform safeContent;
@@ -25,14 +27,14 @@ namespace SpineRecovery.App
         private Text trackingMessage;
         private Text adminMessage;
         private Text historyMessage;
-        private Text postTrainingMessage;
         private Text activationMessage;
-        private Text routineMessage;
-        private Text routinePainLabel;
         private Text arTrainingMessage;
         private Text trainingMenuMessage;
         private EventSystem appEventSystem;
         private Button trackingCompleteButton;
+        private Text trackingStatusTitle;
+        private Text trainingDisplayStatus;
+        private Text trainingTrackerStatus;
         private InputField accountInput;
         private InputField passwordInput;
         private InputField registerAccountInput;
@@ -40,14 +42,14 @@ namespace SpineRecovery.App
         private InputField registerConfirmInput;
         private InputField activationCodeInput;
         private InputField[] profileInputs;
+        private AppRoute profileContinueRoute = AppRoute.Home;
+        private AppRoute trackingReturnRoute = AppRoute.Home;
         private Text flowMessage;
         private Text painScoreLabel;
         private Text surveySelectionLabel;
         private Text selectedPainPartLabel;
-        private Text preTrainingPainLabel;
         private Button[] situationButtons;
         private Button[] symptomButtons;
-        private Button[] preTrainingSymptomButtons;
         private Button[] genderButtons;
         private Button[] painPartButtons;
         private Button noPainButton;
@@ -55,9 +57,6 @@ namespace SpineRecovery.App
         private Button[] extensionResponseButtons;
         private Button[] flexionPhaseButtons;
         private Button[] extensionPhaseButtons;
-        private Button[] postTrainingFeelingButtons;
-        private Button[] postTrainingDifficultyButtons;
-        private Button[] routineSymptomButtons;
         private readonly Dictionary<AppRoute, Text> flowMessages = new Dictionary<AppRoute, Text>();
         private int selectedPain = 3;
         private int flexionAdmissionPain;
@@ -69,7 +68,6 @@ namespace SpineRecovery.App
         private string selectedGender = "";
         private string selectedSituation = "";
         private string selectedSymptom = "";
-        private string selectedPreTrainingSymptom = "";
         private string selectedPainPart = "";
         private string flexionResponse;
         private string extensionResponse;
@@ -77,11 +75,18 @@ namespace SpineRecovery.App
         private string extensionPainPhase;
         private readonly List<string> selectedPainParts = new List<string>();
         private readonly Dictionary<string, int> painLevelsByPart = new Dictionary<string, int>();
-        private string postTrainingFeeling = "";
-        private string postTrainingDifficulty = "";
-        private int routinePain;
-        private string routineSymptom = "";
-
+        private PreTrainingScreen preTrainingScreen;
+        private NoticeScreen preTrainingBlockedScreen;
+        private PostActionScreen postActionScreen;
+        private NoticeScreen postTrainingStopScreen;
+        // Set when a training button sent the user to the pre-training check,
+        // so passing the check can carry on into that training session.
+        private string pendingTrainingScene = "";
+        private string pendingTrainingActionId = "";
+        private string[] lastPreTrainingParts = System.Array.Empty<string>();
+        private int postActionNumber = 1;
+        private int postActionCount = 1;
+        private HomeScreen homeScreen;
         private void Start()
         {
             AppBootstrap sceneBootstrap = GetComponent<AppBootstrap>();
@@ -113,16 +118,23 @@ namespace SpineRecovery.App
             GameObject arTrainingPanel = CreateArTrainingPanel(safeContent);
             GameObject trainingMenuPanel = CreateTrainingMenuPanel(safeContent);
             GameObject trackingPanel = CreateTrackingCalibrationPanel(safeContent);
-            GameObject profilePanel = CreateFormPanel(safeContent, "资料登记", "请填写基本资料（年龄 10–100，身高 120–220 cm，体重 35–200 kg）", CreateProfileForm);
+            GameObject profilePanel = CreateProfilePanel(safeContent);
             GameObject surveyPanel = CreateFormPanel(safeContent, "基础问卷", "选择最符合当前情况的一项；如出现危险症状请暂停并联系专业人员。", CreateSurveyForm);
             GameObject painPanel = CreateFormPanel(safeContent, "疼痛记录", "选择疼痛部位并记录 1–10 分；没有疼痛可选择“无疼痛”。", CreatePainForm);
             GameObject admissionPanel = CreateFormPanel(safeContent, "首次动作评估", "仅记录体验，不用于诊断。若疼痛明显加重或达到 8/10，请停止并寻求专业评估。", CreateAdmissionForm);
             GameObject reviewPanel = CreateFormPanel(safeContent, "需要专业评估", "根据当前记录，系统暂停自助训练。请联系医疗专业人员；该结果不是诊断。", CreateReviewForm);
-            GameObject preTrainingPanel = CreateFormPanel(safeContent, "训练前检查", "每次训练前记录当前疼痛和症状变化。", CreatePreTrainingForm);
+            preTrainingScreen = new PreTrainingScreen();
+            GameObject preTrainingPanel = preTrainingScreen.Build(safeContent, HandlePreTrainingBack,
+                HandlePreTrainingSubmitted,
+                () => string.IsNullOrEmpty(pendingTrainingScene) ? "确认并返回首页" : "开始训练");
+            GameObject preTrainingBlockedPanel = CreatePreTrainingBlockedPanel(safeContent);
             GameObject adminPanel = CreateAdminPanel(safeContent);
             GameObject historyPanel = CreateHistoryPanel(safeContent);
-            GameObject postTrainingPanel = CreatePostTrainingPanel(safeContent);
-            GameObject routinePanel = CreateRoutineQuestionnairePanel(safeContent);
+            postActionScreen = new PostActionScreen();
+            GameObject postTrainingPanel = postActionScreen.Build(safeContent, HandlePostActionBack,
+                HandlePostActionSubmitted);
+            GameObject postTrainingStopPanel = CreatePostTrainingStopPanel(safeContent);
+            GameObject routinePanel = CreateServerRoutinePanel(safeContent);
 
             bootstrap.Router.Initialize(bootstrap.State);
             bootstrap.Router.RegisterPanel(AppRoute.Login, loginPanel);
@@ -138,9 +150,11 @@ namespace SpineRecovery.App
             bootstrap.Router.RegisterPanel(AppRoute.MobileAdmission, admissionPanel);
             bootstrap.Router.RegisterPanel(AppRoute.AdmissionDecision, reviewPanel);
             bootstrap.Router.RegisterPanel(AppRoute.PreTraining, preTrainingPanel);
+            bootstrap.Router.RegisterPanel(AppRoute.PreTrainingBlocked, preTrainingBlockedPanel);
             bootstrap.Router.RegisterPanel(AppRoute.Admin, adminPanel);
             bootstrap.Router.RegisterPanel(AppRoute.History, historyPanel);
             bootstrap.Router.RegisterPanel(AppRoute.PostTrainingSurvey, postTrainingPanel);
+            bootstrap.Router.RegisterPanel(AppRoute.PostTrainingStop, postTrainingStopPanel);
             bootstrap.Router.RegisterPanel(AppRoute.RoutineQuestionnaire, routinePanel);
         }
 
@@ -198,8 +212,10 @@ namespace SpineRecovery.App
 
         private void HandleSessionChanged(UserSession session)
         {
+            sessionIdentityGeneration++;
             if (session == null)
             {
+                nativeBusy = false;
                 loginGeneration++;
                 NativeMobileService.Call("logout");
             }
@@ -213,100 +229,154 @@ namespace SpineRecovery.App
 
         private void RefreshHomeSummary()
         {
-            if (bootstrap == null || bootstrap.State == null || bootstrap.State.Session == null || homeMessage == null)
-                return;
-
-            UserSession session = bootstrap.State.Session;
-            string identity = "当前用户：" + session.accountId + (session.IsReturningUser ? "（回访用户）" : "（新用户）");
-            if (session.IsAdministrator)
-            {
-                homeMessage.text = identity;
-                return;
-            }
-
-            AdminTrainingConfiguration config = bootstrap.AdminConfigs?.CurrentPublished();
-            AdminActionDefinition[] recommended = config?.RecommendedActions(session.userTags);
-            string tagText = session.userTags == null || session.userTags.Length == 0
-                ? "暂无用户标签"
-                : "用户标签：" + string.Join("、", session.userTags);
-            string recommendation = recommended == null || recommended.Length == 0
-                ? "当前暂无匹配的推荐动作"
-                : "推荐动作：" + string.Join("、", recommended.Select(action => action.displayName));
-            string routineReminder = NativeMobileService.Available
-                ? "\n例行问卷可在线刷新医生安排"
-                : "";
-            homeMessage.text = identity + "\n" + tagText + "\n" + (NativeMobileService.Available ? "开始训练时获取本次医生处方" : recommendation) + routineReminder;
+            if (homeScreen != null) homeScreen.Refresh();
         }
 
-        private static bool RoutineQuestionnaireDue(UserSession session)
-        {
-            if (session == null || string.IsNullOrWhiteSpace(session.routineQuestionnaireCompletedAt)) return true;
-            if (!System.DateTimeOffset.TryParse(session.routineQuestionnaireCompletedAt, out System.DateTimeOffset completedAt)) return true;
-            return System.DateTimeOffset.UtcNow - completedAt >= System.TimeSpan.FromHours(24);
-        }
 
         private GameObject CreateLoginPanel(Transform parent)
         {
             GameObject panel = CreatePanel("LoginPanel", parent, new Color(0.973f, 0.980f, 1f));
-            CreateLabel(panel.transform, "Spine Recovery", new Vector2(0, 230), 30);
-            CreateLabel(panel.transform, "脊柱康复训练", new Vector2(0, 170), 16);
-            CreateLabel(panel.transform, "使用您的患者账号登录，训练记录按账号保存。", new Vector2(0, 110), 14);
-            accountInput = CreateInput(panel.transform, "账号", new Vector2(0, 30), false);
-            passwordInput = CreateInput(panel.transform, "密码", new Vector2(0, -45), true);
-            CreateButton(panel.transform, "登录", new Vector2(0, -130), HandleLoginClicked);
-            CreateButton(panel.transform, "注册新账号", new Vector2(0, -200), () => bootstrap.Router.Navigate(AppRoute.Register));
-            loginMessage = CreateLabel(panel.transform, "", new Vector2(0, -265), 14);
+            GameObject designRoot = new GameObject("LoginDesign390x884", typeof(RectTransform));
+            designRoot.transform.SetParent(panel.transform, false);
+            RectTransform designRect = designRoot.GetComponent<RectTransform>();
+            designRect.anchorMin = new Vector2(0.5f, 0.5f);
+            designRect.anchorMax = new Vector2(0.5f, 0.5f);
+            designRect.pivot = new Vector2(0.5f, 0.5f);
+            designRect.sizeDelta = new Vector2(390f, 884f);
+            designRect.anchoredPosition = Vector2.zero;
+            float designScale = Mathf.Min(1080f / 390f, 1920f / 884f);
+            designRoot.transform.localScale = new Vector3(designScale, designScale, 1f);
+
+            // Figma exports use top-left coordinates in a 390x884 frame. The
+            // RectTransform above uses the same local frame, so convert every
+            // component through one mapping instead of mixing center and top-
+            // left coordinates (the source of the old overlap/drift).
+            // LoginCover.png is the approved complete 390x884 Figma export.
+            // Keep it as one image so every logo, label, border, shadow and
+            // spacing remains pixel-identical to the source design. The
+            // controls below are transparent interaction overlays only.
+            CreateRasterImage(designRoot.transform, "AppUi/LoginCover", Vector2.zero,
+                new Vector2(LoginDesignWidth, LoginDesignHeight));
+
+            accountInput = CreateInput(designRoot.transform, "手机号 / 邮箱", LoginDesignPosition(45.5f, 317.5f, 299f, 51f), false);
+            passwordInput = CreateInput(designRoot.transform, "密码", LoginDesignPosition(45.5f, 385.5f, 299f, 51f), true);
+            accountInput.GetComponent<RectTransform>().sizeDelta = LoginDesignSize(299f, 51f);
+            passwordInput.GetComponent<RectTransform>().sizeDelta = LoginDesignSize(299f, 51f);
+            MakeOverlayInput(accountInput);
+            MakeOverlayInput(passwordInput);
+
+            Button loginButton = CreateButton(designRoot.transform, "登录", LoginDesignPosition(45f, 491f, 300f, 52f), HandleLoginClicked, 300f, 52f);
+            Button registerButton = CreateButton(designRoot.transform, "注册新账号", LoginDesignPosition(214.489f, 610.271f, 59.106f, 14.677f),
+                () => bootstrap.Router.Navigate(AppRoute.Register), 59.106f, 28f);
+            MakeOverlayButton(loginButton);
+            MakeOverlayButton(registerButton);
+
+            loginMessage = CreateLabel(designRoot.transform, "", LoginDesignPosition(45f, 550f, 300f, 28f), 12);
+            loginMessage.rectTransform.sizeDelta = LoginDesignSize(300f, 28f);
             return panel;
         }
 
         private GameObject CreateRegisterPanel(Transform parent)
         {
             GameObject panel = CreatePanel("RegisterPanel", parent, new Color(0.973f, 0.980f, 1f));
-            CreateLabel(panel.transform, "注册账号", new Vector2(0, 250), 30);
-            CreateLabel(panel.transform, "创建账号后可以绑定激活档案。", new Vector2(0, 195), 16);
-            registerAccountInput = CreateInput(panel.transform, "设置账号", new Vector2(0, 115), false);
-            registerPasswordInput = CreateInput(panel.transform, "设置密码", new Vector2(0, 40), true);
-            registerConfirmInput = CreateInput(panel.transform, "再次输入密码", new Vector2(0, -35), true);
-            CreateButton(panel.transform, "注册并继续激活", new Vector2(0, -125), HandleRegisterClicked);
-            CreateButton(panel.transform, "返回登录", new Vector2(0, -195), () => bootstrap.Router.Navigate(AppRoute.Login));
+            GameObject designRoot = new GameObject("RegisterDesign390x884", typeof(RectTransform));
+            designRoot.transform.SetParent(panel.transform, false);
+            RectTransform designRect = designRoot.GetComponent<RectTransform>();
+            designRect.anchorMin = new Vector2(0.5f, 0.5f);
+            designRect.anchorMax = new Vector2(0.5f, 0.5f);
+            designRect.pivot = new Vector2(0.5f, 0.5f);
+            designRect.sizeDelta = new Vector2(LoginDesignWidth, LoginDesignHeight);
+            designRect.anchoredPosition = Vector2.zero;
+            float designScale = Mathf.Min(1080f / LoginDesignWidth, 1920f / LoginDesignHeight);
+            designRoot.transform.localScale = new Vector3(designScale, designScale, 1f);
+            CreateRasterImage(designRoot.transform, "AppUi/RegisterScreen", Vector2.zero,
+                new Vector2(LoginDesignWidth, LoginDesignHeight));
+
+            registerAccountInput = CreateInput(designRoot.transform, "设置账号", LoginDesignPosition(44f, 312f, 302f, 57f), false);
+            registerPasswordInput = CreateInput(designRoot.transform, "设置密码", LoginDesignPosition(44f, 380f, 302f, 57f), true);
+            registerConfirmInput = CreateInput(designRoot.transform, "再次输入密码", LoginDesignPosition(44f, 448f, 302f, 57f), true);
+            registerAccountInput.GetComponent<RectTransform>().sizeDelta = LoginDesignSize(302f, 57f);
+            registerPasswordInput.GetComponent<RectTransform>().sizeDelta = LoginDesignSize(302f, 57f);
+            registerConfirmInput.GetComponent<RectTransform>().sizeDelta = LoginDesignSize(302f, 57f);
+            MakeOverlayInput(registerAccountInput);
+            MakeOverlayInput(registerPasswordInput);
+            MakeOverlayInput(registerConfirmInput);
+
+            Button registerButton = CreateButton(designRoot.transform, "注册并继续激活",
+                LoginDesignPosition(44f, 530f, 302f, 52f), HandleRegisterClicked, 302f, 52f);
+            Button backButton = CreateButton(designRoot.transform, "返回登录",
+                LoginDesignPosition(190f, 604f, 110f, 28f), () => bootstrap.Router.Navigate(AppRoute.Login), 110f, 28f);
+            MakeOverlayButton(registerButton);
+            MakeOverlayButton(backButton);
             return panel;
         }
 
         private GameObject CreateActivationPanel(Transform parent)
         {
             GameObject panel = CreatePanel("ActivationPanel", parent, new Color(0.973f, 0.980f, 1f));
-            CreateLabel(panel.transform, "激活档案", new Vector2(0, 220), 30);
-            CreateLabel(panel.transform, "请输入医生建档时提供的 11 位手机号激活码。", new Vector2(0, 165), 16);
-            activationCodeInput = CreateInput(panel.transform, "激活码（11位手机号）", new Vector2(0, 80), false);
-            activationMessage = CreateLabel(panel.transform, "本地演示会保存绑定状态；正式环境可替换为服务器预览/核销。", new Vector2(0, 15), 14);
-            activationMessage.rectTransform.sizeDelta = new Vector2(760, 70);
-            CreateButton(panel.transform, "确认绑定", new Vector2(0, -75), HandleActivationClicked);
-            CreateButton(panel.transform, "跳过，稍后激活", new Vector2(0, -145), SkipActivation);
-            CreateButton(panel.transform, "返回登录", new Vector2(0, -215), () => bootstrap.State.ClearSession());
-            return panel;
-        }
+            GameObject designRoot = new GameObject("ActivationDesign390x884", typeof(RectTransform));
+            designRoot.transform.SetParent(panel.transform, false);
+            RectTransform designRect = designRoot.GetComponent<RectTransform>();
+            designRect.anchorMin = new Vector2(0.5f, 0.5f);
+            designRect.anchorMax = new Vector2(0.5f, 0.5f);
+            designRect.pivot = new Vector2(0.5f, 0.5f);
+            designRect.sizeDelta = new Vector2(LoginDesignWidth, LoginDesignHeight);
+            designRect.anchoredPosition = Vector2.zero;
+            float designScale = Mathf.Min(1080f / LoginDesignWidth, 1920f / LoginDesignHeight);
+            designRoot.transform.localScale = new Vector3(designScale, designScale, 1f);
+            CreateRasterImage(designRoot.transform, "AppUi/ActivationScreen", Vector2.zero,
+                new Vector2(LoginDesignWidth, LoginDesignHeight));
 
-        private GameObject CreateRoutineQuestionnairePanel(Transform parent)
-        {
-            return CreateServerRoutinePanel(parent);
+            activationCodeInput = CreateInput(designRoot.transform, "激活码（11位手机号）",
+                LoginDesignPosition(44f, 400f, 302f, 57f), false);
+            activationCodeInput.GetComponent<RectTransform>().sizeDelta = LoginDesignSize(302f, 57f);
+            MakeOverlayInput(activationCodeInput);
+            activationMessage = CreateLabel(designRoot.transform, "",
+                LoginDesignPosition(44f, 475f, 302f, 30f), 12);
+            activationMessage.rectTransform.sizeDelta = LoginDesignSize(302f, 30f);
+            activationMessage.alignment = TextAnchor.MiddleLeft;
+            activationMessage.color = new Color(0.35f, 0.40f, 0.48f, 1f);
+
+            Button activateButton = CreateButton(designRoot.transform, "确认绑定",
+                LoginDesignPosition(44f, 522f, 302f, 52f), HandleActivationClicked, 302f, 52f);
+            Button backButton = CreateButton(designRoot.transform, "返回登录",
+                LoginDesignPosition(165f, 598f, 90f, 28f), () => bootstrap.State.ClearSession(), 90f, 28f);
+            MakeOverlayButton(activateButton);
+            MakeOverlayButton(backButton);
+            return panel;
         }
 
         private GameObject CreateHomePanel(Transform parent)
         {
-            GameObject panel = CreatePanel("HomePanel", parent, new Color(0.973f, 0.980f, 1f));
-            CreateLabel(panel.transform, "训练首页", new Vector2(0, 450), 30);
-            homeMessage = CreateLabel(panel.transform, "", new Vector2(0, 300), 18);
-            homeMessage.rectTransform.sizeDelta = new Vector2(860, 170);
-            CreateButton(panel.transform, "追踪器连接与校准", new Vector2(0, 75), () => bootstrap.Router.Navigate(AppRoute.TrackingCalibration));
-            CreateButton(panel.transform, "进入 AR 训练", new Vector2(0, 0), () => bootstrap.Router.Navigate(AppRoute.Training));
-            CreateButton(panel.transform, "激活档案", new Vector2(0, -75), () => bootstrap.Router.Navigate(AppRoute.Activation));
-            CreateButton(panel.transform, "例行问卷", new Vector2(0, -150), ShowRoutineQuestionnaire);
-            CreateButton(panel.transform, "训练历史", new Vector2(0, -225), ShowHistory);
-            CreateButton(panel.transform, "同步训练记录", new Vector2(0, -300), RequestSync);
-            CreateButton(panel.transform, "检查动作包更新", new Vector2(0, -450), RequestConfigUpdate);
-            CreateButton(panel.transform, "导入旧记录与回放备份", new Vector2(0, -525), ImportLegacyArchive);
-            CreateButton(panel.transform, "退出登录", new Vector2(0, -375), () => bootstrap.State.ClearSession());
+            homeScreen = new HomeScreen();
+            GameObject panel = homeScreen.Build(parent, BuildHomeState, new HomeScreen.Actions
+            {
+                EnterTraining = () => bootstrap.Router.Navigate(AppRoute.TrainingPreparation),
+                OpenTracker = OpenTrackingCalibrationFromHome,
+                OpenActivation = () => bootstrap.Router.Navigate(AppRoute.Activation),
+                OpenHistory = ShowHistory,
+                OpenMonthly = ShowMonthlyQuestionnaire,
+                Logout = () => bootstrap.State.ClearSession(),
+            });
+            // Status lines (launch errors, save confirmations) still go through homeMessage.
+            homeMessage = homeScreen.Message;
             return panel;
+        }
+
+        private HomeScreen.State BuildHomeState()
+        {
+            UserSession session = bootstrap != null && bootstrap.State != null ? bootstrap.State.Session : null;
+            if (session == null) return new HomeScreen.State { Name = "" };
+
+            HomeScreen.MonthlyEntryStatus monthlyStatus = NativeMobileService.Available
+                ? HomeScreen.MonthlyEntryStatus.Open : HomeScreen.MonthlyEntryStatus.Disabled;
+            return new HomeScreen.State
+            {
+                Name = session.accountId,
+                Activated = session.profile != null && session.profile.activationBound,
+                Calibrated = !string.IsNullOrEmpty(session.trackingCalibratedAt),
+                MonthlyStatus = monthlyStatus,
+            };
         }
 
         private GameObject CreateArTrainingPanel(Transform parent)
@@ -319,7 +389,7 @@ namespace SpineRecovery.App
             // The Unity V2 scene owns the AR preparation screen and its action
             // menu.  Enter it directly so the phone flow matches SpineFlowMobile.
             CreateButton(panel.transform, "开始训练", new Vector2(0, 40), () => StartTraining("SpineV2Minimal", "dead_bug"));
-            CreateButton(panel.transform, "追踪器连接与校准", new Vector2(0, -50), () => bootstrap.Router.Navigate(AppRoute.TrackingCalibration));
+            CreateButton(panel.transform, "追踪器连接与校准", new Vector2(0, -50), OpenTrackingCalibrationFromHome);
             CreateButton(panel.transform, "动作示范库", new Vector2(0, -140), OpenActionLibrary);
             CreateButton(panel.transform, "返回训练首页", new Vector2(0, -230), () => bootstrap.Router.Navigate(AppRoute.Home));
             return panel;
@@ -327,16 +397,113 @@ namespace SpineRecovery.App
 
         private GameObject CreateTrainingMenuPanel(Transform parent)
         {
-            GameObject panel = CreatePanel("TrainingMenuPanel", parent, new Color(0.973f, 0.980f, 1f));
-            CreateLabel(panel.transform, "选择训练内容", new Vector2(0, 250), 32);
-            CreateLabel(panel.transform, "开始训练前请选择一种模式或测试项目。", new Vector2(0, 195), 17);
-            trainingMenuMessage = CreateLabel(panel.transform, "训练模式会按当前处方进入指导训练。", new Vector2(0, 135), 16);
-            trainingMenuMessage.rectTransform.sizeDelta = new Vector2(820, 70);
-            CreateButton(panel.transform, "训练模式", new Vector2(0, 55), () => StartTraining("SpineV2Minimal", "dead_bug"));
-            CreateButton(panel.transform, "动作示范库", new Vector2(0, -35), OpenActionLibrary);
-            CreateButton(panel.transform, "返回 AR 训练", new Vector2(0, -305), () => bootstrap.Router.Navigate(AppRoute.Training));
-            CreateButton(panel.transform, "回到主页", new Vector2(0, -395), () => bootstrap.Router.Navigate(AppRoute.Home));
+            RectTransform root = QuestionnaireUi.CreateScreen(parent, "TrainingMenuPanel", null, out GameObject panel);
+            QuestionnaireUi.Header(root, "训练准备", () => bootstrap.Router.Navigate(AppRoute.Home));
+            RectTransform content = QuestionnaireUi.ScrollArea(root, QuestionnaireUi.HeaderHeight, 96f, 690f);
+            QuestionnaireUi.Label(content, "开始本次训练", 29, QuestionnaireUi.Accent, TextAnchor.MiddleLeft,
+                FontStyle.Bold, 20f, 36f, 350f, 48f);
+            QuestionnaireUi.Label(content, "连接投屏眼镜和 IMU 追踪器后，进入训练流程", 15, QuestionnaireUi.Muted,
+                TextAnchor.MiddleLeft, FontStyle.Normal, 20f, 91f, 350f, 42f);
+
+            RectTransform deviceCard = QuestionnaireUi.Card(content, 20f, 153f, 350f, 178f);
+            trainingDisplayStatus = AddPreparationRow(deviceCard, "投屏眼镜", "未连接", "连接", 12f, 18f,
+                OpenDisplayConnection);
+            QuestionnaireUi.Box(deviceCard, "Divider", QuestionnaireUi.Divider, 0.5f, 20f, 88f, 310f, 1f);
+            trainingTrackerStatus = AddPreparationRow(deviceCard, "IMU 追踪器", "未校准", "去校准", 12f, 96f,
+                OpenTrackingCalibrationFromPreparation);
+
+            RectTransform info = QuestionnaireUi.Card(content, 20f, 350f, 350f, 86f);
+            QuestionnaireUi.Label(info, "i", 18, QuestionnaireUi.Accent, TextAnchor.MiddleCenter,
+                FontStyle.Bold, 12f, 0f, 30f, 86f);
+            QuestionnaireUi.Label(info, "建议先完成追踪器校准再开始训练，动作识别会更准确", 14,
+                QuestionnaireUi.Muted, TextAnchor.MiddleLeft, FontStyle.Normal, 50f, 0f, 282f, 86f);
+
+            Button library = QuestionnaireUi.MakeButton(content, "ActionLibrary", Color.white, 18f,
+                20f, 458f, 350f, 88f, OpenActionLibrary);
+            QuestionnaireUi.Label(library.transform, "动作示范库", 19, QuestionnaireUi.Ink, TextAnchor.MiddleLeft,
+                FontStyle.Bold, 76f, 15f, 240f, 30f);
+            QuestionnaireUi.Label(library.transform, "开始前可以先看一遍动作要领", 14, QuestionnaireUi.Muted,
+                TextAnchor.MiddleLeft, FontStyle.Normal, 76f, 48f, 240f, 24f);
+            QuestionnaireUi.Label(library.transform, ">", 26, QuestionnaireUi.Muted, TextAnchor.MiddleCenter,
+                FontStyle.Normal, 312f, 0f, 26f, 88f);
+
+            RectTransform footer = QuestionnaireUi.Footer(root, 96f);
+            trainingMenuMessage = QuestionnaireUi.Label(footer, "", 12, QuestionnaireUi.DangerText,
+                TextAnchor.MiddleCenter, FontStyle.Normal, 20f, 2f, 350f, 18f);
+            QuestionnaireUi.PillButton(footer, "开始训练", 20f, 28f, 350f, 52f, true,
+                () => StartTraining("SpineV2Minimal", "dead_bug"));
+            RefreshTrainingPreparationStatus();
             return panel;
+        }
+
+        private static Text AddPreparationRow(Transform parent, string title, string initialStatus,
+            string actionCaption, float x, float y, UnityEngine.Events.UnityAction action)
+        {
+            QuestionnaireUi.Box(parent, title + "Icon", QuestionnaireUi.SecondaryButton, 14f, x, y, 52f, 52f);
+            QuestionnaireUi.Label(parent, title, 18, QuestionnaireUi.Ink, TextAnchor.MiddleLeft,
+                FontStyle.Bold, x + 66f, y + 1f, 158f, 27f);
+            Text status = QuestionnaireUi.Label(parent, initialStatus, 14, QuestionnaireUi.BadgeText,
+                TextAnchor.MiddleLeft, FontStyle.Bold, x + 66f, y + 27f, 158f, 22f);
+            Button button = QuestionnaireUi.MakeButton(parent, title + "Action", QuestionnaireUi.SecondaryButton,
+                18f, 257f, y + 6f, 72f, 40f, action);
+            QuestionnaireUi.Label(button.transform, actionCaption, 15, QuestionnaireUi.Accent,
+                TextAnchor.MiddleCenter, FontStyle.Bold, 0f, 0f, 72f, 40f);
+            return status;
+        }
+
+        private void RefreshTrainingPreparationStatus()
+        {
+            if (trainingTrackerStatus == null) return;
+            bool confirmed = !string.IsNullOrEmpty(bootstrap?.State?.Session?.trackingCalibratedAt);
+            if (EmbeddedSlimeVrBridge.TryReadState(out var state, true) && state.trackers != null)
+            {
+                int connected = state.trackers.Count(item => item.connected);
+                trainingTrackerStatus.text = connected > 0
+                    ? (confirmed ? connected + " 个已连接 · 已校准" : connected + " 个已连接")
+                    : (confirmed ? "已校准 · 等待连接" : "未校准");
+            }
+            else trainingTrackerStatus.text = confirmed ? "已校准" : "未校准";
+        }
+
+        private void OpenTrackingCalibrationFromHome()
+        {
+            trackingReturnRoute = AppRoute.Home;
+            bootstrap.Router.Navigate(AppRoute.TrackingCalibration);
+        }
+
+        private void OpenTrackingCalibrationFromPreparation()
+        {
+            trackingReturnRoute = AppRoute.TrainingPreparation;
+            bootstrap.Router.Navigate(AppRoute.TrackingCalibration);
+        }
+
+        private void ReturnFromTrackingCalibration()
+        {
+            AppRoute destination = trackingReturnRoute == AppRoute.TrainingPreparation
+                ? AppRoute.TrainingPreparation : AppRoute.Home;
+            bootstrap.Router.Navigate(destination);
+        }
+
+        private void OpenDisplayConnection()
+        {
+#if UNITY_ANDROID && !UNITY_EDITOR
+            try
+            {
+                using (var unityPlayer = new AndroidJavaClass("com.unity3d.player.UnityPlayer"))
+                using (var activity = unityPlayer.GetStatic<AndroidJavaObject>("currentActivity"))
+                using (var intent = new AndroidJavaObject("android.content.Intent", "android.settings.CAST_SETTINGS"))
+                {
+                    activity.Call("startActivity", intent);
+                    if (trainingDisplayStatus != null) trainingDisplayStatus.text = "请在系统中选择设备";
+                }
+            }
+            catch (System.Exception exception)
+            {
+                if (trainingMenuMessage != null) trainingMenuMessage.text = "无法打开投屏设置：" + exception.Message;
+            }
+#else
+            if (trainingDisplayStatus != null) trainingDisplayStatus.text = "请在 Android 设备上连接";
+#endif
         }
 
         private void ImportLegacyArchive()
@@ -347,14 +514,14 @@ namespace SpineRecovery.App
 
         private void OnApplicationFocus(bool focused)
         {
-            if (!focused || !NativeMobileService.Available || bootstrap?.State?.Session == null) return;
+            if (!focused) return;
+            RefreshTrainingPreparationStatus();
+            if (!NativeMobileService.Available || bootstrap?.State?.Session == null) return;
             var user = bootstrap.Users.Load(bootstrap.State.Session.accountId);
             JsonUtility.FromJsonOverwrite(JsonUtility.ToJson(user), bootstrap.State.Session);
             RefreshHomeSummary();
             RefreshHistorySummary();
         }
-
-        [System.Serializable] private sealed class ImportedReplayList { public string[] items; }
 
         private void RequestSync()
         {
@@ -377,6 +544,8 @@ namespace SpineRecovery.App
             ScreenOrientationService.SetLandscape();
             SceneManager.LoadScene("CoachingChoose", LoadSceneMode.Single);
         }
+
+        [System.Serializable] private sealed class ImportedReplayList { public string[] items; }
 
         private void OpenReplay()
         {
@@ -445,83 +614,152 @@ namespace SpineRecovery.App
             return panel;
         }
 
-        private GameObject CreatePostTrainingPanel(Transform parent)
+        private const string TherapistContactPending = "暂未配置治疗师联系方式，请通过医院渠道联系你的治疗师。";
+
+        private GameObject CreatePreTrainingBlockedPanel(Transform parent)
         {
-            GameObject panel = CreatePanel("PostTrainingPanel", parent, new Color(0.973f, 0.980f, 1f));
-            CreateLabel(panel.transform, "训练后反馈", new Vector2(0, 220), 30);
-            CreateLabel(panel.transform, "请确认本次训练是否完整完成，并记录训练后的感受。", new Vector2(0, 165), 16);
-            postTrainingMessage = CreateLabel(panel.transform, "请选择反馈后提交。", new Vector2(0, 110), 16);
-            postTrainingFeelingButtons = new[]
+            preTrainingBlockedScreen = new NoticeScreen();
+            return preTrainingBlockedScreen.Build(parent, "PreTrainingBlockedPanel", "今天先不练了", "今天的记录",
+                new[]
+                {
+                    new NoticeScreen.Row("静息疼痛", NoticeScreen.RowStyle.Badge),
+                    new NoticeScreen.Row("疼痛部位", NoticeScreen.RowStyle.Muted),
+                    new NoticeScreen.Row("训练状态", NoticeScreen.RowStyle.Muted),
+                },
+                "联系治疗师", "返回首页",
+                () => bootstrap.Router.Navigate(AppRoute.Home),
+                () => preTrainingBlockedScreen.SetNotice(TherapistContactPending),
+                () => bootstrap.Router.Navigate(AppRoute.Home));
+        }
+
+        private GameObject CreatePostTrainingStopPanel(Transform parent)
+        {
+            postTrainingStopScreen = new NoticeScreen();
+            return postTrainingStopScreen.Build(parent, "PostTrainingStopPanel", "这次先练到这里", "本次记录",
+                new[]
+                {
+                    new NoticeScreen.Row("已完成动作", NoticeScreen.RowStyle.Strong),
+                    new NoticeScreen.Row("训练前疼痛", NoticeScreen.RowStyle.Strong),
+                    new NoticeScreen.Row("本次最高疼痛", NoticeScreen.RowStyle.Badge),
+                    new NoticeScreen.Row("触发动作", NoticeScreen.RowStyle.Muted),
+                    new NoticeScreen.Row("疼痛部位", NoticeScreen.RowStyle.Muted),
+                },
+                "结束训练", "联系治疗师",
+                FinishAfterPainStop,
+                FinishAfterPainStop,
+                () => postTrainingStopScreen.SetNotice(TherapistContactPending));
+        }
+
+        private static string PartsText(string[] parts)
+        {
+            return parts == null || parts.Length == 0 ? "未选择" : string.Join("、", parts);
+        }
+
+        private static string DisplayActionName(TrainingPlan plan)
+        {
+            if (plan == null) return "本次动作";
+            if (plan.actionId == "dead_bug") return "死虫式";
+            if (plan.actionId == "bird_dog") return "鸟狗式";
+            return string.IsNullOrEmpty(plan.actionId) ? "本次动作" : plan.actionId;
+        }
+
+        private void HandlePreTrainingBack()
+        {
+            pendingTrainingScene = "";
+            pendingTrainingActionId = "";
+            bootstrap.Router.Navigate(bootstrap.State.Session != null ? AppRoute.Home : AppRoute.Login);
+        }
+
+        private void HandlePreTrainingSubmitted(PreTrainingAnswers answers)
+        {
+            UserSession user = bootstrap.State.Session;
+            if (user == null)
             {
-                CreateButton(panel.transform, "感觉：良好", new Vector2(-145, 45), () => SelectPostTrainingFeeling("良好"), 250),
-                CreateButton(panel.transform, "感觉：一般", new Vector2(145, 45), () => SelectPostTrainingFeeling("一般"), 250),
-                CreateButton(panel.transform, "感觉：不适", new Vector2(0, -25), () => SelectPostTrainingFeeling("不适"), 250),
-            };
-            postTrainingDifficultyButtons = new[]
+                bootstrap.Router.Navigate(AppRoute.Login);
+                return;
+            }
+
+            string[] painParts = answers.ToPainParts();
+            user.latestPainLevel = answers.Pain;
+            user.symptomChange = answers.SymptomChange;
+            user.preTrainingCheckPassed = answers.Pain < QuestionnaireUi.PainStopThreshold && answers.SymptomChange != "worse";
+            user.preTrainingRecordedAt = System.DateTimeOffset.UtcNow.ToString("O");
+            user.preTrainingEventId = "pre:" + user.preTrainingRecordedAt;
+            bootstrap.Users.AppendPainRecord(user, new PainHistoryRecord
             {
-                CreateButton(panel.transform, "难度：容易", new Vector2(-145, -105), () => SelectPostTrainingDifficulty("容易"), 250),
-                CreateButton(panel.transform, "难度：合适", new Vector2(145, -105), () => SelectPostTrainingDifficulty("合适"), 250),
-                CreateButton(panel.transform, "难度：困难", new Vector2(0, -175), () => SelectPostTrainingDifficulty("困难"), 250),
-            };
-            CreateButton(panel.transform, "提交并查看结果", new Vector2(0, -265), SubmitPostTrainingFeedback);
-            CreateButton(panel.transform, "稍后填写", new Vector2(0, -335), AbortPostTrainingFeedback);
-            return panel;
+                id = user.preTrainingEventId,
+                recordedAt = user.preTrainingRecordedAt,
+                painLevel = answers.Pain,
+                source = "DailyQuestionnaire",
+                painParts = painParts,
+            });
+            lastPreTrainingParts = painParts;
+
+            if (!user.preTrainingCheckPassed)
+            {
+                pendingTrainingScene = "";
+                pendingTrainingActionId = "";
+                preTrainingBlockedScreen.Show(
+                    "本次疼痛达到停训标准或症状明显加重，请先休息并联系专业人员。",
+                    new[] { answers.Pain + " / 10", PartsText(painParts), "未开始" });
+                bootstrap.Router.Navigate(AppRoute.PreTrainingBlocked);
+                return;
+            }
+
+            // Arrived from a training button: carry on into the session the
+            // user asked for. Otherwise (e.g. the check right after login) go
+            // back to the home screen like before.
+            if (!string.IsNullOrEmpty(pendingTrainingScene))
+            {
+                string scene = pendingTrainingScene;
+                string actionId = pendingTrainingActionId;
+                pendingTrainingScene = "";
+                pendingTrainingActionId = "";
+                StartTraining(scene, actionId);
+                return;
+            }
+            homeMessage.text = "训练前检查已记录。训练场景仍需设备校准与服务端授权后才能安全接入。";
+            bootstrap.Router.Navigate(AppRoute.Home);
         }
 
         public void ShowPostTrainingSurvey()
         {
-            postTrainingFeeling = "";
-            postTrainingDifficulty = "";
-            RefreshPostTrainingChoiceColors();
-            if (postTrainingMessage != null) postTrainingMessage.text = bootstrap.Training.CurrentResult?.completed == true
-                ? "训练结果已保存，请记录感受。" : "本次训练已中断，已有结果已保存，请记录感受。";
+            TrainingPlan plan = bootstrap != null && bootstrap.Training != null ? bootstrap.Training.CurrentPlan : null;
+            // The AR scene runs one action per launch today, so the survey that
+            // follows it always belongs to the last (or only) action of the plan.
+            postActionCount = plan != null && plan.actions != null ? Mathf.Max(1, plan.prescriptionContractVersion == 2 ? plan.actions.Length / 2 : plan.actions.Length) : 1;
+            postActionNumber = postActionCount;
+            if (postActionScreen != null) postActionScreen.Show(postActionNumber, postActionCount, DisplayActionName(plan));
             if (bootstrap != null && bootstrap.Router != null)
                 bootstrap.Router.Navigate(AppRoute.PostTrainingSurvey);
         }
 
-        private void SelectPostTrainingFeeling(string value)
+        private void HandlePostActionBack()
         {
-            postTrainingFeeling = value;
-            RefreshPostTrainingChoiceColors();
-            if (postTrainingMessage != null) postTrainingMessage.text = "训练感受：" + value +
-                (string.IsNullOrEmpty(postTrainingDifficulty) ? "；请选择训练难度。" : "；训练难度：" + postTrainingDifficulty);
+            // Keep the durable session result; the next login resumes this survey.
+            if (bootstrap.Training != null) bootstrap.Training.DeferFeedback();
+            bootstrap.Router.Navigate(AppRoute.Home);
         }
 
-        private void SelectPostTrainingDifficulty(string value)
+        private void HandlePostActionSubmitted(int intensity, int pain)
         {
-            postTrainingDifficulty = value;
-            RefreshPostTrainingChoiceColors();
-            if (postTrainingMessage != null) postTrainingMessage.text =
-                (string.IsNullOrEmpty(postTrainingFeeling) ? "请选择训练感受" : "训练感受：" + postTrainingFeeling) + "；训练难度：" + value;
-        }
-
-        private void RefreshPostTrainingChoiceColors()
-        {
-            RefreshChoiceColors(postTrainingFeelingButtons,
-                postTrainingFeeling == "良好" ? 0 : postTrainingFeeling == "一般" ? 1 : postTrainingFeeling == "不适" ? 2 : -1,
-                new Color(0.08f, 0.28f, 0.70f));
-            RefreshChoiceColors(postTrainingDifficultyButtons,
-                postTrainingDifficulty == "容易" ? 0 : postTrainingDifficulty == "合适" ? 1 : postTrainingDifficulty == "困难" ? 2 : -1,
-                new Color(0.08f, 0.28f, 0.70f));
-        }
-
-        private void SubmitPostTrainingFeedback()
-        {
-            if (string.IsNullOrEmpty(postTrainingFeeling) || string.IsNullOrEmpty(postTrainingDifficulty))
-            {
-                if (postTrainingMessage != null) postTrainingMessage.text = "请先选择训练感受和训练难度。";
-                return;
-            }
-
-            bootstrap.Training.SubmitFeedback(postTrainingFeeling, postTrainingDifficulty);
+            // Keep the existing feedback transport. Its separator is " / ", so
+            // score captions must not contain that separator themselves.
+            bootstrap.Training.SubmitFeedback("疼痛 " + pain + "（0–10）", "运动强度 " + intensity + "（0–10）");
             RefreshHistorySummary();
             bootstrap.Router.Navigate(AppRoute.History);
         }
 
-        private void AbortPostTrainingFeedback()
+        private void FinishAfterPainStop()
         {
-            bootstrap.Training.DeferFeedback();
-            bootstrap.Router.Navigate(AppRoute.Home);
+            RefreshHistorySummary();
+            bootstrap.Router.Navigate(AppRoute.History);
+        }
+
+        private void ShowMonthlyQuestionnaire()
+        {
+            bootstrap.Router.Navigate(AppRoute.RoutineQuestionnaire);
+            RefreshServerRoutine();
         }
 
         private void ShowHistory()
@@ -562,29 +800,48 @@ namespace SpineRecovery.App
 
         private void HandleActivationClicked()
         {
-            if (nativeBusy || bootstrap.State.Session == null) return;
-            string code = activationCodeInput.text.Trim();
-            string account = bootstrap.State.Session.accountId;
-            bool confirmed = previewActivationCode == code;
-            nativeBusy = true;
-            activationMessage.text = confirmed ? "正在绑定医生档案…" : "正在核对档案…";
-            NativeMobileService.Instance.Request(confirmed ? "activate" : "previewActivation",
-                new NativeRequest { accountId = account, code = code }, reply =>
-                {
-                    nativeBusy = false;
-                    if (bootstrap.State.Session?.accountId != account) return;
-                    if (!reply.ok) { activationMessage.text = reply.error; return; }
-                    if (!confirmed)
+            UserSession session = bootstrap.State.Session;
+            string code = activationCodeInput == null ? "" : activationCodeInput.text.Trim();
+            if (session == null) return;
+            if (NativeMobileService.Available)
+            {
+                if (nativeBusy) return;
+                string account = session.accountId;
+                bool confirmed = previewActivationCode == code;
+                nativeBusy = true;
+                activationMessage.text = confirmed ? "正在绑定医生档案…" : "正在核对档案…";
+                NativeMobileService.Instance.Request(confirmed ? "activate" : "previewActivation",
+                    new NativeRequest { accountId = account, code = code }, reply =>
                     {
-                        previewActivationCode = code;
-                        activationMessage.text = JsonUtility.FromJson<NativeMessage>(reply.dataJson).message + "；确认是本人后再次点击绑定。";
-                        return;
-                    }
-                    previewActivationCode = null;
-                    bootstrap.State.SetSession(JsonUtility.FromJson<UserSession>(reply.dataJson));
-                    activationMessage.text = "医生档案绑定成功。";
-                    bootstrap.Router.Navigate(bootstrap.State.Session.profile.ageYears > 0 ? AppRoute.Home : AppRoute.BasicProfile);
-                });
+                        nativeBusy = false;
+                        if (bootstrap.State.Session?.accountId != account) return;
+                        if (!reply.ok) { activationMessage.text = reply.error; return; }
+                        if (!confirmed)
+                        {
+                            previewActivationCode = code;
+                            activationMessage.text = JsonUtility.FromJson<NativeMessage>(reply.dataJson).message + "；确认是本人后再次点击绑定。";
+                            return;
+                        }
+                        previewActivationCode = null;
+                        bootstrap.State.SetSession(JsonUtility.FromJson<UserSession>(reply.dataJson));
+                        activationMessage.text = "医生档案绑定成功。";
+                        NavigateWithProfile(AppRoute.Home);
+                        });
+                return;
+            }
+            if (!System.Text.RegularExpressions.Regex.IsMatch(code, "^1[3-9][0-9]{9}$"))
+            {
+                if (activationMessage != null) activationMessage.text = "激活失败：请输入有效的 11 位手机号。";
+                return;
+            }
+            if (session.profile == null) session.profile = new UserProfile();
+            session.profile.activationCode = code;
+            session.profile.patientId = "local-patient-" + session.accountId;
+            session.profile.activationBound = true;
+            session.profile.activationBoundAt = System.DateTimeOffset.UtcNow.ToString("O");
+            bootstrap.Users.Save(session);
+            if (activationMessage != null) activationMessage.text = "激活成功，已绑定本地演示档案。";
+            NavigateWithProfile(AppRoute.Home);
         }
 
         [System.Serializable]
@@ -592,56 +849,7 @@ namespace SpineRecovery.App
 
         private void SkipActivation()
         {
-            UserSession session = bootstrap.State.Session;
-            bootstrap.Router.Navigate(session != null && session.profile.ageYears > 0 ? AppRoute.Home : AppRoute.BasicProfile);
-        }
-
-        private void ShowRoutineQuestionnaire()
-        {
-            bootstrap.Router.Navigate(AppRoute.RoutineQuestionnaire);
-            RefreshServerRoutine();
-        }
-
-        private void ChangeRoutinePain(int delta)
-        {
-            routinePain = Mathf.Clamp(routinePain + delta, 0, 10);
-            if (routinePainLabel != null) routinePainLabel.text = "当前疼痛评分：" + routinePain + " / 10";
-        }
-
-        private void SelectRoutineSymptom(string value)
-        {
-            routineSymptom = value;
-            RefreshRoutineSymptomSelection();
-        }
-
-        private void RefreshRoutineSymptomSelection()
-        {
-            int selected = routineSymptom == "stable" ? 0 : routineSymptom == "slightly_worse" ? 1 : routineSymptom == "worse" ? 2 : -1;
-            RefreshChoiceColors(routineSymptomButtons, selected, new Color(0.08f, 0.28f, 0.70f));
-        }
-
-        private void SaveRoutineQuestionnaire()
-        {
-            UserSession session = bootstrap.State.Session;
-            if (session == null || string.IsNullOrEmpty(routineSymptom))
-            {
-                if (routineMessage != null) routineMessage.text = "请选择症状变化后再保存。";
-                return;
-            }
-            session.routineQuestionnairePainLevel = routinePain;
-            session.routineQuestionnaireSymptomChange = routineSymptom;
-            session.routineQuestionnaireCompletedAt = System.DateTimeOffset.UtcNow.ToString("O");
-            session.routineQuestionnaireAnswers = "pain=" + routinePain + ";symptom=" + routineSymptom;
-            bootstrap.Users.AppendPainRecord(session, new PainHistoryRecord
-            {
-                id = "routine:" + System.DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(),
-                recordedAt = session.routineQuestionnaireCompletedAt,
-                painLevel = routinePain,
-                source = "DailyQuestionnaire",
-                painParts = session.painParts ?? System.Array.Empty<string>(),
-            });
-            if (routineMessage != null) routineMessage.text = "例行问卷已保存。";
-            bootstrap.Router.Navigate(AppRoute.Home);
+            NavigateWithProfile(AppRoute.Home);
         }
 
         [System.Serializable] private sealed class HistoryScore { public int overallScore; }
@@ -742,17 +950,52 @@ namespace SpineRecovery.App
 
         private GameObject CreateTrackingCalibrationPanel(Transform parent)
         {
-            GameObject panel = CreatePanel("TrackingCalibrationPanel", parent, new Color(0.973f, 0.980f, 1f));
-            CreateLabel(panel.transform, "IMU 追踪器校准", new Vector2(0, 185), 28);
-            CreateLabel(panel.transform,
-                "启动内嵌 SlimeVR，按引导连接追踪器并完成校准。返回后请确认校准状态。",
-                new Vector2(0, 115), 15);
-            trackingMessage = CreateLabel(panel.transform, "校准尚未开始", new Vector2(0, 55), 15);
-            CreateButton(panel.transform, "打开 SlimeVR 校准清单", new Vector2(0, -15), OpenEmbeddedSlimeVrCalibration);
-            trackingCompleteButton = CreateButton(panel.transform, "我已完成校准，继续", new Vector2(0, -85), ConfirmTrackingCalibration);
+            RectTransform root = QuestionnaireUi.CreateScreen(parent, "TrackingCalibrationPanel", null, out GameObject panel);
+            QuestionnaireUi.Header(root, "追踪器校准", ReturnFromTrackingCalibration);
+            RectTransform content = QuestionnaireUi.ScrollArea(root, QuestionnaireUi.HeaderHeight, 152f, 670f);
+            QuestionnaireUi.Label(content, "IMU 追踪器校准", 29, QuestionnaireUi.Accent, TextAnchor.MiddleLeft,
+                FontStyle.Bold, 20f, 36f, 350f, 48f);
+            QuestionnaireUi.Label(content, "训练前需要连接并校准追踪器，动作识别才准确", 15,
+                QuestionnaireUi.Muted, TextAnchor.MiddleLeft, FontStyle.Normal, 20f, 91f, 350f, 42f);
+
+            RectTransform state = QuestionnaireUi.Card(content, 20f, 153f, 350f, 104f);
+            QuestionnaireUi.Box(state, "StateIcon", QuestionnaireUi.BadgeFill, 16f, 18f, 26f, 52f, 52f);
+            trackingStatusTitle = QuestionnaireUi.Label(state, "校准尚未开始", 18, QuestionnaireUi.Ink,
+                TextAnchor.MiddleLeft, FontStyle.Bold, 84f, 17f, 200f, 30f);
+            trackingMessage = QuestionnaireUi.Label(state, "状态：未校准", 14, QuestionnaireUi.BadgeText,
+                TextAnchor.MiddleLeft, FontStyle.Bold, 84f, 53f, 230f, 28f);
+
+            RectTransform steps = QuestionnaireUi.Card(content, 20f, 277f, 350f, 325f);
+            QuestionnaireUi.Label(steps, "校准步骤", 20, QuestionnaireUi.Ink, TextAnchor.MiddleLeft,
+                FontStyle.Bold, 20f, 18f, 310f, 34f);
+            AddCalibrationStep(steps, 1, "打开 SlimeVR 校准清单", "连接追踪器并检查设备状态", 72f);
+            AddCalibrationStep(steps, 2, "连接追踪器并完成校准", "按 SlimeVR 引导佩戴并完成校准", 151f);
+            AddCalibrationStep(steps, 3, "返回此页确认", "完成后点击下方按钮继续", 230f);
+
+            // Keep the three actions comfortably above the bottom edge and give
+            // each touch target enough separation on small phone screens.
+            RectTransform footer = QuestionnaireUi.Footer(root, 210f);
+            QuestionnaireUi.PillButton(footer, "打开 SlimeVR 校准清单", 20f, 12f, 350f, 44f, false,
+                OpenEmbeddedSlimeVrCalibration);
+            Button quick = QuestionnaireUi.PillButton(footer, "快速校准", 20f, 72f, 350f, 44f, false,
+                OpenEmbeddedSlimeVrQuickCalibration);
+            quick.GetComponent<Image>().color = Color.white;
+            trackingCompleteButton = QuestionnaireUi.PillButton(footer, "我已完成校准，继续", 20f, 136f,
+                350f, 52f, true, ConfirmTrackingCalibration);
             trackingCompleteButton.interactable = false;
-            CreateButton(panel.transform, "返回训练首页", new Vector2(0, -155), () => bootstrap.Router.Navigate(AppRoute.Home));
             return panel;
+        }
+
+        private static void AddCalibrationStep(Transform parent, int number, string title, string detail, float top)
+        {
+            QuestionnaireUi.Box(parent, "StepNumber", number == 1 ? QuestionnaireUi.Accent : QuestionnaireUi.SecondaryButton,
+                18f, 20f, top, 36f, 36f);
+            QuestionnaireUi.Label(parent, number.ToString(), 16, number == 1 ? Color.white : QuestionnaireUi.Accent,
+                TextAnchor.MiddleCenter, FontStyle.Bold, 20f, top, 36f, 36f);
+            QuestionnaireUi.Label(parent, title, 16, QuestionnaireUi.Ink, TextAnchor.MiddleLeft,
+                FontStyle.Bold, 68f, top - 1f, 260f, 28f);
+            QuestionnaireUi.Label(parent, detail, 13, QuestionnaireUi.Muted, TextAnchor.MiddleLeft,
+                FontStyle.Normal, 68f, top + 28f, 260f, 34f);
         }
 
         private void OpenEmbeddedSlimeVrCalibration()
@@ -766,17 +1009,42 @@ namespace SpineRecovery.App
             }
 
             trackingCompleteButton.interactable = true;
-            trackingMessage.text = "SlimeVR 已打开。完成校准后返回此页面，再点击确认。";
+            trackingStatusTitle.text = "SlimeVR 校准清单已打开";
+            trackingMessage.text = "请完成校准后返回此页面确认";
+        }
+
+        private void OpenEmbeddedSlimeVrQuickCalibration()
+        {
+            int height = bootstrap.State.Session != null ? bootstrap.State.Session.profile.heightCm : 0;
+            if (!EmbeddedSlimeVrBridge.TryOpenCalibration(height, out string error, true))
+            {
+                trackingStatusTitle.text = "无法启动快速校准";
+                trackingMessage.text = error;
+                return;
+            }
+            trackingCompleteButton.interactable = true;
+            trackingStatusTitle.text = "快速校准已打开";
+            trackingMessage.text = "完成后返回此页面确认";
         }
 
         private void ConfirmTrackingCalibration()
         {
+            UserSession session = bootstrap.State.Session;
+            if (session != null)
+            {
+                session.trackingCalibratedAt = System.DateTimeOffset.UtcNow.ToString("O");
+                bootstrap.Users.Save(session);
+            }
+            RefreshTrainingPreparationStatus();
             if (trackingMessage != null)
-                trackingMessage.text = EmbeddedSlimeVrBridge.TryReadState(out var tracking)
-                    ? "SlimeVR：" + tracking.state + "；在线追踪器：" + tracking.trackers.Count(t => t.connected) +
-                        "；骨骼输出：" + (tracking.vmcSkeletonOutputFresh ? "正在更新" : "等待数据")
-                    : "暂时无法读取追踪器状态，可以重新打开校准页检查。";
-            bootstrap.Router.Navigate(AppRoute.Home);
+            {
+                bool available = EmbeddedSlimeVrBridge.TryReadState(out var tracking, true);
+                int connected = available && tracking.trackers != null ? tracking.trackers.Count(t => t.connected) : 0;
+                trackingStatusTitle.text = connected > 0 ? "追踪器已连接" : "校准确认已记录";
+                trackingMessage.text = available ? "在线追踪器：" + connected + " · " +
+                    (tracking.vmcSkeletonOutputFresh ? "动作数据正常" : "等待动作数据") : "校准状态已保存";
+            }
+            ReturnFromTrackingCalibration();
         }
 
         private void HandleLoginClicked()
@@ -786,7 +1054,7 @@ namespace SpineRecovery.App
             {
                 nativeBusy = true;
                 int generation = ++loginGeneration;
-                loginMessage.text = "正在登录…";
+                loginMessage.text = "";
                 NativeMobileService.Instance.Request("login", new NativeRequest
                 { accountId = accountInput.text, password = passwordInput.text }, reply =>
                 {
@@ -797,8 +1065,19 @@ namespace SpineRecovery.App
                 });
                 return;
             }
+            if (bootstrap.Users.TryAuthenticateAdministrator(accountInput.text, passwordInput.text, out UserSession admin))
+            {
+                bootstrap.State.SetSession(admin);
+                RefreshAdminSummary();
+                bootstrap.Router.Navigate(AppRoute.Admin);
+                return;
+            }
             if (!bootstrap.Users.TryAuthenticate(accountInput.text, passwordInput.text, out UserSession session))
-            { loginMessage.text = "账号或密码错误。"; return; }
+            {
+                loginMessage.text = "登录失败：患者账号为 new1–new10 / old1–old10，密码 123；原管理员为 admin / admin。";
+                loginMessage.color = new Color(1f, 0.55f, 0.45f);
+                return;
+            }
             HandleAuthenticated(session);
         }
 
@@ -806,15 +1085,51 @@ namespace SpineRecovery.App
         {
             bootstrap.State.SetSession(session);
             RefreshHomeSummary();
-            AppRoute next = session.profile.ageYears <= 0 ? AppRoute.BasicProfile :
-                session.intakeReviewRequired ? AppRoute.AdmissionDecision :
-                session.IsReturningUser ? AppRoute.PreTraining :
-                !session.intakeCompleted ? AppRoute.BasicSurvey :
-                session.admissionReviewRequired ? AppRoute.AdmissionDecision :
-                !session.admissionCompleted ? AppRoute.MobileAdmission : AppRoute.PreTraining;
-            session.preTrainingCheckPassed = false;
-            bootstrap.Router.Navigate(next);
-            bootstrap.Training.RestoreForCurrentUser();
+            if (session.IsReturningUser)
+            {
+                if (!NativeMobileService.Available && session.profile.ageYears <= 0)
+                {
+                    session.profile.gender = "男"; session.profile.ageYears = 35; session.profile.heightCm = 175; session.profile.weightKg = 70;
+                    if (session.latestPainLevel <= 0) session.latestPainLevel = 3;
+                    bootstrap.Users.Save(session);
+                }
+                session.preTrainingCheckPassed = false;
+                bootstrap.Users.Save(session);
+                pendingTrainingScene = "";
+                pendingTrainingActionId = "";
+                NavigateWithProfile(AppRoute.PreTraining);
+            }
+            else
+            {
+                NavigateWithProfile(AppRoute.Home);
+            }
+            if (bootstrap.State.Route != AppRoute.BasicProfile)
+                bootstrap.Training.RestoreForCurrentUser();
+        }
+
+        private void NavigateWithProfile(AppRoute destination)
+        {
+            UserProfile profile = bootstrap.State.Session.profile;
+            string gender = profile?.gender;
+            bool male = gender == "男" || gender == "male";
+            bool female = gender == "女" || gender == "female";
+            if (profile != null && (male || female) &&
+                profile.ageYears >= 10 && profile.ageYears <= 100 &&
+                profile.heightCm >= 120 && profile.heightCm <= 220 &&
+                profile.weightKg >= 35 && profile.weightKg <= 200)
+            {
+                bootstrap.Router.Navigate(destination);
+                return;
+            }
+
+            profileContinueRoute = destination;
+            profileInputs[0].text = profile != null && profile.ageYears > 0 ? profile.ageYears.ToString() : "";
+            profileInputs[1].text = profile != null && profile.heightCm > 0 ? profile.heightCm.ToString() : "";
+            profileInputs[2].text = profile != null && profile.weightKg > 0 ? profile.weightKg.ToString() : "";
+            selectedGender = male ? "男" : female ? "女" : "";
+            SetSelectedChoice(genderButtons, male ? 0 : female ? 1 : -1);
+            flowMessages[AppRoute.BasicProfile].text = "";
+            bootstrap.Router.Navigate(AppRoute.BasicProfile);
         }
 
         private GameObject CreateFormPanel(Transform parent, string title, string subtitle, System.Action<Transform> build)
@@ -834,20 +1149,90 @@ namespace SpineRecovery.App
             return panel;
         }
 
-        private void CreateProfileForm(Transform parent)
+        private GameObject CreateProfilePanel(Transform parent)
         {
-            profileInputs = new[] {
-                CreateInput(parent, "年龄（岁）", new Vector2(0, 180), false),
-                CreateInput(parent, "身高（cm）", new Vector2(0, 105), false),
-                CreateInput(parent, "体重（kg）", new Vector2(0, 30), false),
-            };
+            RectTransform root = QuestionnaireUi.CreateScreen(parent, "BasicProfilePanel", null, out GameObject panel);
+            QuestionnaireUi.Header(root, "资料登记", () => bootstrap.Router.Navigate(profileContinueRoute));
+            RectTransform content = QuestionnaireUi.ScrollArea(root, QuestionnaireUi.HeaderHeight, 96f, 650f);
+            QuestionnaireUi.Label(content, "先填一下基本资料", 29, QuestionnaireUi.Accent, TextAnchor.MiddleLeft,
+                FontStyle.Bold, 20f, 36f, 350f, 48f);
+            QuestionnaireUi.Label(content, "用来调整训练强度和动作识别，只需填写一次", 15,
+                QuestionnaireUi.Muted, TextAnchor.MiddleLeft, FontStyle.Normal, 20f, 91f, 350f, 42f);
+
+            RectTransform card = QuestionnaireUi.Card(content, 20f, 153f, 350f, 404f);
+            QuestionnaireUi.Label(card, "性别", 17, QuestionnaireUi.Ink, TextAnchor.MiddleLeft,
+                FontStyle.Bold, 20f, 20f, 310f, 28f);
             genderButtons = new[]
             {
-                CreateButton(parent, "性别：男", new Vector2(-145, -50), () => SelectGender("男", 0), 250),
-                CreateButton(parent, "性别：女", new Vector2(145, -50), () => SelectGender("女", 1), 250),
+                CreateProfileChoice(card, "男", 20f, 58f, () => SelectGender("男", 0)),
+                CreateProfileChoice(card, "女", 176f, 58f, () => SelectGender("女", 1)),
             };
             SetSelectedChoice(genderButtons, -1);
-            CreateButton(parent, "保存并继续", new Vector2(0, -145), SaveProfile);
+
+            profileInputs = new[]
+            {
+                CreateProfileNumberInput(card, "年龄", "请输入年龄", "岁", "10–100", 122f),
+                CreateProfileNumberInput(card, "身高", "请输入身高", "cm", "120–220", 214f),
+                CreateProfileNumberInput(card, "体重", "请输入体重", "kg", "35–200", 306f),
+            };
+
+            RectTransform footer = QuestionnaireUi.Footer(root, 96f);
+            flowMessage = QuestionnaireUi.Label(footer, "", 12, QuestionnaireUi.DangerText,
+                TextAnchor.MiddleCenter, FontStyle.Normal, 20f, 2f, 350f, 18f);
+            flowMessages[AppRoute.BasicProfile] = flowMessage;
+            QuestionnaireUi.PillButton(footer, "保存并继续", 20f, 28f, 350f, 52f, true, SaveProfile);
+            return panel;
+        }
+
+        private static Button CreateProfileChoice(Transform parent, string caption, float x, float y,
+            UnityEngine.Events.UnityAction action)
+        {
+            Button button = QuestionnaireUi.MakeButton(parent, "Gender" + caption, QuestionnaireUi.OptionBackground,
+                12f, x, y, 154f, 48f, action);
+            QuestionnaireUi.Label(button.transform, caption, 17, QuestionnaireUi.Muted, TextAnchor.MiddleCenter,
+                FontStyle.Bold, 0f, 0f, 154f, 48f);
+            return button;
+        }
+
+        private static InputField CreateProfileNumberInput(Transform parent, string label, string placeholder,
+            string suffix, string range, float y)
+        {
+            QuestionnaireUi.Label(parent, label, 17, QuestionnaireUi.Ink, TextAnchor.MiddleLeft,
+                FontStyle.Bold, 20f, y, 120f, 28f);
+            QuestionnaireUi.Label(parent, range, 13, QuestionnaireUi.Muted, TextAnchor.MiddleRight,
+                FontStyle.Normal, 210f, y, 120f, 28f);
+
+            Image background = QuestionnaireUi.Box(parent, label + "Input", Color.white, 12f,
+                20f, y + 34f, 310f, 50f);
+            background.raycastTarget = true;
+            Image ring = QuestionnaireUi.Ring(background.transform, "InputBorder", new Color(.77f, .80f, .86f),
+                12f, 1.2f);
+            QuestionnaireUi.Stretch(ring.rectTransform, 0f, 0f, 0f, 0f);
+            ring.raycastTarget = false;
+            InputField input = background.gameObject.AddComponent<InputField>();
+            input.targetGraphic = background;
+            input.transition = Selectable.Transition.None;
+            input.contentType = InputField.ContentType.IntegerNumber;
+            input.keyboardType = TouchScreenKeyboardType.NumberPad;
+            input.lineType = InputField.LineType.SingleLine;
+            input.characterLimit = 3;
+            input.shouldHideMobileInput = true;
+            input.customCaretColor = true;
+            input.caretColor = QuestionnaireUi.Accent;
+            input.selectionColor = new Color(.29f, .53f, .85f, .25f);
+
+            Text value = QuestionnaireUi.Label(background.transform, "", 17, QuestionnaireUi.Ink,
+                TextAnchor.MiddleLeft, FontStyle.Normal, 16f, 0f, 232f, 50f);
+            value.horizontalOverflow = HorizontalWrapMode.Overflow;
+            input.textComponent = value;
+            Text hint = QuestionnaireUi.Label(background.transform, placeholder, 17, new Color(.58f, .62f, .70f),
+                TextAnchor.MiddleLeft, FontStyle.Normal, 16f, 0f, 232f, 50f);
+            input.placeholder = hint;
+            QuestionnaireUi.Label(background.transform, suffix, 17, QuestionnaireUi.Muted, TextAnchor.MiddleCenter,
+                FontStyle.Bold, 252f, 0f, 44f, 50f);
+            ProfileInputFocusFeedback feedback = background.gameObject.AddComponent<ProfileInputFocusFeedback>();
+            feedback.Initialize(ring);
+            return input;
         }
 
         private void SelectGender(string gender, int selectedIndex)
@@ -858,14 +1243,20 @@ namespace SpineRecovery.App
 
         private void SaveProfile()
         {
+            if (profileInputs != null)
+                foreach (InputField input in profileInputs)
+                    if (input != null) input.DeactivateInputField();
             if (!int.TryParse(profileInputs[0].text, out int age) || age < 10 || age > 100 ||
                 !int.TryParse(profileInputs[1].text, out int height) || height < 120 || height > 220 ||
                 !int.TryParse(profileInputs[2].text, out int weight) || weight < 35 || weight > 200 || string.IsNullOrEmpty(selectedGender))
             { ShowFlowMessage("资料无效：请检查年龄、身高、体重范围并选择性别。"); return; }
             UserSession user = bootstrap.State.Session;
+            if (user.profile == null) user.profile = new UserProfile();
             user.profile.ageYears = age; user.profile.heightCm = height; user.profile.weightKg = weight; user.profile.gender = selectedGender;
             bootstrap.Users.Save(user);
-            bootstrap.Router.Navigate(AppRoute.BasicSurvey);
+            RefreshHomeSummary();
+            bootstrap.Router.Navigate(profileContinueRoute);
+            bootstrap.Training.RestoreForCurrentUser();
         }
 
         private void CreateSurveyForm(Transform parent)
@@ -1362,109 +1753,6 @@ namespace SpineRecovery.App
             CreateButton(parent, "退出登录", new Vector2(0, -5), () => bootstrap.State.ClearSession());
         }
 
-        private void CreatePreTrainingForm(Transform parent)
-        {
-            preTrainingPainLabel = CreateLabel(parent, "当前疼痛评分：" + selectedPain + " / 10", new Vector2(0, 205), 22);
-            preTrainingPainLabel.fontStyle = FontStyle.Bold;
-            preTrainingPainLabel.rectTransform.sizeDelta = new Vector2(760, 44);
-
-            Button decreasePainButton = CreateButton(parent, "疼痛 −", new Vector2(-145, 140),
-                () => ChangePreTrainingPain(-1), 250, 58);
-            Button increasePainButton = CreateButton(parent, "疼痛 +", new Vector2(145, 140),
-                () => ChangePreTrainingPain(1), 250, 58);
-            StylePreTrainingButton(decreasePainButton);
-            StylePreTrainingButton(increasePainButton);
-
-            Text symptomPrompt = CreateLabel(parent, "请选择本次症状变化", new Vector2(0, 55), 20);
-            symptomPrompt.fontStyle = FontStyle.Bold;
-            symptomPrompt.rectTransform.sizeDelta = new Vector2(760, 42);
-
-            string[] symptomLabels = { "好转 / 不变", "稍微加重", "明显加重" };
-            string[] symptomValues = { "stable", "slightly_worse", "worse" };
-            preTrainingSymptomButtons = new Button[symptomLabels.Length];
-            for (int i = 0; i < symptomLabels.Length; i++)
-            {
-                string symptomValue = symptomValues[i];
-                preTrainingSymptomButtons[i] = CreateButton(parent, symptomLabels[i],
-                    new Vector2(0, -10 - i * 70),
-                    () => SelectPreTrainingSymptom(symptomValue), 560, 58);
-            }
-            RefreshPreTrainingSymptomSelection();
-
-            Button confirmButton = CreateButton(parent, "确认并继续", new Vector2(0, -260),
-                SavePreTraining, 560, 64);
-            StylePreTrainingButton(confirmButton);
-        }
-
-        private void ChangePreTrainingPain(int delta)
-        {
-            selectedPain = Mathf.Clamp(selectedPain + delta, 0, 10);
-            if (preTrainingPainLabel != null)
-            {
-                preTrainingPainLabel.text = "当前疼痛评分：" + selectedPain + " / 10";
-            }
-        }
-
-        private void SelectPreTrainingSymptom(string value)
-        {
-            selectedPreTrainingSymptom = value;
-            RefreshPreTrainingSymptomSelection();
-        }
-
-        private void RefreshPreTrainingSymptomSelection()
-        {
-            if (preTrainingSymptomButtons == null) return;
-            int selectedIndex = selectedPreTrainingSymptom == "stable" ? 0 :
-                selectedPreTrainingSymptom == "slightly_worse" ? 1 : selectedPreTrainingSymptom == "worse" ? 2 : -1;
-            string[] captions = { "好转 / 不变", "稍微加重", "明显加重" };
-            for (int i = 0; i < preTrainingSymptomButtons.Length; i++)
-            {
-                Button button = preTrainingSymptomButtons[i];
-                bool selected = i == selectedIndex;
-                Color accent = selected ? new Color(0.12f, 0.40f, 0.82f) : new Color(0.95f, 0.97f, 0.99f);
-                SetButtonColors(button, accent, Color.Lerp(accent, new Color(0.12f, 0.40f, 0.82f), 0.18f),
-                    selected ? Color.white : new Color(0.10f, 0.17f, 0.27f));
-                Text label = button.GetComponentInChildren<Text>();
-                if (label != null)
-                {
-                    label.text = selected ? "✓  " + captions[i] : captions[i];
-                    label.fontSize = 22;
-                    label.fontStyle = FontStyle.Bold;
-                }
-            }
-        }
-
-        private static void StylePreTrainingButton(Button button)
-        {
-            if (button == null) return;
-            Text label = button.GetComponentInChildren<Text>();
-            if (label != null)
-            {
-                label.fontSize = 22;
-                label.fontStyle = FontStyle.Bold;
-            }
-        }
-
-        private void SavePreTraining()
-        {
-            if (string.IsNullOrEmpty(selectedPreTrainingSymptom)) { ShowFlowMessage("请选择本次症状变化。"); return; }
-            UserSession user = bootstrap.State.Session; user.latestPainLevel = selectedPain; user.symptomChange = selectedPreTrainingSymptom;
-            user.preTrainingRecordedAt = System.DateTimeOffset.UtcNow.ToString("O");
-            user.preTrainingEventId = "pre:" + user.preTrainingRecordedAt;
-            user.preTrainingCheckPassed = selectedPain <= 7 && selectedPreTrainingSymptom != "worse";
-            bootstrap.Users.AppendPainRecord(user, new PainHistoryRecord
-            {
-                id = user.preTrainingEventId,
-                recordedAt = user.preTrainingRecordedAt,
-                painLevel = selectedPain,
-                source = "DailyQuestionnaire",
-                painParts = user.painParts ?? System.Array.Empty<string>(),
-            });
-            if (!user.preTrainingCheckPassed) { ShowFlowMessage("本次检查未通过（疼痛需 ≤7 且症状不能明显加重）。请暂停训练并寻求专业建议。"); return; }
-            homeMessage.text = "训练前检查已记录，可以进入本次训练。";
-            bootstrap.Router.Navigate(AppRoute.Home);
-        }
-
         private void ShowFlowMessage(string message)
         {
             if (flowMessages.TryGetValue(bootstrap.State.Route, out Text messageText) && messageText != null)
@@ -1477,7 +1765,13 @@ namespace SpineRecovery.App
             if (user == null) { bootstrap.Router.Navigate(AppRoute.Login); return; }
             if (bootstrap.Training.HasPendingFeedback && bootstrap.Training.CurrentPlan.accountId == user.accountId)
             { ShowPostTrainingSurvey(); return; }
-            if (!user.preTrainingCheckPassed) { bootstrap.Router.Navigate(AppRoute.PreTraining); return; }
+            if (!user.preTrainingCheckPassed)
+            {
+                pendingTrainingScene = sceneName;
+                pendingTrainingActionId = actionId;
+                bootstrap.Router.Navigate(AppRoute.PreTraining);
+                return;
+            }
             if (nativeBusy) return;
             if (NativeMobileService.Available && user.profile.activationBound)
             {
@@ -1531,6 +1825,95 @@ namespace SpineRecovery.App
             scaler.matchWidthOrHeight = 0.5f;
             canvasObject.AddComponent<GraphicRaycaster>();
             return canvas;
+        }
+
+        private const float LoginDesignWidth = 390f;
+        private const float LoginDesignHeight = 884f;
+
+        private static Vector2 LoginDesignSize(float width, float height)
+        {
+            return new Vector2(width, height);
+        }
+
+        private static Vector2 LoginDesignPosition(float x, float y, float width, float height)
+        {
+            return new Vector2(
+                x + width * 0.5f - LoginDesignWidth * 0.5f,
+                LoginDesignHeight * 0.5f - (y + height * 0.5f));
+        }
+
+        private static void CreateRasterImage(Transform parent, string resourcePath, Vector2 position, Vector2 size)
+        {
+            Texture2D texture = Resources.Load<Texture2D>(resourcePath);
+            if (texture == null) return;
+            GameObject imageObject = new GameObject("Raster:" + resourcePath, typeof(RectTransform), typeof(Image));
+            imageObject.transform.SetParent(parent, false);
+            RectTransform rect = imageObject.GetComponent<RectTransform>();
+            rect.sizeDelta = size;
+            rect.anchoredPosition = position;
+            Image image = imageObject.GetComponent<Image>();
+            image.sprite = Sprite.Create(texture, new Rect(0f, 0f, texture.width, texture.height),
+                new Vector2(0.5f, 0.5f), 100f);
+            image.type = Image.Type.Simple;
+            image.preserveAspect = false;
+            image.raycastTarget = false;
+        }
+
+        private static void MakeOverlayInput(InputField input)
+        {
+            if (input == null) return;
+            Image image = input.GetComponent<Image>();
+            if (image != null)
+            {
+                // This InputField is only an interaction layer over the
+                // approved phone PNG. Keep its Image transparent and detach
+                // it from Selectable's targetGraphic so Unity cannot tint it
+                // white on focus and cover the authored icon/border.
+                image.color = new Color(1f, 1f, 1f, 0f);
+                image.raycastTarget = true;
+            }
+            input.targetGraphic = null;
+            input.transition = Selectable.Transition.None;
+            RoundedBorderGraphic border = input.GetComponentInChildren<RoundedBorderGraphic>(true);
+            if (border != null)
+            {
+                border.SetBorderColor(new Color(1f, 1f, 1f, 0f));
+                border.raycastTarget = false;
+            }
+            if (input.textComponent != null)
+            {
+                input.textComponent.color = new Color(0.25f, 0.30f, 0.38f, 1f);
+                // The login design root is scaled up for the portrait canvas;
+                // generate the glyphs at a larger size so typed characters do
+                // not become soft after the transform scale.
+                // The login artwork is authored at 390 design pixels (the
+                // source PNG is now imported at 2x). Keep live glyphs at the
+                // same visual size as the artwork instead of the old 30px
+                // value, which rendered typed text oversized and soft.
+                input.textComponent.font = AppBootstrap.Instance != null && AppBootstrap.Instance.uiFont != null
+                    ? AppBootstrap.Instance.uiFont : Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+                input.textComponent.fontSize = 17;
+                input.textComponent.alignByGeometry = false;
+                input.textComponent.horizontalOverflow = HorizontalWrapMode.Overflow;
+                input.textComponent.verticalOverflow = VerticalWrapMode.Truncate;
+            }
+            if (input.placeholder is Text placeholder)
+                placeholder.color = new Color(1f, 1f, 1f, 0f);
+        }
+
+        private static void MakeOverlayButton(Button button)
+        {
+            if (button == null) return;
+            Image image = button.GetComponent<Image>();
+            if (image != null) image.color = new Color(1f, 1f, 1f, 0f);
+            Text label = button.GetComponentInChildren<Text>();
+            if (label != null) label.color = new Color(1f, 1f, 1f, 0f);
+            ColorBlock colors = button.colors;
+            colors.normalColor = new Color(1f, 1f, 1f, 0f);
+            colors.highlightedColor = new Color(1f, 1f, 1f, 0f);
+            colors.pressedColor = new Color(1f, 1f, 1f, 0f);
+            colors.selectedColor = new Color(1f, 1f, 1f, 0f);
+            button.colors = colors;
         }
 
         private void EnsureEventSystem()
@@ -1628,47 +2011,111 @@ namespace SpineRecovery.App
             rect.anchoredPosition = position;
             Image fieldImage = inputObject.GetComponent<Image>();
             fieldImage.color = Color.white;
-            Outline outline = inputObject.AddComponent<Outline>();
-            outline.effectColor = new Color(0.77f, 0.81f, 0.87f);
-            outline.effectDistance = new Vector2(1f, -1f);
+            // The SVG card supplies the normal gray input border. Do not use
+            // Unity's Outline on this transparent Image: Outline paints the
+            // whole rectangular graphic when its alpha is zero, creating the
+            // large blue block seen while typing. A dedicated rounded ring
+            // draws only the border and keeps the field interior clear.
+            RoundedBorderGraphic focusBorder = CreateRoundedBorder(inputObject.transform);
             InputField input = inputObject.GetComponent<InputField>();
             input.targetGraphic = fieldImage;
-            input.transition = Selectable.Transition.ColorTint;
+            input.transition = Selectable.Transition.None;
             ColorBlock colors = input.colors;
             colors.normalColor = Color.white;
             colors.highlightedColor = new Color(0.96f, 0.98f, 1f);
             colors.pressedColor = new Color(0.90f, 0.95f, 1f);
             colors.selectedColor = new Color(0.96f, 0.98f, 1f);
             input.colors = colors;
-            inputObject.AddComponent<InputFieldFocusFeedback>().Initialize(fieldImage, outline);
+            InputFieldFocusFeedback focusFeedback = inputObject.AddComponent<InputFieldFocusFeedback>();
+            focusFeedback.Initialize(fieldImage, focusBorder);
 
             GameObject textObject = new GameObject("Text", typeof(RectTransform), typeof(Text));
             textObject.transform.SetParent(inputObject.transform, false);
             RectTransform textRect = textObject.GetComponent<RectTransform>();
             textRect.anchorMin = Vector2.zero;
             textRect.anchorMax = Vector2.one;
-            textRect.offsetMin = new Vector2(15f, 5f);
-            textRect.offsetMax = new Vector2(-15f, -5f);
+            textRect.offsetMin = new Vector2(48f, 4f);
+            textRect.offsetMax = new Vector2(-16f, -4f);
             Text text = textObject.GetComponent<Text>();
-            text.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
-            text.fontSize = 26;
+            // Use the same imported UI font as the authored phone screens.
+            // LegacyRuntime.ttf is a bitmap-style fallback and becomes soft
+            // after the portrait design root is scaled on Android.
+            text.font = AppBootstrap.Instance != null && AppBootstrap.Instance.uiFont != null
+                ? AppBootstrap.Instance.uiFont : Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+            text.fontSize = 17;
             text.color = Color.black;
             text.alignment = TextAnchor.MiddleLeft;
+            text.alignByGeometry = false;
+            text.horizontalOverflow = HorizontalWrapMode.Overflow;
+            text.verticalOverflow = VerticalWrapMode.Truncate;
             text.raycastTarget = false;
             text.supportRichText = false;
             input.textComponent = text;
             input.contentType = password ? InputField.ContentType.Password : InputField.ContentType.Standard;
+            // Match the mobile reference state: the focused field uses a
+            // blue outline, a visible blue caret and the standard blinking
+            // cadence. Keep Unity's caret visible when the Android keyboard
+            // is displayed instead of delegating all feedback to the IME.
+            input.customCaretColor = true;
+            input.caretColor = new Color(0.34f, 0.61f, 0.91f, 1f);
+            input.caretBlinkRate = 0.85f;
+            input.caretWidth = 2;
+            input.selectionColor = new Color(0.34f, 0.61f, 0.91f, 0.28f);
+            input.shouldHideMobileInput = false;
             Text placeholderText = CreateLabel(inputObject.transform, placeholder, Vector2.zero, 21);
             placeholderText.color = new Color(0.35f, 0.35f, 0.35f);
             input.placeholder = placeholderText;
             RectTransform placeholderRect = placeholderText.rectTransform;
             placeholderRect.anchorMin = Vector2.zero;
             placeholderRect.anchorMax = Vector2.one;
-            placeholderRect.offsetMin = new Vector2(15f, 5f);
-            placeholderRect.offsetMax = new Vector2(-15f, -5f);
+            placeholderRect.offsetMin = new Vector2(48f, 4f);
+            placeholderRect.offsetMax = new Vector2(-16f, -4f);
             placeholderText.alignment = TextAnchor.MiddleLeft;
             inputObject.GetComponent<Image>().raycastTarget = true;
+
+            // Group.svg contains the authored placeholder as vector artwork.
+            // Once the user types, cover only the text lane so that the live
+            // InputField value never renders on top of that static placeholder
+            // (or the left/right icons). The mask stays disabled while empty.
+            GameObject valueMaskObject = new GameObject("ValueMask", typeof(RectTransform), typeof(Image));
+            valueMaskObject.transform.SetParent(inputObject.transform, false);
+            valueMaskObject.transform.SetSiblingIndex(0);
+            RectTransform maskRect = valueMaskObject.GetComponent<RectTransform>();
+            maskRect.anchorMin = new Vector2(0.5f, 0.5f);
+            maskRect.anchorMax = new Vector2(0.5f, 0.5f);
+            maskRect.pivot = new Vector2(0.5f, 0.5f);
+            maskRect.anchoredPosition = new Vector2(-2.5f, 0f);
+            // Keep the mask inside the field so it never paints over the
+            // rounded border. The previous height reached the authored ring
+            // and made focus look like a blue/white filled strip.
+            maskRect.sizeDelta = new Vector2(235f, 34f);
+            Image valueMask = valueMaskObject.GetComponent<Image>();
+            valueMask.color = Color.white;
+            valueMask.raycastTarget = false;
+            valueMask.enabled = false;
+            focusFeedback.SetPlaceholderMask(valueMask, input);
+            input.onValueChanged.AddListener(value => valueMask.enabled = input.isFocused || !string.IsNullOrEmpty(value));
             return input;
+        }
+
+        private static RoundedBorderGraphic CreateRoundedBorder(Transform parent)
+        {
+            GameObject borderObject = new GameObject("FocusBorder", typeof(RectTransform));
+            borderObject.transform.SetParent(parent, false);
+            RectTransform rect = borderObject.GetComponent<RectTransform>();
+            rect.anchorMin = Vector2.zero;
+            rect.anchorMax = Vector2.one;
+            rect.offsetMin = Vector2.zero;
+            rect.offsetMax = Vector2.zero;
+            rect.SetAsLastSibling();
+            RoundedBorderGraphic border = borderObject.AddComponent<RoundedBorderGraphic>();
+            border.cornerRadius = 12f;
+            border.borderThickness = 2.2f;
+            border.raycastTarget = false;
+            // Registration and activation pages need a visible neutral field ring.
+            // The login page hides this ring after creating its raster overlay.
+            border.SetBorderColor(new Color(0.78f, 0.81f, 0.87f, 1f));
+            return border;
         }
 
         private static Button CreateButton(Transform parent, string caption, Vector2 position, UnityEngine.Events.UnityAction action)
@@ -1707,35 +2154,170 @@ namespace SpineRecovery.App
         }
     }
 
+    /// <summary>
+    /// Draws a real rounded rectangle ring. Unity's built-in Outline is not
+    /// suitable here because the input field intentionally has a transparent
+    /// Image over the authored SVG; Outline then fills the whole rectangle.
+    /// </summary>
+    internal sealed class RoundedBorderGraphic : Graphic
+    {
+        public float cornerRadius = 12f;
+        public float borderThickness = 2.2f;
+
+        public void SetBorderColor(Color borderColor)
+        {
+            color = borderColor;
+            SetVerticesDirty();
+        }
+
+        protected override void OnPopulateMesh(VertexHelper vertexHelper)
+        {
+            vertexHelper.Clear();
+            if (color.a <= 0f || borderThickness <= 0f) return;
+
+            Rect rect = rectTransform.rect;
+            float thickness = Mathf.Min(borderThickness, Mathf.Min(rect.width, rect.height) * 0.5f);
+            if (thickness <= 0f) return;
+
+            float outerRadius = Mathf.Clamp(cornerRadius, thickness, Mathf.Min(rect.width, rect.height) * 0.5f);
+            float innerRadius = Mathf.Max(0f, outerRadius - thickness);
+            const int segmentsPerCorner = 8;
+            int pointCount = segmentsPerCorner * 4;
+
+            for (int i = 0; i < pointCount; i++)
+            {
+                Vector2 outer = RoundedPoint(rect, outerRadius, i, segmentsPerCorner);
+                Vector2 inner = RoundedPoint(rect, innerRadius, i, segmentsPerCorner);
+                Vector2 nextOuter = RoundedPoint(rect, outerRadius, (i + 1) % pointCount, segmentsPerCorner);
+                Vector2 nextInner = RoundedPoint(rect, innerRadius, (i + 1) % pointCount, segmentsPerCorner);
+                int start = vertexHelper.currentVertCount;
+                vertexHelper.AddVert(outer, color, Vector2.zero);
+                vertexHelper.AddVert(nextOuter, color, Vector2.zero);
+                vertexHelper.AddVert(nextInner, color, Vector2.zero);
+                vertexHelper.AddVert(inner, color, Vector2.zero);
+                vertexHelper.AddTriangle(start, start + 1, start + 2);
+                vertexHelper.AddTriangle(start, start + 2, start + 3);
+            }
+        }
+
+        private static Vector2 RoundedPoint(Rect rect, float radius, int index, int segmentsPerCorner)
+        {
+            int corner = index / segmentsPerCorner;
+            int segment = index % segmentsPerCorner;
+            float angle = (corner * 90f + 180f + segment * (90f / segmentsPerCorner)) * Mathf.Deg2Rad;
+            Vector2 center;
+            switch (corner)
+            {
+                case 0:
+                    center = new Vector2(rect.xMin + radius, rect.yMin + radius);
+                    break;
+                case 1:
+                    center = new Vector2(rect.xMax - radius, rect.yMin + radius);
+                    break;
+                case 2:
+                    center = new Vector2(rect.xMax - radius, rect.yMax - radius);
+                    break;
+                default:
+                    center = new Vector2(rect.xMin + radius, rect.yMax - radius);
+                    break;
+            }
+            return center + new Vector2(Mathf.Cos(angle), Mathf.Sin(angle)) * radius;
+        }
+    }
+
     internal sealed class InputFieldFocusFeedback : MonoBehaviour, ISelectHandler, IDeselectHandler
     {
         private Image image;
-        private Outline outline;
+        private RoundedBorderGraphic border;
+        private Image placeholderMask;
+        private InputField input;
+        private bool focusStateInitialized;
+        private bool lastFocused;
 
-        public void Initialize(Image targetImage, Outline targetOutline)
+        public void Initialize(Image targetImage, RoundedBorderGraphic targetBorder)
         {
             image = targetImage;
-            outline = targetOutline;
+            border = targetBorder;
+        }
+
+        public void SetPlaceholderMask(Image mask, InputField owner)
+        {
+            placeholderMask = mask;
+            input = owner;
+        }
+
+        private void Update()
+        {
+            // Some Android input modules do not dispatch ISelectHandler on the
+            // first touch, even though the InputField receives the keystroke.
+            // Poll the authoritative InputField focus state as a fallback so
+            // the blue frame is always synchronized with the caret.
+            if (input == null) return;
+            bool focused = input.isFocused;
+            if (!focusStateInitialized || focused != lastFocused)
+            {
+                ApplyFocusVisual(focused);
+            }
+        }
+
+        private void ApplyFocusVisual(bool focused)
+        {
+            focusStateInitialized = true;
+            lastFocused = focused;
+            if (image != null) image.color = new Color(1f, 1f, 1f, 0f);
+            if (border != null)
+            {
+                // Keep the focus ring above the authored PNG and all input
+                // helper graphics; otherwise the gray raster border can
+                // cover the straight sections and leave only blue corners.
+                if (focused)
+                    border.transform.SetAsLastSibling();
+                // Draw a distinct, thicker focus ring over the authored PNG.
+                // When focus leaves, hide the overlay completely so the
+                // original gray border from LoginCover.png is visible again.
+                border.SetBorderColor(focused
+                    ? new Color(0.08f, 0.32f, 0.72f, 1f)
+                    : new Color(1f, 1f, 1f, 0f));
+                border.borderThickness = focused ? 3.2f : 0f;
+            }
+            if (placeholderMask != null)
+                placeholderMask.enabled = focused || (input != null && !string.IsNullOrEmpty(input.text));
         }
 
         public void OnSelect(BaseEventData eventData)
         {
-            if (image != null) image.color = new Color(0.96f, 0.98f, 1f);
-            if (outline != null)
-            {
-                outline.effectColor = new Color(0.36f, 0.61f, 0.93f);
-                outline.effectDistance = new Vector2(2f, -2f);
-            }
+            ApplyFocusVisual(true);
         }
 
         public void OnDeselect(BaseEventData eventData)
         {
-            if (image != null) image.color = Color.white;
-            if (outline != null)
-            {
-                outline.effectColor = new Color(0.77f, 0.81f, 0.87f);
-                outline.effectDistance = new Vector2(1f, -1f);
-            }
+            ApplyFocusVisual(false);
+        }
+    }
+
+    internal sealed class ProfileInputFocusFeedback : MonoBehaviour, ISelectHandler, IDeselectHandler
+    {
+        private Image border;
+
+        public void Initialize(Image borderImage)
+        {
+            border = borderImage;
+        }
+
+        public void OnSelect(BaseEventData eventData)
+        {
+            SetFocused(true);
+        }
+
+        public void OnDeselect(BaseEventData eventData)
+        {
+            SetFocused(false);
+        }
+
+        private void SetFocused(bool focused)
+        {
+            if (border != null)
+                border.color = focused ? QuestionnaireUi.Accent : new Color(.77f, .80f, .86f);
         }
     }
 

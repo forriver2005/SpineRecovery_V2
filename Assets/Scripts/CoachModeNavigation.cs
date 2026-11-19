@@ -12,11 +12,13 @@ public static class CoachModeNavigation
     public const string BirdDogCoachScene = "BirdDogPractice";
     public const string HipThrustCoachScene = "HipThrustPractice";
     public const string SideBridgeCoachScene = "SideBridgePractice";
+    public const string SideBridgeRightCoachScene = "SideBridgeOppositePractice";
 
     public const string DeadBugGameScene = "DeadBug_RingSkinC_Recorded";
     public const string BirdDogGameScene = "BirdDog_RingSkinC_Recorded";
     public const string HipThrustGameScene = "HipThrust_RingBridge_NewScoring";
     public const string SideBridgeGameScene = "SideBridge_RingBridge_Dynamic";
+    public const string SideBridgeRightGameScene = "SideBridgeOpposite_RingBridge_Dynamic";
 
     private static string replayPracticeScene;
     private static string replayGameScene;
@@ -57,6 +59,9 @@ public static class CoachModeNavigation
             case "maleSideBridgePractice":
                 gameScene = SideBridgeGameScene;
                 return true;
+            case SideBridgeRightCoachScene:
+                gameScene = SideBridgeRightGameScene;
+                return true;
             default:
                 gameScene = null;
                 return false;
@@ -87,6 +92,10 @@ public static class CoachModeNavigation
             case SideBridgeGameScene:
             case "SideBridge_RingBridge_Hold30":
                 coachScene = SideBridgeCoachScene;
+                return true;
+            case SideBridgeRightGameScene:
+            case "SideBridgeOpposite_RingBridge_Hold30":
+                coachScene = SideBridgeRightCoachScene;
                 return true;
             default:
                 coachScene = null;
@@ -161,6 +170,8 @@ public static class CoachModeNavigation
 
     public static void OpenActionLibraryFromCoach()
     {
+        UnityEngine.Object.FindObjectOfType<DeadBugStartMenuController>(true)
+            ?.HidePracticeToolbarForActionLibrary();
         StopCurrentPractice();
         if (!CoachingActionLibrary.OpenFromPractice())
         {
@@ -252,8 +263,10 @@ public static class CoachModeNavigation
             string.Equals(sceneName, BirdDogGameScene, StringComparison.Ordinal) ||
             string.Equals(sceneName, HipThrustGameScene, StringComparison.Ordinal) ||
             string.Equals(sceneName, SideBridgeGameScene, StringComparison.Ordinal) ||
+            string.Equals(sceneName, SideBridgeRightGameScene, StringComparison.Ordinal) ||
             string.Equals(sceneName, "HipThrust_RingBridge_Hold30", StringComparison.Ordinal) ||
-            string.Equals(sceneName, "SideBridge_RingBridge_Hold30", StringComparison.Ordinal);
+            string.Equals(sceneName, "SideBridge_RingBridge_Hold30", StringComparison.Ordinal) ||
+            string.Equals(sceneName, "SideBridgeOpposite_RingBridge_Hold30", StringComparison.Ordinal);
     }
 
     private static string NormalizeSceneName(string sceneName)

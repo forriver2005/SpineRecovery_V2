@@ -142,6 +142,14 @@ public class SceneSwitcher : MonoBehaviour
             false));
     }
 
+    public void LoadSideBridgeOppositePracticeScene()
+    {
+        LoadSceneForCurrentMobileSession(ResolveReplayReturnScene(
+            CoachModeNavigation.SideBridgeRightCoachScene,
+            ReplaySessionContext.ReturnPracticeScene,
+            false));
+    }
+
     public void LoadPlayBackScene()
     {
         LoadSceneForCurrentMobileSession(PlayBackScene);

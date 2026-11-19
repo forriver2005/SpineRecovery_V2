@@ -22,6 +22,8 @@ public sealed class GameWorkoutPlan
         if (action == "hipthrust_hold30") return "HipThrust_RingBridge_Hold30";
         if (action == "sidebridge") return "SideBridge_RingBridge_Dynamic";
         if (action == "sidebridge_hold30") return "SideBridge_RingBridge_Hold30";
+        if (action == "sidebridge_right") return "SideBridgeOpposite_RingBridge_Dynamic";
+        if (action == "sidebridge_right_hold30") return "SideBridgeOpposite_RingBridge_Hold30";
         if (recordedCoach)
         {
             switch (action)
@@ -52,6 +54,8 @@ public sealed class GameWorkoutPlan
             case "hipthrust_hold30": return "臀桥 · 保持30秒";
             case "sidebridge": return "左侧桥 · 动态";
             case "sidebridge_hold30": return "左侧桥 · 保持30秒";
+            case "sidebridge_right": return "右侧桥 · 动态";
+            case "sidebridge_right_hold30": return "右侧桥 · 保持30秒";
             default: return action;
         }
     }
@@ -79,5 +83,5 @@ public sealed class GameWorkoutPlan
         if (total > 1000) throw new ArgumentException("动作串总组数不能超过 1000。");
         return copy;
     }
-    public static bool RequiresExactReps(string action) => action=="hipthrust_hold30" || action=="sidebridge" || action=="sidebridge_hold30";
+    public static bool RequiresExactReps(string action) => action=="hipthrust_hold30" || action=="sidebridge" || action=="sidebridge_hold30" || action=="sidebridge_right" || action=="sidebridge_right_hold30";
 }

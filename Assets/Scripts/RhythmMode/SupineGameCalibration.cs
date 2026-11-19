@@ -11,10 +11,14 @@ public sealed class SupineGameCalibration : MonoBehaviour
     public float referenceSeconds = 6.8f;
     public const string Instruction = "请仰卧屈膝、双脚着地，双臂放身体两侧";
     public bool leftSideBridge;
-    public string PoseInstruction => leftSideBridge ? "请按教练左侧支撑，左肘与左脚支撑，肩髋叠放" : Instruction;
+    public SideBridgePoseGeometry.SupportSide supportSide = SideBridgePoseGeometry.SupportSide.Left;
+    public string PoseInstruction => leftSideBridge ? (supportSide == SideBridgePoseGeometry.SupportSide.Left ? "请按教练左侧支撑，左肘与左脚支撑，肩髋叠放" : "请按教练右侧支撑，右肘与右脚支撑，肩髋叠放") : Instruction;
     public bool IsPoseReady(Animator avatar) => leftSideBridge
-        ? SideBridgePoseGeometry.TryMeasure(avatar,out var pose)&&pose.IsLeftSupport
+        ? SideBridgePoseGeometry.TryMeasure(avatar,EffectiveSide(),out var pose)&&new SideBridgePoseGeometry(EffectiveSide()).IsSupport(pose)
         : IsLying(avatar);
+    private SideBridgePoseGeometry.SupportSide EffectiveSide() =>
+        UnityEngine.SceneManagement.SceneManager.GetActiveScene().name.StartsWith("SideBridgeOpposite")
+            ? SideBridgePoseGeometry.SupportSide.Right : supportSide;
     private PlayableGraph graph;
 
     public bool Prepare(Animator coach)

@@ -283,6 +283,7 @@ public class PracticeSessionController : MonoBehaviour
         if (scene.StartsWith("male", System.StringComparison.Ordinal)) scene = scene.Substring(4);
         return scene == "DeadBugPractice" || scene == "BirdDogPractice" ||
             scene == "HipThrustPractice" || scene == "SideBridgePractice" ||
+            scene == "SideBridgeOppositePractice" ||
             scene == "CatCamelPractice" || scene == "CurlUpPractice";
     }
 
@@ -2045,6 +2046,8 @@ public class PracticeSessionController : MonoBehaviour
             motionRecorder.RequestFinish();
         }
 
+        // Score finalization must precede the checkpoint regardless of event subscription order.
+        poseScorer?.SealTrainingMeasurement();
         SpineFlowTrainingSession.CompleteCoachTraining(
             poseScorer != null ? poseScorer.SessionScores : null,
             poseScorer != null ? poseScorer.MaximumUserMotionDegrees : 0f,

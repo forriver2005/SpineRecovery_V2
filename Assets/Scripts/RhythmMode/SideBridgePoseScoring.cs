@@ -4,6 +4,9 @@ using System.Collections.Generic;
 /// <summary>Left-support references, achievable recorded hold targets, and measured repetitions.</summary>
 public sealed class SideBridgePoseScoring : MonoBehaviour
 {
+    [SerializeField] private SideBridgePoseGeometry.SupportSide supportSide = SideBridgePoseGeometry.SupportSide.Left;
+    public SideBridgePoseGeometry.SupportSide SupportSide => supportSide;
+    public void SetSupportSide(SideBridgePoseGeometry.SupportSide side) { supportSide = side; }
     public readonly SideBridgeHoldRule Rule=new SideBridgeHoldRule();
     public SideBridgePoseGeometry Geometry => references!=null?references[activeCycle]:null;
     public bool PostureReady { get; private set; }
@@ -41,9 +44,9 @@ public sealed class SideBridgePoseScoring : MonoBehaviour
         for(int i=0;i<references.Length;i++)
         {
             var cycle=timeline.cycles[i];Sample(cycle.liftStartFrame);
-            if(!SideBridgePoseGeometry.TryMeasure(measured,out var rest)||!SideBridgePoseGeometry.TryMeasure(animator,out var coachRest))return false;
+            if(!SideBridgePoseGeometry.TryMeasure(measured,supportSide,out var rest)||!SideBridgePoseGeometry.TryMeasure(animator,supportSide,out var coachRest))return false;
             Sample(HipThrustHold30Timeline.PeakFrame(timeline,i));
-            if(!SideBridgePoseGeometry.TryMeasure(measured,out var top)||!SideBridgePoseGeometry.TryMeasure(animator,out var coachTop))return false;
+            if(!SideBridgePoseGeometry.TryMeasure(measured,supportSide,out var top)||!SideBridgePoseGeometry.TryMeasure(animator,supportSide,out var coachTop))return false;
             // A brief recorded overshoot must not make the whole stable plateau
             // look like a partial lift. Use its median height for amplitude scaling;
             // the coach still freezes at the original actual peak in the 30s mode.
@@ -51,16 +54,16 @@ public sealed class SideBridgePoseScoring : MonoBehaviour
             var coachPlateau=new float[plateau.Length];
             for(int frame=cycle.holdStartFrame;frame<=cycle.lowerStartFrame;frame++)
             {
-                Sample(frame);if(!SideBridgePoseGeometry.TryMeasure(measured,out var holdPose)||!SideBridgePoseGeometry.TryMeasure(animator,out var coachPose))return false;
+                Sample(frame);if(!SideBridgePoseGeometry.TryMeasure(measured,supportSide,out var holdPose)||!SideBridgePoseGeometry.TryMeasure(animator,supportSide,out var coachPose))return false;
                 plateau[frame-cycle.holdStartFrame]=holdPose.lift;
                 coachPlateau[frame-cycle.holdStartFrame]=coachPose.lift;
             }
             System.Array.Sort(plateau);
             System.Array.Sort(coachPlateau);
             float stableLift=plateau[plateau.Length/2];
-            var geometry=references[i]=new SideBridgePoseGeometry();
+            var geometry=references[i]=new SideBridgePoseGeometry(supportSide);
             if(!geometry.SetTargets(rest,top,rest.lift,stableLift))return false;
-            coachReferences[i]=new SideBridgePoseGeometry();
+            coachReferences[i]=new SideBridgePoseGeometry(supportSide);
             if(!coachReferences[i].SetTargets(coachRest,coachTop,coachRest.lift,coachPlateau[coachPlateau.Length/2]))return false;
             // Measure the achievable total valid high-position time of this dynamic cycle.
             // This uses the same entry confirmation and quality gates as the player.
@@ -74,7 +77,7 @@ public sealed class SideBridgePoseScoring : MonoBehaviour
                 for(int sample=0;sample<=System.Math.Floor(duration*sampleRate);sample++)
                 {
                     Sample(cycle.liftStartFrame+sample*timeline.sourceClip.frameRate/sampleRate);
-                    bool valid=SideBridgePoseGeometry.TryMeasure(measured,out var pose)&&SideBridgePoseGeometry.HasStableSupport(pose,top);
+                    bool valid=SideBridgePoseGeometry.TryMeasure(measured,supportSide,out var pose)&&new SideBridgePoseGeometry(supportSide).HasStableSupportForSide(pose,top);
                     if(valid)referenceSignal.Sample(geometry.RawProgress(pose),geometry.TopLift-geometry.RestLift,1f/sampleRate);
                     referenceRule.Step(referenceSignal.Progress,valid?geometry.Quality(pose,top,referenceRule.QualityTolerance):0,1f/sampleRate,valid,-1,valid,Mathf.Abs(referenceSignal.LiftSpeed)<=referenceRule.StableSpeed);
                 }
@@ -110,19 +113,19 @@ public sealed class SideBridgePoseScoring : MonoBehaviour
     public bool Evaluate(Animator animator,out float progress,out float quality,float deltaTime=.0333333f)
     {
         progress=quality=TrackingQuality=0;PostureReady=SupportReady=Stable=HighAmplitudeReady=false;
-        if(Geometry==null||!SideBridgePoseGeometry.TryMeasure(animator,out var pose))return false;
+        if(Geometry==null||!SideBridgePoseGeometry.TryMeasure(animator,supportSide,out var pose))return false;
         PostureReady=pose.IsLeftSupport;
         if(!PostureReady){signal.Reset();return true;}
         // Filter before clamping: clipping peaks first turns symmetric sensor
         // noise into a downward bias and unfairly fails a correct high hold.
         float rawProgress=Geometry.RawProgress(pose);
-        SideBridgePoseGeometry.TryMeasure(transport.CoachAnimator,out var expected);
+        SideBridgePoseGeometry.TryMeasure(transport.CoachAnimator,supportSide,out var expected);
         float expectedProgress=expected!=null?coachReferences[activeCycle].Progress(expected):0;
         // Learn only a small zero-height offset while both demonstrator and user
         // are at rest. Never learn amplitude from a patient's incomplete top.
         // Fixed strap/baseline errors cannot turn a half lift into a full one.
         if(biasSeconds<.2f&&expected!=null&&expectedProgress<.10f&&
-            rawProgress>=-.60f&&rawProgress<=.65f&&SideBridgePoseGeometry.HasStableSupport(pose,Geometry.Rest)&&
+            rawProgress>=-.60f&&rawProgress<=.65f&&Geometry.HasStableSupportForSide(pose,Geometry.Rest)&&
             Geometry.Quality(pose,Geometry.Rest,Rule.QualityTolerance)>=70)
         {
             biasSum+=(rawProgress-expectedProgress)*deltaTime;biasSeconds+=deltaTime;
@@ -138,7 +141,7 @@ public sealed class SideBridgePoseScoring : MonoBehaviour
         progress=signal.Progress;quality=Geometry.Quality(pose,Geometry.Top,Rule.QualityTolerance);
         HighAmplitudeReady=expected!=null&&(expectedProgress<.4f||progress>=expectedProgress*(difficulty=="simple"?.75f:difficulty=="hard"?.78f:.76f));
         Stable=Mathf.Abs(signal.LiftSpeed)<=Rule.StableSpeed;
-        SupportReady=SideBridgePoseGeometry.HasStableSupport(pose,Geometry.Top);
+        SupportReady=Geometry.HasStableSupportForSide(pose,Geometry.Top);
         if(expected!=null)
         {
             history.Add(new SampledPose{time=transport.Elapsed,progress=expectedProgress,pose=expected});
@@ -172,9 +175,9 @@ public sealed class SideBridgePoseScoring : MonoBehaviour
 
     public bool Matches(Animator user,Animator coach)
     {
-        return Geometry!=null&&SideBridgePoseGeometry.TryMeasure(user,out var actual)&&
-            SideBridgePoseGeometry.TryMeasure(coach,out var expected)&&expected.IsLeftSupport&&
-            SideBridgePoseGeometry.HasStableSupport(actual,expected)&&
+        return Geometry!=null&&SideBridgePoseGeometry.TryMeasure(user,supportSide,out var actual)&&
+            SideBridgePoseGeometry.TryMeasure(coach,supportSide,out var expected)&&Geometry.IsSupport(expected)&&
+            Geometry.HasStableSupportForSide(actual,expected)&&
             HighAmplitudeReady&&TrackingQuality>=GameDifficultyPolicy.FollowingThreshold(difficulty)&&
             // During a high demonstration a tiny lift must not HIT merely
             // because its other joints have a good weighted quality score.

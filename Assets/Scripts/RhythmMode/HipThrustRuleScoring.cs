@@ -4,6 +4,7 @@ using System.Collections.Generic;
 /// <summary>Opt-in scoring for the two new scenes. The legacy menu/calibration and transport remain in charge.</summary>
 public sealed class HipThrustRuleScoring : MonoBehaviour
 {
+    [SerializeField] private SideBridgePoseGeometry.SupportSide supportSide = SideBridgePoseGeometry.SupportSide.Left;
     public HipThrustTaikoController transport;
     public DeadBugGamingPoseScorer calibration;
     public SideBridgePoseScoring sideBridge;
@@ -58,6 +59,9 @@ public sealed class HipThrustRuleScoring : MonoBehaviour
 
     public void Begin(string difficulty)
     {
+        if (UnityEngine.SceneManagement.SceneManager.GetActiveScene().name.StartsWith("SideBridgeOpposite"))
+            supportSide = SideBridgePoseGeometry.SupportSide.Right;
+        if (sideBridge != null) sideBridge.SetSupportSide(supportSide);
         Rule.Reset(difficulty); Progress=Quality=MatchedDelay=0; InputFresh=false;coachHistory.Clear();
         minimumTrackingQuality=GameDifficultyPolicy.FollowingThreshold(difficulty);
         progressTolerance=GameDifficultyPolicy.BridgeProgressTolerance(difficulty);

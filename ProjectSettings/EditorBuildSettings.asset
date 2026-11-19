@@ -83,4 +83,15 @@ EditorBuildSettings:
   - enabled: 1
     path: Assets/Scenes/BirdDogPracticeOld.unity
     guid: 18cc5a1bc2834e3e9d998a3fc94ec82c
+  - enabled: 1
+    path: Assets/Scenes/SideBridgeOppositePractice.unity
+    guid: a0ea75489cd44df49da803928649519f
+  - enabled: 1
+    path: Assets/Scenes/SideBridgeOpposite_RingBridge_Dynamic.unity
+    guid: 4b397cba6d244c948b9534a5050d0f2c
+  - enabled: 1
+    path: Assets/Scenes/SideBridgeOpposite_RingBridge_Hold30.unity
+    guid: 5b7af8caee6845ad95aed9b9cf2f0160
   m_configObjects: {}
+
+

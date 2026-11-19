@@ -954,6 +954,13 @@ public class DeadBugStartMenuController : MonoBehaviour
         }
     }
 
+    public void HidePracticeToolbarForActionLibrary()
+    {
+        if (!IsPracticeCoachMode) return;
+        SetPracticeActionMenuCanvasVisible(false);
+        SetPracticeToolbarVisible(false);
+    }
+
     private void ResumePracticeFromPause()
     {
         MobileCoachControls controls = FindObjectOfType<MobileCoachControls>(true);

@@ -2310,9 +2310,23 @@ namespace SpineRecovery.App
         {
             if (input == null) return;
             Image image = input.GetComponent<Image>();
-            if (image != null) image.color = new Color(1f, 1f, 1f, 0f);
+            if (image != null)
+            {
+                // This InputField is only an interaction layer over the
+                // approved phone PNG. Keep its Image transparent and detach
+                // it from Selectable's targetGraphic so Unity cannot tint it
+                // white on focus and cover the authored icon/border.
+                image.color = new Color(1f, 1f, 1f, 0f);
+                image.raycastTarget = true;
+            }
+            input.targetGraphic = null;
+            input.transition = Selectable.Transition.None;
             RoundedBorderGraphic border = input.GetComponentInChildren<RoundedBorderGraphic>(true);
-            if (border != null) border.SetBorderColor(new Color(1f, 1f, 1f, 0f));
+            if (border != null)
+            {
+                border.SetBorderColor(new Color(1f, 1f, 1f, 0f));
+                border.raycastTarget = false;
+            }
             if (input.textComponent != null)
             {
                 input.textComponent.color = new Color(0.25f, 0.30f, 0.38f, 1f);

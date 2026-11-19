@@ -23,7 +23,7 @@ public static class PracticeSceneController
     {
         string currentScene = SceneManager.GetActiveScene().name;
         skipLessonOnNextLoad = true;
-        SceneManager.LoadScene(currentScene);
+        SceneLoadingOverlay.Load(currentScene);
         Debug.Log($"[PracticeSceneController] 重新加载练习场景: {currentScene}");
     }
 
@@ -105,7 +105,7 @@ public static class PracticeSceneController
     private static void LoadSceneForCurrentSession(string sceneName)
     {
         string resolvedScene = SpineFlowTrainingSession.ResolveSceneForMobileSession(sceneName);
-        SceneManager.LoadScene(resolvedScene);
+        SceneLoadingOverlay.Load(resolvedScene);
     }
 
     /// <summary>

@@ -235,7 +235,7 @@ public static class CoachModeNavigation
             return;
         }
 
-        SceneManager.LoadScene(resolved);
+        SceneLoadingOverlay.Load(resolved);
     }
 
     private static string ResolvePreferredGameScene(string coachScene, string fallback)

@@ -3299,7 +3299,7 @@ MonoBehaviour:
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_text: "\u5DE6\u4FA7\u6865 \xB7 \u52A8\u6001"
+  m_text: "\u53F3\u4FA7\u6865 \xB7 \u52A8\u6001"
   m_isRightToLeft: 0
   m_fontAsset: {fileID: 11400000, guid: c51d6bd242c90b6409817346d886d3ef, type: 2}
   m_sharedMaterial: {fileID: 6653073857887410576, guid: c51d6bd242c90b6409817346d886d3ef, type: 2}
@@ -6464,7 +6464,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: a41b17853c1d06c43ac7b58c49eaae31, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  actionName: "\u5DE6\u4FA7\u6865"
+  actionName: "\u53F3\u4FA7\u6865"
   targetSceneName: SideBridge_RingBridge_Dynamic
   hitArea: {fileID: 521654081}
   previewAnimator: {fileID: 1390636358}
@@ -15474,7 +15474,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: fbfe3a977dc7dae48b1cf76f6cbb8a7d, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  actionId: sidebridge
+  actionId: sidebridge_right
   useRecordedCoachAnimations: 1
   hipThrustSceneOverride: 
   hideWorkoutToggle: 1
@@ -32350,7 +32350,7 @@ MonoBehaviour:
   repeatStartFrame: 30
   repeatEndFrame: 765
   routineStateName: sidebridge_routine
-  actionDisplayName: "\u5DE6\u4FA7\u6865"
+  actionDisplayName: "\u53F3\u4FA7\u6865"
   restTransitionStateName: sidebridge_wrap
   hipThrustStartStateName: sidebridge_start
   hipThrustAnimatorController: {fileID: 9100000, guid: b85eb77bb0c0f19489b03c94624ee626, type: 2}
@@ -32413,7 +32413,7 @@ MonoBehaviour:
   menu: {fileID: 1133686541}
   menuDescription: {fileID: 248765020}
   prescriptionActionId: side_bridge
-  actionDisplayName: "\u5DE6\u4FA7\u6865"
+  actionDisplayName: "\u53F3\u4FA7\u6865"
   preserveRecordedTiming: 1
   skipRecordedPlateauAfterHold: 0
   preserveSourceGaps: 1
@@ -32454,4 +32454,7 @@ SceneRoots:
   - {fileID: 1840094071}
   - {fileID: 2073477129}
   - {fileID: 860241094}
+
+
+
 

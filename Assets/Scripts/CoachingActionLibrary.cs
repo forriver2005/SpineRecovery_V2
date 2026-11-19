@@ -373,7 +373,7 @@ public sealed class CoachingActionLibrary : MonoBehaviour
         retainedPracticeRoots = null;
         retainedRootActiveStates = null;
         DeadBugStartMenuController.ShowPracticeStartOnNextLoad();
-        SceneManager.LoadScene(destination, LoadSceneMode.Single);
+        SceneLoadingOverlay.Load(destination, LoadSceneMode.Single);
     }
 
     private void Select(int index)

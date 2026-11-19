@@ -462,6 +462,9 @@ public sealed class SpineFlowTrainingSession : MonoBehaviour
 
     public static string ResolveSceneForGender(string sceneName, bool isMale)
     {
+        if (string.Equals(sceneName, "SideBridgeOppositePractice", StringComparison.Ordinal))
+            return sceneName;
+
         LumbarCoachProfile lumbar = LumbarCoachMode.ForScene(sceneName);
         if (lumbar != null)
             return isMale ? "male" + lumbar.sceneName : lumbar.sceneName;

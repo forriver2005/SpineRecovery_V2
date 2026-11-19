@@ -123,7 +123,9 @@ namespace SpineRecovery.App
                     coach.sets < 1 || coach.sets > 20 || coach.reps < 1 || coach.reps > 100 ||
                     coach.holdSeconds < 0 || coach.holdSeconds > 600 ||
                     coach.sets != game.sets || coach.reps != game.reps || coach.holdSeconds != game.holdSeconds ||
-                    !File.Exists(coach.prescriptionAssetPath) ||
+                    (!string.IsNullOrWhiteSpace(coach.prescriptionAssetPath) && !File.Exists(coach.prescriptionAssetPath)) ||
+                    (string.IsNullOrWhiteSpace(coach.prescriptionAssetPath) &&
+                     !LocalActionCatalog.IsSupported(BaseActionId(coach.actionId))) ||
                     !Application.CanStreamedLevelBeLoaded(coach.sceneName) ||
                     !Application.CanStreamedLevelBeLoaded(game.sceneName)) return false;
             }
@@ -140,6 +142,18 @@ namespace SpineRecovery.App
             ScreenOrientationService.SetLandscape();
             SceneManager.LoadScene(plan.targetScene);
             return true;
+        }
+
+        private static string BaseActionId(string actionId)
+        {
+            if (string.IsNullOrWhiteSpace(actionId)) return string.Empty;
+            const string coachSuffix = "_coach";
+            const string gameSuffix = "_game";
+            if (actionId.EndsWith(coachSuffix, StringComparison.Ordinal))
+                return actionId.Substring(0, actionId.Length - coachSuffix.Length);
+            if (actionId.EndsWith(gameSuffix, StringComparison.Ordinal))
+                return actionId.Substring(0, actionId.Length - gameSuffix.Length);
+            return actionId;
         }
 
         public void ContinuePrescription()

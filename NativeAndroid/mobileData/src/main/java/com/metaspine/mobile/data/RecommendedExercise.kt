@@ -15,6 +15,16 @@ enum class RecommendedExercise(
         displayName = "鸟狗式",
         targetScene = SpineFlowProtocol.BIRD_DOG_PRACTICE_TARGET_SCENE
     ),
+    HipThrust(
+        actionIdPrefix = "hip_thrust",
+        displayName = "臀桥",
+        targetScene = "HipThrustPractice"
+    ),
+    SideBridge(
+        actionIdPrefix = "side_bridge",
+        displayName = "侧桥",
+        targetScene = "SideBridgePractice"
+    ),
 
     /**
      * 联调用：由一个现实中不会出现的疼痛组合触发，进入数据驱动的统一练习场景。
@@ -37,10 +47,9 @@ enum class RecommendedExercise(
 
         fun fromActionIds(actionIds: Collection<String>): RecommendedExercise? {
             if (actionIds.isEmpty()) return null
-            return actionIds
-                .map { actionId -> fromActionId(actionId) ?: return null }
-                .distinct()
-                .singleOrNull()
+            // A prescription may contain several different actions. The first item
+            // is the initial scene; Unity advances the remaining pairs in order.
+            return fromActionId(actionIds.first())
         }
     }
 }

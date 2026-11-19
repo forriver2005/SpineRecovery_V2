@@ -39,6 +39,20 @@ namespace SpineRecovery.App
                     FemaleCoachScene = "BirdDogPractice", MaleCoachScene = "maleBirdDogPractice",
                     GameScene = "BirdDogMinimal"
                 },
+                ["hip_thrust"] = new LocalActionDefinition
+                {
+                    ServerActionId = "hip_thrust", LocalKey = "hip_thrust",
+                    FemaleCoachScene = "HipThrustPractice", MaleCoachScene = "maleHipThrustPractice",
+                    GameScene = "HipThrust_RingBridge_NewScoring",
+                    EmbeddedMotionResource = "ActionLibrary/Motions/clip_26"
+                },
+                ["side_bridge"] = new LocalActionDefinition
+                {
+                    ServerActionId = "side_bridge", LocalKey = "side_bridge",
+                    FemaleCoachScene = "SideBridgePractice", MaleCoachScene = "maleSideBridgePractice",
+                    GameScene = "SideBridge_RingBridge_Dynamic",
+                    EmbeddedMotionResource = "ActionLibrary/Motions/clip_27"
+                },
                 // Future package-only mappings. They become executable after a local scene
                 // and action contract are added for the corresponding server action id.
                 ["1"] = new LocalActionDefinition { ServerActionId = "1", LocalKey = "clip_01", EmbeddedMotionResource = "ActionLibrary/Motions/clip_01" },

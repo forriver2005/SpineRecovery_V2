@@ -36,6 +36,8 @@ data class TrainingAction(
     val transitionSeconds: Int = 0,
     val demoFirst: Boolean = false,
     val difficultyOptionsSeconds: List<Int> = emptyList(),
+    val prescriptionItemId: Long? = null,
+    val prescriptionPosition: Int? = null,
     /**
      * 动作数据包的 content:// URI。非空时 AR 端按这份关键帧数据驱动教练，
      * 不使用内置的导入片段。由 MotionPackageStore.uriFor() 签发。
@@ -162,6 +164,10 @@ data class TrainingStartPayload(
                                     .put("holdSeconds", action.holdSeconds)
                                     .put("transitionSeconds", action.transitionSeconds)
                                     .put("demoFirst", action.demoFirst)
+                                    .apply {
+                                        action.prescriptionItemId?.let { put("prescriptionItemId", it) }
+                                        action.prescriptionPosition?.let { put("prescriptionPosition", it) }
+                                    }
                                     .put(
                                         "difficultyOptionsSeconds",
                                         JSONArray(action.difficultyOptionsSeconds)
@@ -210,10 +216,11 @@ data class TrainingStartPayload(
         ): TrainingStartPayload {
             require(patientId.isNotBlank()) { "尚未完成患者身份绑定，请联系医生" }
             require(binding.patientId == patientId && binding.accountId == user.accountId) { "医院绑定与当前账号不一致" }
-            require(order.items.size == 1) { "医生处方包含多个动作，手机端暂不支持顺序执行" }
-            val item = requireNotNull(order.singleItem) { "医生处方参数不完整，请联系医生" }
-            require(item.actionId in TrainingDirectiveParser.SUPPORTED_ACTION_IDS) { "医生处方包含手机端不支持的动作" }
-            require(item.sets in 1..20 && item.reps in 1..100 && item.holdSeconds in 0..600) {
+            require(order.items.isNotEmpty()) { "医生处方参数不完整，请联系医生" }
+            require(order.items.all { it.actionId in TrainingDirectiveParser.SUPPORTED_ACTION_IDS }) {
+                "医生处方包含手机端不支持的动作"
+            }
+            require(order.items.all { it.sets in 1..20 && it.reps in 1..100 && it.holdSeconds in 0..600 }) {
                 "医生处方参数超出支持范围"
             }
             val dailyCheck = requireNotNull(user.latestPreTrainingCheck) {
@@ -229,16 +236,20 @@ data class TrainingStartPayload(
                 imuCalibrationRequired = true,
                 painPoints = user.latestPainPoints,
                 dailyCheck = dailyCheck,
-                actions = coachAndGameActions(
-                    actionId = item.actionId,
-                    displayName = item.actionName,
-                    coachSets = item.sets,
-                    coachReps = item.reps,
-                    coachHoldSeconds = item.holdSeconds,
-                    transitionSeconds = 2,
-                    gameDifficultySeconds = ArTrainingDefaults.GAME_DIFFICULTY_OPTIONS_SECONDS,
-                    motionPackageUri = null
-                ),
+                actions = order.items.flatMap { item ->
+                    coachAndGameActions(
+                            actionId = item.actionId,
+                            displayName = item.actionName,
+                            coachSets = item.sets,
+                            coachReps = item.reps,
+                            coachHoldSeconds = item.holdSeconds,
+                            transitionSeconds = 2,
+                            gameDifficultySeconds = ArTrainingDefaults.GAME_DIFFICULTY_OPTIONS_SECONDS,
+                            motionPackageUri = null,
+                            prescriptionItemId = item.itemId,
+                            prescriptionPosition = item.position
+                    )
+                },
                 patientId = patientId,
                 prescriptionOrderId = order.orderId,
                 prescription = null,
@@ -293,13 +304,9 @@ data class TrainingStartPayload(
         /**
          * 执行能力缺口（面向患者）。返回空表示本机可以执行整份处方。
          *
-         * 目前执行层一次只跑一个动作，且只认识 [TrainingDirectiveParser.SUPPORTED_ACTION_IDS]；
-         * 新增能力前必须在这里显式放开，而不是让多动作处方悄悄只跑第一项。
+         * 每个处方条目都必须有明确的本地执行路由；多动作按服务器 position 顺序交给 Unity。
          */
         fun capabilityGaps(order: DownloadedOrder): List<String> = buildList {
-            if (order.items.size != 1) {
-                add("医生处方包含多个动作，手机端暂不支持顺序执行，请联系医生调整。")
-            }
             if (order.items.any { it.actionId !in TrainingDirectiveParser.SUPPORTED_ACTION_IDS }) {
                 add("医生处方包含手机端不支持的动作")
             }
@@ -308,8 +315,7 @@ data class TrainingStartPayload(
         /**
          * 医生处方 → AR 动作。教练剂量取医生值；游戏保留现有单局与时长选择语义。
          *
-         * 多动作处方在 P4 只是完整下发与保存，执行层仍是一次一个动作：这里明确报告能力缺口，
-         * 不截取第一项，也不假装已支持多动作执行。
+         * 多动作处方按条目顺序展开为 coach/game 对，Unity 在每个游戏结果页推进下一项。
          */
         private fun trainingActionsForPrescription(
             handoff: TrainingPrescriptionHandoff,
@@ -318,34 +324,32 @@ data class TrainingStartPayload(
             val order = handoff.order
             val gaps = capabilityGaps(order)
             require(gaps.isEmpty()) { gaps.first() }
-            val item = requireNotNull(order.singleItem) { "医生处方参数不完整，请联系医生" }
-            require(
-                item.sets in 1..20 &&
-                    item.reps in 1..100 &&
-                    item.holdSeconds in 0..600
-            ) { "医生处方参数超出支持范围" }
-            // 冻结资源必须逐项对上：条目、版本、摘要、长度与清单一致才允许启动 AR。
-            val asset = requireNotNull(handoff.assets.firstOrNull { it.item.itemId == item.itemId }) {
-                "处方资源未完成校验，请重新下拉处方"
+            return order.items.flatMap { item ->
+                // 冻结资源必须逐项对上：条目、版本、摘要、长度与清单一致才允许启动 AR。
+                val asset = requireNotNull(handoff.assets.firstOrNull { it.item.itemId == item.itemId }) {
+                    "处方资源未完成校验，请重新下拉处方"
+                }
+                require(asset.item.asset.sha256 == item.asset.sha256 &&
+                    asset.byteCount == item.asset.fileSize &&
+                    asset.file.length() == item.asset.fileSize) {
+                    "处方资源与处方清单不一致，请重新下拉处方"
+                }
+                val uri = requireNotNull(assetUri(asset.file)) {
+                    "无法把处方资源交给 AR，请联系工作人员"
+                }
+                coachAndGameActions(
+                    actionId = item.actionId,
+                    displayName = item.actionName,
+                    coachSets = item.sets,
+                    coachReps = item.reps,
+                    coachHoldSeconds = item.holdSeconds,
+                    transitionSeconds = 2,
+                    gameDifficultySeconds = ArTrainingDefaults.GAME_DIFFICULTY_OPTIONS_SECONDS,
+                    motionPackageUri = uri,
+                    prescriptionItemId = item.itemId,
+                    prescriptionPosition = item.position
+                )
             }
-            require(asset.item.asset.sha256 == item.asset.sha256 &&
-                asset.byteCount == item.asset.fileSize &&
-                asset.file.length() == item.asset.fileSize) {
-                "处方资源与处方清单不一致，请重新下拉处方"
-            }
-            val uri = requireNotNull(assetUri(asset.file)) {
-                "无法把处方资源交给 AR，请联系工作人员"
-            }
-            return coachAndGameActions(
-                actionId = item.actionId,
-                displayName = item.actionName,
-                coachSets = item.sets,
-                coachReps = item.reps,
-                coachHoldSeconds = item.holdSeconds,
-                transitionSeconds = 2,
-                gameDifficultySeconds = ArTrainingDefaults.GAME_DIFFICULTY_OPTIONS_SECONDS,
-                motionPackageUri = uri
-            )
         }
 
         private fun coachAndGameActions(
@@ -356,7 +360,9 @@ data class TrainingStartPayload(
             coachHoldSeconds: Int,
             transitionSeconds: Int,
             gameDifficultySeconds: List<Int>,
-            motionPackageUri: String?
+            motionPackageUri: String?,
+            prescriptionItemId: Long? = null,
+            prescriptionPosition: Int? = null
         ): List<TrainingAction> = listOf(
             TrainingAction(
                 actionId = "${actionId}_coach",
@@ -368,20 +374,24 @@ data class TrainingStartPayload(
                 holdSeconds = coachHoldSeconds,
                 transitionSeconds = transitionSeconds,
                 demoFirst = true,
-                motionPackageUri = motionPackageUri
+                motionPackageUri = motionPackageUri,
+                prescriptionItemId = prescriptionItemId,
+                prescriptionPosition = prescriptionPosition
             ),
             TrainingAction(
                 actionId = "${actionId}_game",
                 actionName = "${displayName}（游戏模式）",
                 arTaskType = ArTaskType.GameTraining.wireValue,
                 level = "user_selected_duration",
-                // 保持原有游戏动作的一局入口语义；游戏时长由用户在 AR 端选择。
-                sets = 1,
-                reps = 1,
-                holdSeconds = 0,
+                // 游戏仍由用户选择时长，但保留医生下发的剂量用于结果对账。
+                sets = coachSets,
+                reps = coachReps,
+                holdSeconds = coachHoldSeconds,
                 transitionSeconds = transitionSeconds,
                 difficultyOptionsSeconds = gameDifficultySeconds,
-                motionPackageUri = motionPackageUri
+                motionPackageUri = motionPackageUri,
+                prescriptionItemId = prescriptionItemId,
+                prescriptionPosition = prescriptionPosition
             )
         )
 

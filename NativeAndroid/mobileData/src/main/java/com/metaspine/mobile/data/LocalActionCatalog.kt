@@ -19,6 +19,8 @@ object LocalActionCatalog {
     private val definitions = listOf(
         LocalActionDefinition("dead_bug", "dead_bug", "DeadBugPractice", "maleDeadBugPractice", "SpineV2Minimal"),
         LocalActionDefinition("bird_dog", "bird_dog", "BirdDogPractice", "maleBirdDogPractice", "BirdDogMinimal"),
+        LocalActionDefinition("hip_thrust", "hip_thrust", "HipThrustPractice", "maleHipThrustPractice", "HipThrust_RingBridge_NewScoring"),
+        LocalActionDefinition("side_bridge", "side_bridge", "SideBridgePractice", "maleSideBridgePractice", "SideBridge_RingBridge_Dynamic"),
         LocalActionDefinition("1", "clip_01", null, null, null, "ActionLibrary/Motions/clip_01"),
         LocalActionDefinition("2", "clip_03", null, null, null, "ActionLibrary/Motions/clip_03"),
         LocalActionDefinition("3", "clip_05", null, null, null, "ActionLibrary/Motions/clip_05"),

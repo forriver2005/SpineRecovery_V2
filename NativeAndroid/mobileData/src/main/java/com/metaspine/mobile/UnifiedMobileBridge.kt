@@ -433,10 +433,14 @@ object UnifiedMobileBridge {
                 }
                 run {
                     val localOrder = locallyReceived.snapshot.prescription
-                    val localItem = localOrder?.singleItem
-                    val localDefinition = localItem?.let { LocalActionCatalog.find(it.actionId) }
-                    if (localOrder != null && localItem != null && localDefinition != null &&
-                        LocalActionCatalog.isLocallyExecutable(localItem.actionId)) {
+                    val localItems = localOrder?.items.orEmpty()
+                    val localDefinitions = localItems.mapNotNull { item ->
+                        LocalActionCatalog.find(item.actionId)?.takeIf {
+                            LocalActionCatalog.isLocallyExecutable(item.actionId)
+                        }
+                    }
+                    if (localOrder != null && localItems.isNotEmpty() &&
+                        localDefinitions.size == localItems.size) {
                         require(isCurrent(bindingScope)) { "医院绑定或网络连接已变化，请重新进入训练" }
                         val payload = TrainingStartPayload.forLocalPrescription(
                             user,
@@ -447,11 +451,15 @@ object UnifiedMobileBridge {
                         )
                         val source = JSONObject(payload.toJson())
                         val actions = source.getJSONObject("trainingPlan").getJSONArray("recommendedActions")
-                        val coachScene = requireNotNull(localDefinition.coachScene(user.profile?.gender == UserGender.Male))
-                        val gameScene = requireNotNull(localDefinition.gameScene)
                         objects(actions).forEach { row ->
-                            row.put("sceneName", if (row.getString("arTaskType") == "coach_training") coachScene else gameScene)
+                            val actionId = row.getString("actionId").removeSuffix("_coach").removeSuffix("_game")
+                            val definition = requireNotNull(LocalActionCatalog.find(actionId))
+                            row.put("sceneName", if (row.getString("arTaskType") == "coach_training")
+                                requireNotNull(definition.coachScene(user.profile?.gender == UserGender.Male))
+                            else requireNotNull(definition.gameScene))
                         }
+                        val firstDefinition = localDefinitions.first()
+                        val coachScene = requireNotNull(firstDefinition.coachScene(user.profile?.gender == UserGender.Male))
                         val sessionId = UUID.randomUUID().toString()
                         val planToken = UUID.randomUUID().toString()
                         require(isCurrent(bindingScope)) { "医院绑定或网络连接已变化，请重新进入训练" }
@@ -461,7 +469,7 @@ object UnifiedMobileBridge {
                         return JSONObject().put("sessionId", sessionId).put("requestToken", sessionId)
                             .put("planToken", planToken).put("startedAt", startedAt).put("accountId", account)
                             .put("patientId", credential.patientId).put("gender", user.profile?.gender?.wireValue)
-                            .put("actionId", localItem.actionId).put("targetScene", coachScene).put("actions", actions)
+                            .put("actionId", localItems.first().actionId).put("targetScene", coachScene).put("actions", actions)
                             .put("prescriptionOrderId", localOrder.orderId)
                             .put("prescriptionJson", source.getJSONObject("trainingPlan").toString())
                             .put("preTrainingEventId", user.latestPreTrainingCheck?.recordedAt?.takeIf { it.isNotBlank() }?.let { "pre:$it" }.orEmpty())

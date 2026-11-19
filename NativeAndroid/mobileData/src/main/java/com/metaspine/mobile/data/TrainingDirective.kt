@@ -84,8 +84,8 @@ class DirectiveProtocolException(message: String) : RuntimeException(message)
  * 旧版处方直接失败，不截第一项、不构造默认动作。
  */
 object TrainingDirectiveParser {
-    /** 与 Server `MOBILE_ROUTE_ACTIONS` 一致：AR 执行层当前只有这两个基础动作。 */
-    val SUPPORTED_ACTION_IDS = setOf("dead_bug", "bird_dog")
+    /** 与 Server/Unity 固定内置训练路由一致。未知动作必须明确阻断，不能回退到死虫。 */
+    val SUPPORTED_ACTION_IDS = setOf("dead_bug", "bird_dog", "hip_thrust", "side_bridge")
 
     /** Server `ACTION_ID`：小写标识符或纯数字，V2 处方里是可执行动作的冻结 ID。 */
     private val ACTION_ID_PATTERN = Regex("^(?:[a-z][a-z0-9_]{0,127}|[1-9][0-9]{0,5})$")

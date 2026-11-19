@@ -7,9 +7,8 @@ namespace SpineRecovery.App
     {
         /// <summary>
         /// Newest pending assignment for the patient, or null when none is active.
-        /// Until the server link exists, the very first call seeds one default
-        /// page-1 assignment; after it is completed the entry stays grey until a
-        /// new assignment arrives.
+        /// The patient app never creates a questionnaire locally; assignments
+        /// must come from the doctor/server side.
         /// </summary>
         MonthlyQuestionnaireAssignment GetActive(string accountId);
         MonthlyQuestionnaireAssignment[] LoadHistory(string accountId);
@@ -26,10 +25,8 @@ namespace SpineRecovery.App
     public sealed class JsonMonthlyAssignmentRepository : IMonthlyAssignmentRepository
     {
         /// <summary>
-        /// Returns the newest pending assignment, seeding a default page-1 one
-        /// only for a first-time patient with no history at all. Once that seed
-        /// is completed the row greys out until a real assignment arrives, so
-        /// reseeding here must be a one-shot.
+        /// Returns only a doctor-issued pending assignment. A first-time patient
+        /// with no server assignment has no questionnaire to display.
         /// </summary>
         public MonthlyQuestionnaireAssignment GetActive(string accountId)
         {
@@ -39,23 +36,7 @@ namespace SpineRecovery.App
             {
                 return active;
             }
-            if (items.Length > 0)
-            {
-                return null;
-            }
-
-            active = new MonthlyQuestionnaireAssignment
-            {
-                assignmentId = "local:" + Guid.NewGuid().ToString("N"),
-                patientAccount = accountId,
-                issuedBy = "local-demo",
-                issuedAt = DateTimeOffset.UtcNow.ToString("O"),
-                modules = MonthlyQuestionnaireAssignment.ModuleJoa,
-                status = MonthlyQuestionnaireAssignment.StatusPending,
-                syncState = MonthlyQuestionnaireAssignment.SyncLocal,
-            };
-            Save(accountId, active);
-            return active;
+            return null;
         }
 
         public MonthlyQuestionnaireAssignment[] LoadHistory(string accountId)

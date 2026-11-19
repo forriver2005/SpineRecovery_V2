@@ -7,7 +7,7 @@ namespace SpineRecovery.App
     /// modular: <see cref="modules"/> is a bitmask of the pages the patient
     /// must fill this round — 1 = page 1 (JOA self assessment), 2 = page 2
     /// (SF-MPQ), 3 = both. Stored per patient locally and synced later; the
-    /// demo seeds a page-1-only assignment because there is no server yet.
+    /// assignments are created by the doctor/server and delivered to the patient.
     /// </summary>
     [Serializable]
     public sealed class MonthlyQuestionnaireAssignment

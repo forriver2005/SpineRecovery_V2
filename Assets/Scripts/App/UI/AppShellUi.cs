@@ -44,6 +44,9 @@ namespace SpineRecovery.App
         private Text trainingMenuMessage;
         private EventSystem appEventSystem;
         private Button trackingCompleteButton;
+        private Text trackingStatusTitle;
+        private Text trainingDisplayStatus;
+        private Text trainingTrackerStatus;
         private InputField accountInput;
         private InputField passwordInput;
         private InputField registerAccountInput;
@@ -52,6 +55,7 @@ namespace SpineRecovery.App
         private InputField activationCodeInput;
         private InputField[] profileInputs;
         private AppRoute profileContinueRoute = AppRoute.Home;
+        private AppRoute trackingReturnRoute = AppRoute.Home;
         private Text flowMessage;
         private Text painScoreLabel;
         private Text surveySelectionLabel;
@@ -130,7 +134,7 @@ namespace SpineRecovery.App
             GameObject arTrainingPanel = CreateArTrainingPanel(safeContent);
             GameObject trainingMenuPanel = CreateTrainingMenuPanel(safeContent);
             GameObject trackingPanel = CreateTrackingCalibrationPanel(safeContent);
-            GameObject profilePanel = CreateFormPanel(safeContent, "资料登记", "请填写基本资料（年龄 10–100，身高 120–220 cm，体重 35–200 kg）", CreateProfileForm);
+            GameObject profilePanel = CreateProfilePanel(safeContent);
             GameObject surveyPanel = CreateFormPanel(safeContent, "基础问卷", "选择最符合当前情况的一项；如出现危险症状请暂停并联系专业人员。", CreateSurveyForm);
             GameObject painPanel = CreateFormPanel(safeContent, "疼痛记录", "选择疼痛部位并记录 1–10 分；没有疼痛可选择“无疼痛”。", CreatePainForm);
             GameObject admissionPanel = CreateFormPanel(safeContent, "首次动作评估", "仅记录体验，不用于诊断。若疼痛明显加重或达到 8/10，请停止并寻求专业评估。", CreateAdmissionForm);
@@ -393,8 +397,8 @@ namespace SpineRecovery.App
             homeScreen = new HomeScreen();
             GameObject panel = homeScreen.Build(parent, BuildHomeState, new HomeScreen.Actions
             {
-                EnterTraining = () => bootstrap.Router.Navigate(AppRoute.Training),
-                OpenTracker = () => bootstrap.Router.Navigate(AppRoute.TrackingCalibration),
+                EnterTraining = () => bootstrap.Router.Navigate(AppRoute.TrainingPreparation),
+                OpenTracker = OpenTrackingCalibrationFromHome,
                 OpenActivation = () => bootstrap.Router.Navigate(AppRoute.Activation),
                 OpenHistory = ShowHistory,
                 OpenMonthly = ShowMonthlyQuestionnaire,
@@ -442,7 +446,7 @@ namespace SpineRecovery.App
             // The Unity V2 scene owns the AR preparation screen and its action
             // menu.  Enter it directly so the phone flow matches SpineFlowMobile.
             CreateButton(panel.transform, "开始训练", new Vector2(0, 40), () => StartTraining("SpineV2Minimal", "dead_bug"));
-            CreateButton(panel.transform, "追踪器连接与校准", new Vector2(0, -50), () => bootstrap.Router.Navigate(AppRoute.TrackingCalibration));
+            CreateButton(panel.transform, "追踪器连接与校准", new Vector2(0, -50), OpenTrackingCalibrationFromHome);
             CreateButton(panel.transform, "动作示范库", new Vector2(0, -140), OpenActionLibrary);
             CreateButton(panel.transform, "返回训练首页", new Vector2(0, -230), () => bootstrap.Router.Navigate(AppRoute.Home));
             return panel;
@@ -450,16 +454,113 @@ namespace SpineRecovery.App
 
         private GameObject CreateTrainingMenuPanel(Transform parent)
         {
-            GameObject panel = CreatePanel("TrainingMenuPanel", parent, new Color(0.973f, 0.980f, 1f));
-            CreateLabel(panel.transform, "选择训练内容", new Vector2(0, 250), 32);
-            CreateLabel(panel.transform, "开始训练前请选择一种模式或测试项目。", new Vector2(0, 195), 17);
-            trainingMenuMessage = CreateLabel(panel.transform, "训练模式会按当前处方进入指导训练。", new Vector2(0, 135), 16);
-            trainingMenuMessage.rectTransform.sizeDelta = new Vector2(820, 70);
-            CreateButton(panel.transform, "训练模式", new Vector2(0, 55), () => StartTraining("SpineV2Minimal", "dead_bug"));
-            CreateButton(panel.transform, "动作示范库", new Vector2(0, -35), OpenActionLibrary);
-            CreateButton(panel.transform, "返回 AR 训练", new Vector2(0, -305), () => bootstrap.Router.Navigate(AppRoute.Training));
-            CreateButton(panel.transform, "回到主页", new Vector2(0, -395), () => bootstrap.Router.Navigate(AppRoute.Home));
+            RectTransform root = QuestionnaireUi.CreateScreen(parent, "TrainingMenuPanel", null, out GameObject panel);
+            QuestionnaireUi.Header(root, "训练准备", () => bootstrap.Router.Navigate(AppRoute.Home));
+            RectTransform content = QuestionnaireUi.ScrollArea(root, QuestionnaireUi.HeaderHeight, 96f, 690f);
+            QuestionnaireUi.Label(content, "开始本次训练", 29, QuestionnaireUi.Accent, TextAnchor.MiddleLeft,
+                FontStyle.Bold, 20f, 36f, 350f, 48f);
+            QuestionnaireUi.Label(content, "连接投屏眼镜和 IMU 追踪器后，进入训练流程", 15, QuestionnaireUi.Muted,
+                TextAnchor.MiddleLeft, FontStyle.Normal, 20f, 91f, 350f, 42f);
+
+            RectTransform deviceCard = QuestionnaireUi.Card(content, 20f, 153f, 350f, 178f);
+            trainingDisplayStatus = AddPreparationRow(deviceCard, "投屏眼镜", "未连接", "连接", 12f, 18f,
+                OpenDisplayConnection);
+            QuestionnaireUi.Box(deviceCard, "Divider", QuestionnaireUi.Divider, 0.5f, 20f, 88f, 310f, 1f);
+            trainingTrackerStatus = AddPreparationRow(deviceCard, "IMU 追踪器", "未校准", "去校准", 12f, 96f,
+                OpenTrackingCalibrationFromPreparation);
+
+            RectTransform info = QuestionnaireUi.Card(content, 20f, 350f, 350f, 86f);
+            QuestionnaireUi.Label(info, "i", 18, QuestionnaireUi.Accent, TextAnchor.MiddleCenter,
+                FontStyle.Bold, 12f, 0f, 30f, 86f);
+            QuestionnaireUi.Label(info, "建议先完成追踪器校准再开始训练，动作识别会更准确", 14,
+                QuestionnaireUi.Muted, TextAnchor.MiddleLeft, FontStyle.Normal, 50f, 0f, 282f, 86f);
+
+            Button library = QuestionnaireUi.MakeButton(content, "ActionLibrary", Color.white, 18f,
+                20f, 458f, 350f, 88f, OpenActionLibrary);
+            QuestionnaireUi.Label(library.transform, "动作示范库", 19, QuestionnaireUi.Ink, TextAnchor.MiddleLeft,
+                FontStyle.Bold, 76f, 15f, 240f, 30f);
+            QuestionnaireUi.Label(library.transform, "开始前可以先看一遍动作要领", 14, QuestionnaireUi.Muted,
+                TextAnchor.MiddleLeft, FontStyle.Normal, 76f, 48f, 240f, 24f);
+            QuestionnaireUi.Label(library.transform, ">", 26, QuestionnaireUi.Muted, TextAnchor.MiddleCenter,
+                FontStyle.Normal, 312f, 0f, 26f, 88f);
+
+            RectTransform footer = QuestionnaireUi.Footer(root, 96f);
+            trainingMenuMessage = QuestionnaireUi.Label(footer, "", 12, QuestionnaireUi.DangerText,
+                TextAnchor.MiddleCenter, FontStyle.Normal, 20f, 2f, 350f, 18f);
+            QuestionnaireUi.PillButton(footer, "开始训练", 20f, 28f, 350f, 52f, true,
+                () => StartTraining("SpineV2Minimal", "dead_bug"));
+            RefreshTrainingPreparationStatus();
             return panel;
+        }
+
+        private static Text AddPreparationRow(Transform parent, string title, string initialStatus,
+            string actionCaption, float x, float y, UnityEngine.Events.UnityAction action)
+        {
+            QuestionnaireUi.Box(parent, title + "Icon", QuestionnaireUi.SecondaryButton, 14f, x, y, 52f, 52f);
+            QuestionnaireUi.Label(parent, title, 18, QuestionnaireUi.Ink, TextAnchor.MiddleLeft,
+                FontStyle.Bold, x + 66f, y + 1f, 158f, 27f);
+            Text status = QuestionnaireUi.Label(parent, initialStatus, 14, QuestionnaireUi.BadgeText,
+                TextAnchor.MiddleLeft, FontStyle.Bold, x + 66f, y + 27f, 158f, 22f);
+            Button button = QuestionnaireUi.MakeButton(parent, title + "Action", QuestionnaireUi.SecondaryButton,
+                18f, 257f, y + 6f, 72f, 40f, action);
+            QuestionnaireUi.Label(button.transform, actionCaption, 15, QuestionnaireUi.Accent,
+                TextAnchor.MiddleCenter, FontStyle.Bold, 0f, 0f, 72f, 40f);
+            return status;
+        }
+
+        private void RefreshTrainingPreparationStatus()
+        {
+            if (trainingTrackerStatus == null) return;
+            bool confirmed = !string.IsNullOrEmpty(bootstrap?.State?.Session?.trackingCalibratedAt);
+            if (EmbeddedSlimeVrBridge.TryReadState(out var state, true) && state.trackers != null)
+            {
+                int connected = state.trackers.Count(item => item.connected);
+                trainingTrackerStatus.text = connected > 0
+                    ? (confirmed ? connected + " 个已连接 · 已校准" : connected + " 个已连接")
+                    : (confirmed ? "已校准 · 等待连接" : "未校准");
+            }
+            else trainingTrackerStatus.text = confirmed ? "已校准" : "未校准";
+        }
+
+        private void OpenTrackingCalibrationFromHome()
+        {
+            trackingReturnRoute = AppRoute.Home;
+            bootstrap.Router.Navigate(AppRoute.TrackingCalibration);
+        }
+
+        private void OpenTrackingCalibrationFromPreparation()
+        {
+            trackingReturnRoute = AppRoute.TrainingPreparation;
+            bootstrap.Router.Navigate(AppRoute.TrackingCalibration);
+        }
+
+        private void ReturnFromTrackingCalibration()
+        {
+            AppRoute destination = trackingReturnRoute == AppRoute.TrainingPreparation
+                ? AppRoute.TrainingPreparation : AppRoute.Home;
+            bootstrap.Router.Navigate(destination);
+        }
+
+        private void OpenDisplayConnection()
+        {
+#if UNITY_ANDROID && !UNITY_EDITOR
+            try
+            {
+                using (var unityPlayer = new AndroidJavaClass("com.unity3d.player.UnityPlayer"))
+                using (var activity = unityPlayer.GetStatic<AndroidJavaObject>("currentActivity"))
+                using (var intent = new AndroidJavaObject("android.content.Intent", "android.settings.CAST_SETTINGS"))
+                {
+                    activity.Call("startActivity", intent);
+                    if (trainingDisplayStatus != null) trainingDisplayStatus.text = "请在系统中选择设备";
+                }
+            }
+            catch (System.Exception exception)
+            {
+                if (trainingMenuMessage != null) trainingMenuMessage.text = "无法打开投屏设置：" + exception.Message;
+            }
+#else
+            if (trainingDisplayStatus != null) trainingDisplayStatus.text = "请在 Android 设备上连接";
+#endif
         }
 
         private void ImportLegacyArchive()
@@ -470,7 +571,9 @@ namespace SpineRecovery.App
 
         private void OnApplicationFocus(bool focused)
         {
-            if (!focused || !NativeMobileService.Available || bootstrap?.State?.Session == null) return;
+            if (!focused) return;
+            RefreshTrainingPreparationStatus();
+            if (!NativeMobileService.Available || bootstrap?.State?.Session == null) return;
             var user = bootstrap.Users.Load(bootstrap.State.Session.accountId);
             JsonUtility.FromJsonOverwrite(JsonUtility.ToJson(user), bootstrap.State.Session);
             RefreshHomeSummary();
@@ -1230,17 +1333,50 @@ namespace SpineRecovery.App
 
         private GameObject CreateTrackingCalibrationPanel(Transform parent)
         {
-            GameObject panel = CreatePanel("TrackingCalibrationPanel", parent, new Color(0.973f, 0.980f, 1f));
-            CreateLabel(panel.transform, "IMU 追踪器校准", new Vector2(0, 185), 28);
-            CreateLabel(panel.transform,
-                "启动内嵌 SlimeVR，按引导连接追踪器并完成校准。返回后请确认校准状态。",
-                new Vector2(0, 115), 15);
-            trackingMessage = CreateLabel(panel.transform, "校准尚未开始", new Vector2(0, 55), 15);
-            CreateButton(panel.transform, "打开 SlimeVR 校准清单", new Vector2(0, -15), OpenEmbeddedSlimeVrCalibration);
-            trackingCompleteButton = CreateButton(panel.transform, "我已完成校准，继续", new Vector2(0, -85), ConfirmTrackingCalibration);
+            RectTransform root = QuestionnaireUi.CreateScreen(parent, "TrackingCalibrationPanel", null, out GameObject panel);
+            QuestionnaireUi.Header(root, "追踪器校准", ReturnFromTrackingCalibration);
+            RectTransform content = QuestionnaireUi.ScrollArea(root, QuestionnaireUi.HeaderHeight, 152f, 670f);
+            QuestionnaireUi.Label(content, "IMU 追踪器校准", 29, QuestionnaireUi.Accent, TextAnchor.MiddleLeft,
+                FontStyle.Bold, 20f, 36f, 350f, 48f);
+            QuestionnaireUi.Label(content, "训练前需要连接并校准追踪器，动作识别才准确", 15,
+                QuestionnaireUi.Muted, TextAnchor.MiddleLeft, FontStyle.Normal, 20f, 91f, 350f, 42f);
+
+            RectTransform state = QuestionnaireUi.Card(content, 20f, 153f, 350f, 104f);
+            QuestionnaireUi.Box(state, "StateIcon", QuestionnaireUi.BadgeFill, 16f, 18f, 26f, 52f, 52f);
+            trackingStatusTitle = QuestionnaireUi.Label(state, "校准尚未开始", 18, QuestionnaireUi.Ink,
+                TextAnchor.MiddleLeft, FontStyle.Bold, 84f, 17f, 200f, 30f);
+            trackingMessage = QuestionnaireUi.Label(state, "状态：未校准", 14, QuestionnaireUi.BadgeText,
+                TextAnchor.MiddleLeft, FontStyle.Bold, 84f, 53f, 230f, 28f);
+
+            RectTransform steps = QuestionnaireUi.Card(content, 20f, 277f, 350f, 325f);
+            QuestionnaireUi.Label(steps, "校准步骤", 20, QuestionnaireUi.Ink, TextAnchor.MiddleLeft,
+                FontStyle.Bold, 20f, 18f, 310f, 34f);
+            AddCalibrationStep(steps, 1, "打开 SlimeVR 校准清单", "连接追踪器并检查设备状态", 72f);
+            AddCalibrationStep(steps, 2, "连接追踪器并完成校准", "按 SlimeVR 引导佩戴并完成校准", 151f);
+            AddCalibrationStep(steps, 3, "返回此页确认", "完成后点击下方按钮继续", 230f);
+
+            RectTransform footer = QuestionnaireUi.Footer(root, 146f);
+            QuestionnaireUi.PillButton(footer, "打开 SlimeVR 校准清单", 20f, 8f, 350f, 40f, false,
+                OpenEmbeddedSlimeVrCalibration);
+            Button quick = QuestionnaireUi.PillButton(footer, "快速校准", 20f, 54f, 350f, 40f, false,
+                OpenEmbeddedSlimeVrQuickCalibration);
+            quick.GetComponent<Image>().color = Color.white;
+            trackingCompleteButton = QuestionnaireUi.PillButton(footer, "我已完成校准，继续", 20f, 100f,
+                350f, 52f, true, ConfirmTrackingCalibration);
             trackingCompleteButton.interactable = false;
-            CreateButton(panel.transform, "返回训练首页", new Vector2(0, -155), () => bootstrap.Router.Navigate(AppRoute.Home));
             return panel;
+        }
+
+        private static void AddCalibrationStep(Transform parent, int number, string title, string detail, float top)
+        {
+            QuestionnaireUi.Box(parent, "StepNumber", number == 1 ? QuestionnaireUi.Accent : QuestionnaireUi.SecondaryButton,
+                18f, 20f, top, 36f, 36f);
+            QuestionnaireUi.Label(parent, number.ToString(), 16, number == 1 ? Color.white : QuestionnaireUi.Accent,
+                TextAnchor.MiddleCenter, FontStyle.Bold, 20f, top, 36f, 36f);
+            QuestionnaireUi.Label(parent, title, 16, QuestionnaireUi.Ink, TextAnchor.MiddleLeft,
+                FontStyle.Bold, 68f, top - 1f, 260f, 28f);
+            QuestionnaireUi.Label(parent, detail, 13, QuestionnaireUi.Muted, TextAnchor.MiddleLeft,
+                FontStyle.Normal, 68f, top + 28f, 260f, 34f);
         }
 
         private void OpenEmbeddedSlimeVrCalibration()
@@ -1254,7 +1390,22 @@ namespace SpineRecovery.App
             }
 
             trackingCompleteButton.interactable = true;
-            trackingMessage.text = "SlimeVR 已打开。完成校准后返回此页面，再点击确认。";
+            trackingStatusTitle.text = "SlimeVR 校准清单已打开";
+            trackingMessage.text = "请完成校准后返回此页面确认";
+        }
+
+        private void OpenEmbeddedSlimeVrQuickCalibration()
+        {
+            int height = bootstrap.State.Session != null ? bootstrap.State.Session.profile.heightCm : 0;
+            if (!EmbeddedSlimeVrBridge.TryOpenCalibration(height, out string error, true))
+            {
+                trackingStatusTitle.text = "无法启动快速校准";
+                trackingMessage.text = error;
+                return;
+            }
+            trackingCompleteButton.interactable = true;
+            trackingStatusTitle.text = "快速校准已打开";
+            trackingMessage.text = "完成后返回此页面确认";
         }
 
         private void ConfirmTrackingCalibration()
@@ -1265,12 +1416,16 @@ namespace SpineRecovery.App
                 session.trackingCalibratedAt = System.DateTimeOffset.UtcNow.ToString("O");
                 bootstrap.Users.Save(session);
             }
+            RefreshTrainingPreparationStatus();
             if (trackingMessage != null)
-                trackingMessage.text = EmbeddedSlimeVrBridge.TryReadState(out var tracking)
-                    ? "SlimeVR：" + tracking.state + "；在线追踪器：" + tracking.trackers.Count(t => t.connected) +
-                        "；骨骼输出：" + (tracking.vmcSkeletonOutputFresh ? "正在更新" : "等待数据")
-                    : "暂时无法读取追踪器状态，可以重新打开校准页检查。";
-            bootstrap.Router.Navigate(AppRoute.Home);
+            {
+                bool available = EmbeddedSlimeVrBridge.TryReadState(out var tracking, true);
+                int connected = available && tracking.trackers != null ? tracking.trackers.Count(t => t.connected) : 0;
+                trackingStatusTitle.text = connected > 0 ? "追踪器已连接" : "校准确认已记录";
+                trackingMessage.text = available ? "在线追踪器：" + connected + " · " +
+                    (tracking.vmcSkeletonOutputFresh ? "动作数据正常" : "等待动作数据") : "校准状态已保存";
+            }
+            ReturnFromTrackingCalibration();
         }
 
         private void HandleLoginClicked()
@@ -1377,20 +1532,90 @@ namespace SpineRecovery.App
             return panel;
         }
 
-        private void CreateProfileForm(Transform parent)
+        private GameObject CreateProfilePanel(Transform parent)
         {
-            profileInputs = new[] {
-                CreateInput(parent, "年龄（岁）", new Vector2(0, 180), false),
-                CreateInput(parent, "身高（cm）", new Vector2(0, 105), false),
-                CreateInput(parent, "体重（kg）", new Vector2(0, 30), false),
-            };
+            RectTransform root = QuestionnaireUi.CreateScreen(parent, "BasicProfilePanel", null, out GameObject panel);
+            QuestionnaireUi.Header(root, "资料登记", () => bootstrap.Router.Navigate(profileContinueRoute));
+            RectTransform content = QuestionnaireUi.ScrollArea(root, QuestionnaireUi.HeaderHeight, 96f, 650f);
+            QuestionnaireUi.Label(content, "先填一下基本资料", 29, QuestionnaireUi.Accent, TextAnchor.MiddleLeft,
+                FontStyle.Bold, 20f, 36f, 350f, 48f);
+            QuestionnaireUi.Label(content, "用来调整训练强度和动作识别，只需填写一次", 15,
+                QuestionnaireUi.Muted, TextAnchor.MiddleLeft, FontStyle.Normal, 20f, 91f, 350f, 42f);
+
+            RectTransform card = QuestionnaireUi.Card(content, 20f, 153f, 350f, 404f);
+            QuestionnaireUi.Label(card, "性别", 17, QuestionnaireUi.Ink, TextAnchor.MiddleLeft,
+                FontStyle.Bold, 20f, 20f, 310f, 28f);
             genderButtons = new[]
             {
-                CreateButton(parent, "性别：男", new Vector2(-145, -50), () => SelectGender("男", 0), 250),
-                CreateButton(parent, "性别：女", new Vector2(145, -50), () => SelectGender("女", 1), 250),
+                CreateProfileChoice(card, "男", 20f, 58f, () => SelectGender("男", 0)),
+                CreateProfileChoice(card, "女", 176f, 58f, () => SelectGender("女", 1)),
             };
             SetSelectedChoice(genderButtons, -1);
-            CreateButton(parent, "保存并继续", new Vector2(0, -145), SaveProfile);
+
+            profileInputs = new[]
+            {
+                CreateProfileNumberInput(card, "年龄", "请输入年龄", "岁", "10–100", 122f),
+                CreateProfileNumberInput(card, "身高", "请输入身高", "cm", "120–220", 214f),
+                CreateProfileNumberInput(card, "体重", "请输入体重", "kg", "35–200", 306f),
+            };
+
+            RectTransform footer = QuestionnaireUi.Footer(root, 96f);
+            flowMessage = QuestionnaireUi.Label(footer, "", 12, QuestionnaireUi.DangerText,
+                TextAnchor.MiddleCenter, FontStyle.Normal, 20f, 2f, 350f, 18f);
+            flowMessages[AppRoute.BasicProfile] = flowMessage;
+            QuestionnaireUi.PillButton(footer, "保存并继续", 20f, 28f, 350f, 52f, true, SaveProfile);
+            return panel;
+        }
+
+        private static Button CreateProfileChoice(Transform parent, string caption, float x, float y,
+            UnityEngine.Events.UnityAction action)
+        {
+            Button button = QuestionnaireUi.MakeButton(parent, "Gender" + caption, QuestionnaireUi.OptionBackground,
+                12f, x, y, 154f, 48f, action);
+            QuestionnaireUi.Label(button.transform, caption, 17, QuestionnaireUi.Muted, TextAnchor.MiddleCenter,
+                FontStyle.Bold, 0f, 0f, 154f, 48f);
+            return button;
+        }
+
+        private static InputField CreateProfileNumberInput(Transform parent, string label, string placeholder,
+            string suffix, string range, float y)
+        {
+            QuestionnaireUi.Label(parent, label, 17, QuestionnaireUi.Ink, TextAnchor.MiddleLeft,
+                FontStyle.Bold, 20f, y, 120f, 28f);
+            QuestionnaireUi.Label(parent, range, 13, QuestionnaireUi.Muted, TextAnchor.MiddleRight,
+                FontStyle.Normal, 210f, y, 120f, 28f);
+
+            Image background = QuestionnaireUi.Box(parent, label + "Input", Color.white, 12f,
+                20f, y + 34f, 310f, 50f);
+            background.raycastTarget = true;
+            Image ring = QuestionnaireUi.Ring(background.transform, "InputBorder", new Color(.77f, .80f, .86f),
+                12f, 1.2f);
+            QuestionnaireUi.Stretch(ring.rectTransform, 0f, 0f, 0f, 0f);
+            ring.raycastTarget = false;
+            InputField input = background.gameObject.AddComponent<InputField>();
+            input.targetGraphic = background;
+            input.transition = Selectable.Transition.None;
+            input.contentType = InputField.ContentType.IntegerNumber;
+            input.keyboardType = TouchScreenKeyboardType.NumberPad;
+            input.lineType = InputField.LineType.SingleLine;
+            input.characterLimit = 3;
+            input.shouldHideMobileInput = true;
+            input.customCaretColor = true;
+            input.caretColor = QuestionnaireUi.Accent;
+            input.selectionColor = new Color(.29f, .53f, .85f, .25f);
+
+            Text value = QuestionnaireUi.Label(background.transform, "", 17, QuestionnaireUi.Ink,
+                TextAnchor.MiddleLeft, FontStyle.Normal, 16f, 0f, 232f, 50f);
+            value.horizontalOverflow = HorizontalWrapMode.Overflow;
+            input.textComponent = value;
+            Text hint = QuestionnaireUi.Label(background.transform, placeholder, 17, new Color(.58f, .62f, .70f),
+                TextAnchor.MiddleLeft, FontStyle.Normal, 16f, 0f, 232f, 50f);
+            input.placeholder = hint;
+            QuestionnaireUi.Label(background.transform, suffix, 17, QuestionnaireUi.Muted, TextAnchor.MiddleCenter,
+                FontStyle.Bold, 252f, 0f, 44f, 50f);
+            ProfileInputFocusFeedback feedback = background.gameObject.AddComponent<ProfileInputFocusFeedback>();
+            feedback.Initialize(ring);
+            return input;
         }
 
         private void SelectGender(string gender, int selectedIndex)
@@ -1401,6 +1626,9 @@ namespace SpineRecovery.App
 
         private void SaveProfile()
         {
+            if (profileInputs != null)
+                foreach (InputField input in profileInputs)
+                    if (input != null) input.DeactivateInputField();
             if (!int.TryParse(profileInputs[0].text, out int age) || age < 10 || age > 100 ||
                 !int.TryParse(profileInputs[1].text, out int height) || height < 120 || height > 220 ||
                 !int.TryParse(profileInputs[2].text, out int weight) || weight < 35 || weight > 200 || string.IsNullOrEmpty(selectedGender))
@@ -2488,6 +2716,32 @@ namespace SpineRecovery.App
         public void OnDeselect(BaseEventData eventData)
         {
             ApplyFocusVisual(false);
+        }
+    }
+
+    internal sealed class ProfileInputFocusFeedback : MonoBehaviour, ISelectHandler, IDeselectHandler
+    {
+        private Image border;
+
+        public void Initialize(Image borderImage)
+        {
+            border = borderImage;
+        }
+
+        public void OnSelect(BaseEventData eventData)
+        {
+            SetFocused(true);
+        }
+
+        public void OnDeselect(BaseEventData eventData)
+        {
+            SetFocused(false);
+        }
+
+        private void SetFocused(bool focused)
+        {
+            if (border != null)
+                border.color = focused ? QuestionnaireUi.Accent : new Color(.77f, .80f, .86f);
         }
     }
 

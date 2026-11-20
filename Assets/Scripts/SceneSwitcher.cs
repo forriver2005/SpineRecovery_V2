@@ -1,5 +1,8 @@
+using System.Collections;
 using UnityEngine;
 using UnityEngine.SceneManagement;
+using UnityEngine.UI;
+using SpineRecovery.App;
 
 public class SceneSwitcher : MonoBehaviour
 {
@@ -17,14 +20,60 @@ public class SceneSwitcher : MonoBehaviour
     private const string PlayBackScene = "PlayBack";
     private const string ActionLibraryScene = "ActionLibrary";
     private const string GamingChooseScene = "GamingChoose";
+    private static int returningSceneHandle = -1;
+
+    [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+    private static void ResetReturnState() => returningSceneHandle = -1;
+
+    private IEnumerator Start()
+    {
+        yield return null;
+        BindAppHomeButtons();
+    }
+
+    private void BindAppHomeButtons()
+    {
+        // Practice menus own their StopPractice + return callback. Keep it intact.
+        string scene = gameObject.scene.name;
+        if (AppBootstrap.Instance == null ||
+            (scene != PlayBackScene && !CoachModeNavigation.IsSupportedGameScene(scene) &&
+             scene != "DeadBugRhythmHapticsTest")) return;
+
+        foreach (Button button in FindObjectsOfType<Button>(true))
+        {
+            if (button.gameObject.scene != gameObject.scene || button.name != "Home") continue;
+            // Only replace this switcher's known exit binding, never unrelated Home actions.
+            if (button.onClick.GetPersistentEventCount() != 1 ||
+                button.onClick.GetPersistentTarget(0) != this ||
+                button.onClick.GetPersistentMethodName(0) != nameof(ReturnToMobileApp)) continue;
+            button.onClick = new Button.ButtonClickedEvent();
+            button.onClick.AddListener(ReturnToMobileApp);
+        }
+    }
 
     public void ReturnToMobileApp()
     {
-        if (SpineFlowTrainingSession.TryReturnToMobile())
+        int sceneHandle = SceneManager.GetActiveScene().handle;
+        if (returningSceneHandle == sceneHandle) return;
+        returningSceneHandle = sceneHandle;
+        try
         {
-            return;
+            AppBootstrap app = AppBootstrap.Instance;
+            if (app != null)
+            {
+                if (app.GetComponent<AppShellUi>()?.TryReturnFromAuxiliaryPage() == true) return;
+                app.Training.FinishAndReturn();
+                return;
+            }
+            if (SpineFlowTrainingSession.TryReturnToMobile()) return;
+        }
+        catch
+        {
+            returningSceneHandle = -1;
+            throw;
         }
 
+        returningSceneHandle = -1;
         Debug.LogWarning(
             "[SpineFlow] Could not return to the mobile app. " +
             "The Home scene is intentionally not used in this release.",
@@ -33,6 +82,7 @@ public class SceneSwitcher : MonoBehaviour
 
     public void ReturnToCurrentCoachScene()
     {
+        if (TryReturnFromAppReplay()) return;
         string coachScene = SpineFlowTrainingSession.CurrentCoachScene;
         if (string.IsNullOrEmpty(coachScene))
         {
@@ -206,12 +256,22 @@ public class SceneSwitcher : MonoBehaviour
 
     private static void LoadSceneForCurrentMobileSession(string sceneName)
     {
+        if (TryReturnFromAppReplay()) return;
         SceneManager.LoadScene(SpineFlowTrainingSession.ResolveSceneForMobileSession(sceneName));
+    }
+
+    private static bool TryReturnFromAppReplay()
+    {
+        return SceneManager.GetActiveScene().name == PlayBackScene &&
+            AppBootstrap.Instance?.GetComponent<AppShellUi>()?.TryReturnFromAuxiliaryPage() == true;
     }
 
     private static bool IsCoachWithoutGame()
     {
         string scene = SceneManager.GetActiveScene().name;
+        if (scene == PlayBackScene &&
+            AppBootstrap.Instance?.GetComponent<AppShellUi>()?.IsBrowsingAuxiliaryScene == true)
+            return false;
         return LumbarCoachMode.ForScene(scene) != null ||
             (scene == PlayBackScene && LumbarCoachMode.ForScene(ReplaySessionContext.ReturnPracticeScene) != null);
     }
@@ -228,6 +288,9 @@ public class SceneSwitcher : MonoBehaviour
         {
             return fallback;
         }
+
+        if (AppBootstrap.Instance?.GetComponent<AppShellUi>()?.IsBrowsingAuxiliaryScene == true)
+            return fallback;
 
         if (CoachModeNavigation.TryConsumeReplayReturnScene(gaming, out string coachRoute))
         {

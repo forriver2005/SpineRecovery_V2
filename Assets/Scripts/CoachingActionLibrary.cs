@@ -28,6 +28,7 @@ public sealed class CoachingActionLibrary : MonoBehaviour
     private static Scene retainedPracticeScene;
     private static GameObject[] retainedPracticeRoots;
     private static bool[] retainedRootActiveStates;
+    private static bool returnInProgress;
 
     private readonly Color cardColor = new Color(0.12f, 0.12f, 0.12f, 1f);
     private readonly Color selectedColor = new Color(0.22f, 0.22f, 0.22f, 1f);
@@ -63,6 +64,7 @@ public sealed class CoachingActionLibrary : MonoBehaviour
         retainedPracticeScene = default;
         retainedPracticeRoots = null;
         retainedRootActiveStates = null;
+        returnInProgress = false;
         SceneManager.activeSceneChanged -= RememberSourceScene;
         SceneManager.activeSceneChanged += RememberSourceScene;
         SceneManager.sceneLoaded -= OnSceneLoaded;
@@ -92,6 +94,7 @@ public sealed class CoachingActionLibrary : MonoBehaviour
     {
         if (scene.name == SceneName)
         {
+            returnInProgress = false;
             if (retainedPracticeScene.IsValid() && retainedPracticeScene.isLoaded)
             {
                 retainedPracticeRoots = retainedPracticeScene.GetRootGameObjects();
@@ -527,12 +530,14 @@ public sealed class CoachingActionLibrary : MonoBehaviour
 
     private static void GoBack()
     {
+        if (returnInProgress) return;
         if (retainedPracticeScene.IsValid() && retainedPracticeScene.isLoaded &&
             retainedPracticeRoots != null)
         {
             Scene libraryScene = SceneManager.GetSceneByName(SceneName);
             if (SceneManager.SetActiveScene(retainedPracticeScene))
             {
+                returnInProgress = true;
                 foreach (GameObject root in libraryScene.GetRootGameObjects())
                 {
                     root.SetActive(false);
@@ -550,6 +555,9 @@ public sealed class CoachingActionLibrary : MonoBehaviour
                 return;
             }
         }
+
+        if (SpineRecovery.App.AppBootstrap.Instance?.GetComponent<SpineRecovery.App.AppShellUi>()
+            ?.TryReturnFromAuxiliaryPage() == true) return;
 
         string destination = IsPracticeScene(returnScene)
             ? returnScene : SpineFlowTrainingSession.CurrentCoachScene;

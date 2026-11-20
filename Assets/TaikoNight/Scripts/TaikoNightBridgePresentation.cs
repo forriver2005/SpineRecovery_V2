@@ -38,7 +38,7 @@ namespace TaikoNight
             transport.RequireLiftForReturnHit = true;
             transport.ExtraRecordedHoldSeconds = TaikoNightChart.AddedHoldSeconds;
             chart.UsePlayerJudgements();
-            transport.HitResolved += chart.ShowPlayerHit;
+            transport.HitFeedback += chart.ShowPlayerHit;
             BuildOverlay();
             var framing = System.Array.Find(FindObjectsOfType<HipThrustPreviewFraming>(true), f => f.avatar == transport.PreviewAnimator);
             card = gameObject.AddComponent<TaikoNightCoachCard>();
@@ -61,7 +61,7 @@ namespace TaikoNight
 
         private void OnDestroy()
         {
-            if (transport != null && chart != null) transport.HitResolved -= chart.ShowPlayerHit;
+            if (transport != null && chart != null) transport.HitFeedback -= chart.ShowPlayerHit;
             if (overlayRoot != null) Destroy(overlayRoot);
             if (selection != null) Destroy(selection.gameObject);
             DesignSpace.ExternalNow = null;

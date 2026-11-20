@@ -43,6 +43,7 @@ namespace TaikoNight
         private TaikoNightSelection selection;
         private TMP_Text scoreText, holdText;
         private float clock, countdownRemaining;
+        private float lastCompletedScore;
         private bool running, countdownRunning;
         private int playbackSegment;
         private string difficultyKey = "standard";
@@ -141,6 +142,8 @@ namespace TaikoNight
 
         private void OnRoundCompleted(float score)
         {
+            if (!running) return;
+            lastCompletedScore = score;
             if (running && scorer.TrackingAvailable && scorer.ValidHoldSeconds >= scorer.TargetHoldSeconds)
                 chart.ShowPlayerHit(score >= 90f);
         }
@@ -150,6 +153,7 @@ namespace TaikoNight
             if (motion == null || !motion.IsReady || running || countdownRunning ||
                 !HasFreshTracker()) return false;
             completedRepetitions = 0;
+            lastCompletedScore = 0f;
             clock = 0f;
             countdownRemaining = DeadBugCountdownController.DefaultCountdownSeconds;
             countdownRunning = true;
@@ -253,7 +257,7 @@ namespace TaikoNight
                         return;
                     }
                     bool measured = scorer.TrackingAvailable;
-                    float finalScore = scorer.LastRoundScore;
+                    float finalScore = Mathf.Max(scorer.LastRoundScore, lastCompletedScore);
                     StopTraining();
                     selection.SetResult(measured ? $"本轮得分　{Mathf.FloorToInt(finalScore)}" : "示范完成 · 无动作数据");
                     Completed?.Invoke();
@@ -271,7 +275,9 @@ namespace TaikoNight
                 float end = stage == 0 ? phaseSeconds.x : stage == 1 ? phaseSeconds.x + phaseSeconds.y : phaseSeconds.x + phaseSeconds.y + phaseSeconds.z;
                 remaining = Mathf.Max(0, end - clock);
                 progress = Mathf.Clamp01(1f - remaining / phaseSeconds[stage]);
-                scoreText.text = Mathf.FloorToInt(scorer.CurrentLiveComparisonScore).ToString();
+                float displayedScore = scorer.CurrentLiveComparisonScore > 0f
+                    ? scorer.CurrentLiveComparisonScore : lastCompletedScore;
+                scoreText.text = Mathf.FloorToInt(displayedScore).ToString();
                 holdText.text = scorer.TrackingAvailable ? $"有效保持 {scorer.ValidHoldSeconds:0.0} / {scorer.TargetHoldSeconds:0.0} 秒" : "等待动作数据";
             }
             DesignSpace.ExternalNow = running ? clock : 0f;

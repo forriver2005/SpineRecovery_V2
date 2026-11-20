@@ -70,7 +70,7 @@ public sealed class HipThrustTaikoController : MonoBehaviour
         public RectTransform root;
         public Image up, hold, down;
         public bool spawned, upResolved, downResolved, holdResolved;
-        public bool upHit, downHit, trackedLift;
+        public bool upHit, downHit, upFeedbackShown, downFeedbackShown, trackedLift;
         public float heldSeconds, sampledSeconds;
     }
     private readonly List<Beat> beats = new List<Beat>();
@@ -145,6 +145,7 @@ public sealed class HipThrustTaikoController : MonoBehaviour
     // Taiko Night resolves both endpoints of one recorded repetition. A patient
     // resting at the return target throughout the beat has not performed it.
     public bool RequireLiftForReturnHit { get; set; }
+    public event Action<bool> HitFeedback;
     public event Action<bool> HitResolved;
     private float FrameRate => sourceClip.frameRate;
     private double LoopStart => (phaseTimeline != null ? phaseTimeline.repeatStartFrame : repeatStartFrame) / (double)FrameRate;
@@ -370,8 +371,18 @@ public sealed class HipThrustTaikoController : MonoBehaviour
                 ruleScoring.Rule.HoldingCorrectly) beat.trackedLift = true;
             if (Math.Abs(elapsed - beat.upTime) <= judgementWindow)
                 beat.upHit |= poseMatches && (!RequireLiftForReturnHit || (ruleScoring.Rule.LowConfirmed && ruleScoring.Progress > 0f));
+            if (!beat.upFeedbackShown && elapsed >= beat.upTime && beat.upHit)
+            {
+                beat.upFeedbackShown = true;
+                HitFeedback?.Invoke(true);
+            }
             if (Math.Abs(elapsed - beat.downTime) <= judgementWindow)
                 beat.downHit |= poseMatches && (!RequireLiftForReturnHit || beat.trackedLift);
+            if (!beat.downFeedbackShown && elapsed >= beat.downTime && beat.downHit)
+            {
+                beat.downFeedbackShown = true;
+                HitFeedback?.Invoke(true);
+            }
             if (!beat.upResolved && elapsed >= beat.upTime + judgementWindow)
             {
                 beat.upResolved = true;
@@ -445,6 +456,7 @@ public sealed class HipThrustTaikoController : MonoBehaviour
 
     private void ResolveHit(bool hit, int points, Beat beat)
     {
+        if (!hit) HitFeedback?.Invoke(false);
         if (hit)
         {
             hitCount++; if (ruleScoring == null) score += points;

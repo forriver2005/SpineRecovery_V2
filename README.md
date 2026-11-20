@@ -44,4 +44,4 @@ Build Settings 注册以下九个正式游戏场景。
 - `Tools > Taiko Self > Verify Recorded Visual Skin`：臀桥菜单、三阶段视觉与教练同步、暂停、完成和难度流程。
 - `Tools > Ring Bridge > Verify New Scoring and 30 Second Scenes`：新规则边界、骨骼静止30秒、精确剂量、实际动作串组间转换。报告见 `output/hipthrust-new-rules/`。
 
-两阶段、朝向和震动验证报告及截图位于 `output/two-phase-haptics/`。设备佩戴和实际震感仍需硬件联调。`Tools > Ring Skin C > Organize Game Scenes` 可重新登记当前五个构建场景。素材接入历史见 `Assets/RingSkinC/DEADBUG_INTEGRATION.md`、`Assets/RingBridge/INTEGRATION.md`、`Assets/TaikoSelf/INTEGRATION.md`。
+两阶段、朝向和震动验证报告及截图位于 `output/two-phase-haptics/`。设备佩戴和实际震感仍需硬件联调。`Tools > Ring Skin C > Organize Game Scenes` 可重新登记 RingSkinC 场景。素材接入历史见 `Assets/RingSkinC/DEADBUG_INTEGRATION.md`、`Assets/RingBridge/INTEGRATION.md`、`Assets/TaikoSelf/INTEGRATION.md`。

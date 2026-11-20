@@ -8083,6 +8083,7 @@ MonoBehaviour:
   calibrationMotionLimit: 45
   allowedMovingBoneFraction: 0.4
   autoCalibrateOnStart: 1
+  disableCalibrationForFlowTest: 0
   scoringBones: 000000000700000008000000010000000200000003000000040000000d0000000e0000000f00000010000000
 --- !u!4 &577822669
 Transform:
@@ -8111,7 +8112,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 07dab94499618024882db0deb75a519b, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  skipCalibrationForPreview: 1
+  skipCalibrationForPreview: 0
   referenceClip: {fileID: -3539842621816718849, guid: a8c57a9b75ce0144a8a8105194a53bc1, type: 3}
   referenceSeconds: 6.8
 --- !u!1 &580731882

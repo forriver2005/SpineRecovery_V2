@@ -1,0 +1,48 @@
+{
+  "sourcePackage": "DeadBugRecordedPractice_Minimal.unitypackage",
+  "sourceSha256": "44ff3278167ea2056fc72b69795cc74d71fe52cca1e72d7a6d13cf333161e077",
+  "importedCoreFiles": [
+    {
+      "source": "Scripts/GameRules/DeadBugHoldScorer.cs",
+      "sourceSha256": "753bda93b950bb6faab534416ecf7fd198477a4b76893a475c20d14647d6b819",
+      "destination": "Runtime/DeadBugHoldScorer.cs",
+      "migratedSha256": "cce8d35f6cf00f8bbc3e4fbd8f4d1812aabfec636a134eae38395bfd3fea1432",
+      "logicUnchanged": true
+    },
+    {
+      "source": "Scripts/GameRules/DeadBugPose.cs",
+      "sourceSha256": "f65373cb740872bbdf66dff3f6549b74f9c78c6b0b2055003b978af1c74a3369",
+      "destination": "Runtime/DeadBugPose.cs",
+      "migratedSha256": "642cc4d37a00560e587266b28f33007309d689aca1edddfdd96e20c8a7868e60",
+      "logicUnchanged": true
+    },
+    {
+      "source": "Scripts/GameRules/DeadBugAnatomicalConstraint.cs",
+      "sourceSha256": "fbdf97cc4265965b50c0450348bda87ad416533a5be8a906e0c1ca4751e2faa2",
+      "destination": "Runtime/DeadBugAnatomicalConstraint.cs",
+      "migratedSha256": "7ad5dd59face83311e7688b3f3092ec020c16a2409b26c0a863ac2a1b6303984",
+      "logicUnchanged": true
+    },
+    {
+      "source": "Scripts/GameRules/RecordedDeadBugCoachMotion.cs",
+      "sourceSha256": "2691667c00914d9daab599c87573caeb770cfa3e02ea09bb3a412f33ee3f5fe7",
+      "destination": "Runtime/RecordedDeadBugCoachMotion.cs",
+      "migratedSha256": "66a5e09a5b0b81822e0e5ee0c0ef942957bf393bb586cf67ef9226b9b709818d",
+      "logicUnchanged": true
+    },
+    {
+      "source": "Scripts/AvatarMotionSource.cs",
+      "sourceSha256": "9eb50353e2f9463ed2e0991d195f2a84b5cb2668c1a3de1019c021c1ae3ee27c",
+      "destination": "Runtime/AvatarMotionSource.cs",
+      "migratedSha256": "7b505ce0818f7c95cf627391e9474e8cba930d7589600067a6e9bf7f782b76c9",
+      "logicUnchanged": true
+    }
+  ],
+  "recordingSha256": "580957a79fc5bde70b0a480cec63a6b80d25bdb889e5a21b1a166ce3ebf4f82f",
+  "adaptations": [
+    "Core types and the delivered AvatarMotionSource isolated under namespace DeadBugDelivery.",
+    "Recorded JSON resource path isolated; payload unchanged. Pure sagittal mirror helper extracted.",
+    "New LateUpdate VMC bridge transfers exact per-frame telemetry, including zero packet counts; shared host source/scripts are not overwritten.",
+    "Scene-local game presentation replaces practice-specific HUD and orchestration. Recognition, stability, scoring and anatomical constraints retain the package logic."
+  ]
+}

@@ -8,8 +8,16 @@ using UnityEngine;
 [Serializable]
 public class CoachMotionFrame
 {
-    /// <summary>HumanPose.muscles 的固定长度（HumanTrait.MuscleCount）</summary>
-    public static int MuscleCount => HumanTrait.MuscleCount;
+    /// <summary>
+    /// HumanPose.muscles 的固定长度。
+    ///
+    /// Unity 会在反序列化 JSON 动作包时先构造这个可序列化类型。直接在
+    /// 字段初始化器或序列化阶段读取 HumanTrait.MuscleCount 会触发
+    /// "get_MuscleCount is not allowed during serialization"，导致新场景的
+    /// 录制教练初始化中断。Unity Humanoid 的 muscle 数量是稳定的 95，运行时
+    /// 仍由 ApplyTo/FromHumanPose 对数组长度进行校验。
+    /// </summary>
+    public const int MuscleCount = 95;
 
     /// <summary>相对该段起点的时间（秒）</summary>
     public float time;

@@ -118,35 +118,3 @@ public sealed class VmcGameModeBootstrap : MonoBehaviour
         return deadBugScorer != null ? deadBugScorer.UserAnimator : null;
     }
 }
-
-/// <summary>Feeds the existing scoring freshness gate from EVMC4U packets.</summary>
-public sealed class VmcGameModeSourceBridge : MonoBehaviour
-{
-    private EVMC4U.ExternalReceiver receiver;
-    private AvatarMotionSource source;
-
-    public void Configure(
-        EVMC4U.ExternalReceiver externalReceiver,
-        AvatarMotionSource motionSource)
-    {
-        receiver = externalReceiver;
-        source = motionSource;
-    }
-
-    private void Update()
-    {
-        if (receiver == null || source == null)
-        {
-            return;
-        }
-
-        source.SetAvailable(!receiver.Freeze && receiver.GetAvailable() > 0);
-        if(receiver.Freeze)return;
-        if (receiver.LastBonePacketCounterInFrame > 0)
-        {
-            source.ReportFrame(
-                receiver.GetRemoteTime(),
-                receiver.LastBonePacketCounterInFrame);
-        }
-    }
-}

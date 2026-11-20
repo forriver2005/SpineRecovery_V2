@@ -53,6 +53,14 @@ public sealed class HipThrustPhaseTimeline : ScriptableObject
         return result;
     }
 
+    // Amount of added wall-clock time consumed so far when stretching a recorded hold.
+    public static double ConsumedHoldExtension(double time, double top, double lower, double extension)
+    {
+        if (time <= top) return 0;
+        if (time >= lower) return extension;
+        return extension * (time - top) / (lower - top);
+    }
+
     public void Validate()
     {
         if (sourceClip == null || cycles == null || cycles.Length == 0 || recordedHeight == null || recordedHeight.length < 2)

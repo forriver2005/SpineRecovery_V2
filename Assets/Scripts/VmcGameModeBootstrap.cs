@@ -21,7 +21,8 @@ public sealed class VmcGameModeBootstrap : MonoBehaviour
 
     private static void InstallForScene(Scene scene, LoadSceneMode mode)
     {
-        if (FindObjectOfType<RhythmModeController>(true) == null ||
+        bool taikoNightAction = FindObjectOfType<TaikoNight.TaikoNightActionRuntime>(true) != null;
+        if ((!taikoNightAction && FindObjectOfType<RhythmModeController>(true) == null) ||
             FindUserAnimator() == null ||
             FindObjectOfType<VmcGameModeBootstrap>(true) != null)
         {
@@ -100,6 +101,14 @@ public sealed class VmcGameModeBootstrap : MonoBehaviour
 
     private static Animator FindUserAnimator()
     {
+        TaikoNight.TaikoNightActionRuntime taikoNightAction =
+            FindObjectOfType<TaikoNight.TaikoNightActionRuntime>(true);
+        if (taikoNightAction != null && taikoNightAction.recorder != null &&
+            taikoNightAction.recorder.UserAnimator != null)
+        {
+            return taikoNightAction.recorder.UserAnimator;
+        }
+
         PoseScorer scorer = FindObjectOfType<PoseScorer>(true);
         if (scorer != null)
         {

@@ -1492,13 +1492,13 @@ namespace SpineRecovery.App
             AddCalibrationStep(steps, 2, "连接追踪器并完成校准", "按 SlimeVR 引导佩戴并完成校准", 151f);
             AddCalibrationStep(steps, 3, "返回此页确认", "完成后点击下方按钮继续", 230f);
 
-            RectTransform footer = QuestionnaireUi.Footer(root, 146f);
-            QuestionnaireUi.PillButton(footer, "打开 SlimeVR 校准清单", 20f, 8f, 350f, 40f, false,
+            RectTransform footer = QuestionnaireUi.Footer(root, 210f);
+            QuestionnaireUi.PillButton(footer, "打开 SlimeVR 校准清单", 20f, 12f, 350f, 44f, false,
                 OpenEmbeddedSlimeVrCalibration);
-            Button quick = QuestionnaireUi.PillButton(footer, "快速校准", 20f, 54f, 350f, 40f, false,
+            Button quick = QuestionnaireUi.PillButton(footer, "快速校准", 20f, 72f, 350f, 44f, false,
                 OpenEmbeddedSlimeVrQuickCalibration);
             quick.GetComponent<Image>().color = Color.white;
-            trackingCompleteButton = QuestionnaireUi.PillButton(footer, "我已完成校准，继续", 20f, 100f,
+            trackingCompleteButton = QuestionnaireUi.PillButton(footer, "我已完成校准，继续", 20f, 136f,
                 350f, 52f, true, ConfirmTrackingCalibration);
             trackingCompleteButton.interactable = false;
             return panel;

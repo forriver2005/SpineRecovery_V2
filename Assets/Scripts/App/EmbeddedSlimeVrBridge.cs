@@ -19,7 +19,7 @@ namespace SpineRecovery.App
             public SlimeVrHapticTrackerSnapshot[] trackers;
         }
 
-        public static bool TryReadState(out RuntimeState state, bool imuOnly = false)
+        public static bool TryReadState(out RuntimeState state)
         {
             state = null;
 #if UNITY_ANDROID && !UNITY_EDITOR
@@ -40,13 +40,10 @@ namespace SpineRecovery.App
                         vmcSkeletonOutputFresh = snapshot.Call<bool>("getVmcSkeletonOutputFresh"),
                         trackers = new SlimeVrHapticTrackerSnapshot[trackers.Call<int>("size")]
                     };
-                    var selectedTrackers = new System.Collections.Generic.List<SlimeVrHapticTrackerSnapshot>();
                     for (int i = 0; i < state.trackers.Length; i++)
                     {
                         using (var tracker = trackers.Call<AndroidJavaObject>("get", i))
-                        {
-                            if (imuOnly && !tracker.Call<bool>("isImu")) continue;
-                            selectedTrackers.Add(new SlimeVrHapticTrackerSnapshot
+                            state.trackers[i] = new SlimeVrHapticTrackerSnapshot
                             {
                                 hardwareId = tracker.Call<string>("getHardwareId"),
                                 trackerNum = tracker.Call<int>("getTrackerNum"),
@@ -55,10 +52,8 @@ namespace SpineRecovery.App
                                 bodyPosition = tracker.Call<string>("getBodyPosition"),
                                 status = tracker.Call<string>("getStatus"),
                                 connected = tracker.Call<bool>("getConnected")
-                            });
-                        }
+                            };
                     }
-                    state.trackers = selectedTrackers.ToArray();
                     return true;
                 }
             }
@@ -70,10 +65,20 @@ namespace SpineRecovery.App
         private const string InitialRouteExtra = "dev.slimevr.android.extra.INITIAL_ROUTE";
         private const string AllowDirectRouteExtra = "dev.slimevr.android.extra.ALLOW_DIRECT_ROUTE";
 
-        public static bool TryOpenCalibration(int profileHeightCm, out string error, bool quickCalibration = false)
+        public static bool TryOpenCalibration(int profileHeightCm, out string error)
+        {
+            return TryOpenCalibrationRoute("/checklist", profileHeightCm, out error);
+        }
+
+        public static bool TryOpenQuickCalibration(int profileHeightCm, out string error)
+        {
+            return TryOpenCalibrationRoute("/quick-calibration", profileHeightCm, out error);
+        }
+
+        private static bool TryOpenCalibrationRoute(string initialRoute, int profileHeightCm, out string error)
         {
             error = null;
-            Debug.Log("[SlimeVR] calibration launch requested; profileHeightCm=" + profileHeightCm);
+            Debug.Log("[SlimeVR] calibration launch requested; route=" + initialRoute + ", profileHeightCm=" + profileHeightCm);
 #if UNITY_ANDROID && !UNITY_EDITOR
             try
             {
@@ -83,7 +88,7 @@ namespace SpineRecovery.App
                 using (var activityClass = classApi.CallStatic<AndroidJavaObject>("forName", ActivityClass))
                 using (var intent = new AndroidJavaObject("android.content.Intent", activity, activityClass))
                 {
-                    string route = quickCalibration ? "/quick-calibration" : "/checklist";
+                    string route = initialRoute;
                     if (profileHeightCm >= 120 && profileHeightCm <= 220)
                         route += "?profileHeightCm=" + profileHeightCm;
                     intent.Call<AndroidJavaObject>("putExtra", InitialRouteExtra, route);

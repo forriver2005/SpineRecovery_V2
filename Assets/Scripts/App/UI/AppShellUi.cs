@@ -38,6 +38,11 @@ namespace SpineRecovery.App
         private Text homeMessage;
         private Text trackingMessage;
         private Text adminMessage;
+        private Text adminTrackerMessage;
+        private Text[] adminTrackerStates;
+        private InputField[] adminMacInputs;
+        private FixedTrackerBindingRepository fixedTrackerBindings;
+        private FixedTrackerBindingSet adminBindingSet;
         private Text historyMessage;
         private Text activationMessage;
         private Text arTrainingMessage;
@@ -119,6 +124,8 @@ namespace SpineRecovery.App
 
             SceneManager.sceneLoaded += HandleSceneLoaded;
             bootstrap.State.SessionChanged += HandleSessionChanged;
+            fixedTrackerBindings = new FixedTrackerBindingRepository();
+            adminBindingSet = fixedTrackerBindings.Load();
             EnsureEventSystem();
             EnsureCameraIfNeeded();
             ScreenOrientationService.SetPortrait();
@@ -145,6 +152,7 @@ namespace SpineRecovery.App
                 () => string.IsNullOrEmpty(pendingTrainingScene) ? "确认并返回首页" : "开始训练");
             GameObject preTrainingBlockedPanel = CreatePreTrainingBlockedPanel(safeContent);
             GameObject adminPanel = CreateAdminPanel(safeContent);
+            GameObject adminTrackerPanel = CreateAdminTrackerPanel(safeContent);
             GameObject historyPanel = CreateHistoryPanel(safeContent);
             postActionScreen = new PostActionScreen();
             GameObject postTrainingPanel = postActionScreen.Build(safeContent, HandlePostActionBack,
@@ -179,6 +187,7 @@ namespace SpineRecovery.App
             bootstrap.Router.RegisterPanel(AppRoute.PreTraining, preTrainingPanel);
             bootstrap.Router.RegisterPanel(AppRoute.PreTrainingBlocked, preTrainingBlockedPanel);
             bootstrap.Router.RegisterPanel(AppRoute.Admin, adminPanel);
+            bootstrap.Router.RegisterPanel(AppRoute.AdminTrackers, adminTrackerPanel);
             bootstrap.Router.RegisterPanel(AppRoute.History, historyPanel);
             bootstrap.Router.RegisterPanel(AppRoute.PostTrainingSurvey, postTrainingPanel);
             bootstrap.Router.RegisterPanel(AppRoute.PostTrainingStop, postTrainingStopPanel);
@@ -697,8 +706,136 @@ namespace SpineRecovery.App
             CreateButton(panel.transform, "标记 AR 测试通过", new Vector2(0, -230), MarkAdminArTestPassed);
             CreateButton(panel.transform, "发布当前草稿", new Vector2(0, -305), PublishAdminDraft);
             CreateButton(panel.transform, "回滚到最近归档版本", new Vector2(0, -380), RollbackAdminVersion);
-            CreateButton(panel.transform, "返回登录", new Vector2(0, -455), () => bootstrap.State.ClearSession());
+            CreateButton(panel.transform, "网络与 IMU 固定绑定", new Vector2(0, -455),
+                () => bootstrap.Router.Navigate(AppRoute.AdminTrackers));
+            CreateButton(panel.transform, "返回登录", new Vector2(0, -530), () => bootstrap.State.ClearSession());
             return panel;
+        }
+
+        private GameObject CreateAdminTrackerPanel(Transform parent)
+        {
+            RectTransform root = QuestionnaireUi.CreateScreen(parent, "AdminTrackerPanel", null, out GameObject panel);
+            QuestionnaireUi.Header(root, "管理员 · IMU 固定绑定", () => bootstrap.Router.Navigate(AppRoute.Admin));
+            RectTransform content = QuestionnaireUi.ScrollArea(root, QuestionnaireUi.HeaderHeight, 104f, 900f);
+            QuestionnaireUi.Label(content, "网络与设备登记", 25, QuestionnaireUi.Accent, TextAnchor.MiddleLeft,
+                FontStyle.Bold, 20f, 30f, 350f, 42f);
+            QuestionnaireUi.Label(content,
+                "首次登记时，手机和 IMU 必须连接同一局域网。绑定按 MAC 保存到本机，患者账号只能读取。",
+                14, QuestionnaireUi.Muted, TextAnchor.MiddleLeft, FontStyle.Normal, 20f, 73f, 350f, 48f);
+            adminTrackerMessage = QuestionnaireUi.Label(content, "正在检查网络和追踪器…", 13,
+                QuestionnaireUi.BadgeText, TextAnchor.MiddleLeft, FontStyle.Bold, 20f, 125f, 350f, 28f);
+
+            RectTransform card = QuestionnaireUi.Card(content, 20f, 165f, 350f, 760f);
+            QuestionnaireUi.Label(card, "固定位置（10 个 IMU）", 18, QuestionnaireUi.Ink,
+                TextAnchor.MiddleLeft, FontStyle.Bold, 16f, 16f, 250f, 30f);
+            adminMacInputs = new InputField[FixedTrackerBindingRepository.DefaultTrackerCount];
+            adminTrackerStates = new Text[FixedTrackerBindingRepository.DefaultTrackerCount];
+            FixedTrackerBinding[] slots = adminBindingSet?.trackers ?? System.Array.Empty<FixedTrackerBinding>();
+            for (int i = 0; i < adminMacInputs.Length; i++)
+            {
+                FixedTrackerBinding slot = slots.FirstOrDefault(item => item != null && item.slot == i + 1);
+                string position = slot == null ? FixedTrackerBindingRepository.DefaultBodyPositions[i] : slot.bodyPosition;
+                float y = 58f + i * 68f;
+                QuestionnaireUi.Label(card, (i + 1) + ". " + position, 14, QuestionnaireUi.Ink,
+                    TextAnchor.MiddleLeft, FontStyle.Bold, 16f, y, 102f, 38f);
+                adminMacInputs[i] = CreateAdminMacInput(card, slot?.macAddress ?? string.Empty, 116f, y);
+                adminTrackerStates[i] = QuestionnaireUi.Label(card, slot != null && slot.HasMac ? "已登记" : "未登记",
+                    12, QuestionnaireUi.Muted, TextAnchor.MiddleLeft, FontStyle.Normal, 116f, y + 38f, 150f, 20f);
+                int slotIndex = i;
+                QuestionnaireUi.PillButton(card, "发现并绑定", 270f, y + 2f, 92f, 34f, false,
+                    () => BindNextDiscoveredTracker(slotIndex));
+            }
+            RectTransform footer = QuestionnaireUi.Footer(root, 104f);
+            QuestionnaireUi.PillButton(footer, "刷新 IMU", 20f, 6f, 168f, 42f, false, RefreshAdminTrackerBindings);
+            QuestionnaireUi.PillButton(footer, "保存并锁定绑定", 196f, 6f, 174f, 42f, true, SaveAdminTrackerBindings);
+            RefreshAdminTrackerBindings();
+            return panel;
+        }
+
+        private static InputField CreateAdminMacInput(Transform parent, string value, float x, float y)
+        {
+            Image background = QuestionnaireUi.Box(parent, "MacInput", Color.white, 10f, x, y, 148f, 38f);
+            Image ring = QuestionnaireUi.Ring(background.transform, "MacBorder", new Color(.77f, .80f, .86f), 10f, 1.2f);
+            QuestionnaireUi.Stretch(ring.rectTransform, 0f, 0f, 0f, 0f);
+            ring.raycastTarget = false;
+            InputField input = background.gameObject.AddComponent<InputField>();
+            input.targetGraphic = background;
+            input.transition = Selectable.Transition.None;
+            input.text = value ?? string.Empty;
+            input.characterLimit = 17;
+            input.lineType = InputField.LineType.SingleLine;
+            Text text = QuestionnaireUi.Label(background.transform, value ?? string.Empty, 12,
+                QuestionnaireUi.Ink, TextAnchor.MiddleLeft, FontStyle.Normal, 8f, 0f, 132f, 38f);
+            text.horizontalOverflow = HorizontalWrapMode.Overflow;
+            input.textComponent = text;
+            return input;
+        }
+
+        private void RefreshAdminTrackerBindings()
+        {
+            if (adminTrackerMessage == null) return;
+            bool available = EmbeddedSlimeVrBridge.TryReadState(out var runtime, true);
+            var trackers = available ? runtime.trackers ?? System.Array.Empty<SlimeVrHapticTrackerSnapshot>() : System.Array.Empty<SlimeVrHapticTrackerSnapshot>();
+            int connected = trackers.Count(item => item != null && item.connected);
+            adminTrackerMessage.text = available
+                ? "局域网发现：" + trackers.Length + " 个 · 在线：" + connected + " 个"
+                : "未发现内嵌 SlimeVR 服务；请确认手机与 IMU 在同一 Wi‑Fi。";
+            if (adminTrackerStates == null || adminMacInputs == null) return;
+            for (int i = 0; i < adminMacInputs.Length; i++)
+            {
+                string mac = adminMacInputs[i] == null ? string.Empty : adminMacInputs[i].text.Trim().ToUpperInvariant();
+                SlimeVrHapticTrackerSnapshot found = trackers.FirstOrDefault(item => item != null &&
+                    string.Equals(item.hardwareId?.Trim(), mac, System.StringComparison.OrdinalIgnoreCase));
+                adminTrackerStates[i].text = string.IsNullOrEmpty(mac) ? "未登记" :
+                    found == null ? "已登记 · 当前离线" : (found.connected ? "已登记 · 在线" : "已登记 · 离线");
+            }
+        }
+
+        private void BindNextDiscoveredTracker(int slotIndex)
+        {
+            if (adminMacInputs == null || slotIndex < 0 || slotIndex >= adminMacInputs.Length) return;
+            if (!EmbeddedSlimeVrBridge.TryReadState(out var runtime, true) || runtime.trackers == null)
+            {
+                adminTrackerMessage.text = "没有发现 IMU；请先连接同一局域网。";
+                return;
+            }
+            HashSet<string> used = new HashSet<string>(adminMacInputs.Select(input => input?.text?.Trim().ToUpperInvariant())
+                .Where(mac => !string.IsNullOrEmpty(mac)));
+            SlimeVrHapticTrackerSnapshot next = runtime.trackers.FirstOrDefault(item => item != null && item.connected &&
+                !used.Contains((item.hardwareId ?? string.Empty).Trim().ToUpperInvariant()));
+            if (next == null)
+            {
+                adminTrackerMessage.text = "没有新的在线 IMU 可绑定，请只打开准备登记的设备。";
+                return;
+            }
+            adminMacInputs[slotIndex].text = next.hardwareId;
+            RefreshAdminTrackerBindings();
+        }
+
+        private void SaveAdminTrackerBindings()
+        {
+            if (adminMacInputs == null) return;
+            FixedTrackerBindingSet next = adminBindingSet ?? FixedTrackerBindingRepository.CreateEmpty();
+            FixedTrackerBinding[] slots = next.trackers ?? System.Array.Empty<FixedTrackerBinding>();
+            for (int i = 0; i < adminMacInputs.Length; i++)
+            {
+                FixedTrackerBinding slot = slots.FirstOrDefault(item => item != null && item.slot == i + 1);
+                if (slot == null) continue;
+                slot.macAddress = adminMacInputs[i].text.Trim().ToUpperInvariant();
+                slot.enabled = !string.IsNullOrEmpty(slot.macAddress);
+            }
+            string[] macs = slots.Where(item => item != null && item.enabled && item.HasMac)
+                .Select(item => item.NormalizedMac).ToArray();
+            if (macs.Distinct().Count() != macs.Length)
+            {
+                adminTrackerMessage.text = "保存失败：同一个 MAC 不能绑定到多个部位。";
+                return;
+            }
+            next.locked = true;
+            adminBindingSet = next;
+            fixedTrackerBindings.Save(next);
+            adminTrackerMessage.text = "绑定已保存并锁定。普通账号不会显示修改入口。";
+            RefreshAdminTrackerBindings();
         }
 
         private GameObject CreateHistoryPanel(Transform parent)
@@ -1355,15 +1492,13 @@ namespace SpineRecovery.App
             AddCalibrationStep(steps, 2, "连接追踪器并完成校准", "按 SlimeVR 引导佩戴并完成校准", 151f);
             AddCalibrationStep(steps, 3, "返回此页确认", "完成后点击下方按钮继续", 230f);
 
-            // Keep the three actions comfortably above the bottom edge and give
-            // each touch target enough separation on small phone screens.
-            RectTransform footer = QuestionnaireUi.Footer(root, 210f);
-            QuestionnaireUi.PillButton(footer, "打开 SlimeVR 校准清单", 20f, 12f, 350f, 44f, false,
+            RectTransform footer = QuestionnaireUi.Footer(root, 146f);
+            QuestionnaireUi.PillButton(footer, "打开 SlimeVR 校准清单", 20f, 8f, 350f, 40f, false,
                 OpenEmbeddedSlimeVrCalibration);
-            Button quick = QuestionnaireUi.PillButton(footer, "快速校准", 20f, 72f, 350f, 44f, false,
+            Button quick = QuestionnaireUi.PillButton(footer, "快速校准", 20f, 54f, 350f, 40f, false,
                 OpenEmbeddedSlimeVrQuickCalibration);
             quick.GetComponent<Image>().color = Color.white;
-            trackingCompleteButton = QuestionnaireUi.PillButton(footer, "我已完成校准，继续", 20f, 136f,
+            trackingCompleteButton = QuestionnaireUi.PillButton(footer, "我已完成校准，继续", 20f, 100f,
                 350f, 52f, true, ConfirmTrackingCalibration);
             trackingCompleteButton.interactable = false;
             return panel;
@@ -2674,7 +2809,7 @@ namespace SpineRecovery.App
         }
     }
 
-    internal sealed class InputFieldFocusFeedback : MonoBehaviour, ISelectHandler, IDeselectHandler
+    internal sealed class InputFieldFocusFeedback : MonoBehaviour, ISelectHandler, IDeselectHandler, IPointerDownHandler
     {
         private Image image;
         private RoundedBorderGraphic border;
@@ -2735,6 +2870,14 @@ namespace SpineRecovery.App
 
         public void OnSelect(BaseEventData eventData)
         {
+            ApplyFocusVisual(true);
+        }
+
+        public void OnPointerDown(PointerEventData eventData)
+        {
+            // Android's InputSystem module can deliver the text focus without
+            // dispatching ISelectHandler. Paint the visual immediately on the
+            // first touch so the blue ring is visible before the first key.
             ApplyFocusVisual(true);
         }
 

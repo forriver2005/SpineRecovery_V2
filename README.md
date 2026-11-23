@@ -2,17 +2,21 @@
 
 ## 当前游戏
 
-Build Settings 注册以下五个录制动画场景。原有三个游戏保留，新增两个臀桥评分变体。
+Build Settings 注册以下九个正式游戏场景。
 
 | 动作 | 场景 | 视觉与阶段 |
 | --- | --- | --- |
 | 鸟狗 | `Assets/Scenes/BirdDog_RingSkinC_Recorded.unity` | RingSkinC；伸展、收回 |
 | 死虫 | `Assets/Scenes/DeadBug_RingSkinC_Recorded.unity` | RingSkinC；伸展、收回 |
-| 臀桥 | `Assets/Scenes/HipThrust_RingBridge_Recorded.unity` | 敲鼓；抬起、保持、放下 |
 | 臀桥 · 新评分 | `Assets/Scenes/HipThrust_RingBridge_NewScoring.unity` | 同一敲鼓视觉与原节奏，换用交付包 A/B 保持评分 |
 | 臀桥 · 保持30秒 | `Assets/Scenes/HipThrust_RingBridge_Hold30.unity` | 同一敲鼓视觉；最高点静止30秒后放下，精确处方次数 |
+| 侧桥 · 动态 | `Assets/Scenes/SideBridge_RingBridge_Dynamic.unity` | 敲鼓；录制节奏与真实动作评分 |
+| 侧桥 · 保持30秒 | `Assets/Scenes/SideBridge_RingBridge_Hold30.unity` | 敲鼓；最高点保持30秒，精确处方次数 |
+| 敲鼓臀桥 | `Assets/Scenes/HipThrust_TaikoNight_Dynamic.unity` | 星轨敲鼓；抬起、保持、放下 |
+| 卷腹 | `Assets/Scenes/CrunchPractice_TaikoNight.unity` | 星轨敲鼓；卷起、保持、回落 |
+| 卧位猫式 | `Assets/Scenes/LyingCatPractice_TaikoNight.unity` | 星轨敲鼓；拱背、保持、还原 |
 
-场景均保留起始菜单、校准、难度、倒计时、暂停、计分、结束和动作串流程。右侧教练窗口持续显示实际动画，并与游戏阶段、进度和暂停同步。鸟狗与死虫的全部难度不再插入保持等待，仍在伸展到达时进行原有评分检查。臀桥鼓盘与教练共用对应模式的三阶段时间轴。新评分规则和处方接入方法见 [HIPTHRUST_NEW_RULES.md](HIPTHRUST_NEW_RULES.md)。
+游戏支持医生动作串。动作串从首组前的准备倒计时开始，每组完成后休息30秒，再按处方动作、难度、组数和次数切换；`hipthrust` 映射到臀桥新评分场景。鸟狗与死虫保留原有评分检查；新游戏通过对应的实时传感器输入和动作评分器计分。新评分规则和处方接入方法见 [HIPTHRUST_NEW_RULES.md](HIPTHRUST_NEW_RULES.md)。
 
 ## 录制动画与手脚方向
 
@@ -40,4 +44,4 @@ Build Settings 注册以下五个录制动画场景。原有三个游戏保留�
 - `Tools > Taiko Self > Verify Recorded Visual Skin`：臀桥菜单、三阶段视觉与教练同步、暂停、完成和难度流程。
 - `Tools > Ring Bridge > Verify New Scoring and 30 Second Scenes`：新规则边界、骨骼静止30秒、精确剂量、实际动作串组间转换。报告见 `output/hipthrust-new-rules/`。
 
-两阶段、朝向和震动验证报告及截图位于 `output/two-phase-haptics/`。设备佩戴和实际震感仍需硬件联调。`Tools > Ring Skin C > Organize Game Scenes` 可重新登记当前五个构建场景。素材接入历史见 `Assets/RingSkinC/DEADBUG_INTEGRATION.md`、`Assets/RingBridge/INTEGRATION.md`、`Assets/TaikoSelf/INTEGRATION.md`。
+两阶段、朝向和震动验证报告及截图位于 `output/two-phase-haptics/`。设备佩戴和实际震感仍需硬件联调。`Tools > Ring Skin C > Organize Game Scenes` 可重新登记 RingSkinC 场景。素材接入历史见 `Assets/RingSkinC/DEADBUG_INTEGRATION.md`、`Assets/RingBridge/INTEGRATION.md`、`Assets/TaikoSelf/INTEGRATION.md`。

@@ -1,6 +1,6 @@
 # 三段圆环臀桥：新录制动作
 
-正式场景：`Assets/Scenes/HipThrust_RingBridge_Recorded.unity`，Build Index 6。
+臀桥新评分正式场景：`Assets/Scenes/HipThrust_RingBridge_NewScoring.unity`。保持版：`Assets/Scenes/HipThrust_RingBridge_Hold30.unity`。此目录保留原敲鼓视觉素材和早期接入说明。
 
 ## 素材与画面
 

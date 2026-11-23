@@ -9,10 +9,14 @@ public class DeadBugCountdownController : MonoBehaviour
     [SerializeField] private CoachActionController coachActionController;
     [SerializeField] private ActionPreviewCard deadBugPreviewCard;
     [SerializeField] private bool countdownEnabled = true;
-    [SerializeField] private int countdownSeconds = 5;
+    [SerializeField] private int countdownSeconds = DefaultCountdownSeconds;
     [SerializeField] private float countdownStepSeconds = 1f;
     [SerializeField] private bool autoStartOnPlay;
     [SerializeField] private string autoStartActionStateName = "animation_pose";
+
+    public const int DefaultCountdownSeconds = 5;
+    public string DisplayedNumber => countdownRoot != null && countdownRoot.activeInHierarchy && countdownText != null
+        ? countdownText.text : null;
 
     private Coroutine countdownRoutine;
 

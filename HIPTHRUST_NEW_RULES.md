@@ -1,6 +1,6 @@
 # 两个臀桥新评分场景
 
-原有三个场景、录制动画、材质、动作时间轴均保留。新场景都复制自当前敲鼓视觉的 `HipThrust_RingBridge_Recorded`，保留起始界面、倒计时、教练演示、暂停、结束界面、躺姿校准和 HIT 腰部震动。
+两个臀桥变体使用现有敲鼓视觉、录制动画和时间轴，分别提供原节奏新评分与最高点保持30秒。原旧版场景已从构建列表移除；通用动作键 `hipthrust` 与 `hipthrust_newscore` 现在都路由至 `HipThrust_RingBridge_NewScoring`。
 
 | 场景 | 行为 |
 | --- | --- |
@@ -38,11 +38,11 @@ var dose = FindObjectOfType<HipThrustPrescriptionDose>();
 bool ok = dose.SetPrescriptionJson(prescriptionJson, itemId: 123, out string error);
 ```
 
-读取 `prescriptionContractVersion=2` 和 `items[]` 中指定 `itemId` 的 `actionId="5"`、`sets`、`reps`。多个臀桥项目必须明确指定 itemId；其他动作不能误当作臀桥。组数限制 1–20，次数限制 1–100。单独场景按 `sets × reps` 完整播放，菜单明确显示组数和次数；处方未提供组间休息，本场景不自行增加。`holdSeconds` 不覆盖该变体固定的 30 秒。此入口消费已获取的处方，不新增网络请求或资源下载。
+读取 `prescriptionContractVersion=2` 和 `items[]` 中指定 `itemId` 的 `actionId="5"`、`sets`、`reps`。多个臀桥项目必须明确指定 itemId；其他动作不能误当作臀桥。组数限制 1–20，次数限制 1–100。单独场景按 `sets × reps` 完整播放，菜单明确显示组数和次数。动作串中的每组（包括不同动作之间和同一动作的下一组）固定休息30秒；单独游玩不追加组间休息。`holdSeconds` 不覆盖该变体固定的 30 秒。此入口消费已获取的处方，不新增网络请求或资源下载。
 
 ### 现有动作串执行器
 
-新增两个显式动作键，旧 `hipthrust` 仍指向原场景：
+支持臀桥和其他已接入游戏的动作键；`hipthrust` 与 `hipthrust_newscore` 都指向新评分场景：
 
 ```json
 {

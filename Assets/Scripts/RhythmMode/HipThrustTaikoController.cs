@@ -70,12 +70,13 @@ public sealed class HipThrustTaikoController : MonoBehaviour
         public RectTransform root;
         public Image up, hold, down;
         public bool spawned, upResolved, downResolved, holdResolved;
-        public bool upHit, downHit;
+        public bool upHit, downHit, upFeedbackShown, downFeedbackShown, trackedLift;
         public float heldSeconds, sampledSeconds;
     }
     private readonly List<Beat> beats = new List<Beat>();
     private double elapsed;
     private int passes = 1;
+    private int actionRepetitionCount;
     private bool running, paused;
     private int score, hitCount, missCount;
     private int consecutiveHits;
@@ -88,7 +89,10 @@ public sealed class HipThrustTaikoController : MonoBehaviour
     public bool IsPaused => paused;
     public double Elapsed => elapsed;
     public float SourceTime => SourceTimeAt(elapsed);
-    public double Duration => hold30Timeline != null ? hold30Timeline.Duration : sourceClip.length + (passes - 1) * LoopDuration;
+    public float ExtraRecordedHoldSeconds { get; set; }
+    private HipThrustHold30Timeline.Repetition[] recordedRepetitions = Array.Empty<HipThrustHold30Timeline.Repetition>();
+    public double Duration => hold30Timeline != null ? hold30Timeline.Duration :
+        sourceClip.length + (passes - 1) * LoopDuration + recordedRepetitions.Length * (double)ExtraRecordedHoldSeconds;
     public int BeatCount => beats.Count;
     public int HitCount => hitCount;
     public int MissCount => missCount;
@@ -107,7 +111,8 @@ public sealed class HipThrustTaikoController : MonoBehaviour
             return (float)(sample.phase==0 ? rep.top-rep.start : sample.phase==1 ? rep.lower-rep.top : rep.end-rep.lower);
         }
         var c = phaseTimeline.cycles[sample.cycle];
-        return (sample.phase==0 ? c.holdStartFrame-c.liftStartFrame : sample.phase==1 ? c.lowerStartFrame-c.holdStartFrame : c.lowerEndFrame-c.lowerStartFrame)/FrameRate;
+        if (sample.phase == 1) return (c.lowerStartFrame - c.holdStartFrame) / FrameRate + ExtraRecordedHoldSeconds;
+        return (sample.phase == 0 ? c.holdStartFrame - c.liftStartFrame : c.lowerEndFrame - c.lowerStartFrame) / FrameRate;
     }
     public int ConsecutiveHits => consecutiveHits;
     public HipThrustPhaseTimeline PhaseTimeline => phaseTimeline;
@@ -119,18 +124,28 @@ public sealed class HipThrustTaikoController : MonoBehaviour
     public GameTrainingAssessment Assessment { get; set; }
     public HipThrustHold30Timeline.Repetition[] AssessmentRepetitions()
     {
-        if(hold30Timeline!=null)return hold30Timeline.Repetitions;
+        return hold30Timeline != null ? hold30Timeline.Repetitions : recordedRepetitions;
+    }
+
+    private HipThrustHold30Timeline.Repetition[] BuildRecordedRepetitions()
+    {
         var result=new List<HipThrustHold30Timeline.Repetition>();
         if(phaseTimeline!=null)
         for(int pass=0;pass<passes;pass++)for(int i=0;i<phaseTimeline.cycles.Length;i++)
         {
-            var c=phaseTimeline.cycles[i];double offset=pass*LoopDuration;
+            var c=phaseTimeline.cycles[i];
+            double offset = pass * LoopDuration + result.Count * (double)ExtraRecordedHoldSeconds;
             result.Add(new HipThrustHold30Timeline.Repetition(i,c.holdStartFrame,
                 c.liftStartFrame/(double)FrameRate+offset,c.holdStartFrame/(double)FrameRate+offset,
-                c.lowerEndFrame/(double)FrameRate+offset,(c.lowerStartFrame-c.holdStartFrame)/(double)FrameRate));
+                c.lowerEndFrame/(double)FrameRate+offset+ExtraRecordedHoldSeconds,
+                (c.lowerStartFrame-c.holdStartFrame)/(double)FrameRate+ExtraRecordedHoldSeconds));
         }
         return result.ToArray();
     }
+    // Taiko Night resolves both endpoints of one recorded repetition. A patient
+    // resting at the return target throughout the beat has not performed it.
+    public bool RequireLiftForReturnHit { get; set; }
+    public event Action<bool> HitFeedback;
     public event Action<bool> HitResolved;
     private float FrameRate => sourceClip.frameRate;
     private double LoopStart => (phaseTimeline != null ? phaseTimeline.repeatStartFrame : repeatStartFrame) / (double)FrameRate;
@@ -197,6 +212,16 @@ public sealed class HipThrustTaikoController : MonoBehaviour
         if (elapsed >= Duration) CompleteSession();
     }
 
+    public bool SetActionRepetitionCount(int count, out string error)
+    {
+        error = null;
+        if (running || !startMenu.IsTrainingMenuVisible) error = "请先返回菜单，再更换动作次数。";
+        else if (count < 0 || count > 100) error = "动作次数须为 0–100，0 使用难度默认次数。";
+        if (error != null) return false;
+        actionRepetitionCount = count;
+        return true;
+    }
+
     public void StartMode()
     {
         if (!CanStart) { StopAndShowMenu(); return; }
@@ -206,6 +231,12 @@ public sealed class HipThrustTaikoController : MonoBehaviour
         if (repetitionsText != null && int.TryParse(repetitionsText.text, out int requested)) repetitions = requested;
         passes = Mathf.Clamp(Mathf.CeilToInt(repetitions / (float)cycleCount), 1, 3);
         hold30Timeline = hold30Dose != null ? new HipThrustHold30Timeline(phaseTimeline, hold30Dose.Total, hold30Dose.preserveRecordedTiming, hold30Dose.skipRecordedPlateauAfterHold, hold30Dose.preserveSourceGaps) : null;
+        recordedRepetitions = hold30Timeline == null ? BuildRecordedRepetitions() : Array.Empty<HipThrustHold30Timeline.Repetition>();
+        if (actionRepetitionCount > 0 && hold30Dose == null && phaseTimeline != null)
+        {
+            // Repeat the authored cycle at its original speed, with an exact per-set dose.
+            hold30Timeline = new HipThrustHold30Timeline(phaseTimeline, actionRepetitionCount, true, false, true, ExtraRecordedHoldSeconds);
+        }
         CompletedDemonstrations = 0;
         if (ruleScoring != null) ruleScoring.Begin(startMenu.SelectedDifficultyKey);
         elapsed = 0d;
@@ -224,19 +255,10 @@ public sealed class HipThrustTaikoController : MonoBehaviour
 
     private void BuildChart()
     {
-        if (hold30Timeline != null)
-        {
-            foreach (var rep in hold30Timeline.Repetitions)
-                beats.Add(new Beat { upTime=rep.top, holdEndTime=rep.lower, downTime=rep.end });
-            return;
-        }
         if (phaseTimeline != null)
         {
-            for (int pass = 0; pass < passes; pass++)
-            foreach (var cycle in phaseTimeline.cycles)
-                beats.Add(new Beat { upTime = cycle.holdStartFrame / (double)FrameRate + pass * LoopDuration,
-                    holdEndTime = cycle.lowerStartFrame / (double)FrameRate + pass * LoopDuration,
-                    downTime = cycle.lowerEndFrame / (double)FrameRate + pass * LoopDuration });
+            foreach (var rep in AssessmentRepetitions())
+                beats.Add(new Beat { upTime = rep.top, holdEndTime = rep.lower, downTime = rep.end });
             return;
         }
         for (int pass = 0; pass < passes; pass++)
@@ -252,6 +274,15 @@ public sealed class HipThrustTaikoController : MonoBehaviour
     {
         if (hold30Timeline != null)
         { hold30Timeline.Evaluate(time, out float frame, out _, out _); return frame / FrameRate; }
+        if (ExtraRecordedHoldSeconds > 0)
+        {
+            double gameTime = time;
+            foreach (var rep in recordedRepetitions)
+            {
+                if (gameTime <= rep.top) break;
+                time -= HipThrustPhaseTimeline.ConsumedHoldExtension(gameTime, rep.top, rep.lower, ExtraRecordedHoldSeconds);
+            }
+        }
         double lastLoopEnd = LoopEnd + (passes - 1) * LoopDuration;
         if (time < LoopStart) return (float)Math.Max(0d, time);
         if (time < lastLoopEnd) return (float)(LoopStart + (time - LoopStart) % LoopDuration);
@@ -336,8 +367,22 @@ public sealed class HipThrustTaikoController : MonoBehaviour
         bool poseMatches = PoseMatchesCoach();
         foreach (Beat beat in beats)
         {
-            if (Math.Abs(elapsed - beat.upTime) <= judgementWindow) beat.upHit |= poseMatches;
-            if (Math.Abs(elapsed - beat.downTime) <= judgementWindow) beat.downHit |= poseMatches;
+            if (RequireLiftForReturnHit && elapsed >= beat.upTime - judgementWindow && elapsed <= beat.holdEndTime &&
+                ruleScoring.Rule.HoldingCorrectly) beat.trackedLift = true;
+            if (Math.Abs(elapsed - beat.upTime) <= judgementWindow)
+                beat.upHit |= poseMatches && (!RequireLiftForReturnHit || (ruleScoring.Rule.LowConfirmed && ruleScoring.Progress > 0f));
+            if (!beat.upFeedbackShown && elapsed >= beat.upTime && beat.upHit)
+            {
+                beat.upFeedbackShown = true;
+                HitFeedback?.Invoke(true);
+            }
+            if (Math.Abs(elapsed - beat.downTime) <= judgementWindow)
+                beat.downHit |= poseMatches && (!RequireLiftForReturnHit || beat.trackedLift);
+            if (!beat.downFeedbackShown && elapsed >= beat.downTime && beat.downHit)
+            {
+                beat.downFeedbackShown = true;
+                HitFeedback?.Invoke(true);
+            }
             if (!beat.upResolved && elapsed >= beat.upTime + judgementWindow)
             {
                 beat.upResolved = true;
@@ -411,6 +456,7 @@ public sealed class HipThrustTaikoController : MonoBehaviour
 
     private void ResolveHit(bool hit, int points, Beat beat)
     {
+        if (!hit) HitFeedback?.Invoke(false);
         if (hit)
         {
             hitCount++; if (ruleScoring == null) score += points;

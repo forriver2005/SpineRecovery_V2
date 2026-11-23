@@ -7,6 +7,9 @@ public sealed class HipThrustPreviewFraming : MonoBehaviour
     public Animator avatar;
     public Camera previewCamera;
     [Min(0f)] public float framingPadding = 0.22f;
+    // A keyframe-driven coach recenters its hips late in the frame. Fit that
+    // final pose immediately before this camera renders its texture.
+    public bool fitAfterLatePose;
     static readonly HumanBodyBones[] Bones = {
         HumanBodyBones.Head, HumanBodyBones.Hips, HumanBodyBones.Chest,
         HumanBodyBones.LeftHand, HumanBodyBones.RightHand,
@@ -15,6 +18,14 @@ public sealed class HipThrustPreviewFraming : MonoBehaviour
         HumanBodyBones.LeftLowerArm, HumanBodyBones.RightLowerArm
     };
     void LateUpdate()
+    {
+        if (!fitAfterLatePose) FitPose();
+    }
+    void OnPreCull()
+    {
+        if (fitAfterLatePose) FitPose();
+    }
+    void FitPose()
     {
         if (avatar == null || !avatar.isHuman || previewCamera == null) return;
         Quaternion rotation = previewCamera.transform.rotation;

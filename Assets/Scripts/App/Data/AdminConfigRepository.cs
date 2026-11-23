@@ -15,6 +15,7 @@ namespace SpineRecovery.App
         bool MarkArTestPassed(string configId, string fingerprint);
         bool Publish(string configId);
         bool RollbackTo(string configId);
+        bool BindPublishedTrackers(IEnumerable<SlimeVrHapticTrackerSnapshot> trackers, out string message);
     }
 
     /// <summary>
@@ -57,6 +58,7 @@ namespace SpineRecovery.App
         public void SaveConfigurations(IEnumerable<AdminTrainingConfiguration> values)
         {
             var next = (values ?? Array.Empty<AdminTrainingConfiguration>()).Where(c => c != null).ToList();
+            foreach (AdminTrainingConfiguration config in next) NormalizeTrackerBindings(config);
             if (next.Count(c => c.state == AdminConfigState.Published) > 1)
                 throw new InvalidOperationException("Only one administrator configuration may be published.");
             configurations = next;
@@ -117,6 +119,40 @@ namespace SpineRecovery.App
             return true;
         }
 
+        public bool BindPublishedTrackers(IEnumerable<SlimeVrHapticTrackerSnapshot> trackers, out string message)
+        {
+            EnsureLoaded();
+            AdminTrainingConfiguration published = CurrentPublished();
+            var next = (trackers ?? Array.Empty<SlimeVrHapticTrackerSnapshot>())
+                .Where(t => t != null && t.connected && !string.IsNullOrWhiteSpace(t.hardwareId))
+                .ToArray();
+            var bindings = new List<AdminTrackerBinding>();
+            foreach (SlimeVrHapticTrackerSnapshot tracker in next)
+            {
+                if (!FixedTrackerSlotMapping.TryParse(tracker.bodyPosition, out FixedTrackerSlot slot)) continue;
+                if (bindings.Any(b => b.slot == slot)) continue;
+                bindings.Add(new AdminTrackerBinding
+                {
+                    slot = slot,
+                    hardwareId = tracker.hardwareId.Trim(),
+                    ip = tracker.ip == null ? string.Empty : tracker.ip.Trim(),
+                    online = tracker.connected,
+                    batteryPercent = tracker.batteryPercent,
+                    lastSeenAt = DateTimeOffset.UtcNow.ToString("O"),
+                });
+            }
+            if (bindings.Count != Enum.GetValues(typeof(FixedTrackerSlot)).Length)
+            {
+                message = "需要同时识别左脚腕、右脚腕、左手腕、右手腕和腰这 5 个追踪器。当前识别到 " + bindings.Count + " 个。";
+                return false;
+            }
+            published.trackerBindings = bindings.OrderBy(b => b.slot).ToArray();
+            published.updatedAt = DateTimeOffset.UtcNow.ToString("O");
+            Persist();
+            message = "已保存 5 个固定追踪器的硬件 ID/MAC。普通用户将只读取这些设备。";
+            return true;
+        }
+
         private void Persist()
         {
             JsonFileStore.Save(FileName, new ConfigurationDocument { configurations = configurations.ToArray() });
@@ -133,7 +169,23 @@ namespace SpineRecovery.App
             else
             {
                 configurations = document.configurations.Where(c => c != null).ToList();
+                foreach (AdminTrainingConfiguration config in configurations) NormalizeTrackerBindings(config);
             }
+        }
+
+        private static void NormalizeTrackerBindings(AdminTrainingConfiguration config)
+        {
+            if (config == null) return;
+            var existing = (config.trackerBindings ?? Array.Empty<AdminTrackerBinding>())
+                .Where(binding => binding != null)
+                .GroupBy(binding => binding.slot)
+                .ToDictionary(group => group.Key, group => group.First());
+            config.trackerBindings = Enum.GetValues(typeof(FixedTrackerSlot))
+                .Cast<FixedTrackerSlot>()
+                .Select(slot => existing.TryGetValue(slot, out var binding)
+                    ? binding
+                    : new AdminTrackerBinding { slot = slot })
+                .ToArray();
         }
 
         private static AdminTrainingConfiguration DefaultConfiguration()
@@ -158,6 +210,14 @@ namespace SpineRecovery.App
                 },
                 userTags = new[] { "准入疼痛较高", "腰部疼痛指数低", "伸展方向偏好", "屈曲方向偏好" },
                 actionTags = new[] { "high_pain", "low_pain", "extension_preference", "flexion_preference" },
+                trackerBindings = new[]
+                {
+                    new AdminTrackerBinding { slot = FixedTrackerSlot.LeftAnkle },
+                    new AdminTrackerBinding { slot = FixedTrackerSlot.RightAnkle },
+                    new AdminTrackerBinding { slot = FixedTrackerSlot.LeftWrist },
+                    new AdminTrackerBinding { slot = FixedTrackerSlot.RightWrist },
+                    new AdminTrackerBinding { slot = FixedTrackerSlot.Waist },
+                },
             };
         }
     }

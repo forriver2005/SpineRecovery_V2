@@ -616,12 +616,25 @@ namespace SpineRecovery.App
             adminMessage = CreateLabel(panel.transform, "", new Vector2(0, 80), 16);
             adminMessage.rectTransform.sizeDelta = new Vector2(900, 260);
             CreateButton(panel.transform, "刷新已发布配置", new Vector2(0, -80), RefreshAdminSummary);
-            CreateButton(panel.transform, "从当前版本创建草稿", new Vector2(0, -155), CreateAdminDraft);
-            CreateButton(panel.transform, "标记 AR 测试通过", new Vector2(0, -230), MarkAdminArTestPassed);
-            CreateButton(panel.transform, "发布当前草稿", new Vector2(0, -305), PublishAdminDraft);
-            CreateButton(panel.transform, "回滚到最近归档版本", new Vector2(0, -380), RollbackAdminVersion);
-            CreateButton(panel.transform, "返回登录", new Vector2(0, -455), () => bootstrap.State.ClearSession());
+            CreateButton(panel.transform, "绑定当前 5 个追踪器", new Vector2(0, -155), BindCurrentTrackers);
+            CreateButton(panel.transform, "从当前版本创建草稿", new Vector2(0, -230), CreateAdminDraft);
+            CreateButton(panel.transform, "标记 AR 测试通过", new Vector2(0, -305), MarkAdminArTestPassed);
+            CreateButton(panel.transform, "发布当前草稿", new Vector2(0, -380), PublishAdminDraft);
+            CreateButton(panel.transform, "回滚到最近归档版本", new Vector2(0, -455), RollbackAdminVersion);
+            CreateButton(panel.transform, "返回登录", new Vector2(0, -530), () => bootstrap.State.ClearSession());
             return panel;
+        }
+
+        private void BindCurrentTrackers()
+        {
+            if (!(bootstrap.AdminConfigs is JsonAdminConfigRepository repository) || CoachHapticFeedbackController.Instance == null)
+            {
+                if (adminMessage != null) adminMessage.text = "无法读取当前追踪器状态，请先启动 SlimeVR 并刷新。";
+                return;
+            }
+            repository.BindPublishedTrackers(CoachHapticFeedbackController.Instance.LatestTrackerSnapshots, out string message);
+            RefreshAdminSummary();
+            if (adminMessage != null) adminMessage.text += "\n" + message;
         }
 
         private GameObject CreateHistoryPanel(Transform parent)
@@ -937,10 +950,25 @@ namespace SpineRecovery.App
                 .OrderByDescending(rule => rule.priority)
                 .Select(rule => rule.userTag + " → " + string.Join("、", rule.actionIds ?? System.Array.Empty<string>()))
                 .ToArray();
+            var trackerLines = (config.trackerBindings ?? System.Array.Empty<AdminTrackerBinding>())
+                .OrderBy(binding => binding.slot)
+                .Select(binding => binding.DisplayName() + "：" +
+                    (string.IsNullOrWhiteSpace(binding.hardwareId) ? "未绑定" : binding.hardwareId) +
+                    " / " + (binding.online ? "在线" : "离线") +
+                    (binding.batteryPercent >= 0 ? " / 电量 " + binding.batteryPercent + "%" : " / 电量未知"))
+                .ToArray();
+            var liveTrackers = CoachHapticFeedbackController.Instance == null
+                ? "状态源未启动"
+                : string.Join("\n", CoachHapticFeedbackController.Instance.LatestTrackerSnapshots
+                    .Where(tracker => tracker != null && FixedTrackerSlotMapping.TryParse(tracker.bodyPosition, out _))
+                    .Select(tracker => tracker.bodyPosition + "：" + (tracker.connected ? "在线" : "离线") +
+                        (tracker.batteryPercent >= 0 ? " / 电量 " + tracker.batteryPercent + "%" : " / 电量未知")));
             adminMessage.text = "当前版本：" + config.versionName + "（" + config.state + "）\n" +
                 "配置 ID：" + config.configId + "\n" +
                 "动作：" + string.Join("、", actionLines) + "\n" +
                 "推荐规则：" + (ruleLines.Length == 0 ? "暂无" : string.Join("；", ruleLines)) + "\n" +
+                "固定追踪器（5 个）：\n" + (trackerLines.Length == 0 ? "暂无" : string.Join("\n", trackerLines)) + "\n" +
+                "实时状态：\n" + (string.IsNullOrWhiteSpace(liveTrackers) ? "暂无设备状态" : liveTrackers) + "\n" +
                 "说明：患者侧只读取 Published 配置；发布前必须完成 AR 测试。";
         }
 

@@ -4,6 +4,55 @@ using System.Linq;
 
 namespace SpineRecovery.App
 {
+    public enum FixedTrackerSlot
+    {
+        LeftAnkle,
+        RightAnkle,
+        LeftWrist,
+        RightWrist,
+        Waist,
+    }
+
+    [Serializable]
+    public sealed class AdminTrackerBinding
+    {
+        public FixedTrackerSlot slot;
+        public string hardwareId;
+        public string ip;
+        public bool online;
+        public int batteryPercent = -1;
+        public string lastSeenAt;
+
+        public string DisplayName()
+        {
+            switch (slot)
+            {
+                case FixedTrackerSlot.LeftAnkle: return "左脚腕";
+                case FixedTrackerSlot.RightAnkle: return "右脚腕";
+                case FixedTrackerSlot.LeftWrist: return "左手腕";
+                case FixedTrackerSlot.RightWrist: return "右手腕";
+                case FixedTrackerSlot.Waist: return "腰";
+                default: return slot.ToString();
+            }
+        }
+    }
+
+    public static class FixedTrackerSlotMapping
+    {
+        public static bool TryParse(string bodyPosition, out FixedTrackerSlot slot)
+        {
+            switch ((bodyPosition ?? string.Empty).Trim().ToLowerInvariant())
+            {
+                case "left_ankle": case "left_foot": case "left_lower_leg": slot = FixedTrackerSlot.LeftAnkle; return true;
+                case "right_ankle": case "right_foot": case "right_lower_leg": slot = FixedTrackerSlot.RightAnkle; return true;
+                case "left_wrist": case "left_forearm": slot = FixedTrackerSlot.LeftWrist; return true;
+                case "right_wrist": case "right_forearm": slot = FixedTrackerSlot.RightWrist; return true;
+                case "waist": case "abdomen": case "body:abdomen": slot = FixedTrackerSlot.Waist; return true;
+                default: slot = FixedTrackerSlot.Waist; return false;
+            }
+        }
+    }
+
     public enum AdminConfigState
     {
         Draft,
@@ -66,6 +115,8 @@ namespace SpineRecovery.App
         public string[] userTags = Array.Empty<string>();
         public string[] actionTags = Array.Empty<string>();
         public AdminRecommendationRule[] recommendationRules = Array.Empty<AdminRecommendationRule>();
+        // Exactly five administrator-owned bindings. Patient flows only read this published snapshot.
+        public AdminTrackerBinding[] trackerBindings = Array.Empty<AdminTrackerBinding>();
 
         public AdminActionDefinition[] RecommendedActions(IEnumerable<string> tags)
         {

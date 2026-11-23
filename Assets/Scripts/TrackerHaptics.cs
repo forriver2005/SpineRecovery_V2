@@ -1,6 +1,7 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.Linq;
 using UnityEngine;
 using UnityEngine.Networking;
 
@@ -41,6 +42,8 @@ public sealed class SlimeVrHapticTrackerSnapshot
     public string bodyPosition;
     public string status;
     public bool connected;
+    // SlimeVR bridge may omit this field; -1 means unknown.
+    public int batteryPercent = -1;
 }
 
 [Serializable]
@@ -99,12 +102,14 @@ public sealed class CoachHapticFeedbackController : MonoBehaviour
         new HashSet<TrackerWearLocation>();
     private float trackingStatusReceivedAt = float.NegativeInfinity;
     private string lastLoggedDiscoveryStatus;
+    private SlimeVrHapticTrackerSnapshot[] latestTrackerSnapshots = Array.Empty<SlimeVrHapticTrackerSnapshot>();
 
     private bool phaseWasEnabled;
     private bool hasGuidanceGroupPulse;
     private Coroutine discoveryCoroutine;
 
     public string DiscoveryStatus { get; private set; } = "等待连接修改版 SlimeVR";
+    public IReadOnlyList<SlimeVrHapticTrackerSnapshot> LatestTrackerSnapshots => latestTrackerSnapshots;
 
     private static readonly TrackerWearLocation[] RightArmMapping =
     {
@@ -604,6 +609,7 @@ public sealed class CoachHapticFeedbackController : MonoBehaviour
 
     private void ApplyDiscoveredTrackers(SlimeVrHapticTrackerSnapshot[] trackers)
     {
+        latestTrackerSnapshots = trackers ?? Array.Empty<SlimeVrHapticTrackerSnapshot>();
         trackedLocations.Clear();
         trackingStatusReceivedAt = Time.realtimeSinceStartup;
         var discovered = new Dictionary<TrackerWearLocation, string>();
@@ -616,7 +622,7 @@ public sealed class CoachHapticFeedbackController : MonoBehaviour
                 continue;
             }
 
-            if (!TryMapBodyPosition(tracker.bodyPosition, out TrackerWearLocation location))
+            if (!TryMapPublishedBinding(tracker, out TrackerWearLocation location))
             {
                 if (string.IsNullOrWhiteSpace(tracker.bodyPosition))
                 {
@@ -656,6 +662,35 @@ public sealed class CoachHapticFeedbackController : MonoBehaviour
             Debug.Log($"[Haptics] {DiscoveryStatus}", this);
             lastLoggedDiscoveryStatus = DiscoveryStatus;
         }
+    }
+
+    private static bool TryMapPublishedBinding(
+        SlimeVrHapticTrackerSnapshot tracker,
+        out TrackerWearLocation location)
+    {
+        location = default;
+        SpineRecovery.App.AppBootstrap app = SpineRecovery.App.AppBootstrap.Instance;
+        bool administrator = app != null && app.State != null && app.State.Session != null && app.State.Session.IsAdministrator;
+        var published = app?.AdminConfigs?.CurrentPublished();
+        var bindings = published?.trackerBindings ?? Array.Empty<SpineRecovery.App.AdminTrackerBinding>();
+        bool hasFixedBindings = bindings.Length == 5 && bindings.Any(binding => binding != null && !string.IsNullOrWhiteSpace(binding.hardwareId));
+        if (!administrator && hasFixedBindings)
+        {
+            SpineRecovery.App.AdminTrackerBinding binding = bindings.FirstOrDefault(candidate =>
+                candidate != null && !string.IsNullOrWhiteSpace(candidate.hardwareId) &&
+                string.Equals(candidate.hardwareId.Trim(), tracker.hardwareId?.Trim(), StringComparison.OrdinalIgnoreCase));
+            if (binding == null) return false;
+            switch (binding.slot)
+            {
+                case SpineRecovery.App.FixedTrackerSlot.LeftAnkle: location = TrackerWearLocation.LeftLowerLeg; return true;
+                case SpineRecovery.App.FixedTrackerSlot.RightAnkle: location = TrackerWearLocation.RightLowerLeg; return true;
+                case SpineRecovery.App.FixedTrackerSlot.LeftWrist: location = TrackerWearLocation.LeftForearm; return true;
+                case SpineRecovery.App.FixedTrackerSlot.RightWrist: location = TrackerWearLocation.RightForearm; return true;
+                case SpineRecovery.App.FixedTrackerSlot.Waist: location = TrackerWearLocation.Abdomen; return true;
+                default: return false;
+            }
+        }
+        return TryMapBodyPosition(tracker.bodyPosition, out location);
     }
 
     private void ClearAutomaticallyDiscoveredEndpoints()

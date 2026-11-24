@@ -845,13 +845,13 @@ namespace SpineRecovery.App
         }
 
         /// <summary>Starts a fresh questionnaire for action <paramref name="actionNumber"/> of <paramref name="actionCount"/>.</summary>
-        public void Show(int actionNumber, int actionCount, string actionName)
+        public void Show(int actionNumber, int actionCount, string actionName, bool completed)
         {
             intensity = -1;
             pain = -1;
-            chipLabel.text = "动作 " + actionNumber + "/" + actionCount;
-            titleLabel.text = actionName + " 完成";
-            nextLabel.text = actionNumber < actionCount ? "下一个动作" : "完成训练";
+            chipLabel.text = "训练反馈";
+            titleLabel.text = actionName + (completed ? " 完成" : " 已结束");
+            nextLabel.text = "保存反馈";
             contentRect.anchoredPosition = Vector2.zero;
             RefreshNotice();
             Refresh();

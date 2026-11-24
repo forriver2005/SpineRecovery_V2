@@ -4,16 +4,19 @@
 | --- | --- |
 | 鸟狗式 | `BirdDog_RingSkinC_Recorded.unity` |
 | 死虫式 | `DeadBug_RingSkinC_Recorded.unity` |
-| 臀桥 · 新评分 | `HipThrust_RingBridge_NewScoring.unity` |
+| 臀桥（新评分） | `HipThrust_RingBridge_NewScoring.unity` |
 | 臀桥 · 保持 30 秒 | `HipThrust_RingBridge_Hold30.unity` |
 | 左侧桥 · 动态 | `SideBridge_RingBridge_Dynamic.unity` |
 | 左侧桥 · 保持 30 秒 | `SideBridge_RingBridge_Hold30.unity` |
+| 敲鼓臀桥 | `HipThrust_TaikoNight_Dynamic.unity` |
+| 卷腹 | `CrunchPractice_TaikoNight.unity` |
+| 卧位猫式 | `LyingCatPractice_TaikoNight.unity` |
 
-按场景名称加载，不依赖固定 Build Index。可选旧版 `HipThrust_RingBridge_Recorded.unity` 仅在文件保留时注册；整理工具不会恢复已经删除的场景。
+按场景名称加载，不依赖固定 Build Index。`hipthrust` 与 `hipthrust_newscore` 都路由到臀桥新评分场景。
 
 全部使用新录制动画及右侧教练窗口。鸟狗和死虫使用 RingSkinC 视觉，全部难度仅有伸展、收回；臀桥使用敲鼓素材，保留抬起、保持、放下。教练与视觉跟随同一播放进度，暂停时同步停止。
 
-直接打开场景并 Play，按校准、选择难度、开始训练流程操作。`hipthrust_newscore`、`hipthrust_hold30` 分别选择臀桥新评分和 30 秒变体。鸟狗左腿配右手、右腿配左手；桥式 HIT 仅腰部震动。
+直接打开场景并 Play，按校准、选择难度、开始训练流程操作。`hipthrust_newscore`、`hipthrust_hold30` 分别选择臀桥新评分和 30 秒变体；`sidebridge`、`sidebridge_hold30` 分别选择侧桥动态和保持变体；`hipthrust_taiko`、`crunch`、`lying_cat` 选择三款星轨敲鼓游戏。动作串每组结束后统一休息30秒。鸟狗左腿配右手、右腿配左手；桥式 HIT 仅腰部震动。
 
 新评分场景保持原 4/8/12 次节奏。30 秒场景在最高点静止保持，次数来自处方，默认附带标注为演示的 1 组 × 4 次处方；实际接入方法及评分规则见项目根目录 `HIPTHRUST_NEW_RULES.md`。
 

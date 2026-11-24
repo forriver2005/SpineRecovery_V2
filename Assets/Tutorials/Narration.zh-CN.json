@@ -1,0 +1,207 @@
+{
+  "lessons": [
+    {
+      "kind": 0,
+      "title": "鸟狗 / 死虫 · 四肢节奏教程",
+      "defaultGame": "BirdDog_RingSkinC_Recorded",
+      "steps": [
+        {
+          "id": "limbs_intro",
+          "title": "先看演示，再开始游戏",
+          "narration": "这套教程适用于鸟狗式和死虫式。现在只需观看：模型、音符和判定都会自动演示，不需要佩戴追踪器，也不需要跟着做动作。",
+          "demo": 0,
+          "minimumSeconds": 9
+        },
+        {
+          "id": "limbs_left_arm",
+          "title": "左上角 · 左臂",
+          "narration": "圆环分为四个肢体区域。左上角的粉色区域代表左臂。这里的左右，指的是你自己的左右侧。",
+          "demo": 1,
+          "minimumSeconds": 7
+        },
+        {
+          "id": "limbs_right_arm",
+          "title": "右上角 · 右臂",
+          "narration": "右上角的黄色区域代表右臂。看到这个区域的音符时，要关注右臂是否完成当前要求的动作。",
+          "demo": 2,
+          "minimumSeconds": 7
+        },
+        {
+          "id": "limbs_left_leg",
+          "title": "左下角 · 左腿",
+          "narration": "左下角的青绿色区域代表左腿。每个区域都有文字标记，可以结合文字和颜色识别。",
+          "demo": 3,
+          "minimumSeconds": 7
+        },
+        {
+          "id": "limbs_right_leg",
+          "title": "右下角 · 右腿",
+          "narration": "右下角的浅紫色区域代表右腿。四个区域分别检查对应肢体，不要只看模型的整体动作。",
+          "demo": 4,
+          "minimumSeconds": 7
+        },
+        {
+          "id": "limbs_coach",
+          "title": "右侧教练 · 当前动作",
+          "narration": "右侧模型是教练示范。伸展、收回和进度提示帮助你理解当前阶段。正式游戏时，跟随教练完成动作；教程里的模型由录制动画自动播放。",
+          "demo": 5,
+          "minimumSeconds": 10
+        },
+        {
+          "id": "limbs_approach",
+          "title": "音符靠近 · 提前准备",
+          "narration": "音符从外侧朝对应的圆环区域移动。靠近判定位置时，完成对应肢体的目标动作。中间的星形是圆环中心，不是需要点击的按钮。",
+          "demo": 6,
+          "minimumSeconds": 9
+        },
+        {
+          "id": "limbs_hit",
+          "title": "HIT · 命中示范",
+          "narration": "看这次示范：左臂和右腿伸展到位，音符到达判定位置后出现命中反馈。命中需要对应肢体达到动作要求，不能用点击屏幕代替。",
+          "demo": 7,
+          "minimumSeconds": 9
+        },
+        {
+          "id": "limbs_miss",
+          "title": "MISS · 漏击示范",
+          "narration": "这次模型没有完成要求的伸展。音符到达后仍未达标，就出现漏击。动作不到位、错过判定时机，或者没有有效的动作数据，都可能无法命中。",
+          "demo": 8,
+          "minimumSeconds": 10
+        },
+        {
+          "id": "limbs_summary",
+          "title": "记住：看区域、跟教练、等判定",
+          "narration": "鸟狗式和死虫式共用这套四肢判定方式，具体动作以教练示范为准。你可以重播任意一节，也可以返回游戏。返回后仍保持暂停，准备好再继续训练。",
+          "demo": 14,
+          "minimumSeconds": 10
+        }
+      ]
+    },
+    {
+      "kind": 1,
+      "title": "臀桥 / 侧桥 · 动态模式教程",
+      "defaultGame": "HipThrust_RingBridge_NewScoring",
+      "steps": [
+        {
+          "id": "dynamic_intro",
+          "title": "动态模式 · 自动示范",
+          "narration": "这套教程适用于动态臀桥和动态侧桥。我们用臀桥的录制动画介绍共同的游戏流程。侧桥的姿势不同，正式训练时以对应场景的教练为准。",
+          "demo": 0,
+          "minimumSeconds": 10
+        },
+        {
+          "id": "dynamic_overview",
+          "title": "三段圆环 · 抬起、保持、放下",
+          "narration": "圆环的三个区域分别代表抬起、保持和放下。亮起的区域以及前进的光点表示教练当前演示的阶段，不代表你已经完成了动作。",
+          "demo": 0,
+          "minimumSeconds": 10
+        },
+        {
+          "id": "dynamic_lift",
+          "title": "第一段 · 抬起",
+          "narration": "抬起阶段开始时，对应的圆环逐渐亮起，教练模型从起始位置抬起。正式游戏会检查实际动作，不能只等待动画播放结束。",
+          "demo": 9,
+          "minimumSeconds": 8
+        },
+        {
+          "id": "dynamic_hold",
+          "title": "第二段 · 保持与评分",
+          "narration": "进入保持阶段后，关注动作质量和保持分。达到要求并有效保持，才会产生有效的评分。教练的示范进度与用户的实际得分，是两个不同的信息。",
+          "demo": 10,
+          "minimumSeconds": 10
+        },
+        {
+          "id": "dynamic_lower",
+          "title": "第三段 · 放下",
+          "narration": "放下阶段跟随教练回到起始位置。完整的一轮包括抬起、保持和放下。侧桥还会显示实际合格次数，示范结束次数不等于实际完成次数。",
+          "demo": 11,
+          "minimumSeconds": 9
+        },
+        {
+          "id": "dynamic_hit",
+          "title": "达标示例 · HIT",
+          "narration": "这是动作达标的示例，教程用命中标记帮助理解。模型完成抬起、有效保持和放下，示例保持分增加。正式游戏请以对应场景的评分和次数反馈为准。",
+          "demo": 7,
+          "minimumSeconds": 10
+        },
+        {
+          "id": "dynamic_miss",
+          "title": "未达标示例 · MISS",
+          "narration": "这是未达标的示例，教程用漏击标记提示。模型没有抬到要求的位置，虽然教练圆环仍在推进，实际动作没有达标，就不能把示范进度当作有效得分。",
+          "demo": 8,
+          "minimumSeconds": 10
+        },
+        {
+          "id": "dynamic_summary",
+          "title": "跟随三阶段 · 关注实际反馈",
+          "narration": "记住抬起、保持、放下的顺序。圆环看阶段，教练看姿势，评分和次数看实际完成情况。本教程的数据只是演示，不会计入你的训练记录。",
+          "demo": 14,
+          "minimumSeconds": 9
+        }
+      ]
+    },
+    {
+      "kind": 2,
+      "title": "臀桥保持 / 侧桥保持 · 教程",
+      "defaultGame": "HipThrust_RingBridge_Hold30",
+      "steps": [
+        {
+          "id": "hold_intro",
+          "title": "保持模式 · 自动示范",
+          "narration": "这套教程适用于臀桥保持和侧桥保持。我们用臀桥动画说明共同的三阶段流程，以及三十秒保持的玩法。现在不需要用户动作输入。",
+          "demo": 0,
+          "minimumSeconds": 9
+        },
+        {
+          "id": "hold_overview",
+          "title": "示范倒计时 ≠ 有效保持",
+          "narration": "圆环仍然分为抬起、保持和放下。教练倒计时表示示范剩余时间；有效保持时间表示实际达标的时间。两者不能混为一谈。",
+          "demo": 0,
+          "minimumSeconds": 9
+        },
+        {
+          "id": "hold_lift",
+          "title": "先抬起 · 再进入保持",
+          "narration": "先从起始位置抬起，达到保持阶段要求的姿态。模型到达高位之后，保持阶段才开始。",
+          "demo": 9,
+          "minimumSeconds": 7
+        },
+        {
+          "id": "hold_thirty",
+          "title": "完整演示 · 30 秒保持",
+          "narration": "现在演示完整的三十秒保持，这一节没有加速。模型自动保持，示例有效时间逐秒增加。正式游戏中，只有动作持续达标的时间才有效。你可以暂停观看，或点击下一节跳过演示。",
+          "demo": 12,
+          "minimumSeconds": 36
+        },
+        {
+          "id": "hold_interrupted",
+          "title": "中断示例 · 连续保持重新累计",
+          "narration": "看这次中断示例：姿势持续偏离要求，示例有效时间停止，并重新从零累计。正式游戏会容忍短暂波动，但明显中断后，不能把前后两段时间拼成一次连续保持。",
+          "demo": 13,
+          "minimumSeconds": 12
+        },
+        {
+          "id": "hold_hit",
+          "title": "达标示例 · 完成后放下",
+          "narration": "完成要求的有效保持后，还要跟随放下提示回到起始位置。教程中的命中标记只是达标示意；正式游戏以实际评分、保持时间和合格次数为准。",
+          "demo": 7,
+          "minimumSeconds": 10
+        },
+        {
+          "id": "hold_miss",
+          "title": "未达标示例 · 等待不等于完成",
+          "narration": "这次模型没有达到要求的保持姿态。即使教练的三十秒倒计时结束，也不代表用户完成了三十秒有效保持。没有有效动作数据，同样不能算作完成。",
+          "demo": 8,
+          "minimumSeconds": 10
+        },
+        {
+          "id": "hold_summary",
+          "title": "看姿态、看有效时间、完成放下",
+          "narration": "记住：达到姿态，持续有效保持，最后完成放下。侧桥还要关注合格次数。教程支持暂停和重播，演示不会改变你的训练成绩；返回游戏后仍保持暂停。",
+          "demo": 14,
+          "minimumSeconds": 10
+        }
+      ]
+    }
+  ]
+}

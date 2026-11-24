@@ -26,6 +26,8 @@ public class DeadBugStartMenuController : MonoBehaviour
     }
     public event Action TrainingStarted;
     public Func<bool> TrainingStartAllowed { get; set; }
+    public Func<bool> ExternalTrainingStart { get; set; }
+    public bool IsFlowTestCalibrationBypassed => poseScorer != null && poseScorer.IsFlowTestCalibrationBypassed;
     public string SelectedDifficultyKey => selectedDifficulty == Difficulty.Simple ? "simple" : selectedDifficulty == Difficulty.Hard ? "hard" : "standard";
     public bool IsTrainingMenuVisible => menuRoot != null && menuRoot.activeSelf;
 
@@ -360,7 +362,7 @@ public class DeadBugStartMenuController : MonoBehaviour
                     columnIndex = 0;
                     break;
                 case "Game":
-                    if (LumbarCoachMode.ForScene(gameObject.scene.name) != null)
+                    if (!CoachModeNavigation.IsSupportedCoachScene(gameObject.scene.name))
                     {
                         child.gameObject.SetActive(false);
                         continue;
@@ -381,7 +383,7 @@ public class DeadBugStartMenuController : MonoBehaviour
             }
 
             child.gameObject.SetActive(true);
-            if (columnIndex > 1 && LumbarCoachMode.ForScene(gameObject.scene.name) != null)
+            if (columnIndex > 1 && !CoachModeNavigation.IsSupportedCoachScene(gameObject.scene.name))
                 columnIndex--;
             if (child is RectTransform rectTransform)
             {
@@ -534,6 +536,15 @@ public class DeadBugStartMenuController : MonoBehaviour
             {
                 poseScorer.BeginCalibration();
             }
+            return;
+        }
+
+        if (ExternalTrainingStart != null)
+        {
+            if (!ExternalTrainingStart()) return;
+            TrainingStarted?.Invoke();
+            if (startButton != null) startButton.interactable = false;
+            if (menuRoot != null) menuRoot.SetActive(false);
             return;
         }
 
@@ -959,6 +970,13 @@ public class DeadBugStartMenuController : MonoBehaviour
         {
             BeginPracticePlaybackPresentation();
         }
+    }
+
+    public void HidePracticeToolbarForActionLibrary()
+    {
+        if (!IsPracticeCoachMode) return;
+        SetPracticeActionMenuCanvasVisible(false);
+        SetPracticeToolbarVisible(false);
     }
 
     private void ResumePracticeFromPause()

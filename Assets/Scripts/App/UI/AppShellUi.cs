@@ -431,11 +431,12 @@ namespace SpineRecovery.App
             return panel;
         }
 
+        private TrainingActionCatalog.Entry selectedFreeAction = TrainingActionCatalog.Entries[0];
         private GameObject CreateTrainingMenuPanel(Transform parent)
         {
             RectTransform root = QuestionnaireUi.CreateScreen(parent, "TrainingMenuPanel", null, out GameObject panel);
             QuestionnaireUi.Header(root, "训练准备", () => bootstrap.Router.Navigate(AppRoute.Home));
-            RectTransform content = QuestionnaireUi.ScrollArea(root, QuestionnaireUi.HeaderHeight, 96f, 690f);
+            RectTransform content = QuestionnaireUi.ScrollArea(root, QuestionnaireUi.HeaderHeight, 96f, 1430f);
             QuestionnaireUi.Label(content, "开始本次训练", 29, QuestionnaireUi.Accent, TextAnchor.MiddleLeft,
                 FontStyle.Bold, 20f, 36f, 350f, 48f);
             QuestionnaireUi.Label(content, "连接投屏眼镜和 IMU 追踪器后，进入训练流程", 15, QuestionnaireUi.Muted,
@@ -463,11 +464,23 @@ namespace SpineRecovery.App
             QuestionnaireUi.Label(library.transform, ">", 26, QuestionnaireUi.Muted, TextAnchor.MiddleCenter,
                 FontStyle.Normal, 312f, 0f, 26f, 88f);
 
+            var selectionLabel = QuestionnaireUi.Label(content, "自由训练：" + selectedFreeAction.Name + "\n已绑定患者将使用医生处方", 17,
+                QuestionnaireUi.Ink, TextAnchor.MiddleLeft, FontStyle.Normal, 20f, 562f, 350f, 64f);
+            for (int i = 0; i < TrainingActionCatalog.Entries.Length; i++)
+            {
+                var entry = TrainingActionCatalog.Entries[i];
+                QuestionnaireUi.PillButton(content, entry.Name, 20f, 642f + i * 66f, 350f, 52f, false, () =>
+                {
+                    selectedFreeAction = entry;
+                    selectionLabel.text = "自由训练：" + entry.Name + "\n已绑定患者将使用医生处方";
+                });
+            }
+
             RectTransform footer = QuestionnaireUi.Footer(root, 96f);
             trainingMenuMessage = QuestionnaireUi.Label(footer, "", 12, QuestionnaireUi.DangerText,
                 TextAnchor.MiddleCenter, FontStyle.Normal, 20f, 2f, 350f, 18f);
             QuestionnaireUi.PillButton(footer, "开始训练", 20f, 28f, 350f, 52f, true,
-                () => StartTraining("SpineV2Minimal", "dead_bug"));
+                () => StartTraining(selectedFreeAction.Game, selectedFreeAction.Key));
             RefreshTrainingPreparationStatus();
             return panel;
         }
@@ -711,6 +724,8 @@ namespace SpineRecovery.App
         private static string DisplayActionName(TrainingPlan plan)
         {
             if (plan == null) return "本次动作";
+            var entry = TrainingActionCatalog.Find(plan.actionId);
+            if (entry != null) return entry.Name;
             if (plan.actionId == "dead_bug") return "死虫式";
             if (plan.actionId == "bird_dog") return "鸟狗式";
             return string.IsNullOrEmpty(plan.actionId) ? "本次动作" : plan.actionId;
@@ -782,7 +797,8 @@ namespace SpineRecovery.App
             // follows it always belongs to the last (or only) action of the plan.
             postActionCount = plan != null && plan.actions != null ? Mathf.Max(1, plan.prescriptionContractVersion == 2 ? plan.actions.Length / 2 : plan.actions.Length) : 1;
             postActionNumber = postActionCount;
-            if (postActionScreen != null) postActionScreen.Show(postActionNumber, postActionCount, DisplayActionName(plan));
+            if (postActionScreen != null) postActionScreen.Show(postActionNumber, postActionCount, DisplayActionName(plan),
+                bootstrap?.Training.CurrentResult?.completed == true);
             if (bootstrap != null && bootstrap.Router != null)
                 bootstrap.Router.Navigate(AppRoute.PostTrainingSurvey);
         }
@@ -1855,7 +1871,9 @@ namespace SpineRecovery.App
                 });
                 return;
             }
-            string coach = actionId == "bird_dog" ? "BirdDogPractice" : "DeadBugPractice";
+            var entry = TrainingActionCatalog.Find(actionId);
+            if (entry == null) return;
+            string coach = entry.Coach;
             bool male = user.profile.gender == "男" || user.profile.gender == "male";
             coach = SpineFlowTrainingSession.ResolveSceneForGender(coach, male);
             LaunchPlan(new TrainingPlan
@@ -1866,8 +1884,8 @@ namespace SpineRecovery.App
                 preTrainingEventId = user.preTrainingEventId,
                 actions = new[]
                 {
-                    new TrainingAction { actionId = actionId + "_coach", arTaskType = "coach_training", sets = 1, reps = 4, sceneName = coach },
-                    new TrainingAction { actionId = actionId + "_game", arTaskType = "game_training", sceneName = sceneName }
+                    new TrainingAction { actionId = actionId + "_coach", actionName = entry.Name, arTaskType = "coach_training", sets = 1, reps = 4, sceneName = coach },
+                    new TrainingAction { actionId = actionId + "_game", actionName = entry.Name, arTaskType = "game_training", sets = 1, reps = 4, sceneName = entry.Game }
                 }
             });
         }

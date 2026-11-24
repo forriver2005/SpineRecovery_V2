@@ -318,6 +318,8 @@ public sealed class CoachingActionLibrary : MonoBehaviour
     private static string ResolvePracticeScene(Entry entry)
     {
         if (entry == null) return null;
+        var training = TrainingActionCatalog.Find(entry.id);
+        if (training != null) return training.Coach;
 
         LumbarCoachProfile lumbar = LumbarCoachMode.ForAction(entry.id) ??
             LumbarCoachMode.ForAction(entry.displayName);
@@ -343,7 +345,8 @@ public sealed class CoachingActionLibrary : MonoBehaviour
         string sceneName = selectedIndex >= 0 && selectedIndex < entries.Length
             ? ResolvePracticeScene(entries[selectedIndex]) : null;
         bool available = !string.IsNullOrEmpty(sceneName) &&
-            Application.CanStreamedLevelBeLoaded(sceneName);
+            Application.CanStreamedLevelBeLoaded(sceneName) &&
+            (SpineRecovery.App.AppBootstrap.Instance?.Training.AllowsPrescriptionCoach(sceneName) ?? true);
         startPracticeButton.interactable = available;
         startPracticeButton.targetGraphic.color = available
             ? new Color(0.10f, 0.38f, 0.31f, 0.98f)
@@ -356,6 +359,11 @@ public sealed class CoachingActionLibrary : MonoBehaviour
 
         string destination = ResolvePracticeScene(entries[selectedIndex]);
         if (string.IsNullOrEmpty(destination)) return;
+        if (SpineRecovery.App.AppBootstrap.Instance?.Training.AllowsPrescriptionCoach(destination) == false)
+        {
+            statusText.text = "请先完成当前处方动作；其他动作可以查看示范。";
+            return;
+        }
         if (!Application.CanStreamedLevelBeLoaded(destination))
         {
             statusText.text = "对应的教练模式场景不可用";
@@ -376,7 +384,7 @@ public sealed class CoachingActionLibrary : MonoBehaviour
         retainedPracticeRoots = null;
         retainedRootActiveStates = null;
         DeadBugStartMenuController.ShowPracticeStartOnNextLoad();
-        SceneManager.LoadScene(destination, LoadSceneMode.Single);
+        SceneLoadingOverlay.Load(destination, LoadSceneMode.Single);
     }
 
     private void Select(int index)

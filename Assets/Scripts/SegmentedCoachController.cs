@@ -908,6 +908,7 @@ public class SegmentedCoachController : MonoBehaviour
     /// </summary>
     public void CancelDemonstrationPreview()
     {
+        if (this == null) return;
         lessonGeneration++;
         if (lessonRoutine != null)
         {
@@ -916,7 +917,7 @@ public class SegmentedCoachController : MonoBehaviour
         }
 
 
-        if (!hasStarted && motionBackend != null && motionBackend.IsReady &&
+        if (isActiveAndEnabled && !hasStarted && motionBackend != null && motionBackend.IsReady &&
             motionBackend.SegmentCount > 0)
         {
             motionBackend.PlaySegment(0);

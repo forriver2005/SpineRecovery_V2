@@ -163,13 +163,16 @@ public class CoachSetProgressUI : MonoBehaviour
 
     private static string FormatTarget(CoachGuidanceLimb limbs)
     {
+        if (UnityEngine.SceneManagement.SceneManager.GetActiveScene().name == "SideBridgeOppositePractice")
+            return " · 右侧支撑 · 躯干";
         if (limbs == CoachGuidanceLimb.None)
         {
             switch (VoicePromptManager.GetPracticeActionKey())
             {
                 case "hipthrust": return " · 臀部";
                 case "catcamel": return " · 背部";
-                case "sidebridge": return " · 左侧支撑 · 躯干";
+                case "sidebridge": return UnityEngine.SceneManagement.SceneManager.GetActiveScene().name == "SideBridgeOppositePractice"
+                    ? " · 右侧支撑 · 躯干" : " · 左侧支撑 · 躯干";
                 case "curlup": return " · 上背";
                 default: return string.Empty;
             }

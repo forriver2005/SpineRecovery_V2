@@ -71,6 +71,8 @@ public class DeadBugGamingPoseScorer : MonoBehaviour
     [Tooltip("Fraction of moving bones tolerated as normal tracker jitter.")]
     [Range(0f, 0.6f)] [SerializeField] private float allowedMovingBoneFraction = 0.4f;
     [SerializeField] private bool autoCalibrateOnStart = true;
+    [Tooltip("Editor and Development Build only: allow game-flow testing without sensor input or calibration. Scoring stays disabled until calibration succeeds.")]
+    [SerializeField] private bool disableCalibrationForFlowTest;
 
     [Header("Calibration Bones")]
     [SerializeField] private HumanBodyBones[] scoringBones =
@@ -172,9 +174,14 @@ public class DeadBugGamingPoseScorer : MonoBehaviour
                 ? calibrated && externalCoachingInputFresh
                 : calibrated && assessmentMotion!=null && assessmentMotion.HasFreshFrame; }
     }
-    public bool IsScoringPaused => externalCoachingMode
-        ? false
-        : coachController!=null && coachController.IsActionPaused;
+public bool HasCurrentUserInput
+    {
+        get {
+            if (assessmentMotion == null) assessmentMotion = FindObjectOfType<AvatarMotionSource>();
+            return calibrated && assessmentMotion != null && assessmentMotion.isActiveAndEnabled && assessmentMotion.Model == userAnimator.gameObject && assessmentMotion.HasFreshFrame;
+        }
+    }
+    public bool IsScoringPaused => externalCoachingMode ? false : coachController!=null && coachController.IsActionPaused;
     public Dictionary<HumanBodyBones,Vector3> CaptureAssessmentPose(bool user) => user
         ? scoringEngine.CaptureAlignedPose(userAnimator):scoringEngine.CaptureRawPose(coachAnimator);
     public bool HasMatchingFloorPosture => FloorOrientation(userAnimator,out float actualFront,out float actualTilt)&&
@@ -196,8 +203,17 @@ public class DeadBugGamingPoseScorer : MonoBehaviour
     public AnatomicalPoseScore LastFrameScore => lastFrameResult;
     public AnatomicalLimbScores LastLimbScores => lastLimbScores;
     public bool IsCalibrated => calibrated;
-    public bool IsCalibrationBypassed => GetComponent<SupineGameCalibration>() != null
-        && GetComponent<SupineGameCalibration>().skipCalibrationForPreview;
+    public bool IsFlowTestCalibrationBypassed =>
+        disableCalibrationForFlowTest &&
+        (Application.isEditor || Debug.isDebugBuild);
+    public bool IsCalibrationBypassed
+    {
+        get
+        {
+            SupineGameCalibration supine = GetComponent<SupineGameCalibration>();
+            return IsFlowTestCalibrationBypassed || (supine != null && supine.skipCalibrationForPreview);
+        }
+    }
     public bool CanStartTraining => calibrated || IsCalibrationBypassed;
     public bool IsCalibrating => calibrating;
     public Animator CoachAnimator => coachAnimator;
@@ -263,7 +279,7 @@ public class DeadBugGamingPoseScorer : MonoBehaviour
 
     private void Start()
     {
-        if (autoCalibrateOnStart)
+        if (autoCalibrateOnStart && !IsCalibrationBypassed)
         {
             BeginCalibration();
         }
@@ -364,7 +380,7 @@ public class DeadBugGamingPoseScorer : MonoBehaviour
             calibrationRoutine = null;
             calibrating = false;
             calibrated = false;
-            GetComponent<SupineGameCalibration>().Release();
+            GetComponent<SupineGameCalibration>()?.Release();
             CalibrationStateChanged?.Invoke(false);
             ReportCalibrationProgress(0f, "流程预览：已临时跳过校准");
             return;
@@ -463,7 +479,7 @@ public class DeadBugGamingPoseScorer : MonoBehaviour
             bool stable = CheckCalibrationStability();
             bool poseReady = supine == null || supine.IsPoseReady(userAnimator);
             var source = supine != null ? FindObjectOfType<AvatarMotionSource>() : null;
-            bool inputReady = supine == null || (source != null && source.GetAvailable() > 0);
+            bool inputReady = supine == null || (source != null && source.GetAvailable() > 0 && source.HasFreshFrame);
             if (!poseReady || !inputReady)
             {
                 stableElapsed = sampleElapsed = unstableDuringSample = 0f;
@@ -939,3 +955,4 @@ public class DeadBugGamingPoseScorer : MonoBehaviour
             left.stateName == right.stateName;
     }
 }
+

@@ -15,7 +15,11 @@ namespace SpineRecovery.Editor
         {
             PlayerSettings.SetScriptingBackend(BuildTargetGroup.Android, ScriptingImplementation.IL2CPP);
             PlayerSettings.Android.targetArchitectures = AndroidArchitecture.ARM64;
-            PlayerSettings.SetApplicationIdentifier(BuildTargetGroup.Android, "com.metaspine.mobile");
+            // Install acceptance builds alongside the patient app without sharing its private data.
+            bool acceptance = Environment.GetEnvironmentVariable("SPINE_ACCEPTANCE_BUILD") == "1";
+            PlayerSettings.SetApplicationIdentifier(BuildTargetGroup.Android,
+                acceptance ? "com.metaspine.acceptance" : "com.metaspine.mobile");
+            if (acceptance) PlayerSettings.productName = "MetaSpine Acceptance";
             string output = Environment.GetEnvironmentVariable("SPINE_APK_OUTPUT");
             if (string.IsNullOrWhiteSpace(output))
                 output = Path.Combine("Builds", "SpineRecovery_SlimeVR_LogExport.apk");

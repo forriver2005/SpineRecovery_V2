@@ -41,7 +41,8 @@ public sealed class GameTrainingAssessment : MonoBehaviour
     {
         Entry=entry;
         gameObject.AddComponent<TrainingResultView>().Initialize(this);
-        if(entry.taiko!=null)entry.taiko.Assessment=this;
+        if(entry.taikoNightAction!=null)entry.taikoNightAction.Assessment=this;
+        else if(entry.taiko!=null)entry.taiko.Assessment=this;
         else
         {
             entry.coach.ScoringSessionStarted+=BeginRhythm;
@@ -54,7 +55,8 @@ public sealed class GameTrainingAssessment : MonoBehaviour
     void OnDestroy()
     {
         if(Entry==null)return;
-        if(Entry.taiko!=null)Entry.taiko.Assessment=null;
+        if(Entry.taikoNightAction!=null)Entry.taikoNightAction.Assessment=null;
+        else if(Entry.taiko!=null)Entry.taiko.Assessment=null;
         else if(Entry.coach!=null)
         {
             Entry.coach.ScoringSessionStarted-=BeginRhythm;
@@ -75,6 +77,7 @@ public sealed class GameTrainingAssessment : MonoBehaviour
     // Observe input during pauses too: an old packet must never become fresh on resume.
     void Update()
     {
+        if(Entry.taikoNightAction!=null)return;
         if(motion==null)motion=FindObjectOfType<AvatarMotionSource>();
         if(motion!=null && motion.LastPacketframeCounterInFrame!=lastPacket)
         {lastPacket=motion.LastPacketframeCounterInFrame;lastPacketTime=Time.unscaledTime;}
@@ -85,6 +88,30 @@ public sealed class GameTrainingAssessment : MonoBehaviour
     }
     bool Fresh => Entry.scorer!=null && Entry.scorer.IsCalibrated && motion!=null &&
         motion.HasFreshFrame && Time.unscaledTime-lastPacketTime<=.5f;
+
+    public void BeginTaiko(int count, Vector3 phases, float target, string difficulty)
+    {
+        ResetInput();minimumMotion=maximumMotion=null;
+        var durations=new double[count];var targets=new double[count];var following=new double[count];
+        for(int i=0;i<count;i++)
+        {durations[i]=phases.x+phases.y+phases.z;targets[i]=target;following[i]=phases.x+phases.z;}
+        Summary.Reset(durations,targets,true,false,GameDifficultyPolicy.FollowingThreshold(difficulty),following);
+    }
+
+    public void ObserveTaiko(int index,float seconds,bool tracked,float quality,float following)
+    {
+        if(!IsCollecting)return;
+        bool usable=tracked&&seconds>0&&seconds<=.1001f;
+        if(usable)validSamples++;
+        Summary.Observe(index,seconds,usable,quality,usable&&quality>=Summary.Threshold,following);
+    }
+
+    public void RecordTaikoRound(int index,float hold,float target)
+    {
+        if(IsCollecting)Summary.RecordDose(index,hold,hold,true,hold+.0001f>=target);
+    }
+
+    public void CancelTaiko() { IsCollecting=false;IsFinished=false; }
 
     public void BeginBridge()
     {
@@ -181,7 +208,7 @@ public sealed class GameTrainingAssessment : MonoBehaviour
     }
     void LateUpdate()
     {
-        if(!IsCollecting||Entry.taiko!=null||Entry.coach.IsActionPaused)return;
+        if(!IsCollecting||Entry.taikoNightAction!=null||Entry.taiko!=null||Entry.coach.IsActionPaused)return;
         if(finishing)
         {
             ProcessPendingEndpoints(Time.deltaTime);finishElapsed+=Time.deltaTime;
@@ -282,6 +309,8 @@ public sealed class GameTrainingAssessment : MonoBehaviour
                 Summary.CapMovementQuality(i,100*Mathf.InverseLerp(.35f,.70f,Mathf.Min(range.x,range.y)));
         }
         IsCollecting=false;IsFinished=true;
-        SpineFlowTrainingSession.SaveUnifiedGameAssessment(Entry.actionId, Entry.menu.SelectedDifficultyKey, Summary, validSamples);
+        SpineFlowTrainingSession.SaveUnifiedGameAssessment(Entry.actionId,
+            Entry.taikoNightAction!=null?Entry.taikoNightAction.DifficultyKey:Entry.menu.SelectedDifficultyKey,
+            Summary, validSamples, Entry.taikoNightAction!=null?(int?)Mathf.CeilToInt(Entry.taikoNightAction.ActiveSeconds):null);
     }
 }

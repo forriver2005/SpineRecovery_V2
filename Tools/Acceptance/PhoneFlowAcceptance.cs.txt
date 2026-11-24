@@ -1,0 +1,144 @@
+// Copied into Assets only by the isolated acceptance export. Never part of the shipping player.
+#if DEVELOPMENT_BUILD && UNITY_ANDROID
+using System;
+using System.Collections;
+using System.IO;
+using System.Linq;
+using System.Reflection;
+using SpineRecovery.App;
+using UnityEngine;
+using UnityEngine.SceneManagement;
+
+public sealed class PhoneFlowAcceptance : MonoBehaviour
+{
+    const string Account = "flowacceptance20261124";
+    string folder;
+    int passed, failed, errors;
+    static PhoneFlowAcceptance instance;
+
+    [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
+    static void Install()
+    {
+        if (Application.identifier != "com.metaspine.acceptance" || instance != null) return;
+        instance = new GameObject("Isolated phone acceptance").AddComponent<PhoneFlowAcceptance>();
+        DontDestroyOnLoad(instance.gameObject);
+    }
+    IEnumerator Start()
+    {
+        folder = Path.Combine(Application.persistentDataPath, "acceptance");
+        Directory.CreateDirectory(folder);
+        // A completed run stays at the home page so manual checks can follow.
+        if (File.Exists(Path.Combine(folder,"complete.txt"))) yield break;
+        File.WriteAllText(Path.Combine(folder,"checks.txt"), "Real Android device; synthetic local prescription fixtures; no tracker input or fabricated completions.\n");
+        Application.logMessageReceived += LogError;
+        yield return new WaitForSecondsRealtime(5);
+        var app = AppBootstrap.Instance;
+        Check(app != null && NativeMobileService.Available,"native bootstrap");
+        if (app == null) yield break;
+        var registered = app.Users.TryRegister(Account,"AcceptanceOnly-20261124",out var user);
+        Check(registered == AccountRegistrationResult.Success || registered == AccountRegistrationResult.AccountAlreadyExists,"native account registration");
+        Check(app.Users.TryAuthenticate(Account,"AcceptanceOnly-20261124",out user),"native account login");
+        user.lifecycle=UserLifecycle.ReturningUser;
+        user.profile.gender="female";
+        user.preTrainingRecordedAt=DateTimeOffset.UtcNow.ToString("O");
+        user.preTrainingCheckPassed=true;
+        app.Users.Save(user);
+        app.State.SetSession(user);
+        Check(!user.profile.activationBound,"test account is unbound; no patient upload");
+        app.Router.Navigate(AppRoute.TrainingPreparation);
+        yield return Snapshot("00_preparation");
+        int index=0;
+        foreach(var entry in TrainingActionCatalog.Entries)
+        {
+            app.Training.ClearCurrentPlan();
+            var next=TrainingActionCatalog.Entries[(index+1)%TrainingActionCatalog.Entries.Length];
+            var plan=new TrainingPlan {
+                accountId=Account,patientId=Account,gender="female",actionId=entry.Key,
+                prescriptionOrderId=900000+index,prescriptionContractVersion=2,
+                actions=new[] {Action(entry,true,0),Action(entry,false,0),Action(next,true,1),Action(next,false,1)}
+            };
+            var shell=app.GetComponent<AppShellUi>();
+            typeof(AppShellUi).GetMethod("LaunchPlan",BindingFlags.Instance|BindingFlags.NonPublic).Invoke(shell,new object[] {plan});
+            yield return new WaitForSecondsRealtime(3);
+            Check(SceneManager.GetActiveScene().name==entry.Coach,entry.Key+" launches coach");
+            Check(app.Training.AllowsPrescriptionCoach(entry.Coach),entry.Key+" permits matching coach");
+            Check(!app.Training.AllowsPrescriptionGame(entry.Game),entry.Key+" blocks game before coach completion");
+            CoachModeNavigation.OpenGameFromCoach();
+            yield return null;
+            Check(SceneManager.GetActiveScene().name==entry.Coach,entry.Key+" coach game button respects gate");
+            yield return Snapshot(index.ToString("00")+"_"+entry.Key+"_coach");
+            // Route probe only: no coach outcome or training score is marked complete.
+            SceneManager.LoadScene(entry.Game);
+            yield return new WaitForSecondsRealtime(4);
+            var game=FindObjectOfType<GameWorkoutScene>();
+            Check(game!=null && game.GetComponent<GameTrainingAssessment>()!=null,entry.Key+" has game and assessment");
+            if(game!=null)
+            {
+                game.menu.StartTraining();
+                yield return new WaitForSecondsRealtime(1);
+                Check(!game.IsPlaying,entry.Key+" cannot start prescribed game without coach and trackers");
+                if(game.taikoNightAction!=null)
+                    Check(game.taikoNightAction.RepetitionCount==6 && game.taikoNightAction.DifficultyKey=="hard",
+                        entry.Key+" receives prescription repetitions and difficulty");
+                var selection=FindObjectOfType<TaikoNight.TaikoNightSelection>();
+                if(selection!=null)
+                {
+                    var dose=(TMPro.TMP_Text)typeof(TaikoNight.TaikoNightSelection)
+                        .GetField("times",BindingFlags.Instance|BindingFlags.NonPublic).GetValue(selection);
+                    Check(dose.text=="6",entry.Key+" displays prescribed total repetitions rather than sets");
+                }
+            }
+            Check(!SpineFlowTrainingSession.CurrentPrescriptionGameCompleted,entry.Key+" has no fabricated completion");
+            app.Training.ContinuePrescription();
+            yield return null;
+            Check(app.Training.CurrentPrescriptionGameScene==entry.Game,entry.Key+" blocks premature next item");
+            yield return Snapshot(index.ToString("00")+"_"+entry.Key+"_game");
+            CoachModeNavigation.OpenCoachFromGame(entry.Game);
+            yield return new WaitForSecondsRealtime(2);
+            Check(SceneManager.GetActiveScene().name==entry.Coach,entry.Key+" tutorial returns to matching coach");
+            app.Training.FinishAndReturn();
+            yield return new WaitForSecondsRealtime(2);
+            Check(SceneManager.GetActiveScene().name=="AppShell" && app.Training.HasPendingFeedback,entry.Key+" exit reaches feedback");
+            string id=app.Training.CurrentPlan.sessionId;
+            var saved=app.Users.Load(Account).trainingHistory.FirstOrDefault(r=>r.sessionId==id);
+            Check(saved!=null && saved.endReason=="USER_EXIT" && saved.feedbackPending,entry.Key+" interruption persisted in native storage");
+            app.Training.SubmitFeedback("流程验收", "未佩戴追踪器");
+            saved=app.Users.Load(Account).trainingHistory.FirstOrDefault(r=>r.sessionId==id);
+            Check(saved!=null && !saved.feedbackPending,entry.Key+" feedback persisted");
+            index++;
+        }
+        app.Router.Navigate(AppRoute.History);
+        yield return Snapshot("99_history");
+        Check(errors==0,"no runtime errors during flow");
+        string result=$"PHONE_FLOW_COMPLETE passed={passed} failed={failed} runtimeErrors={errors}";
+        File.WriteAllText(Path.Combine(folder,"complete.txt"),result);
+        Debug.Log(result);
+        Application.logMessageReceived-=LogError;
+        app.Router.Navigate(AppRoute.Home);
+    }
+    static TrainingAction Action(TrainingActionCatalog.Entry e,bool coach,int position) => new TrainingAction {
+        actionId=e.Key+(coach?"_coach":"_game"),actionName=e.Name,
+        arTaskType=coach?"coach_training":"game_training",level="hard",sets=2,reps=3,holdSeconds=7,
+        sceneName=coach?e.Coach:e.Game,prescriptionItemId=910000+position,prescriptionPosition=position
+    };
+    IEnumerator Snapshot(string name)
+    {
+        yield return new WaitForEndOfFrame();
+        ScreenCapture.CaptureScreenshot("acceptance/"+name+".png");
+        yield return new WaitForSecondsRealtime(.5f);
+    }
+    void Check(bool value,string name)
+    {
+        if(value)passed++;else failed++;
+        string line=(value?"PASS ":"FAIL ")+name;
+        File.AppendAllText(Path.Combine(folder,"checks.txt"),line+"\n");
+        Debug.Log("[PhoneAcceptance] "+line);
+    }
+    void LogError(string message,string stack,LogType type)
+    {
+        if(type!=LogType.Exception && type!=LogType.Error && type!=LogType.Assert)return;
+        errors++;
+        File.AppendAllText(Path.Combine(folder,"errors.txt"),message+"\n"+stack+"\n");
+    }
+}
+#endif

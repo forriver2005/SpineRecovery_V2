@@ -192,6 +192,14 @@ public class SceneSwitcher : MonoBehaviour
             false));
     }
 
+    public void LoadSideBridgeOppositePracticeScene()
+    {
+        LoadSceneForCurrentMobileSession(ResolveReplayReturnScene(
+            CoachModeNavigation.SideBridgeRightCoachScene,
+            ReplaySessionContext.ReturnPracticeScene,
+            false));
+    }
+
     public void LoadPlayBackScene()
     {
         LoadSceneForCurrentMobileSession(PlayBackScene);
@@ -272,8 +280,9 @@ public class SceneSwitcher : MonoBehaviour
         if (scene == PlayBackScene &&
             AppBootstrap.Instance?.GetComponent<AppShellUi>()?.IsBrowsingAuxiliaryScene == true)
             return false;
-        return LumbarCoachMode.ForScene(scene) != null ||
-            (scene == PlayBackScene && LumbarCoachMode.ForScene(ReplaySessionContext.ReturnPracticeScene) != null);
+        return (LumbarCoachMode.ForScene(scene) != null && !CoachModeNavigation.IsSupportedCoachScene(scene)) ||
+            (scene == PlayBackScene && LumbarCoachMode.ForScene(ReplaySessionContext.ReturnPracticeScene) != null &&
+             !CoachModeNavigation.IsSupportedCoachScene(ReplaySessionContext.ReturnPracticeScene));
     }
 
     private static string ResolveReplayReturnScene(

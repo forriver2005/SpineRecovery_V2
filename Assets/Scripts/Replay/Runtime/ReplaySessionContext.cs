@@ -148,7 +148,9 @@ public static class ReplayContextResolver
                 package != null ? package.formatVersion.ToString() : "builtin"),
             sourceScene = sourceScene,
             returnPracticeScene = sourceScene,
-            returnGamingScene = LumbarCoachMode.ForScene(sourceScene) != null ? null : FirstNonEmpty(
+            returnGamingScene = FirstNonEmpty(
+                SpineRecovery.App.AppBootstrap.Instance?.Training.CurrentPrescriptionGameScene,
+                TrainingActionCatalog.ForCoach(sourceScene)?.Game,
                 config?.gamingSceneName,
                 InferGamingScene(actionId)),
             avatarId = ResolveAvatarId(userAnimator, gender),
@@ -249,6 +251,8 @@ public static class ReplayContextResolver
 
     private static string InferActionId(string sceneName)
     {
+        var entry = TrainingActionCatalog.ForCoach(sceneName) ?? TrainingActionCatalog.ForGame(sceneName);
+        if (entry != null) return entry.Key;
         LumbarCoachProfile lumbar = LumbarCoachMode.ForScene(sceneName);
         if (lumbar != null) return lumbar.actionId;
         return sceneName != null &&
@@ -259,6 +263,8 @@ public static class ReplayContextResolver
 
     private static string InferGamingScene(string actionId)
     {
+        var entry = TrainingActionCatalog.Find(actionId);
+        if (entry != null) return entry.Game;
         if (LumbarCoachMode.ForAction(actionId) != null) return null;
         return string.Equals(
             NormalizeActionId(actionId),

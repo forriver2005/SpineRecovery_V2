@@ -1,0 +1,41 @@
+diff --git a/lib/mobile-prescription-projection.js b/lib/mobile-prescription-projection.js
+index aca5515..bec330e 100755
+--- a/lib/mobile-prescription-projection.js
++++ b/lib/mobile-prescription-projection.js
+@@ -73,7 +73,11 @@ const builtIns = [
+   {id: '6', action: 'curl_up', names: ['卷腹']},
+   {id: 'hip_thrust_taiko', action: 'hip_thrust_taiko', names: ['臀桥 · 星轨敲鼓']},
+   {id: '4', action: 'hip_thrust', names: ['臀桥']},
+-  {id: '5', action: 'side_bridge', names: ['侧桥']},
++  {id: '5', action: 'side_bridge', names: ['侧桥', '左侧桥']},
++  {id: 'side_bridge_right', action: 'side_bridge_right', names: ['右侧桥']},
++  {id: 'hip_thrust_hold30', action: 'hip_thrust_hold30', names: ['臀桥 · 保持30秒']},
++  {id: 'side_bridge_hold30', action: 'side_bridge_hold30', names: ['左侧桥 · 保持30秒']},
++  {id: 'side_bridge_right_hold30', action: 'side_bridge_right_hold30', names: ['右侧桥 · 保持30秒']} ,
+   {id: '7', action: 'dead_bug', names: ['死虫', '死虫式']},
+   {id: '8', action: 'bird_dog', names: ['鸟狗', '鸟狗式']}
+ ];
+diff --git a/tests/mobile-prescription-projection.test.js b/tests/mobile-prescription-projection.test.js
+index 18f5ba5..0fa8217 100755
+--- a/tests/mobile-prescription-projection.test.js
++++ b/tests/mobile-prescription-projection.test.js
+@@ -276,7 +276,9 @@ test('mobile aliases: unreviewed bytes and unknown actions are not guessed; corr
+ 
+ test('new games can be prescribed together, activated and reported without changing source identities', async t => {
+   const s=await startTestServer(t), admin=await loginAs(s.baseUrl,'admin','admin'), doctor=await loginAs(s.baseUrl,'doctor','doctor123');
+-  const entries=[['6','卷腹','curl_up'],['1','卧位猫','cat_camel'],['hip_thrust_taiko','臀桥 · 星轨敲鼓','hip_thrust_taiko']];
++  const entries=[['6','卷腹','curl_up'],['1','卧位猫','cat_camel'],['hip_thrust_taiko','臀桥 · 星轨敲鼓','hip_thrust_taiko'],
++    ['side_bridge_right','右侧桥','side_bridge_right'],['hip_thrust_hold30','臀桥 · 保持30秒','hip_thrust_hold30'],
++    ['side_bridge_hold30','左侧桥 · 保持30秒','side_bridge_hold30'],['side_bridge_right_hold30','右侧桥 · 保持30秒','side_bridge_right_hold30']];
+   const items=[];
+   for (const [index,[actionId,displayName]] of entries.entries()) {
+     const published=await publishVersionFixture(s.baseUrl,admin,{type:'config',versionName:'night-'+index,versionCode:index+1,
+@@ -302,7 +304,7 @@ test('new games can be prescribed together, activated and reported without chang
+   assert.equal(directive.json.data.trainingState,'ready');
+   const order=directive.json.data.activePrescription;
+   assert.deepEqual(order.items.map(i=>i.action),entries.map(e=>e[2]));
+-  assert.deepEqual(order.items.map(i=>[i.position,i.sets,i.reps]),[[0,1,4],[1,2,4],[2,3,4]]);
++  assert.deepEqual(order.items.map(i=>[i.position,i.sets,i.reps]),entries.map((_,index)=>[index,index+1,4]));
+   assert.equal(order.resourceManifestSha256,activated.json.data.prescription.resourceManifestSha256);
+   for (const phase of ['directive_saved','assets_ready']) assert.equal((await receipt(s,token,order,phase)).status,200);
+   const result=completeResult(resultForOrder({...order,items:order.items.map(i=>({...i,actionId:i.action}))}));

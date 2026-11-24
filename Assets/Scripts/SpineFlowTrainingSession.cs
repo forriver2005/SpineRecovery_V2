@@ -448,6 +448,8 @@ public sealed class SpineFlowTrainingSession : MonoBehaviour
             return null;
         }
 
+        var entry = TrainingActionCatalog.Find(action.actionId);
+        if (entry != null) return ResolveSceneForGender(entry.Coach, IsMaleMobileSession);
         LumbarCoachProfile lumbar = LumbarCoachMode.ForAction(action.actionId);
         if (lumbar != null)
             return IsMaleMobileSession ? "male" + lumbar.sceneName : lumbar.sceneName;
@@ -484,6 +486,9 @@ public sealed class SpineFlowTrainingSession : MonoBehaviour
 
     public static string ResolveSceneForGender(string sceneName, bool isMale)
     {
+        if (string.Equals(sceneName, "SideBridgeOppositePractice", StringComparison.Ordinal))
+            return sceneName;
+
         LumbarCoachProfile lumbar = LumbarCoachMode.ForScene(sceneName);
         if (lumbar != null)
             return isMale ? "male" + lumbar.sceneName : lumbar.sceneName;
@@ -808,7 +813,7 @@ public sealed class SpineFlowTrainingSession : MonoBehaviour
     }
 
     public static void SaveUnifiedGameAssessment(
-        string playedGameId, string difficulty, TrainingQualitySummary summary, int validSamples)
+        string playedGameId, string difficulty, TrainingQualitySummary summary, int validSamples, int? activeSeconds = null)
     {
         if (instance == null || !instance.unifiedSession || !instance.HasValidStartPayload()) return;
         int score = summary.HasAssessment ? summary.Score : 0;
@@ -822,9 +827,9 @@ public sealed class SpineFlowTrainingSession : MonoBehaviour
             rawBestScore = score,
             scoreSampleCount = validSamples,
             completedRepetitions = summary.Qualified,
-            durationSeconds = instance.gameTiming
+            durationSeconds = activeSeconds ?? (instance.gameTiming
                 ? instance.ElapsedSeconds(instance.gameStartedAt, true, instance.gamePausedSecondsAtStart)
-                : instance.gameMeasurement?.durationSeconds ?? Mathf.CeilToInt((float)summary.ObservedSeconds),
+                : instance.gameMeasurement?.durationSeconds ?? Mathf.CeilToInt((float)summary.ObservedSeconds)),
             level = difficulty
         };
         instance.gameTiming = false;

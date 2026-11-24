@@ -10,7 +10,7 @@ public class KeyframeCoachMotionBackend : ICoachMotionBackend, IDisposable
 {
     private readonly Animator animator;
     private readonly CoachMotionPackage package;
-    private readonly HumanPoseHandler poseHandler;
+    private HumanPoseHandler poseHandler;
     private readonly bool lockRootPosition;
     private readonly Vector3 initialBodyPosition;
     private readonly float transitionBlendSeconds;
@@ -245,5 +245,6 @@ public class KeyframeCoachMotionBackend : ICoachMotionBackend, IDisposable
     public void Dispose()
     {
         poseHandler?.Dispose();
+        poseHandler = null;
     }
 }

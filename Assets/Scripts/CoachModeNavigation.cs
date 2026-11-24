@@ -12,11 +12,13 @@ public static class CoachModeNavigation
     public const string BirdDogCoachScene = "BirdDogPractice";
     public const string HipThrustCoachScene = "HipThrustPractice";
     public const string SideBridgeCoachScene = "SideBridgePractice";
+    public const string SideBridgeRightCoachScene = "SideBridgeOppositePractice";
 
     public const string DeadBugGameScene = "DeadBug_RingSkinC_Recorded";
     public const string BirdDogGameScene = "BirdDog_RingSkinC_Recorded";
     public const string HipThrustGameScene = "HipThrust_RingBridge_NewScoring";
     public const string SideBridgeGameScene = "SideBridge_RingBridge_Dynamic";
+    public const string SideBridgeRightGameScene = "SideBridgeOpposite_RingBridge_Dynamic";
 
     private static string replayPracticeScene;
     private static string replayGameScene;
@@ -39,6 +41,8 @@ public static class CoachModeNavigation
 
     public static bool TryGetGameSceneForCoach(string coachScene, out string gameScene)
     {
+        var entry = TrainingActionCatalog.ForCoach(coachScene);
+        if (entry != null) { gameScene = entry.Game; return true; }
         switch (NormalizeSceneName(coachScene))
         {
             case DeadBugCoachScene:
@@ -57,6 +61,9 @@ public static class CoachModeNavigation
             case "maleSideBridgePractice":
                 gameScene = SideBridgeGameScene;
                 return true;
+            case SideBridgeRightCoachScene:
+                gameScene = SideBridgeRightGameScene;
+                return true;
             default:
                 gameScene = null;
                 return false;
@@ -65,6 +72,8 @@ public static class CoachModeNavigation
 
     public static bool TryGetCoachSceneForGame(string gameScene, out string coachScene)
     {
+        var entry = TrainingActionCatalog.ForGame(gameScene);
+        if (entry != null) { coachScene = entry.Coach; return true; }
         switch (NormalizeSceneName(gameScene))
         {
             case DeadBugGameScene:
@@ -87,6 +96,10 @@ public static class CoachModeNavigation
             case SideBridgeGameScene:
             case "SideBridge_RingBridge_Hold30":
                 coachScene = SideBridgeCoachScene;
+                return true;
+            case SideBridgeRightGameScene:
+            case "SideBridgeOpposite_RingBridge_Hold30":
+                coachScene = SideBridgeRightCoachScene;
                 return true;
             default:
                 coachScene = null;
@@ -138,6 +151,7 @@ public static class CoachModeNavigation
         var training = SpineRecovery.App.AppBootstrap.Instance?.Training;
         if (training?.IsV2Prescription == true)
         {
+            gameScene = training.CurrentPrescriptionGameScene;
             if (!training.AllowsPrescriptionGame(gameScene)) return;
         }
         else gameScene = ResolvePreferredGameScene(source, gameScene);
@@ -166,6 +180,8 @@ public static class CoachModeNavigation
 
     public static void OpenActionLibraryFromCoach()
     {
+        UnityEngine.Object.FindObjectOfType<DeadBugStartMenuController>(true)
+            ?.HidePracticeToolbarForActionLibrary();
         StopCurrentPractice();
         if (!CoachingActionLibrary.OpenFromPractice())
         {
@@ -229,7 +245,7 @@ public static class CoachModeNavigation
             return;
         }
 
-        SceneManager.LoadScene(resolved);
+        SceneLoadingOverlay.Load(resolved);
     }
 
     private static string ResolvePreferredGameScene(string coachScene, string fallback)
@@ -253,12 +269,14 @@ public static class CoachModeNavigation
 
     private static bool IsConcreteGameScene(string sceneName)
     {
-        return string.Equals(sceneName, DeadBugGameScene, StringComparison.Ordinal) ||
+        return TrainingActionCatalog.ForGame(sceneName) != null || string.Equals(sceneName, DeadBugGameScene, StringComparison.Ordinal) ||
             string.Equals(sceneName, BirdDogGameScene, StringComparison.Ordinal) ||
             string.Equals(sceneName, HipThrustGameScene, StringComparison.Ordinal) ||
             string.Equals(sceneName, SideBridgeGameScene, StringComparison.Ordinal) ||
+            string.Equals(sceneName, SideBridgeRightGameScene, StringComparison.Ordinal) ||
             string.Equals(sceneName, "HipThrust_RingBridge_Hold30", StringComparison.Ordinal) ||
-            string.Equals(sceneName, "SideBridge_RingBridge_Hold30", StringComparison.Ordinal);
+            string.Equals(sceneName, "SideBridge_RingBridge_Hold30", StringComparison.Ordinal) ||
+            string.Equals(sceneName, "SideBridgeOpposite_RingBridge_Hold30", StringComparison.Ordinal);
     }
 
     private static string NormalizeSceneName(string sceneName)

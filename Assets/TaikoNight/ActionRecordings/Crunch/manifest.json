@@ -1,0 +1,27 @@
+{
+    "formatVersion": 1,
+    "actionId": "6",
+    "displayName": "卷腹",
+    "version": 1,
+    "createdAtUtc": "2026-10-18T14:17:28.1258135Z",
+    "fbxFile": "6_v1.fbx",
+    "motionJsonFile": "6_v1.motion.json",
+    "trackerJsonFile": "6_v1.tracker.json",
+    "rawImuJsonFile": "6_v1.raw-imu.json",
+    "keyframesFile": "6_v1.keyframes.json",
+    "fbxSha256": "b2b13cfc3e496f775f9a8c54ca594eb556d227805b8d05a4a23f624a41518a8c",
+    "motionJsonSha256": "0430a93d62582f28b52b86971926ea058705201850f11e29460e45f0e005474c",
+    "trackerJsonSha256": "25d3257decf2734b8c21dad3e0b1cc90d31d5ec94ed87c68577000bfce0f585d",
+    "rawImuJsonSha256": "a5684a8f6961041244f63ad2e88cea57a469eb67c119b475ef0a0b7f5e1a6f7a",
+    "keyframesSha256": "f8f9d189b7ca6be45c582a59939e0f2b59ed98c33d70ec192370f4515bb799d3",
+    "rawImuFrameCount": 2634,
+    "rawImuSensorCount": 17,
+    "segments": [
+        {
+            "name": "6",
+            "firstFrame": 0,
+            "lastFrame": 2635,
+            "durationSeconds": 87.80899810791016
+        }
+    ]
+}

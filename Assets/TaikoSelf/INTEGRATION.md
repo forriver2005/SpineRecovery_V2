@@ -1,8 +1,8 @@
 # 臀桥鼓盘视觉替换
 
-> 当前构建仅保留三个新录制游戏，臀桥 Build Index 为 2。臀桥 HIT 通过 `RhythmHitHapticAdapter` 仅向腰部发送一次震动，MISS、保持奖励和遗留四肢音符不会触发。以下章节记录此前视觉接入时的场景数量和构建顺序。
+> 以下内容记录 2026-10-28 旧版 TaikoSelf 臀桥视觉的接入过程。当前正式场景列表以 `Assets/Scenes/README.md` 和 Build Settings 为准。
 
-场景仍为 `Assets/Scenes/HipThrust_RingBridge_Recorded.unity`，名称、GUID、Build Index 6 均保持不变。
+旧版场景 `HipThrust_RingBridge_Recorded.unity` 已移除。动作串中的通用臀桥键现路由到 `HipThrust_RingBridge_NewScoring.unity`；星轨敲鼓版使用 `HipThrust_TaikoNight_Dynamic.unity`。
 
 ## 2026-10-28 教练与启动显示修复
 

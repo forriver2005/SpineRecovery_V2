@@ -18,17 +18,22 @@ public sealed class GameWorkoutPlan
 
     public static string SceneFor(string action, bool recordedCoach = false)
     {
+        if (action == "hipthrust_taiko" || action == "hipthrust_taiko_night") return "HipThrust_TaikoNight_Dynamic";
+        if (action == "crunch" || action == "crunch_taiko") return "CrunchPractice_TaikoNight";
+        if (action == "lyingcat" || action == "lying_cat" || action == "lying_cat_taiko") return "LyingCatPractice_TaikoNight";
         if (action == "hipthrust_newscore") return "HipThrust_RingBridge_NewScoring";
         if (action == "hipthrust_hold30") return "HipThrust_RingBridge_Hold30";
         if (action == "sidebridge") return "SideBridge_RingBridge_Dynamic";
         if (action == "sidebridge_hold30") return "SideBridge_RingBridge_Hold30";
+        if (action == "sidebridge_right") return "SideBridgeOpposite_RingBridge_Dynamic";
+        if (action == "sidebridge_right_hold30") return "SideBridgeOpposite_RingBridge_Hold30";
         if (recordedCoach)
         {
             switch (action)
             {
                 case "deadbug": return "DeadBug_RingSkinC_Recorded";
                 case "birddog": return "BirdDog_RingSkinC_Recorded";
-                case "hipthrust": return "HipThrust_RingBridge_Recorded";
+                case "hipthrust": return "HipThrust_RingBridge_NewScoring";
                 default: return null;
             }
         }
@@ -36,7 +41,7 @@ public sealed class GameWorkoutPlan
         {
             case "deadbug": return "DeadBug_RingSkinC_Recorded";
             case "birddog": return "BirdDog_RingSkinC_Recorded";
-            case "hipthrust": return "HipThrust_RingBridge_Recorded";
+            case "hipthrust": return "HipThrust_RingBridge_NewScoring";
             default: return null;
         }
     }
@@ -45,6 +50,13 @@ public sealed class GameWorkoutPlan
     {
         switch (action)
         {
+            case "hipthrust_taiko":
+            case "hipthrust_taiko_night": return "臀桥 · 星轨敲鼓";
+            case "crunch":
+            case "crunch_taiko": return "卷腹 · 星轨敲鼓";
+            case "lyingcat":
+            case "lying_cat":
+            case "lying_cat_taiko": return "卧位猫式 · 星轨敲鼓";
             case "deadbug": return "死虫式";
             case "birddog": return "鸟狗式";
             case "hipthrust": return "臀桥";
@@ -52,11 +64,18 @@ public sealed class GameWorkoutPlan
             case "hipthrust_hold30": return "臀桥 · 保持30秒";
             case "sidebridge": return "左侧桥 · 动态";
             case "sidebridge_hold30": return "左侧桥 · 保持30秒";
+            case "sidebridge_right": return "右侧桥 · 动态";
+            case "sidebridge_right_hold30": return "右侧桥 · 保持30秒";
             default: return action;
         }
     }
 
     public static string DifficultyName(string difficulty) => difficulty == "simple" ? "简单" : difficulty == "hard" ? "困难" : "标准";
+
+    public static bool IsTaikoNightAction(string action) =>
+        action == "hipthrust_taiko" || action == "hipthrust_taiko_night" ||
+        action == "crunch" || action == "crunch_taiko" ||
+        action == "lyingcat" || action == "lying_cat" || action == "lying_cat_taiko";
 
     public GameWorkoutPlan ValidatedCopy()
     {
@@ -73,11 +92,15 @@ public sealed class GameWorkoutPlan
             if (item.sets < 1 || item.sets > 100) throw new ArgumentException("每个动作的组数必须为 1–100。");
             if (RequiresExactReps(item.action) && (item.reps < 1 || item.reps > 100))
                 throw new ArgumentException("该动作必须提供处方 reps（1–100）。");
+            if (SupportsOptionalReps(item.action) && (item.reps < 0 || item.reps > 100))
+                throw new ArgumentException("该动作的 reps 必须为 0–100；0 使用难度默认次数。");
             total += item.sets;
             copy.actions[i] = new GameWorkoutAction { action = item.action, difficulty = item.difficulty, sets = item.sets, reps = item.reps };
         }
         if (total > 1000) throw new ArgumentException("动作串总组数不能超过 1000。");
         return copy;
     }
-    public static bool RequiresExactReps(string action) => action=="hipthrust_hold30" || action=="sidebridge" || action=="sidebridge_hold30";
+public static bool SupportsOptionalReps(string action) => IsTaikoNightAction(action) || action == "hipthrust" || action == "hipthrust_newscore";
+      public static bool RequiresExactReps(string action) => action=="hipthrust_hold30" || action=="sidebridge" || action=="sidebridge_hold30" || action=="sidebridge_right" || action=="sidebridge_right_hold30";
 }
+

@@ -1,0 +1,35 @@
+{
+    "formatVersion": 1,
+    "sourceClipAssetPath": "C:\\Users\\supermao\\AppData\\Local\\SpineFlow\\PoseRecordings\\6_卷腹.pose.json",
+    "sourceClipName": "6_卷腹",
+    "sourceClipLengthSeconds": 87.80865478515625,
+    "sourceFrameRate": 30.0,
+    "totalFrames": 2635,
+    "actionId": "6",
+    "displayName": "卷腹",
+    "sampleFps": 30,
+    "setCount": 1,
+    "savedAtUtc": "2026-10-18T14:17:26.8675437Z",
+    "keyframes": [
+        {
+            "name": "start",
+            "frame": 0,
+            "bodyParts": [
+                "whole_body"
+            ],
+            "holdSeconds": 0.0,
+            "followingSegmentName": "6",
+            "followingSegmentDurationSeconds": 87.80899810791016
+        },
+        {
+            "name": "end",
+            "frame": 2635,
+            "bodyParts": [
+                "whole_body"
+            ],
+            "holdSeconds": 0.0,
+            "followingSegmentName": "",
+            "followingSegmentDurationSeconds": 0.0
+        }
+    ]
+}

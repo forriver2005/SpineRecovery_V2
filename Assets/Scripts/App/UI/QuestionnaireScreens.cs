@@ -387,7 +387,9 @@ namespace SpineRecovery.App
 
             GameObject slideArea = new GameObject("HandleSlideArea", typeof(RectTransform));
             slideArea.transform.SetParent(go.transform, false);
-            Place((RectTransform)slideArea.transform, thumb * 0.5f, 0f, width - thumb, height);
+            // Slider stretches its handle anchors vertically; a zero-height track
+            // keeps the 28-unit thumb circular instead of adding the hit-area height.
+            Place((RectTransform)slideArea.transform, thumb * 0.5f, height * 0.5f, width - thumb, 0f);
             Image handle = Rounded(slideArea.transform, "Handle", Accent, thumb * 0.5f);
             RectTransform handleRect = handle.rectTransform;
             handleRect.anchorMin = new Vector2(0f, 0.5f);

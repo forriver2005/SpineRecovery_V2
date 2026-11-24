@@ -326,9 +326,30 @@ namespace SpineRecovery.App
 
         private static void DrawGoggles(Transform glyph)
         {
-            Outline(glyph, 1f, 3f, 34f, 19f, 8f, 2.5f, Color.white);
-            QuestionnaireUi.Box(glyph, "EyeLeft", Color.white, 2.25f, 11.5f, 10.5f, 4.5f, 4.5f);
-            QuestionnaireUi.Box(glyph, "EyeRight", Color.white, 2.25f, 20f, 10.5f, 4.5f, 4.5f);
+            DrawGoggles(glyph, Color.white);
+        }
+
+        private static void DrawGoggles(Transform glyph, Color color)
+        {
+            Outline(glyph, 1f, 3f, 34f, 19f, 8f, 2.5f, color);
+            QuestionnaireUi.Box(glyph, "EyeLeft", color, 2.25f, 11.5f, 10.5f, 4.5f, 4.5f);
+            QuestionnaireUi.Box(glyph, "EyeRight", color, 2.25f, 20f, 10.5f, 4.5f, 4.5f);
+        }
+
+        internal static void PreparationIcon(Transform tile, bool tracker)
+        {
+            if (tracker) DrawTracker(GlyphBox(tile, 14f, 14f, 24f, 24f));
+            else DrawGoggles(GlyphBox(tile, 8f, 14f, 36f, 24f), GlyphBlue);
+        }
+
+        internal static void LibraryIcon(Transform parent)
+        {
+            Image tile = QuestionnaireUi.Box(parent, "LibraryIcon", TileFill, 14f, 12f, 18f, 52f, 52f);
+            RectTransform glyph = GlyphBox(tile.transform, 12f, 12f, 28f, 28f);
+            Outline(glyph, 1f, 3f, 26f, 22f, 5f, 2f, GlyphBlue);
+            Stroke(glyph, 11f, 9f, 19f, 14f, 2f, GlyphBlue);
+            Stroke(glyph, 19f, 14f, 11f, 19f, 2f, GlyphBlue);
+            Stroke(glyph, 11f, 19f, 11f, 9f, 2f, GlyphBlue);
         }
 
         // "(▢)": a sensor between two radio-wave arcs, each arc being the edge of a circle seen through a clip.

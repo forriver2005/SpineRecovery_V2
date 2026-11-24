@@ -96,7 +96,7 @@ public static class HipThrustNewRulesVerification
         Check(GameWorkoutPlan.SceneFor(plan.actions[0].action)==Path.GetFileNameWithoutExtension(HipThrustNewRulesBuilder.Hold30),"Wrong scene route");
         bool rejected=false; try { plan.actions[0].reps=0; plan.ValidatedCopy(); } catch(ArgumentException) { rejected=true; }
         Check(rejected,"Missing reps silently fell back to difficulty");
-        Check(GameWorkoutPlan.SceneFor("hipthrust")=="HipThrust_RingBridge_Recorded","Legacy route changed");
+        Check(GameWorkoutPlan.SceneFor("hipthrust")=="HipThrust_RingBridge_NewScoring","Legacy route changed");
         Log("PASS prescription plan route, exact sets/reps retention, invalid dose rejection, original route preserved.");
     }
     static void Tick()

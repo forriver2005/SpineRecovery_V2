@@ -3,6 +3,9 @@ using UnityEngine;
 /// <summary>Left-side support geometry. Translation, body scale and horizontal heading invariant.</summary>
 public sealed class SideBridgePoseGeometry
 {
+    public enum SupportSide { Left, Right }
+    public SupportSide Side { get; }
+    public SideBridgePoseGeometry(SupportSide side = SupportSide.Left) { Side = side; }
     public sealed class Pose
     {
         public float lift, trunkAngle, kneeAngle, elbowAngle, shoulderStack, pelvisStack, torsoVertical;
@@ -19,7 +22,7 @@ public sealed class SideBridgePoseGeometry
     public bool SetTargets(Pose rest, Pose top, float restLift, float topLift)
     {
         Rest=rest; Top=top; RestLift=restLift; TopLift=topLift;
-        return rest!=null && top!=null && rest.IsLeftSupport && top.IsLeftSupport &&
+        return rest!=null && top!=null && IsSupport(rest) && IsSupport(top) &&
             Finite(restLift) && Finite(topLift) && topLift-restLift>.015f;
     }
 
@@ -27,6 +30,17 @@ public sealed class SideBridgePoseGeometry
     public float Progress(Pose pose) => Mathf.Clamp01(RawProgress(pose));
 
     public static bool HasStableSupport(Pose pose,Pose target) => pose!=null&&target!=null&&pose.IsLeftSupport&&
+        pose.shoulderAxis.sqrMagnitude>.5f&&pose.pelvisAxis.sqrMagnitude>.5f&&
+        pose.stackAngle<Mathf.Max(65,target.stackAngle+30) &&
+        pose.armAngle<Mathf.Max(65,target.armAngle+40) &&
+        Mathf.Abs(pose.armAngle-target.armAngle)<=50 &&
+        Mathf.Abs(pose.shoulderOverElbow-target.shoulderOverElbow)<=.18f &&
+        Mathf.Abs(pose.trunkAngle-target.trunkAngle)<=50 &&
+        Mathf.Abs(pose.kneeAngle-target.kneeAngle)<=65 &&
+        Vector3.Angle(pose.pelvisAxis,target.pelvisAxis)<=45 &&
+        Mathf.Abs(Vector3.Angle(pose.shoulderAxis,pose.pelvisAxis)-Vector3.Angle(target.shoulderAxis,target.pelvisAxis))<=40;
+
+    public bool HasStableSupportForSide(Pose pose,Pose target) => pose!=null&&target!=null&&IsSupport(pose)&&
         pose.shoulderAxis.sqrMagnitude>.5f&&pose.pelvisAxis.sqrMagnitude>.5f&&
         pose.stackAngle<Mathf.Max(65,target.stackAngle+30) &&
         pose.armAngle<Mathf.Max(65,target.armAngle+40) &&
@@ -49,14 +63,22 @@ public sealed class SideBridgePoseGeometry
         return .4f*trunk+.3f*support+.2f*leg+.1f*stack;
     }
 
+    public bool IsSupport(Pose pose) => pose != null && (Side == SupportSide.Left
+        ? pose.IsLeftSupport
+        : pose.shoulderStack < -.35f && pose.pelvisStack < -.25f && pose.torsoVertical < .75f);
+
     public static bool TryMeasure(Animator avatar, out Pose pose)
+        => TryMeasure(avatar, SupportSide.Left, out pose);
+
+    public static bool TryMeasure(Animator avatar, SupportSide side, out Pose pose)
     {
         pose=null;
         if(avatar==null || !avatar.isHuman) return false;
         var hip=avatar.GetBoneTransform(HumanBodyBones.Hips);
         var chest=avatar.GetBoneTransform(HumanBodyBones.Chest)??avatar.GetBoneTransform(HumanBodyBones.Spine);
         var ls=avatar.GetBoneTransform(HumanBodyBones.LeftUpperArm);var rs=avatar.GetBoneTransform(HumanBodyBones.RightUpperArm);
-        var elbow=avatar.GetBoneTransform(HumanBodyBones.LeftLowerArm);var wrist=avatar.GetBoneTransform(HumanBodyBones.LeftHand);
+        var elbow=avatar.GetBoneTransform(side == SupportSide.Left ? HumanBodyBones.LeftLowerArm : HumanBodyBones.RightLowerArm);
+        var wrist=avatar.GetBoneTransform(side == SupportSide.Left ? HumanBodyBones.LeftHand : HumanBodyBones.RightHand);
         var lt=avatar.GetBoneTransform(HumanBodyBones.LeftUpperLeg);var rt=avatar.GetBoneTransform(HumanBodyBones.RightUpperLeg);
         var knee=avatar.GetBoneTransform(HumanBodyBones.LeftLowerLeg);
         var rightKnee=avatar.GetBoneTransform(HumanBodyBones.RightLowerLeg);
@@ -64,7 +86,8 @@ public sealed class SideBridgePoseGeometry
         if(hip==null || chest==null || ls==null || rs==null || elbow==null || wrist==null || lt==null || rt==null || knee==null || rightKnee==null || lf==null || rf==null) return false;
         Vector3 shoulder=(ls.position+rs.position)*.5f,feet=(lf.position+rf.position)*.5f;
         float span=Vector3.Distance(shoulder,feet);
-        Vector3 support=lf.position-elbow.position;
+        Transform supportFoot = side == SupportSide.Left ? lf : rf;
+        Vector3 support= supportFoot.position-elbow.position;
         Vector3 along=Vector3.ProjectOnPlane(feet-shoulder,Vector3.up);
         if(span<.1f || support.sqrMagnitude<.01f || along.sqrMagnitude<.01f) return false;
         along.Normalize();Vector3 across=Vector3.Cross(Vector3.up,along);
@@ -73,7 +96,7 @@ public sealed class SideBridgePoseGeometry
         // the feet overlap. The old chest/two-feet plane degenerates in this pose.
         Vector3 projected=Vector3.ProjectOnPlane(support,Vector3.up);
         float t=projected.sqrMagnitude>.0001f?Mathf.Clamp01(Vector3.Dot(Vector3.ProjectOnPlane(hip.position-elbow.position,Vector3.up),projected)/projected.sqrMagnitude):.5f;
-        Vector3 onSupport=Vector3.Lerp(elbow.position,lf.position,t);
+        Vector3 onSupport=Vector3.Lerp(elbow.position,supportFoot.position,t);
         pose=new Pose {
             lift=Vector3.Dot(hip.position-onSupport,Vector3.up)/span,
             trunkAngle=Vector3.Angle(shoulder-hip.position,feet-hip.position),

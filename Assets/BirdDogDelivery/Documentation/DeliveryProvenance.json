@@ -1,0 +1,37 @@
+{
+  "sourcePackage": "BirdDogRecordedPractice_Minimal.unitypackage",
+  "sourceSha256": "e13247f4e26c7a691f179470ed3a8052a7592d708ad08004ac06ecc36a817107",
+  "importedCoreFiles": [
+    {
+      "source": "Scripts/GameRules/BirdDogPose.cs",
+      "sourceSha256": "b18a60054dd136b12f4e05a474d9059f88b8952e1ceb3d322cbe37c608bfc240",
+      "destination": "Runtime/BirdDogPose.cs",
+      "migratedSha256": "e78a31dddb7aecd2ba4d08da23e67dbf4c0123d6ebbef495a5451adefe314f68"
+    },
+    {
+      "source": "Scripts/GameRules/BirdDogHoldScorer.cs",
+      "sourceSha256": "bbf6c03d5f6202e2071d3d714be566617a0bf2b5502cdca7cc97844b76cab8df",
+      "destination": "Runtime/BirdDogHoldScorer.cs",
+      "migratedSha256": "96f342e4f8bf4a5e0e571d0073976f4897c5ae63863fa166f8bfea469ebfe79b"
+    },
+    {
+      "source": "Scripts/GameRules/BirdDogAnatomicalConstraint.cs",
+      "sourceSha256": "d7fcc5becf7e6f05276dc20cb588e4aa040a40d5a055a6c1a128889d9e57c01d",
+      "destination": "Runtime/BirdDogAnatomicalConstraint.cs",
+      "migratedSha256": "e208c73144120d24936cc1888033eb1e3deaa8d03fe0952deedc91bdbee09870"
+    },
+    {
+      "source": "Scripts/GameRules/RecordedBirdDogCoachMotion.cs",
+      "sourceSha256": "ff1513b6e5da23026bc1176306b324b0fedc86a5b05baeeb8f074af57a7c72a9",
+      "destination": "Runtime/RecordedBirdDogCoachMotion.cs",
+      "migratedSha256": "d93e8f774a667a51d32d2733b10c730f8f1ed0181b259ca8301ad9b4227ec541"
+    }
+  ],
+  "recordingSha256": "4aa028f02255c93b15bcf76270e9e4dc23f8840003006d17dcf9c7d803181683",
+  "adaptations": [
+    "Core types isolated under namespace BirdDogDelivery; practice enums/pause flag and pure muscle mirror extracted locally.",
+    "Recorded JSON moved to a unique Resources path; bytes unchanged.",
+    "Scorer freshness uses host AvatarMotionSource.LastFrameReceivedAt because host caches the last bone packet count.",
+    "Game presentation and controls are scene-local; imported phase/scoring/constraint thresholds are unchanged."
+  ]
+}

@@ -61,26 +61,26 @@ public sealed class MobileCoachControls : MonoBehaviour
     public void BackToSelection()
     {
         Stop();
-        SceneManager.LoadScene("ActionLibrary");
+        SceneLoadingOverlay.Load("ActionLibrary");
     }
 
     public void BackToEntry()
     {
         Stop();
-        SceneManager.LoadScene("CoachModeEntry");
+        SceneLoadingOverlay.Load("CoachModeEntry");
     }
 
     public void ReturnToPhone()
     {
         Stop();
         if (!SpineFlowTrainingSession.TryReturnToMobile())
-            SceneManager.LoadScene("CoachModeEntry");
+            SceneLoadingOverlay.Load("CoachModeEntry");
     }
 
     public void RestartPractice()
     {
         Stop();
-        SceneManager.LoadScene(gameObject.scene.name);
+        SceneLoadingOverlay.Load(gameObject.scene.name);
     }
 
     private void Stop()

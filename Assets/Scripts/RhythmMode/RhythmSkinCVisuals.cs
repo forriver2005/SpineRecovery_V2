@@ -5,6 +5,7 @@ using UnityEngine;
 using UnityEngine.UI;
 
 /// <summary>Presentation only: observes existing notes/results and draws the supplied Ring Skin C art.</summary>
+[ExecuteAlways]
 public sealed class RhythmSkinCVisuals : MonoBehaviour
 {
     public RhythmModeController controller;
@@ -44,10 +45,17 @@ public sealed class RhythmSkinCVisuals : MonoBehaviour
     private readonly float[] flashTimes = { -100f, -100f, -100f, -100f };
     private float coreHitTime = -100f;
     private bool wasVisible;
+    private bool limbLabelsInstalled;
+    private readonly List<GameObject> limbLabels = new List<GameObject>();
+    private readonly List<SpriteRenderer> limbLabelSources = new List<SpriteRenderer>();
+    private readonly List<MaterialPropertyBlock> originalSymbolBlocks = new List<MaterialPropertyBlock>();
 
     private void LateUpdate()
     {
         bool visible = artwork != null && artwork.activeInHierarchy;
+        if (visible && !limbLabelsInstalled) InstallLimbLabels();
+        // Preview only the static labels in Scene view. Gameplay presentation stays in Play mode.
+        if (!Application.IsPlaying(gameObject)) return;
         if (presentationCamera != null)
         {
             EnsureDisplay();
@@ -82,6 +90,113 @@ public sealed class RhythmSkinCVisuals : MonoBehaviour
                 Mathf.Lerp(1.22f, 1f, RingSkinC.Ease.OutQuad((age - 0.04f) / 0.56f));
             core.localScale = Vector3.one * bump;
         }
+    }
+
+    private void InstallLimbLabels()
+    {
+        GameWorkoutScene entry = null;
+        foreach (var candidate in FindObjectsOfType<GameWorkoutScene>(true))
+            if (candidate.gameObject.scene == gameObject.scene) { entry = candidate; break; }
+        if (entry == null || entry.font == null) return;
+
+        // RhythmRingLayout maps 135/45/225/315 degrees to left arm/right arm/left leg/right leg.
+        // Pixel bounds and opaque colors come from the four original 1200 x 1200 zone sprites.
+        string[] zones = { "melody", "harmony", "bass", "drums" };
+        string[] labels = { "左臂", "右臂", "左腿", "右腿" };
+        Rect[] glyphs = {
+            new Rect(358, 346, 53, 58), new Rect(792, 345, 42, 60),
+            new Rect(351, 789, 72, 36), new Rect(786, 766, 54, 55)
+        };
+        Color32[] colors = {
+            new Color32(255, 194, 210, 255), new Color32(255, 234, 168, 255),
+            new Color32(180, 240, 229, 255), new Color32(255, 255, 255, 255)
+        };
+        for (int i = 0; i < zones.Length; i++)
+        {
+            var zone = artwork.transform.Find("Ring/Zone_" + zones[i] + "/Base");
+            var source = zone != null ? zone.GetComponent<SpriteRenderer>() : null;
+            if (source == null || source.sprite == null || source.sharedMaterial == null ||
+                !source.sharedMaterial.HasProperty("_SymbolRect")) return;
+        }
+        float labelScale = 0f;
+        for (int i = 0; i < zones.Length; i++)
+        {
+            var source = artwork.transform.Find("Ring/Zone_" + zones[i] + "/Base").GetComponent<SpriteRenderer>();
+            var sprite = source.sprite;
+            var glyph = glyphs[i];
+            // Texture rows run top-to-bottom in the source PNG, whereas sprite UVs run bottom-to-top.
+            Vector2 Uv(float x, float y) => new Vector2(
+                (sprite.textureRect.x + x / 1200f * sprite.textureRect.width) / sprite.texture.width,
+                (sprite.textureRect.y + (1 - y / 1200f) * sprite.textureRect.height) / sprite.texture.height);
+            var min = Uv(glyph.xMin - 4, glyph.yMax + 4);
+            var max = Uv(glyph.xMax + 4, glyph.yMin - 4);
+            var fill = Uv(glyph.xMin - 6, glyph.yMin - 6);
+            var originalBlock = new MaterialPropertyBlock();
+            source.GetPropertyBlock(originalBlock);
+            limbLabelSources.Add(source);
+            originalSymbolBlocks.Add(originalBlock);
+            var block = new MaterialPropertyBlock();
+            source.GetPropertyBlock(block);
+            block.SetVector("_SymbolRect", new Vector4(min.x, min.y, max.x, max.y));
+            block.SetVector("_SymbolFillUV", new Vector4(fill.x, fill.y, 0, 0));
+            // Clip the erase region inside the decorative inner arc (radius ~354 px).
+            var ringCenter = Uv(600, 600);
+            var innerEdge = Uv(940, 260);
+            block.SetVector("_SymbolCircle", new Vector4(ringCenter.x, ringCenter.y,
+                innerEdge.x - ringCenter.x, innerEdge.y - ringCenter.y));
+            source.SetPropertyBlock(block);
+
+            var host = new GameObject("Limb Label " + labels[i]);
+            // Edit-mode labels are a disposable preview, never saved into the scene or prefab.
+            if (!Application.IsPlaying(gameObject)) host.hideFlags = HideFlags.HideAndDontSave;
+            limbLabels.Add(host);
+            host.layer = source.gameObject.layer;
+            host.transform.SetParent(source.transform, false);
+            var text = host.AddComponent<TextMeshPro>();
+            text.font = entry.font;
+            text.text = labels[i];
+            text.color = (Color)colors[i] * source.color;
+            text.fontSize = 10;
+            text.alignment = TextAlignmentOptions.Center;
+            text.enableWordWrapping = false;
+            text.richText = false;
+            text.overflowMode = TextOverflowModes.Overflow;
+            text.rectTransform.sizeDelta = new Vector2(10, 10);
+            text.ForceMeshUpdate();
+
+            var bounds = text.textBounds;
+            // Use the left-arm label as the baseline, enlarged 30%, then reuse the same
+            // font size and scale for every limb instead of fitting each original symbol.
+            if (i == 0)
+            {
+                var size = Vector2.Scale(glyph.size / 1200f, sprite.rect.size) / sprite.pixelsPerUnit;
+                labelScale = 1.3f * Mathf.Min(size.x / Mathf.Max(.0001f, bounds.size.x), size.y / Mathf.Max(.0001f, bounds.size.y));
+            }
+            Vector3 center = (Vector2.Scale(new Vector2(glyph.center.x / 1200f,
+                1 - glyph.center.y / 1200f), sprite.rect.size) - sprite.pivot) / sprite.pixelsPerUnit;
+            text.transform.localScale = Vector3.one * labelScale;
+            text.transform.localPosition = center - bounds.center * labelScale;
+            var renderer = text.GetComponent<MeshRenderer>();
+            renderer.sortingLayerID = source.sortingLayerID;
+            renderer.sortingOrder = source.sortingOrder + 1;
+        }
+        limbLabelsInstalled = true;
+    }
+
+    private void RemoveLimbLabels()
+    {
+        for (int i = 0; i < limbLabelSources.Count; i++)
+            if (limbLabelSources[i] != null) limbLabelSources[i].SetPropertyBlock(originalSymbolBlocks[i]);
+        foreach (var label in limbLabels)
+        {
+            if (label == null) continue;
+            if (Application.isPlaying) Destroy(label);
+            else DestroyImmediate(label);
+        }
+        limbLabels.Clear();
+        limbLabelSources.Clear();
+        originalSymbolBlocks.Clear();
+        limbLabelsInstalled = false;
     }
 
     public void FitBackgroundToView()
@@ -179,12 +294,15 @@ public sealed class RhythmSkinCVisuals : MonoBehaviour
 
     private void OnDestroy()
     {
+        RemoveLimbLabels();
         ReleaseDisplayTexture();
         if (displayCanvas != null) Destroy(displayCanvas);
     }
 
     private void OnDisable()
     {
+        RemoveLimbLabels();
+        if (!Application.IsPlaying(gameObject)) return;
         if (presentationCamera != null) presentationCamera.enabled = false;
         if (displayCanvas != null) displayCanvas.SetActive(false);
     }

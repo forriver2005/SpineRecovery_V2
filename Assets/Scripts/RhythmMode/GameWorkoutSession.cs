@@ -22,6 +22,7 @@ public sealed class GameWorkoutSession : MonoBehaviour
     public bool IsComplete { get; private set; }
     public int ActionIndex { get; private set; }
     public int CompletedSets { get; private set; }
+    public int RestSecondsRemaining { get; private set; }
     public string Status { get; private set; } = "未设置动作串";
     public GameWorkoutPlan Plan => plan?.ValidatedCopy();
     private GameWorkoutPlan plan;
@@ -29,6 +30,7 @@ public sealed class GameWorkoutSession : MonoBehaviour
     private Coroutine transition;
     private bool awaitingCompletion;
     private bool startingSet;
+    private float restSecondsBeforeNextSet = 3f;
     private bool useRecordedCoachAnimations;
     private string hipThrustSceneOverride;
     private string SceneFor(string action) => action == "hipthrust" && !string.IsNullOrEmpty(hipThrustSceneOverride)
@@ -78,6 +80,8 @@ public sealed class GameWorkoutSession : MonoBehaviour
             if (!Application.CanStreamedLevelBeLoaded(SceneFor(item.action)))
             { error = "动作场景未加入构建：" + item.action; return false; }
         ActionIndex = CompletedSets = 0;
+        RestSecondsRemaining = 0;
+        restSecondsBeforeNextSet = 3f;
         IsRunning = true;
         IsComplete = false;
         transition = StartCoroutine(PrepareNextSet());
@@ -87,9 +91,12 @@ public sealed class GameWorkoutSession : MonoBehaviour
     public void Cancel()
     {
         IsRunning = awaitingCompletion = startingSet = false;
+        RestSecondsRemaining = 0;
         if (transition != null) StopCoroutine(transition);
         transition = null;
         if (scene != null) scene.StopTraining();
+        var selection = UnityEngine.Object.FindObjectOfType<TaikoNight.TaikoNightSelection>(true);
+        if (selection != null) selection.SetGroupRest(0f);
         Status = "动作串已停止";
         Changed?.Invoke();
     }
@@ -125,15 +132,34 @@ public sealed class GameWorkoutSession : MonoBehaviour
             Changed?.Invoke();
             Finished?.Invoke();
         }
-        else transition = StartCoroutine(PrepareNextSet());
+        else
+        {
+            restSecondsBeforeNextSet = 30f;
+            transition = StartCoroutine(PrepareNextSet());
+        }
     }
 
     private IEnumerator PrepareNextSet()
     {
-        // Let completion listeners finish and show the result before transitioning.
-        Status = "准备下一组动作";
-        Changed?.Invoke();
-        yield return new WaitForSecondsRealtime(3f);
+        if (restSecondsBeforeNextSet >= 30f)
+        {
+            for (int remaining = Mathf.CeilToInt(restSecondsBeforeNextSet); remaining > 0; remaining--)
+            {
+                RestSecondsRemaining = remaining;
+                Status = $"组间休息 · {remaining} 秒";
+                Changed?.Invoke();
+                yield return new WaitForSecondsRealtime(1f);
+            }
+            RestSecondsRemaining = 0;
+            Changed?.Invoke();
+        }
+        else
+        {
+            // Keep the initial preparation delay before the first set.
+            Status = "准备下一组动作";
+            Changed?.Invoke();
+            yield return new WaitForSecondsRealtime(restSecondsBeforeNextSet);
+        }
         string target = SceneFor(plan.actions[ActionIndex].action);
         if (SceneManager.GetActiveScene().name != target)
         {
@@ -145,9 +171,9 @@ public sealed class GameWorkoutSession : MonoBehaviour
         if (scene == null || scene.gameObject.scene.name != target) { Abort("动作串场景入口缺失。"); yield break; }
         scene.PrepareMenu(plan.actions[ActionIndex].difficulty);
         if (!scene.PrepareDose(plan.actions[ActionIndex], out string doseError)) { Abort(doseError); yield break; }
-        Status = scene.Scorer.IsCalibrationBypassed ? "流程预览：已临时跳过校准" : "请按提示完成躺姿校准";
+        Status = scene.ReadinessStatus;
         Changed?.Invoke();
-        while (IsRunning && scene != null && !scene.Scorer.CanStartTraining) yield return null;
+        while (IsRunning && scene != null && !scene.CanStartTraining) yield return null;
         if (!IsRunning) yield break;
         if (scene == null || scene.gameObject.scene.name != target) { Abort("动作场景已离开。"); yield break; }
         startingSet = true;
@@ -158,13 +184,14 @@ public sealed class GameWorkoutSession : MonoBehaviour
 
     private void Update()
     {
-        if (IsRunning && awaitingCompletion && (scene == null || scene.Menu.IsTrainingMenuVisible))
+        if (IsRunning && awaitingCompletion && (scene == null || scene.IsMenuVisible))
             Cancel();
     }
 
     private void Abort(string error)
     {
         IsRunning = awaitingCompletion = startingSet = false;
+        RestSecondsRemaining = 0;
         transition = null;
         Status = error;
         Changed?.Invoke();

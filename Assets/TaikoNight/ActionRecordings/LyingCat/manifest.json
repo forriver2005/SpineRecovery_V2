@@ -1,0 +1,27 @@
+{
+    "formatVersion": 1,
+    "actionId": "1",
+    "displayName": "卧位猫",
+    "version": 1,
+    "createdAtUtc": "2026-10-18T14:16:43.1790019Z",
+    "fbxFile": "1_v1.fbx",
+    "motionJsonFile": "1_v1.motion.json",
+    "trackerJsonFile": "1_v1.tracker.json",
+    "rawImuJsonFile": "1_v1.raw-imu.json",
+    "keyframesFile": "1_v1.keyframes.json",
+    "fbxSha256": "ea79945e90b4763623ac847294ec9dbb40a22f3ae3b1368ab30494d9ac27a8e6",
+    "motionJsonSha256": "33a13bfc8359aaa9772280a0a59102438766479cb1cdae192e7cebad7bf56750",
+    "trackerJsonSha256": "d5b4def960db828e2ff1bb1883aaa679bcea251a60b06164f67db02c67084631",
+    "rawImuJsonSha256": "698404655523749cc0597a5954ce596adcd948d589bd583ee9da839edae6ae93",
+    "keyframesSha256": "ee061048853bafbbcd83cb60465e116883fdb0d583a6e8e4e2671c44aa4d7147",
+    "rawImuFrameCount": 2324,
+    "rawImuSensorCount": 17,
+    "segments": [
+        {
+            "name": "1",
+            "firstFrame": 0,
+            "lastFrame": 2323,
+            "durationSeconds": 77.43299865722656
+        }
+    ]
+}

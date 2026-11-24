@@ -283,6 +283,7 @@ public class PracticeSessionController : MonoBehaviour
         if (scene.StartsWith("male", System.StringComparison.Ordinal)) scene = scene.Substring(4);
         return scene == "DeadBugPractice" || scene == "BirdDogPractice" ||
             scene == "HipThrustPractice" || scene == "SideBridgePractice" ||
+            scene == "SideBridgeOppositePractice" ||
             scene == "CatCamelPractice" || scene == "CurlUpPractice";
     }
 

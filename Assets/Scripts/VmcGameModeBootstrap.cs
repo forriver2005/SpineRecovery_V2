@@ -21,7 +21,8 @@ public sealed class VmcGameModeBootstrap : MonoBehaviour
 
     private static void InstallForScene(Scene scene, LoadSceneMode mode)
     {
-        if (FindObjectOfType<RhythmModeController>(true) == null ||
+        bool taikoNightAction = FindObjectOfType<TaikoNight.TaikoNightActionRuntime>(true) != null;
+        if ((!taikoNightAction && FindObjectOfType<RhythmModeController>(true) == null) ||
             FindUserAnimator() == null ||
             FindObjectOfType<VmcGameModeBootstrap>(true) != null)
         {
@@ -100,6 +101,14 @@ public sealed class VmcGameModeBootstrap : MonoBehaviour
 
     private static Animator FindUserAnimator()
     {
+        TaikoNight.TaikoNightActionRuntime taikoNightAction =
+            FindObjectOfType<TaikoNight.TaikoNightActionRuntime>(true);
+        if (taikoNightAction != null && taikoNightAction.recorder != null &&
+            taikoNightAction.recorder.UserAnimator != null)
+        {
+            return taikoNightAction.recorder.UserAnimator;
+        }
+
         PoseScorer scorer = FindObjectOfType<PoseScorer>(true);
         if (scorer != null)
         {
@@ -116,37 +125,5 @@ public sealed class VmcGameModeBootstrap : MonoBehaviour
         DeadBugGamingPoseScorer deadBugScorer =
             FindObjectOfType<DeadBugGamingPoseScorer>(true);
         return deadBugScorer != null ? deadBugScorer.UserAnimator : null;
-    }
-}
-
-/// <summary>Feeds the existing scoring freshness gate from EVMC4U packets.</summary>
-public sealed class VmcGameModeSourceBridge : MonoBehaviour
-{
-    private EVMC4U.ExternalReceiver receiver;
-    private AvatarMotionSource source;
-
-    public void Configure(
-        EVMC4U.ExternalReceiver externalReceiver,
-        AvatarMotionSource motionSource)
-    {
-        receiver = externalReceiver;
-        source = motionSource;
-    }
-
-    private void Update()
-    {
-        if (receiver == null || source == null)
-        {
-            return;
-        }
-
-        source.SetAvailable(!receiver.Freeze && receiver.GetAvailable() > 0);
-        if(receiver.Freeze)return;
-        if (receiver.LastBonePacketCounterInFrame > 0)
-        {
-            source.ReportFrame(
-                receiver.GetRemoteTime(),
-                receiver.LastBonePacketCounterInFrame);
-        }
     }
 }

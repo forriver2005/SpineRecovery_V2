@@ -1,0 +1,35 @@
+{
+    "formatVersion": 1,
+    "sourceClipAssetPath": "C:\\Users\\supermao\\AppData\\Local\\SpineFlow\\PoseRecordings\\1_卧位猫.pose.json",
+    "sourceClipName": "1_卧位猫",
+    "sourceClipLengthSeconds": 77.4329833984375,
+    "sourceFrameRate": 30.0,
+    "totalFrames": 2323,
+    "actionId": "1",
+    "displayName": "卧位猫",
+    "sampleFps": 30,
+    "setCount": 1,
+    "savedAtUtc": "2026-10-18T14:16:41.9242385Z",
+    "keyframes": [
+        {
+            "name": "start",
+            "frame": 0,
+            "bodyParts": [
+                "whole_body"
+            ],
+            "holdSeconds": 0.0,
+            "followingSegmentName": "1",
+            "followingSegmentDurationSeconds": 77.43299865722656
+        },
+        {
+            "name": "end",
+            "frame": 2323,
+            "bodyParts": [
+                "whole_body"
+            ],
+            "holdSeconds": 0.0,
+            "followingSegmentName": "",
+            "followingSegmentDurationSeconds": 0.0
+        }
+    ]
+}

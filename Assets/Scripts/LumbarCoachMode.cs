@@ -97,7 +97,8 @@ public static class LumbarCoachMode
     public static LumbarCoachProfile ForScene(string scene)
     {
         foreach (LumbarCoachProfile profile in Profiles)
-            if (scene == profile.sceneName || scene == "male" + profile.sceneName) return profile;
+            if (scene == profile.sceneName || scene == "male" + profile.sceneName ||
+                (profile.actionId == "side_bridge" && scene == "SideBridgeOppositePractice")) return profile;
         return null;
     }
 

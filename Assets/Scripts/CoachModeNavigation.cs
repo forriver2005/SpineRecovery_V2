@@ -41,6 +41,8 @@ public static class CoachModeNavigation
 
     public static bool TryGetGameSceneForCoach(string coachScene, out string gameScene)
     {
+        var entry = TrainingActionCatalog.ForCoach(coachScene);
+        if (entry != null) { gameScene = entry.Game; return true; }
         switch (NormalizeSceneName(coachScene))
         {
             case DeadBugCoachScene:
@@ -70,6 +72,8 @@ public static class CoachModeNavigation
 
     public static bool TryGetCoachSceneForGame(string gameScene, out string coachScene)
     {
+        var entry = TrainingActionCatalog.ForGame(gameScene);
+        if (entry != null) { coachScene = entry.Coach; return true; }
         switch (NormalizeSceneName(gameScene))
         {
             case DeadBugGameScene:
@@ -147,6 +151,7 @@ public static class CoachModeNavigation
         var training = SpineRecovery.App.AppBootstrap.Instance?.Training;
         if (training?.IsV2Prescription == true)
         {
+            gameScene = training.CurrentPrescriptionGameScene;
             if (!training.AllowsPrescriptionGame(gameScene)) return;
         }
         else gameScene = ResolvePreferredGameScene(source, gameScene);
@@ -264,7 +269,7 @@ public static class CoachModeNavigation
 
     private static bool IsConcreteGameScene(string sceneName)
     {
-        return string.Equals(sceneName, DeadBugGameScene, StringComparison.Ordinal) ||
+        return TrainingActionCatalog.ForGame(sceneName) != null || string.Equals(sceneName, DeadBugGameScene, StringComparison.Ordinal) ||
             string.Equals(sceneName, BirdDogGameScene, StringComparison.Ordinal) ||
             string.Equals(sceneName, HipThrustGameScene, StringComparison.Ordinal) ||
             string.Equals(sceneName, SideBridgeGameScene, StringComparison.Ordinal) ||

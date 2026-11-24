@@ -30,7 +30,8 @@ public sealed class TrainingQualitySummary
     public double LongestHold { get { double best=0; foreach(var r in Repetitions)best=Math.Max(best,r.longestHold); return best; } }
     public float Coverage => Ratio(TrackedSeconds,ExpectedSeconds);
     public float Quality => 100*Ratio(Sum(r=>r.qualityIntegral),100*ExpectedSeconds);
-    public float TimeCompletion => Ratio(CreditedSeconds,TargetSeconds);
+    public float TimeCompletion => TargetSeconds > 0 ? Ratio(CreditedSeconds,TargetSeconds) :
+        (HasAssessment ? RepetitionCompletion : 0);
     public float RepetitionCompletion => Ratio(Qualified,Planned);
     public bool HasAssessment => TrackedSeconds >= .1 && ExpectedSeconds > 0;
     // 100 is reserved for all planned repetitions and dose, even after integer rounding.

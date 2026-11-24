@@ -110,7 +110,9 @@ public sealed class LyingCatHoldScorer : MonoBehaviour, ITaikoHoldScorer
     public bool TrackingAvailable { get; private set; }
     public bool SupportAvailable { get; private set; }
     public float ValidHoldSeconds => validHoldSeconds;
-    public float TargetHoldSeconds => targetHoldSeconds;
+    private float prescribedHoldSeconds = -1f;
+    public float TargetHoldSeconds => prescribedHoldSeconds >= 0 ? prescribedHoldSeconds : targetHoldSeconds;
+    public void SetTargetHoldSeconds(float seconds) => prescribedHoldSeconds = seconds;
 
     public event Action<HipThrustPhase> PhaseChanged;
     public event Action<int> SessionStarted;
@@ -256,7 +258,7 @@ public sealed class LyingCatHoldScorer : MonoBehaviour, ITaikoHoldScorer
         UpdatePhase(posture, dt);
         if (Phase == HipThrustPhase.Holding && !roundSettled && validSamples > 0 && FormAcceptable(posture))
         {
-            float durationScore = 100f * Mathf.Clamp01(validHoldSeconds / targetHoldSeconds);
+            float durationScore = 100f * (TargetHoldSeconds > 0 ? Mathf.Clamp01(validHoldSeconds / TargetHoldSeconds) : 1f);
             CurrentLiveComparisonScore = 0.75f * posture + 0.20f * durationScore + 0.05f * StabilityQuality;
         }
         else CurrentLiveComparisonScore = 0f;
@@ -339,7 +341,7 @@ public sealed class LyingCatHoldScorer : MonoBehaviour, ITaikoHoldScorer
         float posture = postureTotal / validSamples;
         float stability = stabilityTotal / validSamples;
         pendingRoundScore = 0.75f * posture +
-            20f * Mathf.Clamp01(validHoldSeconds / targetHoldSeconds) + 0.05f * stability;
+            20f * (TargetHoldSeconds > 0 ? Mathf.Clamp01(validHoldSeconds / TargetHoldSeconds) : 1f) + 0.05f * stability;
         hasPendingRound = true;
     }
 

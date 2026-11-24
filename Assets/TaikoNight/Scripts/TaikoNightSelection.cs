@@ -11,8 +11,7 @@ namespace TaikoNight
     {
         static readonly string[] Keys = { "hard", "standard", "simple" };
         static readonly string[] ButtonNames = { "Hard", "Standard", "Simple" };
-        static readonly string[] Games = { "HipThrust_TaikoNight_Dynamic", "LyingCatPractice_TaikoNight", "CrunchPractice_TaikoNight" };
-        static readonly string[] Titles = { "敲鼓臀桥", "卧位猫式", "卷腹" };
+        static bool Prescribed => SpineRecovery.App.AppBootstrap.Instance?.Training.IsV2Prescription == true;
         static readonly Color Ink = new Color(.08f, .14f, .24f);
         readonly Button[] difficulties = new Button[3];
         RectTransform panel, dialog;
@@ -69,6 +68,11 @@ namespace TaikoNight
             selected = start.image.sprite;
             resultLabel = Label(panel, "", -400, -355, 570, 56, 28, Ink);
             times = panel.Find("Times").GetComponentInChildren<TMP_Text>(true);
+            times.rectTransform.anchoredPosition += Vector2.up * 5f;
+            // The original caption is baked into the card sprite, not a TMP label.
+            var doseCaption = Box(panel.Find("Times"), "Dose caption", Color.white);
+            Place(doseCaption, 0, -19, 100, 20);
+            Label(doseCaption, "目标次数", 0, 0, 100, 20, 10, new Color(.49f,.60f,.73f));
             for (int i = 0; i < Keys.Length; i++)
             {
                 string key = Keys[i];
@@ -76,33 +80,41 @@ namespace TaikoNight
             }
             normal = difficulties[0].image.sprite;
             Bind("guide", OpenGuide);
-            Bind("Return", OpenGames);
+            Bind("Return", () => {
+                var training = SpineRecovery.App.AppBootstrap.Instance?.Training;
+                if (training != null) training.FinishAndReturn(); else SceneManager.LoadScene("AppShell");
+            });
             var planButton = ExtraButton(panel, "动作串  >\n" + title, new Color(.19f,.29f,.40f), 0, 0, 210, 100, OpenWorkout, 25);
             Corner(planButton, false);
+            planButton.gameObject.SetActive(!Prescribed);
             var gamesButton = ExtraButton(panel, "动作选择", new Color(.25f,.22f,.42f), 0, 0, 225, 75, OpenGames, 29);
             Corner(gamesButton, true);
-            SetDifficulty("standard");
+            gamesButton.gameObject.SetActive(SpineRecovery.App.AppBootstrap.Instance?.Training.CurrentPlan == null);
+            SetDifficulty(Prescribed ? SpineRecovery.App.AppBootstrap.Instance.Training.CurrentPrescriptionDifficulty : "standard");
             RefreshInput();
         }
 
         void SetDifficulty(string key)
         {
+            if (Prescribed) key = SpineRecovery.App.AppBootstrap.Instance.Training.CurrentPrescriptionDifficulty;
             change(key);
             SyncDifficulty(key);
         }
         public void SyncDifficulty(string key)
         {
             difficulty = key;
-            for (int i = 0; i < difficulties.Length; i++) difficulties[i].image.sprite = Keys[i] == key ? selected : normal;
-            times.text = readDose().ToString();
+            for (int i = 0; i < difficulties.Length; i++)
+            { difficulties[i].image.sprite = Keys[i] == key ? selected : normal; difficulties[i].interactable = !Prescribed; }
+            times.text = (Prescribed ? SpineFlowTrainingSession.GetPlannedTrainingVolume("game", 1, 1).TotalRepetitions : readDose()).ToString();
         }
         void OnEnable() { if (start != null) RefreshInput(); }
         void Update() => RefreshInput();
         bool HasInput()
         {
             bool tracking = HasTracking();
-            bool bypass = flowTestWithoutTracker != null && flowTestWithoutTracker();
-            return (tracking || bypass) && (calibrationReady == null || calibrationReady()) && restSecondsRemaining <= 0f;
+            bool bypass = !Prescribed && flowTestWithoutTracker != null && flowTestWithoutTracker();
+            bool allowed = SpineRecovery.App.AppBootstrap.Instance?.Training.AllowsPrescriptionGame(gameObject.scene.name) ?? true;
+            return allowed && (tracking || bypass) && (calibrationReady == null || calibrationReady()) && restSecondsRemaining <= 0f;
         }
         bool HasTracking()
         {
@@ -150,18 +162,21 @@ namespace TaikoNight
             OpenDialog("查看教程");
             Label(dialog, steps, 0, 30, 1080, 80, 42, Ink);
             Label(dialog, "跟随左侧教练动作。保持段结束后，跟随教练放下。\n传感器记录到达标动作时，鼓面会亮起。", 0, -75, 1080, 120, 30, Ink);
-            DialogButton("跟随教练练习", -195, () => { CloseDialog(); begin(); });
+            DialogButton("跟随教练练习", -195, () => { CloseDialog(); CoachModeNavigation.OpenCoachFromGame(); });
         }
         void OpenGames()
         {
             OpenDialog("动作选择");
-            for (int i = 0; i < Games.Length; i++)
+            if (SpineRecovery.App.AppBootstrap.Instance?.Training.CurrentPlan != null) return;
+            for (int i = 0; i < TrainingActionCatalog.Entries.Length; i++)
             {
-                string scene = Games[i];
-                var button = DialogButton(Titles[i], 90 - i * 115, () => {
+                var entry = TrainingActionCatalog.Entries[i];
+                string scene = entry.Game;
+                var button = ExtraButton(dialog, entry.Name, new Color(.12f,.52f,.73f),
+                    (i % 3 - 1) * 365, 110 - i / 3 * 100, 345, 82, () => {
                     if (scene == gameObject.scene.name) CloseDialog();
                     else if (Application.CanStreamedLevelBeLoaded(scene)) SceneManager.LoadScene(scene);
-                });
+                }, 28);
                 button.interactable = scene == gameObject.scene.name || Application.CanStreamedLevelBeLoaded(scene);
             }
         }

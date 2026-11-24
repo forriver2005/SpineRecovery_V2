@@ -292,7 +292,7 @@ public class PracticeSessionController : MonoBehaviour
         SpineFlowTrainingSession.MobileSessionAccepted -= ApplyPlannedTrainingVolume;
         CoachEventBus.CoachSessionCompleted -= HandleCoachTimelineCompleted;
         CoachEventBus.CoachHardStopRequested -= HandleLessonHardStop;
-        CancelPracticeIntroduction();
+        CancelPracticeIntroduction(false);
         ResetUserDirectionLock();
         DestroyOrientationSelection();
 
@@ -1094,15 +1094,16 @@ public class PracticeSessionController : MonoBehaviour
         introductionCoachLabelWasActive = false;
     }
 
-    private void CancelPracticeIntroduction()
+    private void CancelPracticeIntroduction(bool restoreCoachPose = true)
     {
         introductionGeneration++;
         introductionVoiceFinished = false;
         introductionDemonstrationFinished = false;
         lessonCountdownStarted = false;
-        voicePromptManager?.CancelPracticeIntroduction();
-        coachActionController?.CancelDemonstrationPreview();
-        flowPresentation?.ShowLessonStage(false);
+        if (voicePromptManager != null) voicePromptManager.CancelPracticeIntroduction();
+        // Scene teardown can destroy the Animator/controller before this component.
+        if (restoreCoachPose && coachActionController != null) coachActionController.CancelDemonstrationPreview();
+        if (flowPresentation != null) flowPresentation.ShowLessonStage(false);
         RestoreIntroductionRendererStates();
     }
 

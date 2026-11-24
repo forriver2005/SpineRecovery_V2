@@ -362,7 +362,7 @@ public class DeadBugStartMenuController : MonoBehaviour
                     columnIndex = 0;
                     break;
                 case "Game":
-                    if (LumbarCoachMode.ForScene(gameObject.scene.name) != null)
+                    if (!CoachModeNavigation.IsSupportedCoachScene(gameObject.scene.name))
                     {
                         child.gameObject.SetActive(false);
                         continue;
@@ -383,7 +383,7 @@ public class DeadBugStartMenuController : MonoBehaviour
             }
 
             child.gameObject.SetActive(true);
-            if (columnIndex > 1 && LumbarCoachMode.ForScene(gameObject.scene.name) != null)
+            if (columnIndex > 1 && !CoachModeNavigation.IsSupportedCoachScene(gameObject.scene.name))
                 columnIndex--;
             if (child is RectTransform rectTransform)
             {

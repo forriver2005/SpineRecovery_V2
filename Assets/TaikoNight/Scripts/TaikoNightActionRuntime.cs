@@ -51,6 +51,11 @@ namespace TaikoNight
         private GameWorkoutScene entry;
         private int repetitionCount = 8;
         private int completedRepetitions;
+        private float holdExtension, activeSeconds;
+        public GameTrainingAssessment Assessment { get; set; }
+        public bool IsResultVisible { get; private set; }
+        public string DifficultyKey => difficultyKey;
+        public float ActiveSeconds => activeSeconds;
         public event Action Completed;
         public bool IsMenuVisible => !running && !countdownRunning;
         public bool CanStartTraining => motion != null && motion.IsReady && IsMenuVisible && HasFreshTracker();
@@ -97,6 +102,7 @@ namespace TaikoNight
                 crunch ? "卷起　→　保持　→　回落" : "拱背　→　保持　→　还原", SelectDifficulty, () => repetitionCount,
                 menu.StartTraining, () => entry.OpenWorkoutPanelAbove(2210), () => menu.IsFlowTestCalibrationBypassed,
                 null);
+            ApplyPrescription();
             overlayRoot.SetActive(false);
         }
 
@@ -136,14 +142,30 @@ namespace TaikoNight
                 phaseSeconds = RecordedLyingCatCoachMotion.PhaseSeconds;
             }
 
-            phaseSeconds.y += TaikoNightChart.AddedHoldSeconds;
+            holdExtension = TaikoNightChart.AddedHoldSeconds;
+            phaseSeconds.y += holdExtension;
             scorer.RoundCompleted += OnRoundCompleted;
+        }
+
+        private void ApplyPrescription()
+        {
+            var training = SpineRecovery.App.AppBootstrap.Instance?.Training;
+            if (training?.IsV2Prescription != true) return;
+            SelectDifficulty(training.CurrentPrescriptionDifficulty);
+            repetitionCount = SpineFlowTrainingSession.GetPlannedTrainingVolume("game", 1, 1).TotalRepetitions;
+            float recordedHold = phaseSeconds.y - holdExtension;
+            phaseSeconds.y = SpineFlowTrainingSession.PlannedPrescriptionGameHoldSeconds;
+            holdExtension = phaseSeconds.y - recordedHold;
+            scorer.SetTargetHoldSeconds(phaseSeconds.y);
+            selection.SyncDifficulty(difficultyKey);
         }
 
         private void OnRoundCompleted(float score)
         {
             if (!running) return;
             lastCompletedScore = score;
+            if (scorer.TrackingAvailable)
+                Assessment?.RecordTaikoRound(completedRepetitions, scorer.ValidHoldSeconds, scorer.TargetHoldSeconds);
             if (running && scorer.TrackingAvailable && scorer.ValidHoldSeconds >= scorer.TargetHoldSeconds)
                 chart.ShowPlayerHit(score >= 90f);
         }
@@ -153,6 +175,8 @@ namespace TaikoNight
             if (motion == null || !motion.IsReady || running || countdownRunning ||
                 !HasFreshTracker()) return false;
             completedRepetitions = 0;
+            IsResultVisible = false;
+            activeSeconds = 0;
             lastCompletedScore = 0f;
             clock = 0f;
             countdownRemaining = DeadBugCountdownController.DefaultCountdownSeconds;
@@ -171,6 +195,8 @@ namespace TaikoNight
 
         private void StopTraining()
         {
+            if (running && Assessment != null && Assessment.IsCollecting) Assessment.Finish();
+            IsResultVisible = false;
             TaikoNightPracticeClock.IsPaused = running = countdownRunning = false;
             scorer.CancelSession();
             motion.ReturnIdle();
@@ -190,7 +216,7 @@ namespace TaikoNight
         public void SetWorkoutDifficulty(string key)
         {
             SelectDifficulty(key);
-            selection.SyncDifficulty(difficultyKey);
+            selection?.SyncDifficulty(difficultyKey);
             SetMenuRootVisible(false);
             RestoreMenuHiddenPresentation();
         }
@@ -198,6 +224,8 @@ namespace TaikoNight
         public bool SetRepetitionDose(int count, out string error)
         {
             error = null;
+            if (SpineRecovery.App.AppBootstrap.Instance?.Training.IsV2Prescription == true)
+            { error = "处方训练次数由医生指定。"; return false; }
             if (!IsMenuVisible) error = "请先返回菜单，再更换动作次数。";
             else if (count < 0 || count > 100) error = "动作次数须为 0–100。";
             if (error != null) return false;
@@ -227,6 +255,8 @@ namespace TaikoNight
                 countdownRunning = false;
                 running = true;
                 scorer.BeginContinuousSession();
+                SpineFlowTrainingSession.BeginGameTraining(difficultyKey);
+                Assessment?.BeginTaiko(repetitionCount, phaseSeconds, scorer.TargetHoldSeconds, difficultyKey);
                 motion.PlaySegment(1);
                 playbackSegment = 1;
                 pauseButton.gameObject.SetActive(true);
@@ -235,10 +265,14 @@ namespace TaikoNight
             if (!running || TaikoNightPracticeClock.IsPaused) return;
             float previous = clock;
             clock += Time.deltaTime;
+            activeSeconds += Time.deltaTime;
+            float holding = Mathf.Max(0, Mathf.Min(clock, phaseSeconds.x + phaseSeconds.y) - Mathf.Max(previous, phaseSeconds.x));
+            Assessment?.ObserveTaiko(completedRepetitions, Time.deltaTime,
+                HasFreshTracker() && scorer.TrackingAvailable, scorer.CurrentLiveComparisonScore, Mathf.Max(0, Time.deltaTime - holding));
             // Slow only the recorded plateau, including frames straddling either boundary.
             double top = phaseSeconds.x, lower = top + phaseSeconds.y;
-            double extraBefore = HipThrustPhaseTimeline.ConsumedHoldExtension(previous, top, lower, TaikoNightChart.AddedHoldSeconds);
-            double extraNow = HipThrustPhaseTimeline.ConsumedHoldExtension(clock, top, lower, TaikoNightChart.AddedHoldSeconds);
+            double extraBefore = HipThrustPhaseTimeline.ConsumedHoldExtension(previous, top, lower, holdExtension);
+            double extraNow = HipThrustPhaseTimeline.ConsumedHoldExtension(clock, top, lower, holdExtension);
             motion.Tick((float)(clock - previous - (extraNow - extraBefore)));
             if (motion.HasReachedSegmentEnd())
             {
@@ -256,10 +290,10 @@ namespace TaikoNight
                         chart.SetPlayerNotes(new[] { new Vector2(phaseSeconds.x, phaseSeconds.x + phaseSeconds.y) });
                         return;
                     }
-                    bool measured = scorer.TrackingAvailable;
-                    float finalScore = Mathf.Max(scorer.LastRoundScore, lastCompletedScore);
+                    Assessment?.Finish();
                     StopTraining();
-                    selection.SetResult(measured ? $"本轮得分　{Mathf.FloorToInt(finalScore)}" : "示范完成 · 无动作数据");
+                    selection.Show(false);
+                    IsResultVisible = true;
                     Completed?.Invoke();
                 }
             }
@@ -274,7 +308,7 @@ namespace TaikoNight
                 stage = playbackSegment == 2 ? 2 : clock < phaseSeconds.x ? 0 : 1;
                 float end = stage == 0 ? phaseSeconds.x : stage == 1 ? phaseSeconds.x + phaseSeconds.y : phaseSeconds.x + phaseSeconds.y + phaseSeconds.z;
                 remaining = Mathf.Max(0, end - clock);
-                progress = Mathf.Clamp01(1f - remaining / phaseSeconds[stage]);
+                progress = phaseSeconds[stage] > 0 ? Mathf.Clamp01(1f - remaining / phaseSeconds[stage]) : 1f;
                 float displayedScore = scorer.CurrentLiveComparisonScore > 0f
                     ? scorer.CurrentLiveComparisonScore : lastCompletedScore;
                 scoreText.text = Mathf.FloorToInt(displayedScore).ToString();
@@ -283,7 +317,7 @@ namespace TaikoNight
             DesignSpace.ExternalNow = running ? clock : 0f;
             chart.SetPlayerTime(running ? clock : 0f);
             chart.SetMeasuredHold(running && stage == 1 && scorer.TrackingAvailable && scorer.CurrentLiveComparisonScore > 0f
-                ? scorer.ValidHoldSeconds / scorer.TargetHoldSeconds : 0f);
+                ? (scorer.TargetHoldSeconds > 0 ? scorer.ValidHoldSeconds / scorer.TargetHoldSeconds : 1f) : 0f);
             string count = countdownRunning ? Mathf.CeilToInt(countdownRemaining).ToString() : null;
             card.Show(running || countdownRunning, count, stage, progress, remaining, TaikoNightPracticeClock.IsPaused);
         }
@@ -320,6 +354,8 @@ namespace TaikoNight
         private void SelectDifficulty(string key)
         {
             if (running || countdownRunning) return;
+            var training = SpineRecovery.App.AppBootstrap.Instance?.Training;
+            if (training?.IsV2Prescription == true) key = training.CurrentPrescriptionDifficulty;
             difficultyKey = key == "simple" || key == "hard" ? key : "standard";
             HipThrustDifficultyMode mode = difficultyKey == "simple" ? HipThrustDifficultyMode.Easy :
                 difficultyKey == "hard" ? HipThrustDifficultyMode.Hard : HipThrustDifficultyMode.Medium;

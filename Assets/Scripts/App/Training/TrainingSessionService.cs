@@ -28,8 +28,13 @@ namespace SpineRecovery.App
         public string CurrentPrescriptionDifficulty => IsV2Prescription && CurrentPlan.actions != null &&
             actionOffset < CurrentPlan.actions.Length ? CurrentPlan.actions[actionOffset].level : null;
         public bool HasNextPrescriptionItem => IsV2Prescription && actionOffset + 2 < CurrentPlan.actions.Length;
+        public string CurrentPrescriptionGameScene => IsV2Prescription ? CurrentPlan.actions[actionOffset + 1].sceneName : null;
         public bool AllowsPrescriptionCoach(string scene) => !IsV2Prescription ||
-            CurrentPlan.actions[actionOffset].sceneName == scene;
+            SameCoachScene(CurrentPlan.actions[actionOffset].sceneName, scene);
+
+        private static bool SameCoachScene(string planned, string actual) => planned == actual ||
+            (TrainingActionCatalog.ForCoach(planned) != null &&
+             TrainingActionCatalog.ForCoach(planned) == TrainingActionCatalog.ForCoach(actual));
 
         public bool AllowsPrescriptionGame(string scene) => !IsV2Prescription ||
             (CurrentPlan.actions[actionOffset + 1].sceneName == scene &&
@@ -72,21 +77,15 @@ namespace SpineRecovery.App
             if (plan.actions.Length != 2) return false;
             TrainingAction game = Array.Find(plan.actions, action => action?.arTaskType == "game_training");
             if (game == null) return false;
-            string gameScene = plan.actionId == "bird_dog" ? CoachModeNavigation.BirdDogGameScene :
-                plan.actionId == "hip_thrust" ? CoachModeNavigation.HipThrustGameScene :
-                plan.actionId == "side_bridge" ? CoachModeNavigation.SideBridgeGameScene :
-                CoachModeNavigation.DeadBugGameScene;
+            var entry = TrainingActionCatalog.Find(plan.actionId);
+            if (entry == null) return false;
+            string gameScene = entry.Game;
             string targetScene = gameScene;
             if (plan.prescriptionOrderId > 0)
             {
                 TrainingAction coach = Array.Find(plan.actions, action => action?.arTaskType == "coach_training");
                 if (coach == null || coach.holdSeconds < 0 || coach.holdSeconds > 600) return false;
-                switch (plan.actionId)
-                {
-                    case "dead_bug": targetScene = CoachModeNavigation.DeadBugCoachScene; break;
-                    case "bird_dog": targetScene = CoachModeNavigation.BirdDogCoachScene; break;
-                    default: return false;
-                }
+                targetScene = SpineFlowTrainingSession.ResolveSceneForGender(entry.Coach, plan.gender == "male");
             }
             if (!Application.CanStreamedLevelBeLoaded(targetScene)) return false;
             if (HasPendingFeedback && CurrentPlan.accountId == plan.accountId) return false;
@@ -119,6 +118,10 @@ namespace SpineRecovery.App
             {
                 TrainingAction coach = plan.actions[offset];
                 TrainingAction game = plan.actions[offset + 1];
+                var entry = TrainingActionCatalog.Find(coach?.actionId);
+                if (entry == null || TrainingActionCatalog.Find(game?.actionId) != entry ||
+                    !SameCoachScene(entry.Coach, coach.sceneName) || game.sceneName != entry.Game) return false;
+                coach.sceneName = SpineFlowTrainingSession.ResolveSceneForGender(entry.Coach, plan.gender == "male");
                 if (coach == null || game == null || coach.arTaskType != "coach_training" ||
                     game.arTaskType != "game_training" || coach.prescriptionItemId <= 0 ||
                     game.prescriptionItemId != coach.prescriptionItemId ||

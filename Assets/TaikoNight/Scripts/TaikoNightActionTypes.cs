@@ -26,4 +26,5 @@ public interface ITaikoHoldScorer
     bool BeginContinuousSession();
     void CancelSession();
     void SetDifficultyMode(HipThrustDifficultyMode mode);
+    void SetTargetHoldSeconds(float seconds);
 }

@@ -94,7 +94,10 @@ internal object UnifiedPrescriptionV2 {
         val items = order.items.map { item ->
             val modes = ResultMode.ORDER.map { mode ->
                 val row = byMode[item.itemId to mode.wireValue]
-                val completed = row?.optBoolean("prescriptionModeCompleted") == true
+                // Playback completion alone is not evidence of a completed patient repetition.
+                // The wire contract requires at least one repetition for COMPLETED.
+                val completed = row?.optBoolean("prescriptionModeCompleted") == true &&
+                    row.optInt("completedRepetitions") > 0
                 val status = when {
                     completed -> ResultSessionStatus.COMPLETED
                     row != null -> ResultSessionStatus.INTERRUPTED

@@ -8,7 +8,14 @@ internal enum class BuiltInExercise(val key: String, val legacyNumber: String, v
     DEAD_BUG("dead_bug", "7", "DeadBugPractice", "DeadBug_RingSkinC_Recorded", "死虫", "死虫式"),
     BIRD_DOG("bird_dog", "8", "BirdDogPractice", "BirdDog_RingSkinC_Recorded", "鸟狗", "鸟狗式"),
     HIP_THRUST("hip_thrust", "4", "HipThrustPractice", "HipThrust_RingBridge_NewScoring", "臀桥"),
-    SIDE_BRIDGE("side_bridge", "5", "SideBridgePractice", "SideBridge_RingBridge_Dynamic", "侧桥");
+    SIDE_BRIDGE("side_bridge", "5", "SideBridgePractice", "SideBridge_RingBridge_Dynamic", "侧桥", "左侧桥"),
+    SIDE_BRIDGE_RIGHT("side_bridge_right", "side_bridge_right", "SideBridgeOppositePractice", "SideBridgeOpposite_RingBridge_Dynamic", "右侧桥"),
+    CAT_CAMEL("cat_camel", "1", "CatCamelPractice", "LyingCatPractice_TaikoNight", "卧位猫", "卧位猫式"),
+    CURL_UP("curl_up", "6", "CurlUpPractice", "CrunchPractice_TaikoNight", "卷腹"),
+    HIP_THRUST_TAIKO("hip_thrust_taiko", "hip_thrust_taiko", "HipThrustPractice", "HipThrust_TaikoNight_Dynamic", "臀桥 · 星轨敲鼓"),
+    HIP_THRUST_HOLD("hip_thrust_hold30", "hip_thrust_hold30", "HipThrustPractice", "HipThrust_RingBridge_Hold30", "臀桥 · 保持30秒"),
+    SIDE_BRIDGE_HOLD("side_bridge_hold30", "side_bridge_hold30", "SideBridgePractice", "SideBridge_RingBridge_Hold30", "左侧桥 · 保持30秒"),
+    SIDE_BRIDGE_RIGHT_HOLD("side_bridge_right_hold30", "side_bridge_right_hold30", "SideBridgeOppositePractice", "SideBridgeOpposite_RingBridge_Hold30", "右侧桥 · 保持30秒");
 
     companion object {
         fun forKey(key: String) = entries.singleOrNull { it.key == key }

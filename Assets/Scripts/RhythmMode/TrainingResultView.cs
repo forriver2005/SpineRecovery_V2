@@ -18,12 +18,12 @@ public sealed class TrainingResultView : MonoBehaviour
     {
         foreach(var canvas in FindObjectsOfType<Canvas>(true))
             if(canvas.gameObject.scene==gameObject.scene&&canvas.name=="EndMenuCanvas")oldEnd=canvas.gameObject;
-        if(oldEnd==null)return;
+        if(oldEnd==null && assessment.Entry.taikoNightAction==null)return;
         // Hide authored placeholder graphics; keep their controls and the original
         // end-canvas lifecycle intact for existing menu and prescription listeners.
-        foreach(var graphic in oldEnd.GetComponentsInChildren<Graphic>(true))graphic.enabled=false;
+        if(oldEnd!=null)foreach(var graphic in oldEnd.GetComponentsInChildren<Graphic>(true))graphic.enabled=false;
         root=new GameObject("Training Quality Result",typeof(RectTransform),typeof(Canvas),typeof(CanvasScaler),typeof(GraphicRaycaster));
-        var canvasRoot=root.GetComponent<Canvas>();canvasRoot.renderMode=RenderMode.ScreenSpaceOverlay;canvasRoot.sortingOrder=1200;
+        var canvasRoot=root.GetComponent<Canvas>();canvasRoot.renderMode=RenderMode.ScreenSpaceOverlay;canvasRoot.sortingOrder=2300;
         scaler=root.GetComponent<CanvasScaler>();scaler.uiScaleMode=CanvasScaler.ScaleMode.ScaleWithScreenSize;
         scaler.referenceResolution=new Vector2(1920,1080);
         var bg=Box("Background",root.transform,Vector2.zero,new Vector2(1920,1080),new Color(.045f,.04f,.14f));
@@ -49,7 +49,7 @@ public sealed class TrainingResultView : MonoBehaviour
                 training.ContinuePrescription();
                 return;
             }
-            oldEnd.SetActive(false);
+            if(oldEnd!=null)oldEnd.SetActive(false);
             assessment.Entry.StopTraining();
         });
         string buttonText = prescribed ? (training.HasNextPrescriptionItem ? "下一项训练" : "完成训练") : "返回选择";
@@ -86,7 +86,8 @@ public sealed class TrainingResultView : MonoBehaviour
     void LateUpdate()
     {
         if(root==null)return;
-        bool visible=oldEnd.activeInHierarchy&&!assessment.Entry.menu.IsTrainingMenuVisible;
+        bool visible=assessment.Entry.taikoNightAction!=null?assessment.Entry.taikoNightAction.IsResultVisible:
+            oldEnd.activeInHierarchy&&!assessment.Entry.menu.IsTrainingMenuVisible;
         root.SetActive(visible);scaler.matchWidthOrHeight=Screen.width/(float)Mathf.Max(1,Screen.height)<1920f/1080?0:1;
         if(visible&&!wasVisible)Refresh();wasVisible=visible;
     }

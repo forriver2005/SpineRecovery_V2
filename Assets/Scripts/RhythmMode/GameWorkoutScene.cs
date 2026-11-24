@@ -57,11 +57,8 @@ public sealed class GameWorkoutScene : MonoBehaviour
         if (training?.IsV2Prescription != true && GameTestMenu.EnabledForBuild &&
             System.Array.IndexOf(GameTestMenu.Scenes, gameObject.scene.name) >= 0)
             gameObject.AddComponent<GameTestMenu>().Initialize(this);
-        if (taikoNightAction == null)
-        {
-            var assessment = gameObject.AddComponent<GameTrainingAssessment>();
-            assessment.Initialize(this);
-        }
+        var assessment = gameObject.AddComponent<GameTrainingAssessment>();
+        assessment.Initialize(this);
         session = GameWorkoutSession.Instance;
         menu.TrainingStartAllowed = () => session.AllowsStart(this) && (taiko == null || taiko.CanStart) &&
             (training?.AllowsPrescriptionGame(gameObject.scene.name) ?? true) &&

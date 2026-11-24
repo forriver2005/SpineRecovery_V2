@@ -7,7 +7,7 @@ Merge parents:
 - Mobile base: `1478edda0bf28b77909014c955669552da267a12` (`MetaspineApp`). This already includes the six-file prescription difficulty change that was uncommitted during the initial assessment.
 - Incoming main: `862ac44b258392c31f5477e5e1a454e0417c2f78` (`origin/main`).
 
-This is a normal merge preserving both histories. No push, remote branch creation, or PR is part of this task.
+This is a normal merge preserving both histories. The initial integration was completed locally. It is now included in the PR targeting `MetaspineApp`, together with the full action-library integration and acceptance report.
 
 ## Conflict resolutions
 

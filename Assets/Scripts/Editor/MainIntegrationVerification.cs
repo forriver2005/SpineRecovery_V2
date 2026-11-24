@@ -17,6 +17,7 @@ public static class MainIntegrationVerification
         VerifyTrackingScripts();
         VerifyTimelines();
         VerifyRoutes();
+        VerifyFullCatalog();
         NavigationModuleVerification.Run();
         Debug.Log("MAIN_INTEGRATION_VERIFICATION_PASS checks=" + checks + " plus navigation regression checks");
     }
@@ -111,6 +112,41 @@ public static class MainIntegrationVerification
             new GameWorkoutPlan { actions = new[] { new GameWorkoutAction { action = action, difficulty = "standard", sets = 2, reps = 3 } } }.ValidatedCopy();
         }
         Check(GameWorkoutPlan.SceneFor("hipthrust") == CoachModeNavigation.HipThrustGameScene, "Mobile and main share the default bridge route");
+    }
+
+    private static void VerifyFullCatalog()
+    {
+        var packaged = EditorBuildSettings.scenes.Where(s => s.enabled).Select(s => Path.GetFileNameWithoutExtension(s.path)).ToArray();
+        Check(TrainingActionCatalog.Entries.Length == 11, "Full library has eleven game routes");
+        foreach(var entry in TrainingActionCatalog.Entries)
+        {
+            Check(packaged.Contains(entry.Coach) && packaged.Contains(entry.Game), "Coach/game packaged: " + entry.Key);
+            Check(TrainingActionCatalog.Find(entry.Key + "_coach") == entry && TrainingActionCatalog.Find(entry.Key + "_game") == entry,
+                "Both prescribed identities resolve: " + entry.Key);
+            Check(CoachModeNavigation.TryGetCoachSceneForGame(entry.Game, out string coach) && coach == entry.Coach,
+                "Game tutorial returns to correct coach: " + entry.Key);
+            Check(CoachModeNavigation.IsSupportedCoachScene(entry.Coach), "Coach can return to game: " + entry.Key);
+        }
+        var host = new GameObject("Scorer hold verification");
+        try
+        {
+            ITaikoHoldScorer[] scorers = {host.AddComponent<CrunchHoldScorer>(),host.AddComponent<LyingCatHoldScorer>()};
+            foreach(var scorer in scorers)foreach(float hold in new[] {0f,7f,600f})
+            {
+                scorer.SetTargetHoldSeconds(hold);
+                scorer.SetDifficultyMode(HipThrustDifficultyMode.Hard);
+                Check(scorer.TargetHoldSeconds == hold, "Prescribed hold survives difficulty change: " + hold);
+            }
+            var summary = new TrainingQualitySummary();
+            summary.Reset(new[] {10d,10d},new[] {7d,7d},true,false,60);
+            summary.Observe(0,10,false,100,true);
+            Check(!summary.HasAssessment && summary.Qualified == 0 && summary.CreditedSeconds == 0, "No sensor cannot manufacture results");
+            summary.Reset(new[] {1d},new[] {0d},true,false,60);
+            summary.Observe(0,1,true,100,true);
+            summary.RecordDose(0,0,0,true,true);
+            Check(summary.TimeCompletion == 1 && summary.Score == 100, "Zero prescribed hold has no duration penalty for a measured complete repetition");
+        }
+        finally { UnityEngine.Object.DestroyImmediate(host); }
     }
 
     private static void Check(bool condition, string message)

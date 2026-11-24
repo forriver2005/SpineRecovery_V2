@@ -260,7 +260,7 @@ public static class ReplayRuntimeInstaller
         SetMobileRect(menu.transform, "Game", new Vector2(1f, 1f),
             new Vector2(-140f, -460f), new Vector2(190f, 70f));
         Transform game = FindChild(menu.transform, "Game");
-        if (game != null && LumbarCoachMode.ForScene(ReplaySessionContext.ReturnPracticeScene) != null)
+        if (game != null && !CoachModeNavigation.IsSupportedCoachScene(ReplaySessionContext.ReturnPracticeScene))
             game.gameObject.SetActive(false);
     }
 

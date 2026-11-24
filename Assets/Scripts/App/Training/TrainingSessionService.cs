@@ -24,6 +24,9 @@ namespace SpineRecovery.App
 
         private int actionOffset;
         public bool IsV2Prescription => IsPrescribedTraining && CurrentPlan.prescriptionContractVersion == 2;
+        // The active item advances by a coach/game pair; both modes use the same prescribed difficulty.
+        public string CurrentPrescriptionDifficulty => IsV2Prescription && CurrentPlan.actions != null &&
+            actionOffset < CurrentPlan.actions.Length ? CurrentPlan.actions[actionOffset].level : null;
         public bool HasNextPrescriptionItem => IsV2Prescription && actionOffset + 2 < CurrentPlan.actions.Length;
         public bool AllowsPrescriptionCoach(string scene) => !IsV2Prescription ||
             CurrentPlan.actions[actionOffset].sceneName == scene;
@@ -122,6 +125,8 @@ namespace SpineRecovery.App
                     coach.prescriptionPosition != offset / 2 || game.prescriptionPosition != offset / 2 ||
                     coach.sets < 1 || coach.sets > 20 || coach.reps < 1 || coach.reps > 100 ||
                     coach.holdSeconds < 0 || coach.holdSeconds > 600 ||
+                    (coach.level != "simple" && coach.level != "standard" && coach.level != "hard") ||
+                    coach.level != game.level ||
                     coach.sets != game.sets || coach.reps != game.reps || coach.holdSeconds != game.holdSeconds ||
                     !Application.CanStreamedLevelBeLoaded(coach.sceneName) ||
                     !Application.CanStreamedLevelBeLoaded(game.sceneName)) return false;

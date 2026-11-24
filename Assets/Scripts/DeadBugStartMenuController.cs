@@ -208,6 +208,13 @@ public class DeadBugStartMenuController : MonoBehaviour
         RegisterDifficultyButton(standardDifficultyButton, Difficulty.Standard);
         RegisterDifficultyButton(hardDifficultyButton, Difficulty.Hard);
         SelectDifficulty(defaultDifficulty);
+        if (SpineRecovery.App.AppBootstrap.Instance?.Training.IsV2Prescription == true)
+        {
+            // Preserve the normal free-training menu; prescriptions are configured by the doctor.
+            if (simpleDifficultyButton != null) simpleDifficultyButton.gameObject.SetActive(false);
+            if (standardDifficultyButton != null) standardDifficultyButton.gameObject.SetActive(false);
+            if (hardDifficultyButton != null) hardDifficultyButton.gameObject.SetActive(false);
+        }
     }
 
     private void ConfigurePracticeStartPresentation()
@@ -1419,6 +1426,9 @@ public class DeadBugStartMenuController : MonoBehaviour
 
     private void SelectDifficulty(Difficulty difficulty)
     {
+        string prescribed = SpineRecovery.App.AppBootstrap.Instance?.Training.CurrentPrescriptionDifficulty;
+        if (prescribed != null)
+            difficulty = prescribed == "simple" ? Difficulty.Simple : prescribed == "hard" ? Difficulty.Hard : Difficulty.Standard;
         selectedDifficulty = difficulty;
 
         string difficultyKey = difficulty == Difficulty.Simple ? "simple" :

@@ -514,6 +514,9 @@ public class PracticeSessionController : MonoBehaviour
     /// </summary>
     private void ApplyDefaultDifficulty()
     {
+        string prescribed = SpineRecovery.App.AppBootstrap.Instance?.Training.CurrentPrescriptionDifficulty;
+        if (prescribed != null)
+            defaultDifficulty = prescribed == "simple" ? DifficultyLevel.Relaxed : prescribed == "hard" ? DifficultyLevel.Strict : DifficultyLevel.Medium;
         DifficultyConfig config = difficultySettings != null
             ? difficultySettings.GetConfig(defaultDifficulty)
             : DifficultySettings.CreateBuiltInConfig(defaultDifficulty);
@@ -536,7 +539,8 @@ public class PracticeSessionController : MonoBehaviour
 
     public void SetCoachingDifficultyKey(string key)
     {
-        coachingDifficultyKey = string.IsNullOrEmpty(key) ? "standard" : key;
+        string prescribed = SpineRecovery.App.AppBootstrap.Instance?.Training.CurrentPrescriptionDifficulty;
+        coachingDifficultyKey = prescribed ?? (string.IsNullOrEmpty(key) ? "standard" : key);
         if (poseScorer == null) poseScorer = FindObjectOfType<PoseScorer>(true);
         if (poseScorer != null) poseScorer.SetCoachingDifficultyKey(coachingDifficultyKey);
     }

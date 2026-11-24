@@ -42,25 +42,7 @@ internal object UnifiedPrescriptionV2 {
         }
         PatientDirectiveClient.postV2Receipt(credential.patientToken, order, "directive_saved")
 
-        val actions = JSONArray()
-        for (item in order.items) {
-            val exercise = requireNotNull(BuiltInExercise.forKey(item.action)) {
-                "处方动作暂未接入训练场景：${item.actionName}"
-            }
-            for ((mode, scene) in listOf("coach" to exercise.coach, "game" to exercise.game)) {
-                actions.put(JSONObject()
-                    .put("actionId", "${exercise.key}_$mode")
-                    .put("actionName", item.actionName)
-                    .put("arTaskType", "${mode}_training")
-                    .put("level", "standard")
-                    .put("sets", item.sets)
-                    .put("reps", item.reps)
-                    .put("holdSeconds", item.holdSeconds)
-                    .put("prescriptionItemId", item.itemId)
-                    .put("prescriptionPosition", item.position)
-                    .put("sceneName", scene))
-            }
-        }
+        val actions = actionsFor(order)
         check(SpineFlowServerConfig.BASE_URL == origin &&
             PatientCredentials.credential(context, account) == credential) { "患者绑定已变更，请重新获取处方" }
         PatientDirectiveClient.postV2Receipt(credential.patientToken, order, "assets_ready")
@@ -74,6 +56,29 @@ internal object UnifiedPrescriptionV2 {
             .put("prescriptionJson", order.toJson().toString())
             .put("preTrainingEventId", preEvent)
             .put("actions", actions)
+    }
+
+    internal fun actionsFor(order: AdmissionPrescriptionV2): JSONArray {
+        val actions = JSONArray()
+        for (item in order.items) {
+            val exercise = requireNotNull(BuiltInExercise.forKey(item.action)) {
+                "处方动作暂未接入训练场景：${item.actionName}"
+            }
+            for ((mode, scene) in listOf("coach" to exercise.coach, "game" to exercise.game)) {
+                actions.put(JSONObject()
+                    .put("actionId", "${exercise.key}_$mode")
+                    .put("actionName", item.actionName)
+                    .put("arTaskType", "${mode}_training")
+                    .put("level", item.level ?: "standard")
+                    .put("sets", item.sets)
+                    .put("reps", item.reps)
+                    .put("holdSeconds", item.holdSeconds)
+                    .put("prescriptionItemId", item.itemId)
+                    .put("prescriptionPosition", item.position)
+                    .put("sceneName", scene))
+            }
+        }
+        return actions
     }
 
     fun result(record: TrainingHistoryRecord, session: JSONObject): JSONObject? {

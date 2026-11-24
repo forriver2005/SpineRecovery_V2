@@ -39,7 +39,8 @@ data class AdmissionPrescriptionItemV2(
     val reps: Int,
     val holdSeconds: Int,
     val legacyId: String? = null,
-    val asset: AdmissionPrescriptionAsset? = null
+    val asset: AdmissionPrescriptionAsset? = null,
+    val level: String? = null
 )
 
 data class AdmissionPrescriptionV2(
@@ -57,10 +58,10 @@ data class AdmissionPrescriptionV2(
     fun computeManifestSha256(): String {
         val rows = JSONArray(items.map { item ->
             val a = item.asset
-            if (a == null) JSONArray(listOf(item.itemId, item.position, item.action, item.sets, item.reps, item.holdSeconds))
+            if (a == null) JSONArray(listOf(item.itemId, item.position, item.action, item.sets, item.reps, item.holdSeconds)).apply { item.level?.let { put(it) } }
             else JSONArray(listOf(item.itemId, item.position, item.legacyId ?: item.action, a.actionVersionId, a.variantKey,
                 a.formatVersion, a.runtimeContractVersion, a.doseProfile, JSONArray(a.supportedModes), a.fileSize,
-                a.sha256, item.sets, item.reps, item.holdSeconds))
+                a.sha256, item.sets, item.reps, item.holdSeconds)).apply { item.level?.let { put(it) } }
         })
         val manifest = JSONArray(listOf(CONTRACT_VERSION, orderId, rows))
         return ResultDigest.sha256Hex(CanonicalJson.canonicalize(manifest))
@@ -78,7 +79,8 @@ data class AdmissionPrescriptionV2(
             require(items.length() in MIN_ITEMS..MAX_ITEMS) { "处方动作数量异常" }
             val parsed = (0 until items.length()).map { parseItem(items.getJSONObject(it), itemIdKey) }
             require(parsed.map { it.position } == parsed.indices.toList() &&
-                parsed.all { it.itemId > 0 && it.sets in 1..20 && it.reps in 1..100 && it.holdSeconds in 0..600 } &&
+                parsed.all { it.itemId > 0 && it.sets in 1..20 && it.reps in 1..100 && it.holdSeconds in 0..600 &&
+                    (it.level == null || it.level in listOf("simple", "standard", "hard")) } &&
                 parsed.distinctBy { it.itemId }.size == parsed.size &&
                 parsed.all { (it.asset == null) == (parsed.first().asset == null) }) { "处方条目或剂量异常" }
             return AdmissionPrescriptionV2(json.getLong("orderId"), version, json.getString("resourceManifestSha256"), parsed)
@@ -102,13 +104,15 @@ private fun parseItem(json: JSONObject, itemIdKey: String): AdmissionPrescriptio
             a.getLong("fileSize"), a.getString("sha256"))
     } else null
     return AdmissionPrescriptionItemV2(json.getLong(itemIdKey), json.getInt("position"), key, name.ifBlank { key },
-        json.getInt("sets"), json.getInt("reps"), json.getInt("holdSeconds"), id, asset)
+        json.getInt("sets"), json.getInt("reps"), json.getInt("holdSeconds"), id, asset,
+        if (json.has("level")) json.getString("level").also { require(it in listOf("simple", "standard", "hard")) { "处方动作难度无效" } } else null)
 }
 
 private fun AdmissionPrescriptionItemV2.toJson(): JSONObject = JSONObject()
     .put("itemId", itemId).put("position", position).put("actionName", actionName)
     .put("sets", sets).put("reps", reps).put("holdSeconds", holdSeconds)
     .apply {
+        level?.let { put("level", it) }
         if (legacyId == null) put("action", action) else put("actionId", legacyId)
         if (asset != null) {
             put("asset", JSONObject().put("actionVersionId", asset.actionVersionId).put("variantKey", asset.variantKey)

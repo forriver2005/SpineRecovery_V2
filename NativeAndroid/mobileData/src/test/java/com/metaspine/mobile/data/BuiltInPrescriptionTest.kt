@@ -53,6 +53,9 @@ class BuiltInPrescriptionTest {
         assertEquals("bird_dog", frozen.getString("action"))
         assertFalse(frozen.has("actionId"))
         assertFalse(frozen.getJSONObject("asset").has("downloadPath"))
+        // Shared server vector: optional difficulty is appended after dose in the manifest row.
+        val hard = order.copy(items = order.items.map { it.copy(level = "hard") })
+        assertEquals("47d7bbefa5350ef867e6eb21a61c4f725038b2eb29d8eceb78337fea7dbfe049", hard.computeManifestSha256())
         assertEquals(order, AdmissionPrescriptionV2.fromJson(order.toJson()))
     }
 
@@ -67,5 +70,29 @@ class BuiltInPrescriptionTest {
         assertFalse(entry.has("actionId"))
         assertFalse(entry.has("sha256"))
         assertEquals(result, PrescriptionResultV2.parse(result.toJson(), "patient1"))
+    }
+
+    @Test fun prescribedDifficultySurvivesStorageAndBothModes() {
+        val json = JSONObject(orderJson)
+        val first = json.getJSONArray("items").getJSONObject(0).put("level", "hard")
+        json.getJSONArray("items").put(JSONObject(first.toString())
+            .put("itemId", 8).put("position", 1).put("action", "dead_bug").put("level", "simple"))
+        val order = AdmissionPrescriptionV2.fromJson(json)
+        assertEquals(listOf("hard", "simple"), order.items.map { it.level })
+        assertEquals(order, AdmissionPrescriptionV2.fromJson(order.toJson()))
+        val actions = UnifiedPrescriptionV2.actionsFor(order)
+        assertEquals(listOf("hard", "hard", "simple", "simple"),
+            (0 until actions.length()).map { actions.getJSONObject(it).getString("level") })
+        val changed = order.copy(items = order.items.map { it.copy(level = "standard") })
+        assertNotEquals(order.computeManifestSha256(), changed.computeManifestSha256())
+    }
+
+    @Test fun unknownDifficultyFailsClosedAndLegacyKeepsStandard() {
+        val json = JSONObject(orderJson)
+        json.getJSONArray("items").getJSONObject(0).put("level", "expert")
+        assertThrows(IllegalArgumentException::class.java) { AdmissionPrescriptionV2.fromJson(json) }
+        val old = AdmissionPrescriptionV2.fromJson(JSONObject(orderJson))
+        assertEquals("standard", UnifiedPrescriptionV2.actionsFor(old).getJSONObject(0).getString("level"))
+        assertEquals(old.resourceManifestSha256, old.computeManifestSha256())
     }
 }

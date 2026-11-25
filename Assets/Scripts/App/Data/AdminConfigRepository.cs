@@ -15,7 +15,7 @@ namespace SpineRecovery.App
         bool MarkArTestPassed(string configId, string fingerprint);
         bool Publish(string configId);
         bool RollbackTo(string configId);
-        bool BindPublishedTrackers(IEnumerable<SlimeVrHapticTrackerSnapshot> trackers, out string message);
+        bool BindPublishedTrackers(IEnumerable<AdminTrackerBinding> bindings, out string message);
     }
 
     /// <summary>
@@ -119,37 +119,41 @@ namespace SpineRecovery.App
             return true;
         }
 
-        public bool BindPublishedTrackers(IEnumerable<SlimeVrHapticTrackerSnapshot> trackers, out string message)
+        public bool BindPublishedTrackers(IEnumerable<AdminTrackerBinding> bindings, out string message)
         {
             EnsureLoaded();
             AdminTrainingConfiguration published = CurrentPublished();
-            var next = (trackers ?? Array.Empty<SlimeVrHapticTrackerSnapshot>())
-                .Where(t => t != null && t.connected && !string.IsNullOrWhiteSpace(t.hardwareId))
-                .ToArray();
-            var bindings = new List<AdminTrackerBinding>();
-            foreach (SlimeVrHapticTrackerSnapshot tracker in next)
+            if (published.trackerBindingsLocked)
             {
-                if (!FixedTrackerSlotMapping.TryParse(tracker.bodyPosition, out FixedTrackerSlot slot)) continue;
-                if (bindings.Any(b => b.slot == slot)) continue;
-                bindings.Add(new AdminTrackerBinding
-                {
-                    slot = slot,
-                    hardwareId = tracker.hardwareId.Trim(),
-                    ip = tracker.ip == null ? string.Empty : tracker.ip.Trim(),
-                    online = tracker.connected,
-                    batteryPercent = tracker.batteryPercent,
-                    lastSeenAt = DateTimeOffset.UtcNow.ToString("O"),
-                });
-            }
-            if (bindings.Count != Enum.GetValues(typeof(FixedTrackerSlot)).Length)
-            {
-                message = "需要同时识别左脚腕、右脚腕、左手腕、右手腕和腰这 5 个追踪器。当前识别到 " + bindings.Count + " 个。";
+                message = "这 5 个 IMU 已锁定，不能在客户端重新绑定。";
                 return false;
             }
-            published.trackerBindings = bindings.OrderBy(b => b.slot).ToArray();
+            var next = (bindings ?? Array.Empty<AdminTrackerBinding>())
+                .Where(binding => binding != null && !string.IsNullOrWhiteSpace(binding.hardwareId))
+                .GroupBy(binding => binding.slot)
+                .Select(group => group.First())
+                .ToArray();
+            int requiredCount = Enum.GetValues(typeof(FixedTrackerSlot)).Length;
+            if (next.Length != requiredCount || next.Select(binding => binding.hardwareId.Trim())
+                .Distinct(StringComparer.OrdinalIgnoreCase).Count() != requiredCount)
+            {
+                message = "需要选择 5 个不同的在线 IMU，并分别指定左脚腕、右脚腕、左手腕、右手腕和腰。";
+                return false;
+            }
+            string now = DateTimeOffset.UtcNow.ToString("O");
+            published.trackerBindings = next.OrderBy(binding => binding.slot).Select(binding => new AdminTrackerBinding
+            {
+                slot = binding.slot,
+                hardwareId = binding.hardwareId.Trim(),
+                ip = binding.ip?.Trim() ?? string.Empty,
+                online = binding.online,
+                batteryPercent = binding.batteryPercent,
+                lastSeenAt = now,
+            }).ToArray();
+            published.trackerBindingsLocked = true;
             published.updatedAt = DateTimeOffset.UtcNow.ToString("O");
             Persist();
-            message = "已保存 5 个固定追踪器的硬件 ID/MAC。普通用户将只读取这些设备。";
+            message = "已锁定 5 个 IMU 的硬件 ID/MAC 与佩戴部位。普通用户将只读取这些设备。";
             return true;
         }
 

@@ -28,12 +28,16 @@ namespace SpineRecovery.App
         private Text homeMessage;
         private Text trackingMessage;
         private Text adminMessage;
+        private Text adminImuBindingMessage;
         private Text historyMessage;
         private Text activationMessage;
         private Text arTrainingMessage;
         private Text trainingMenuMessage;
         private EventSystem appEventSystem;
         private Button trackingCompleteButton;
+        private Button adminImuCommitButton;
+        private RectTransform adminImuBindingContent;
+        private readonly Dictionary<string, int> adminImuSlotDraft = new Dictionary<string, int>();
         private Text trackingStatusTitle;
         private Text trainingDisplayStatus;
         private Text trainingTrackerStatus;
@@ -131,6 +135,7 @@ namespace SpineRecovery.App
                 () => string.IsNullOrEmpty(pendingTrainingScene) ? "确认并返回首页" : "开始训练");
             GameObject preTrainingBlockedPanel = CreatePreTrainingBlockedPanel(safeContent);
             GameObject adminPanel = CreateAdminPanel(safeContent);
+            GameObject adminImuBindingPanel = CreateAdminImuBindingPanel(safeContent);
             GameObject historyPanel = CreateHistoryPanel(safeContent);
             postActionScreen = new PostActionScreen();
             GameObject postTrainingPanel = postActionScreen.Build(safeContent, HandlePostActionBack,
@@ -154,6 +159,7 @@ namespace SpineRecovery.App
             bootstrap.Router.RegisterPanel(AppRoute.PreTraining, preTrainingPanel);
             bootstrap.Router.RegisterPanel(AppRoute.PreTrainingBlocked, preTrainingBlockedPanel);
             bootstrap.Router.RegisterPanel(AppRoute.Admin, adminPanel);
+            bootstrap.Router.RegisterPanel(AppRoute.AdminImuBinding, adminImuBindingPanel);
             bootstrap.Router.RegisterPanel(AppRoute.History, historyPanel);
             bootstrap.Router.RegisterPanel(AppRoute.PostTrainingSurvey, postTrainingPanel);
             bootstrap.Router.RegisterPanel(AppRoute.PostTrainingStop, postTrainingStopPanel);
@@ -249,7 +255,6 @@ namespace SpineRecovery.App
         private void HandleSessionChanged(UserSession session)
         {
             sessionIdentityGeneration++;
-            ResetRoutineSession();
             if (session == null)
             {
                 nativeBusy = false;
@@ -288,11 +293,12 @@ namespace SpineRecovery.App
             // RectTransform above uses the same local frame, so convert every
             // component through one mapping instead of mixing center and top-
             // left coordinates (the source of the old overlap/drift).
-            // Keep the authored login form and registration link. Exclude the
-            // unused social-login footer from the source sprite without scaling
-            // or moving the form's interaction targets.
+            // LoginCover.png is the approved complete 390x884 Figma export.
+            // Keep it as one image so every logo, label, border, shadow and
+            // spacing remains pixel-identical to the source design. The
+            // controls below are transparent interaction overlays only.
             CreateRasterImage(designRoot.transform, "AppUi/LoginCover", Vector2.zero,
-                new Vector2(LoginDesignWidth, LoginDesignHeight), 214f);
+                new Vector2(LoginDesignWidth, LoginDesignHeight));
 
             accountInput = CreateInput(designRoot.transform, "手机号 / 邮箱", LoginDesignPosition(45.5f, 317.5f, 299f, 51f), false);
             passwordInput = CreateInput(designRoot.transform, "密码", LoginDesignPosition(45.5f, 385.5f, 299f, 51f), true);
@@ -415,13 +421,27 @@ namespace SpineRecovery.App
             };
         }
 
+        private GameObject CreateArTrainingPanel(Transform parent)
+        {
+            GameObject panel = CreatePanel("ArTrainingPanel", parent, new Color(0.973f, 0.980f, 1f));
+            CreateLabel(panel.transform, "AR 训练", new Vector2(0, 250), 34);
+            CreateLabel(panel.transform, "连接投屏眼镜与 IMU 追踪器，进入本次训练流程。", new Vector2(0, 190), 17);
+            arTrainingMessage = CreateLabel(panel.transform, "建议先完成追踪器校准，再开始训练。", new Vector2(0, 130), 16);
+            arTrainingMessage.rectTransform.sizeDelta = new Vector2(820, 70);
+            // The Unity V2 scene owns the AR preparation screen and its action
+            // menu.  Enter it directly so the phone flow matches SpineFlowMobile.
+            CreateButton(panel.transform, "开始训练", new Vector2(0, 40), () => StartTraining("SpineV2Minimal", "dead_bug"));
+            CreateButton(panel.transform, "追踪器连接与校准", new Vector2(0, -50), OpenTrackingCalibrationFromHome);
+            CreateButton(panel.transform, "动作示范库", new Vector2(0, -140), OpenActionLibrary);
+            CreateButton(panel.transform, "返回训练首页", new Vector2(0, -230), () => bootstrap.Router.Navigate(AppRoute.Home));
+            return panel;
+        }
 
-        private TrainingActionCatalog.Entry selectedFreeAction = TrainingActionCatalog.Entries[0];
         private GameObject CreateTrainingMenuPanel(Transform parent)
         {
             RectTransform root = QuestionnaireUi.CreateScreen(parent, "TrainingMenuPanel", null, out GameObject panel);
             QuestionnaireUi.Header(root, "训练准备", () => bootstrap.Router.Navigate(AppRoute.Home));
-            RectTransform content = QuestionnaireUi.ScrollArea(root, QuestionnaireUi.HeaderHeight, 96f, 1430f);
+            RectTransform content = QuestionnaireUi.ScrollArea(root, QuestionnaireUi.HeaderHeight, 96f, 690f);
             QuestionnaireUi.Label(content, "开始本次训练", 29, QuestionnaireUi.Accent, TextAnchor.MiddleLeft,
                 FontStyle.Bold, 20f, 36f, 350f, 48f);
             QuestionnaireUi.Label(content, "连接投屏眼镜和 IMU 追踪器后，进入训练流程", 15, QuestionnaireUi.Muted,
@@ -442,7 +462,6 @@ namespace SpineRecovery.App
 
             Button library = QuestionnaireUi.MakeButton(content, "ActionLibrary", Color.white, 18f,
                 20f, 458f, 350f, 88f, OpenActionLibrary);
-            HomeScreen.LibraryIcon(library.transform);
             QuestionnaireUi.Label(library.transform, "动作示范库", 19, QuestionnaireUi.Ink, TextAnchor.MiddleLeft,
                 FontStyle.Bold, 76f, 15f, 240f, 30f);
             QuestionnaireUi.Label(library.transform, "开始前可以先看一遍动作要领", 14, QuestionnaireUi.Muted,
@@ -450,23 +469,11 @@ namespace SpineRecovery.App
             QuestionnaireUi.Label(library.transform, ">", 26, QuestionnaireUi.Muted, TextAnchor.MiddleCenter,
                 FontStyle.Normal, 312f, 0f, 26f, 88f);
 
-            var selectionLabel = QuestionnaireUi.Label(content, "自由训练：" + selectedFreeAction.Name + "\n已绑定患者将使用医生处方", 17,
-                QuestionnaireUi.Ink, TextAnchor.MiddleLeft, FontStyle.Normal, 20f, 562f, 350f, 64f);
-            for (int i = 0; i < TrainingActionCatalog.Entries.Length; i++)
-            {
-                var entry = TrainingActionCatalog.Entries[i];
-                QuestionnaireUi.PillButton(content, entry.Name, 20f, 642f + i * 66f, 350f, 52f, false, () =>
-                {
-                    selectedFreeAction = entry;
-                    selectionLabel.text = "自由训练：" + entry.Name + "\n已绑定患者将使用医生处方";
-                });
-            }
-
             RectTransform footer = QuestionnaireUi.Footer(root, 96f);
             trainingMenuMessage = QuestionnaireUi.Label(footer, "", 12, QuestionnaireUi.DangerText,
                 TextAnchor.MiddleCenter, FontStyle.Normal, 20f, 2f, 350f, 18f);
             QuestionnaireUi.PillButton(footer, "开始训练", 20f, 28f, 350f, 52f, true,
-                () => StartTraining(selectedFreeAction.Game, selectedFreeAction.Key));
+                () => StartTraining("SpineV2Minimal", "dead_bug"));
             RefreshTrainingPreparationStatus();
             return panel;
         }
@@ -474,8 +481,7 @@ namespace SpineRecovery.App
         private static Text AddPreparationRow(Transform parent, string title, string initialStatus,
             string actionCaption, float x, float y, UnityEngine.Events.UnityAction action)
         {
-            Image icon = QuestionnaireUi.Box(parent, title + "Icon", QuestionnaireUi.SecondaryButton, 14f, x, y, 52f, 52f);
-            HomeScreen.PreparationIcon(icon.transform, title == "IMU 追踪器");
+            QuestionnaireUi.Box(parent, title + "Icon", QuestionnaireUi.SecondaryButton, 14f, x, y, 52f, 52f);
             QuestionnaireUi.Label(parent, title, 18, QuestionnaireUi.Ink, TextAnchor.MiddleLeft,
                 FontStyle.Bold, x + 66f, y + 1f, 158f, 27f);
             Text status = QuestionnaireUi.Label(parent, initialStatus, 14, QuestionnaireUi.BadgeText,
@@ -597,15 +603,8 @@ namespace SpineRecovery.App
                 var imported = JsonUtility.FromJson<ImportedReplayList>("{\"items\":" + ids + "}");
                 replayId = imported.items?.LastOrDefault();
             }
-            OpenReplayById(replayId);
-        }
-
-        private void OpenReplayById(string replayId)
-        {
             if (string.IsNullOrEmpty(replayId))
-            { if (historyMessage != null) historyMessage.text = "暂无本账号已完成的回放。"; return; }
-            if (!Application.CanStreamedLevelBeLoaded("PlayBack"))
-            { if (historyMessage != null) historyMessage.text = "回放页面暂不可用。"; return; }
+            { historyMessage.text = "暂无本账号已完成的回放。"; return; }
             ReplaySessionContext.SetCommitted(replayId);
             auxiliaryReturnRoute = AppRoute.History;
             auxiliaryPageOpen = true;
@@ -616,19 +615,239 @@ namespace SpineRecovery.App
             SceneManager.LoadScene("PlayBack", LoadSceneMode.Single);
         }
 
-
-        private void BindCurrentTrackers()
+        private GameObject CreateAdminPanel(Transform parent)
         {
-            if (!(bootstrap.AdminConfigs is JsonAdminConfigRepository repository) || CoachHapticFeedbackController.Instance == null)
-            {
-                if (adminMessage != null) adminMessage.text = "无法读取当前追踪器状态，请先启动 SlimeVR 并刷新。";
-                return;
-            }
-            repository.BindPublishedTrackers(CoachHapticFeedbackController.Instance.LatestTrackerSnapshots, out string message);
-            RefreshAdminSummary();
-            if (adminMessage != null) adminMessage.text += "\n" + message;
+            GameObject panel = CreatePanel("AdminPanel", parent, new Color(0.973f, 0.980f, 1f));
+            CreateLabel(panel.transform, "管理员配置（只读）", new Vector2(0, 220), 28);
+            adminMessage = CreateLabel(panel.transform, "", new Vector2(0, 80), 16);
+            adminMessage.rectTransform.sizeDelta = new Vector2(900, 260);
+            CreateButton(panel.transform, "刷新已发布配置", new Vector2(0, -80), RefreshAdminSummary);
+            CreateButton(panel.transform, "绑定 IMU", new Vector2(0, -155), OpenAdminImuBinding);
+            CreateButton(panel.transform, "从当前版本创建草稿", new Vector2(0, -230), CreateAdminDraft);
+            CreateButton(panel.transform, "标记 AR 测试通过", new Vector2(0, -305), MarkAdminArTestPassed);
+            CreateButton(panel.transform, "发布当前草稿", new Vector2(0, -380), PublishAdminDraft);
+            CreateButton(panel.transform, "回滚到最近归档版本", new Vector2(0, -455), RollbackAdminVersion);
+            CreateButton(panel.transform, "返回登录", new Vector2(0, -530), () => bootstrap.State.ClearSession());
+            return panel;
         }
 
+        private void OpenAdminImuBinding()
+        {
+            if (bootstrap.State.Session == null || !bootstrap.State.Session.IsAdministrator)
+            {
+                return;
+            }
+            bootstrap.Router.Navigate(AppRoute.AdminImuBinding);
+        }
+
+        private GameObject CreateAdminImuBindingPanel(Transform parent)
+        {
+            RectTransform root = QuestionnaireUi.CreateScreen(parent, "AdminImuBindingPanel", RefreshAdminImuBindingPage, out GameObject panel);
+            QuestionnaireUi.Header(root, "绑定 IMU", () => bootstrap.Router.Navigate(AppRoute.Admin));
+            adminImuBindingContent = QuestionnaireUi.ScrollArea(root, QuestionnaireUi.HeaderHeight, 126f, 820f);
+            RectTransform footer = QuestionnaireUi.Footer(root, 126f);
+            QuestionnaireUi.PillButton(footer, "刷新设备状态", 20f, 12f, 350f, 42f, false, RefreshAdminImuBindingPage);
+            adminImuCommitButton = QuestionnaireUi.PillButton(footer, "绑定并锁定这 5 个 IMU", 20f, 66f, 350f, 50f, true, CommitAdminImuBindings);
+            return panel;
+        }
+
+        private void RefreshAdminImuBindingPage()
+        {
+            if (adminImuBindingContent == null) return;
+            foreach (Transform child in adminImuBindingContent)
+                Destroy(child.gameObject);
+
+            AdminTrainingConfiguration published = bootstrap.AdminConfigs?.CurrentPublished();
+            bool locked = published != null && published.trackerBindingsLocked;
+            if (adminImuCommitButton != null) adminImuCommitButton.interactable = !locked;
+            SlimeVrHapticTrackerSnapshot[] trackers = ReadLiveImuSnapshots();
+            if (!locked) PruneAdminImuSlotDraft(trackers);
+            if (!locked && adminImuSlotDraft.Count == 0)
+                SeedAdminImuSlotDraft(trackers);
+
+            QuestionnaireUi.Label(adminImuBindingContent, locked ? "固定 IMU 已锁定" : "首次绑定 5 个 IMU", 26,
+                QuestionnaireUi.Accent, TextAnchor.MiddleLeft, FontStyle.Bold, 20f, 22f, 350f, 42f);
+            QuestionnaireUi.Label(adminImuBindingContent,
+                locked ? "MAC 与佩戴部位已经发布，普通用户只能使用下列设备。" : "确认设备在线后，为每个 IMU 指定部位；提交后不可在客户端更改。",
+                14, QuestionnaireUi.Muted, TextAnchor.MiddleLeft, FontStyle.Normal, 20f, 68f, 350f, 46f);
+
+            adminImuBindingMessage = QuestionnaireUi.Label(adminImuBindingContent, "", 13,
+                locked ? QuestionnaireUi.BadgeText : QuestionnaireUi.Muted, TextAnchor.MiddleLeft, FontStyle.Normal,
+                20f, 121f, 350f, 32f);
+            adminImuBindingMessage.text = locked
+                ? "已锁定：如需更换设备，请由工程人员清除本机发布配置。"
+                : "已发现 " + trackers.Count(t => t.connected) + " 个在线 IMU；需要 5 个不同设备。";
+
+            if (locked)
+            {
+                DrawLockedBindingCards(published, trackers, 168f);
+                return;
+            }
+
+            SlimeVrHapticTrackerSnapshot[] online = trackers.Where(tracker => tracker != null && tracker.connected &&
+                !string.IsNullOrWhiteSpace(tracker.hardwareId)).ToArray();
+            if (online.Length == 0)
+            {
+                QuestionnaireUi.WarningBox(adminImuBindingContent, "未发现在线 IMU。请先启动追踪器和 SlimeVR，再点击“刷新设备状态”。",
+                    20f, 174f, 350f, 76f);
+                return;
+            }
+
+            float top = 168f;
+            foreach (SlimeVrHapticTrackerSnapshot tracker in online)
+            {
+                DrawAdminImuCandidateCard(tracker, top);
+                top += 126f;
+            }
+        }
+
+        private SlimeVrHapticTrackerSnapshot[] ReadLiveImuSnapshots()
+        {
+            if (EmbeddedSlimeVrBridge.TryReadState(out EmbeddedSlimeVrBridge.RuntimeState state, true) && state.trackers != null)
+                return state.trackers;
+            return CoachHapticFeedbackController.Instance == null
+                ? System.Array.Empty<SlimeVrHapticTrackerSnapshot>()
+                : CoachHapticFeedbackController.Instance.LatestTrackerSnapshots.Where(tracker => tracker != null).ToArray();
+        }
+
+        private void SeedAdminImuSlotDraft(IEnumerable<SlimeVrHapticTrackerSnapshot> trackers)
+        {
+            adminImuSlotDraft.Clear();
+            foreach (SlimeVrHapticTrackerSnapshot tracker in trackers ?? System.Array.Empty<SlimeVrHapticTrackerSnapshot>())
+            {
+                if (tracker == null || string.IsNullOrWhiteSpace(tracker.hardwareId)) continue;
+                adminImuSlotDraft[tracker.hardwareId.Trim()] = FixedTrackerSlotMapping.TryParse(tracker.bodyPosition, out FixedTrackerSlot slot)
+                    ? (int)slot : -1;
+            }
+            // SlimeVR may report duplicate or generic assignments. Leave only
+            // the first device on each slot for the administrator to resolve.
+            foreach (var duplicate in adminImuSlotDraft.Where(pair => pair.Value >= 0)
+                .GroupBy(pair => pair.Value).SelectMany(group => group.Skip(1)).ToArray())
+                adminImuSlotDraft[duplicate.Key] = -1;
+        }
+
+        private void PruneAdminImuSlotDraft(IEnumerable<SlimeVrHapticTrackerSnapshot> trackers)
+        {
+            var liveIds = new HashSet<string>((trackers ?? System.Array.Empty<SlimeVrHapticTrackerSnapshot>())
+                .Where(tracker => tracker != null && tracker.connected && !string.IsNullOrWhiteSpace(tracker.hardwareId))
+                .Select(tracker => tracker.hardwareId.Trim()), System.StringComparer.OrdinalIgnoreCase);
+            foreach (string staleId in adminImuSlotDraft.Keys.Where(id => !liveIds.Contains(id)).ToArray())
+                adminImuSlotDraft.Remove(staleId);
+        }
+
+        private void DrawAdminImuCandidateCard(SlimeVrHapticTrackerSnapshot tracker, float top)
+        {
+            RectTransform card = QuestionnaireUi.Card(adminImuBindingContent, 20f, top, 350f, 112f);
+            string id = tracker.hardwareId.Trim();
+            int slot = adminImuSlotDraft.TryGetValue(id, out int selected) ? selected : -1;
+            QuestionnaireUi.Label(card, tracker.name ?? "IMU " + tracker.trackerNum, 16, QuestionnaireUi.Ink,
+                TextAnchor.MiddleLeft, FontStyle.Bold, 16f, 12f, 190f, 25f);
+            QuestionnaireUi.Label(card, "MAC: " + id, 12, QuestionnaireUi.Muted, TextAnchor.MiddleLeft,
+                FontStyle.Normal, 16f, 39f, 310f, 20f);
+            string battery = tracker.batteryPercent >= 0 ? "电量 " + tracker.batteryPercent + "%" : "电量暂不可用";
+            QuestionnaireUi.Label(card, "在线 · " + battery, 12, new Color(0.12f, 0.55f, 0.30f),
+                TextAnchor.MiddleLeft, FontStyle.Bold, 16f, 62f, 160f, 22f);
+            Button select = QuestionnaireUi.MakeButton(card, "SelectSlot", QuestionnaireUi.SecondaryButton, 15f,
+                202f, 59f, 132f, 38f, () => CycleAdminImuSlot(id));
+            QuestionnaireUi.Label(select.transform, AdminImuSlotCaption(slot), 13, QuestionnaireUi.Accent,
+                TextAnchor.MiddleCenter, FontStyle.Bold, 0f, 0f, 132f, 38f);
+        }
+
+        private void DrawLockedBindingCards(AdminTrainingConfiguration published, IEnumerable<SlimeVrHapticTrackerSnapshot> liveTrackers, float top)
+        {
+            foreach (AdminTrackerBinding binding in (published.trackerBindings ?? System.Array.Empty<AdminTrackerBinding>()).OrderBy(item => item.slot))
+            {
+                SlimeVrHapticTrackerSnapshot live = (liveTrackers ?? System.Array.Empty<SlimeVrHapticTrackerSnapshot>()).FirstOrDefault(tracker =>
+                    tracker != null && string.Equals(tracker.hardwareId?.Trim(), binding.hardwareId?.Trim(), System.StringComparison.OrdinalIgnoreCase));
+                RectTransform card = QuestionnaireUi.Card(adminImuBindingContent, 20f, top, 350f, 92f);
+                QuestionnaireUi.Label(card, binding.DisplayName(), 16, QuestionnaireUi.Ink, TextAnchor.MiddleLeft,
+                    FontStyle.Bold, 16f, 13f, 120f, 25f);
+                QuestionnaireUi.Label(card, "MAC: " + binding.hardwareId, 12, QuestionnaireUi.Muted,
+                    TextAnchor.MiddleLeft, FontStyle.Normal, 16f, 42f, 315f, 20f);
+                string battery = live != null && live.batteryPercent >= 0 ? " · 电量 " + live.batteryPercent + "%" : " · 电量暂不可用";
+                QuestionnaireUi.Label(card, live != null && live.connected ? "在线" + battery : "离线" + battery, 12,
+                    live != null && live.connected ? new Color(0.12f, 0.55f, 0.30f) : QuestionnaireUi.BadgeText,
+                    TextAnchor.MiddleLeft, FontStyle.Bold, 16f, 65f, 250f, 18f);
+                top += 104f;
+            }
+        }
+
+        private void CycleAdminImuSlot(string hardwareId)
+        {
+            int current = adminImuSlotDraft.TryGetValue(hardwareId, out int slot) ? slot : -1;
+            for (int step = 1; step <= 6; step++)
+            {
+                int candidate = (current + 1 + step) % 6 - 1;
+                if (candidate < 0 || !adminImuSlotDraft.Any(pair => pair.Key != hardwareId && pair.Value == candidate))
+                {
+                    adminImuSlotDraft[hardwareId] = candidate;
+                    break;
+                }
+            }
+            RefreshAdminImuBindingPage();
+        }
+
+        private static string AdminImuSlotCaption(int slot)
+        {
+            return slot < 0 ? "选择部位" : ((FixedTrackerSlot)slot).ToString() == "LeftAnkle" ? "左脚腕" :
+                ((FixedTrackerSlot)slot).ToString() == "RightAnkle" ? "右脚腕" :
+                ((FixedTrackerSlot)slot).ToString() == "LeftWrist" ? "左手腕" :
+                ((FixedTrackerSlot)slot).ToString() == "RightWrist" ? "右手腕" : "腰";
+        }
+
+        private void CommitAdminImuBindings()
+        {
+            if (!(bootstrap.AdminConfigs is JsonAdminConfigRepository repository)) return;
+            SlimeVrHapticTrackerSnapshot[] online = ReadLiveImuSnapshots().Where(tracker => tracker != null && tracker.connected &&
+                !string.IsNullOrWhiteSpace(tracker.hardwareId)).ToArray();
+            var bindings = online.Where(tracker => adminImuSlotDraft.TryGetValue(tracker.hardwareId.Trim(), out int slot) && slot >= 0)
+                .Select(tracker => new AdminTrackerBinding
+                {
+                    slot = (FixedTrackerSlot)adminImuSlotDraft[tracker.hardwareId.Trim()],
+                    hardwareId = tracker.hardwareId,
+                    ip = tracker.ip,
+                    online = tracker.connected,
+                    batteryPercent = tracker.batteryPercent,
+                }).ToArray();
+            bool saved = repository.BindPublishedTrackers(bindings, out string message);
+            if (saved)
+            {
+                adminImuSlotDraft.Clear();
+                RefreshAdminSummary();
+            }
+            RefreshAdminImuBindingPage();
+            if (adminImuBindingMessage != null) adminImuBindingMessage.text = message;
+        }
+
+        private GameObject CreateHistoryPanel(Transform parent)
+        {
+            GameObject panel = CreatePanel("HistoryPanel", parent, new Color(0.973f, 0.980f, 1f));
+            CreateLabel(panel.transform, "训练历史", new Vector2(0, 700), 28);
+            var scrollObject = new GameObject("HistoryScroll", typeof(RectTransform), typeof(Image), typeof(ScrollRect));
+            scrollObject.transform.SetParent(panel.transform, false);
+            var rect = scrollObject.GetComponent<RectTransform>();
+            rect.sizeDelta = new Vector2(900, 850);
+            rect.anchoredPosition = new Vector2(0, 170);
+            scrollObject.GetComponent<Image>().color = new Color(1, 1, 1, 0.01f);
+            var viewportObject = new GameObject("Viewport", typeof(RectTransform), typeof(RectMask2D));
+            viewportObject.transform.SetParent(scrollObject.transform, false);
+            var viewport = viewportObject.GetComponent<RectTransform>();
+            viewport.anchorMin = Vector2.zero; viewport.anchorMax = Vector2.one;
+            viewport.offsetMin = viewport.offsetMax = Vector2.zero;
+            historyMessage = CreateLabel(viewport, "", Vector2.zero, 16);
+            historyMessage.rectTransform.anchorMin = historyMessage.rectTransform.anchorMax = new Vector2(0.5f, 1);
+            historyMessage.rectTransform.pivot = new Vector2(0.5f, 1);
+            historyMessage.rectTransform.sizeDelta = new Vector2(840, 0);
+            historyMessage.alignment = TextAnchor.UpperLeft;
+            historyMessage.verticalOverflow = VerticalWrapMode.Overflow;
+            historyMessage.gameObject.AddComponent<ContentSizeFitter>().verticalFit = ContentSizeFitter.FitMode.PreferredSize;
+            var scroll = scrollObject.GetComponent<ScrollRect>();
+            scroll.viewport = viewport; scroll.content = historyMessage.rectTransform;
+            scroll.horizontal = false; scroll.movementType = ScrollRect.MovementType.Clamped;
+            CreateButton(panel.transform, "查看最近完成的回放", new Vector2(0, -350), OpenReplay);
+            CreateButton(panel.transform, "返回训练首页", new Vector2(0, -450), () => bootstrap.Router.Navigate(AppRoute.Home));
+            return panel;
+        }
 
         private const string TherapistContactPending = "暂未配置治疗师联系方式，请通过医院渠道联系你的治疗师。";
 
@@ -674,8 +893,6 @@ namespace SpineRecovery.App
         private static string DisplayActionName(TrainingPlan plan)
         {
             if (plan == null) return "本次动作";
-            var entry = TrainingActionCatalog.Find(plan.actionId);
-            if (entry != null) return entry.Name;
             if (plan.actionId == "dead_bug") return "死虫式";
             if (plan.actionId == "bird_dog") return "鸟狗式";
             return string.IsNullOrEmpty(plan.actionId) ? "本次动作" : plan.actionId;
@@ -747,8 +964,7 @@ namespace SpineRecovery.App
             // follows it always belongs to the last (or only) action of the plan.
             postActionCount = plan != null && plan.actions != null ? Mathf.Max(1, plan.prescriptionContractVersion == 2 ? plan.actions.Length / 2 : plan.actions.Length) : 1;
             postActionNumber = postActionCount;
-            if (postActionScreen != null) postActionScreen.Show(postActionNumber, postActionCount, DisplayActionName(plan),
-                bootstrap?.Training.CurrentResult?.completed == true);
+            if (postActionScreen != null) postActionScreen.Show(postActionNumber, postActionCount, DisplayActionName(plan));
             if (bootstrap != null && bootstrap.Router != null)
                 bootstrap.Router.Navigate(AppRoute.PostTrainingSurvey);
         }
@@ -871,7 +1087,35 @@ namespace SpineRecovery.App
             NavigateWithProfile(AppRoute.Home);
         }
 
+        [System.Serializable] private sealed class HistoryScore { public int overallScore; }
 
+        private void RefreshHistorySummary()
+        {
+            UserSession session = bootstrap.State.Session;
+            if (session == null || historyMessage == null) return;
+            var pain = session.painHistory ?? System.Array.Empty<PainHistoryRecord>();
+            var training = session.trainingHistory ?? System.Array.Empty<TrainingHistoryRecord>();
+            List<string> trainingLines = new List<string>();
+            foreach (TrainingHistoryRecord record in training)
+            {
+                string feedback = string.IsNullOrWhiteSpace(record.feedback) ? "" : "，反馈：" + record.feedback;
+                var result = string.IsNullOrEmpty(record.resultJson) ? null : JsonUtility.FromJson<HistoryScore>(record.resultJson);
+                string state = record.endReason == "LEGACY_IMPORT" ? "导入记录" : record.completed ? "完成" : string.IsNullOrEmpty(record.endReason) ? "进行中" : "中断";
+                trainingLines.Add(record.completedAt + "  " + record.actionId + "  " + state +
+                    (record.completed && result != null ? "  得分 " + result.overallScore : "") + feedback);
+            }
+            List<string> painLines = pain
+                .OrderByDescending(record => record.recordedAt)
+                .Take(8)
+                .Select(record => record.recordedAt + "  疼痛 " + record.painLevel + "/10" +
+                    (record.painParts == null || record.painParts.Length == 0 ? "" : "（" + string.Join("、", record.painParts) + "）"))
+                .ToList();
+            historyMessage.text = "疼痛记录：" + pain.Length + " 条\n" +
+                (painLines.Count == 0 ? "暂无疼痛记录。" : string.Join("\n", painLines)) + "\n\n" +
+                "训练记录：" + training.Length + " 条\n" +
+                (trainingLines.Count == 0 ? "完成训练并提交结果后，这里会显示训练记录。" :
+                    string.Join("\n", trainingLines));
+        }
 
         private void RefreshAdminSummary()
         {
@@ -905,6 +1149,7 @@ namespace SpineRecovery.App
                 "配置 ID：" + config.configId + "\n" +
                 "动作：" + string.Join("、", actionLines) + "\n" +
                 "推荐规则：" + (ruleLines.Length == 0 ? "暂无" : string.Join("；", ruleLines)) + "\n" +
+                "IMU 绑定：" + (config.trackerBindingsLocked ? "已锁定" : "未绑定") + "\n" +
                 "固定追踪器（5 个）：\n" + (trackerLines.Length == 0 ? "暂无" : string.Join("\n", trackerLines)) + "\n" +
                 "实时状态：\n" + (string.IsNullOrWhiteSpace(liveTrackers) ? "暂无设备状态" : liveTrackers) + "\n" +
                 "说明：患者侧只读取 Published 配置；发布前必须完成 AR 测试。";
@@ -1056,6 +1301,20 @@ namespace SpineRecovery.App
         private void HandleLoginClicked()
         {
             if (nativeBusy) return;
+            // The administrator account is local to the Unity app. Check it
+            // before dispatching Android login to the patient/server bridge.
+            if (string.Equals(accountInput.text?.Trim(), "admin", System.StringComparison.OrdinalIgnoreCase) &&
+                passwordInput.text == "admin")
+            {
+                JsonUserRepository localUsers = new JsonUserRepository();
+                if (localUsers.TryAuthenticateAdministrator(accountInput.text, passwordInput.text, out UserSession localAdmin))
+                {
+                    bootstrap.State.SetSession(localAdmin);
+                    RefreshAdminSummary();
+                    bootstrap.Router.Navigate(AppRoute.Admin);
+                    return;
+                }
+            }
             if (NativeMobileService.Available)
             {
                 nativeBusy = true;
@@ -1138,6 +1397,22 @@ namespace SpineRecovery.App
             bootstrap.Router.Navigate(AppRoute.BasicProfile);
         }
 
+        private GameObject CreateFormPanel(Transform parent, string title, string subtitle, System.Action<Transform> build)
+        {
+            GameObject panel = CreatePanel(title + "Panel", parent, new Color(0.973f, 0.980f, 1f));
+            bool admission = title == "首次动作评估";
+            Text heading = CreateLabel(panel.transform, title, new Vector2(0, admission ? 700 : 330), admission ? 36 : 28);
+            if (admission) heading.fontStyle = FontStyle.Bold;
+            Text description = CreateLabel(panel.transform, subtitle, new Vector2(0, admission ? 640 : 275), admission ? 18 : 15);
+            if (admission) description.fontStyle = FontStyle.Bold;
+            flowMessage = CreateLabel(panel.transform, "", new Vector2(0, admission ? -680 : -360), admission ? 18 : 14);
+            AppRoute route = title == "资料登记" ? AppRoute.BasicProfile : title == "基础问卷" ? AppRoute.BasicSurvey :
+                title == "疼痛记录" ? AppRoute.PainSelect : title == "首次动作评估" ? AppRoute.MobileAdmission :
+                title == "需要专业评估" ? AppRoute.AdmissionDecision : AppRoute.PreTraining;
+            flowMessages[route] = flowMessage;
+            build(panel.transform);
+            return panel;
+        }
 
         private GameObject CreateProfilePanel(Transform parent)
         {
@@ -1249,17 +1524,33 @@ namespace SpineRecovery.App
             bootstrap.Training.RestoreForCurrentUser();
         }
 
+        private void CreateSurveyForm(Transform parent)
+        {
+            situationButtons = new[]
+            {
+                CreateButton(parent, "情况：预防 / 保持健康", new Vector2(0, 195), () => SelectSituation(0)),
+                CreateButton(parent, "情况：曾有相关问题", new Vector2(0, 125), () => SelectSituation(1)),
+                CreateButton(parent, "情况：目前急性不适", new Vector2(0, 55), () => SelectSituation(2)),
+            };
+            symptomButtons = new[]
+            {
+                CreateButton(parent, "症状：没感觉", new Vector2(0, -25), () => SelectSymptom(0)),
+                CreateButton(parent, "症状：腰疼 / 腿疼 / 腿麻 / 放射痛", new Vector2(0, -95), () => SelectSymptom(1)),
+                CreateButton(parent, "症状：无力（暂停流程）", new Vector2(0, -165), () => SelectSymptom(2)),
+            };
+            surveySelectionLabel = CreateLabel(parent, "当前选择：尚未选择", new Vector2(0, -315), 14);
+            CreateButton(parent, "保存并继续", new Vector2(0, -245), SaveSurvey);
+            RefreshSurveySelection();
+        }
 
         private void SelectSituation(int index)
         {
-            ShowFlowMessage("");
             selectedSituation = index == 0 ? "prevention" : index == 1 ? "history" : "acute";
             RefreshSurveySelection();
         }
 
         private void SelectSymptom(int index)
         {
-            ShowFlowMessage("");
             selectedSymptom = index == 0 ? "无感觉" : index == 1 ? "疼痛或麻木" : "无力";
             RefreshSurveySelection();
         }
@@ -1286,7 +1577,19 @@ namespace SpineRecovery.App
         private static void SetSelectedChoice(Button[] choices, int selectedIndex)
         {
             if (choices == null) return;
-            for (int i = 0; i < choices.Length; i++) MobileUi.Select(choices[i], i == selectedIndex);
+            for (int i = 0; i < choices.Length; i++)
+            {
+                if (choices[i] != null && choices[i].targetGraphic != null)
+                {
+                    Color normal = i == selectedIndex ? new Color(0.12f, 0.39f, 0.78f) : new Color(0.22f, 0.74f, 0.97f);
+                    ColorBlock colors = choices[i].colors;
+                    colors.normalColor = normal;
+                    colors.highlightedColor = i == selectedIndex ? new Color(0.18f, 0.47f, 0.86f) : new Color(0.30f, 0.78f, 0.98f);
+                    colors.pressedColor = new Color(0.10f, 0.32f, 0.68f);
+                    colors.selectedColor = normal;
+                    choices[i].colors = colors;
+                }
+            }
         }
 
         private void SaveSurvey()
@@ -1305,6 +1608,26 @@ namespace SpineRecovery.App
             bootstrap.Users.Save(user); bootstrap.Router.Navigate(AppRoute.PainSelect);
         }
 
+        private void CreatePainForm(Transform parent)
+        {
+            string[] parts = { "左腰部", "右腰部", "左大臂", "右大臂", "左臀部", "右臀部", "左腿", "右腿" };
+            string[] keys = { "left_waist", "right_waist", "left_upper_arm", "right_upper_arm", "left_hip", "right_hip", "left_leg", "right_leg" };
+            painPartButtons = new Button[parts.Length];
+            for (int i = 0; i < parts.Length; i++)
+            {
+                string key = keys[i];
+                painPartButtons[i] = CreateButton(parent, parts[i], new Vector2((i % 2 == 0 ? -145 : 145), 185 - (i / 2) * 65), () => TogglePainPart(key), 250);
+            }
+            noPainButton = CreateButton(parent, "没有疼痛", new Vector2(0, -72), SelectNoPain);
+            selectedPainPartLabel = CreateLabel(parent, "已选部位：未选择（可多选）", new Vector2(0, -130), 15);
+            selectedPainPartLabel.rectTransform.sizeDelta = new Vector2(760, 38);
+            painScoreLabel = CreateLabel(parent, "选中部位后设置疼痛程度：3 / 10", new Vector2(0, -180), 16);
+            CreateButton(parent, "疼痛评分 −", new Vector2(-145, -238), () => ChangePainScore(-1), 250);
+            CreateButton(parent, "疼痛评分 +", new Vector2(145, -238), () => ChangePainScore(1), 250);
+            CreateButton(parent, "记录并继续", new Vector2(0, -305), SavePain);
+            flowMessage.rectTransform.anchoredPosition = new Vector2(0, -390);
+            RefreshPainSelectionUi(keys, parts);
+        }
 
         private void SavePain()
         {
@@ -1347,7 +1670,6 @@ namespace SpineRecovery.App
 
         private void TogglePainPart(string partKey)
         {
-            ShowFlowMessage("");
             painFree = false;
             if (selectedPainParts.Contains(partKey) && selectedPainPart == partKey)
             {
@@ -1376,7 +1698,6 @@ namespace SpineRecovery.App
 
         private void SelectNoPain()
         {
-            ShowFlowMessage("");
             selectedPainParts.Clear();
             painLevelsByPart.Clear();
             selectedPainPart = "";
@@ -1388,11 +1709,6 @@ namespace SpineRecovery.App
 
         private void RefreshPainSelectionUi(string[] keys, string[] labels)
         {
-            if (intakePainSlider != null)
-            {
-                intakePainSlider.SetValueWithoutNotify(selectedPain);
-                intakePainSlider.interactable = !painFree && !string.IsNullOrEmpty(selectedPainPart);
-            }
             List<string> selectedLabels = new List<string>();
             for (int i = 0; i < painPartButtons.Length; i++)
             {
@@ -1422,7 +1738,6 @@ namespace SpineRecovery.App
                 ShowFlowMessage("请先选择要记录疼痛程度的部位。");
                 return;
             }
-            ShowFlowMessage("");
             selectedPain = Mathf.Clamp(selectedPain + delta, 1, 10);
             painLevelsByPart[selectedPainPart] = selectedPain;
             RefreshPainSelectionUi(
@@ -1443,9 +1758,96 @@ namespace SpineRecovery.App
             if (label != null) label.color = textColor;
         }
 
+        private void CreateAdmissionForm(Transform parent)
+        {
+            const float verticalShift = 180f;
+            flexionResponseButtons = CreateMovementAssessment(parent, true, 225f + verticalShift, "测试项 1 · 站立位前屈（FIS）", "双腿伸直，连续尝试用手摸脚尖；按产品流程完成 10 次。", new Color(0.22f, 0.55f, 0.91f));
+            flexionPhaseButtons = lastCreatedPhaseButtons;
+            extensionResponseButtons = CreateMovementAssessment(parent, false, -285f + verticalShift, "测试项 2 · 站立位后伸（EIS）", "双手托腰，以手为支点连续后仰；按产品流程完成 10 次。", new Color(0.08f, 0.61f, 0.56f));
+            extensionPhaseButtons = lastCreatedPhaseButtons;
+            Button finishButton = CreateButton(parent, "完成首次评估", new Vector2(0, -645), FinishAdmission, 560, 64);
+            Text finishLabel = finishButton.GetComponentInChildren<Text>();
+            if (finishLabel != null) { finishLabel.fontSize = 26; finishLabel.fontStyle = FontStyle.Bold; }
+            flowMessage.rectTransform.anchoredPosition = new Vector2(0, -720);
+        }
 
         private Button[] lastCreatedPhaseButtons;
 
+        private Button[] CreateMovementAssessment(Transform parent, bool flexion, float top, string title, string instruction, Color accent)
+        {
+            Text countLabel = CreateLabel(parent, "实际完成：0 次", new Vector2(-100, top + 52), 18);
+            countLabel.rectTransform.sizeDelta = new Vector2(340, 34);
+            System.Action<int> updateCount = delta =>
+            {
+                int count = Mathf.Clamp((flexion ? flexionCompletedCount : extensionCompletedCount) + delta, 0, 10);
+                if (flexion) flexionCompletedCount = count; else extensionCompletedCount = count;
+                countLabel.text = "实际完成：" + count + " 次";
+            };
+            CreateButton(parent, "−", new Vector2(170, top + 52), () => updateCount(-1), 80, 38);
+            CreateButton(parent, "+", new Vector2(270, top + 52), () => updateCount(1), 80, 38);
+            Text sectionTitle = CreateLabel(parent, title, new Vector2(0, top), 25);
+            sectionTitle.fontStyle = FontStyle.Bold;
+            sectionTitle.rectTransform.sizeDelta = new Vector2(760, 42);
+            Text repetitions = CreateLabel(parent, instruction, new Vector2(0, top - 46), 18);
+            repetitions.fontStyle = FontStyle.Bold;
+            repetitions.rectTransform.sizeDelta = new Vector2(760, 34);
+            Text responseQuestion = CreateLabel(parent, "动作后的疼痛反应", new Vector2(0, top - 82), 20);
+            responseQuestion.fontStyle = FontStyle.Bold;
+            responseQuestion.rectTransform.sizeDelta = new Vector2(760, 34);
+
+            string[] responses = { "是，明显缓解", "否，无变化", "加重" };
+            Button[] responseButtons = new Button[responses.Length];
+            for (int i = 0; i < responses.Length; i++)
+            {
+                int responseIndex = i;
+                responseButtons[i] = CreateButton(parent, responses[i], new Vector2(0, top - 120 - i * 44),
+                    () => SelectAdmissionResponse(flexion, responseIndex), 560, 40);
+                Text responseLabel = responseButtons[i].GetComponentInChildren<Text>();
+                if (responseLabel != null) { responseLabel.fontSize = 22; responseLabel.fontStyle = FontStyle.Bold; }
+                SetButtonColors(responseButtons[i], new Color(0.95f, 0.97f, 0.99f), new Color(0.88f, 0.93f, 0.98f), new Color(0.16f, 0.20f, 0.26f));
+            }
+
+            Text phaseTitle = CreateLabel(parent, "补充观察（可选）：疼痛最先出现阶段", new Vector2(0, top - 266), 18);
+            phaseTitle.fontStyle = FontStyle.Bold;
+            phaseTitle.rectTransform.sizeDelta = new Vector2(760, 30);
+            string[] phases = { "起始阶段", "中间阶段", "末端阶段", "全程无痛" };
+            Button[] phaseButtons = new Button[phases.Length];
+            for (int i = 0; i < phases.Length; i++)
+            {
+                int phaseIndex = i;
+                Vector2 pos = new Vector2(i % 2 == 0 ? -145 : 145, top - 302 - (i / 2) * 42);
+                phaseButtons[i] = CreateButton(parent, phases[i], pos,
+                    () => SelectAdmissionPhase(flexion, phaseIndex), 250, 38);
+                Text phaseLabel = phaseButtons[i].GetComponentInChildren<Text>();
+                if (phaseLabel != null) { phaseLabel.fontSize = 20; phaseLabel.fontStyle = FontStyle.Bold; }
+                SetButtonColors(phaseButtons[i], new Color(0.95f, 0.97f, 0.99f), new Color(0.88f, 0.93f, 0.98f), new Color(0.16f, 0.20f, 0.26f));
+            }
+
+            Text scoreLabel = CreateLabel(parent, "疼痛程度：未评分 / 10", new Vector2(0, top - 394), 20);
+            scoreLabel.fontStyle = FontStyle.Bold;
+            scoreLabel.rectTransform.sizeDelta = new Vector2(760, 32);
+            CreatePainSlider(parent, new Vector2(0, top - 438), accent,
+                value => SetAdmissionPain(flexion, value));
+            Text lowLabel = CreateLabel(parent, "1 轻微", new Vector2(-250, top - 468), 16);
+            lowLabel.rectTransform.sizeDelta = new Vector2(100, 28);
+            lowLabel.alignment = TextAnchor.MiddleLeft;
+            lowLabel.color = new Color(0.42f, 0.48f, 0.56f);
+            Text highLabel = CreateLabel(parent, "10 剧痛", new Vector2(250, top - 468), 16);
+            highLabel.rectTransform.sizeDelta = new Vector2(100, 28);
+            highLabel.alignment = TextAnchor.MiddleRight;
+            highLabel.color = new Color(0.42f, 0.48f, 0.56f);
+            if (flexion)
+            {
+                flexionScoreLabel = scoreLabel;
+            }
+            else
+            {
+                extensionScoreLabel = scoreLabel;
+            }
+
+            lastCreatedPhaseButtons = phaseButtons;
+            return responseButtons;
+        }
 
         private Text flexionScoreLabel;
         private Text extensionScoreLabel;
@@ -1488,7 +1890,6 @@ namespace SpineRecovery.App
 
         private void SelectAdmissionResponse(bool flexion, int index)
         {
-            ShowFlowMessage("");
             string value = index == 0 ? "relieved" : index == 1 ? "unchanged" : "worsened";
             if (flexion) flexionResponse = value; else extensionResponse = value;
             RefreshAdmissionChoiceColors();
@@ -1496,7 +1897,6 @@ namespace SpineRecovery.App
 
         private void SelectAdmissionPhase(bool flexion, int index)
         {
-            ShowFlowMessage("");
             string value = index == 0 ? "start" : index == 1 ? "middle" : index == 2 ? "end" : "pain_free";
             if (flexion) flexionPainPhase = flexionPainPhase == value ? null : value;
             else extensionPainPhase = extensionPainPhase == value ? null : value;
@@ -1575,7 +1975,6 @@ namespace SpineRecovery.App
 
         private void SetAdmissionPain(bool flexion, int value)
         {
-            ShowFlowMessage("");
             if (flexion)
             {
                 flexionPainRated = true;
@@ -1613,6 +2012,11 @@ namespace SpineRecovery.App
             }
         }
 
+        private void CreateReviewForm(Transform parent)
+        {
+            CreateLabel(parent, "本地演示不会自动联网通知医生。请先遵循专业人员的建议，不要通过重新登录绕过此提示。", new Vector2(0, 110), 16);
+            CreateButton(parent, "退出登录", new Vector2(0, -5), () => bootstrap.State.ClearSession());
+        }
 
         private void ShowFlowMessage(string message)
         {
@@ -1648,9 +2052,7 @@ namespace SpineRecovery.App
                 });
                 return;
             }
-            var entry = TrainingActionCatalog.Find(actionId);
-            if (entry == null) return;
-            string coach = entry.Coach;
+            string coach = actionId == "bird_dog" ? "BirdDogPractice" : "DeadBugPractice";
             bool male = user.profile.gender == "男" || user.profile.gender == "male";
             coach = SpineFlowTrainingSession.ResolveSceneForGender(coach, male);
             LaunchPlan(new TrainingPlan
@@ -1661,8 +2063,8 @@ namespace SpineRecovery.App
                 preTrainingEventId = user.preTrainingEventId,
                 actions = new[]
                 {
-                    new TrainingAction { actionId = actionId + "_coach", actionName = entry.Name, arTaskType = "coach_training", sets = 1, reps = 4, sceneName = coach },
-                    new TrainingAction { actionId = actionId + "_game", actionName = entry.Name, arTaskType = "game_training", sets = 1, reps = 4, sceneName = entry.Game }
+                    new TrainingAction { actionId = actionId + "_coach", arTaskType = "coach_training", sets = 1, reps = 4, sceneName = coach },
+                    new TrainingAction { actionId = actionId + "_game", arTaskType = "game_training", sceneName = sceneName }
                 }
             });
         }
@@ -1705,19 +2107,17 @@ namespace SpineRecovery.App
                 LoginDesignHeight * 0.5f - (y + height * 0.5f));
         }
 
-        private static void CreateRasterImage(Transform parent, string resourcePath, Vector2 position, Vector2 size, float bottomCrop = 0f)
+        private static void CreateRasterImage(Transform parent, string resourcePath, Vector2 position, Vector2 size)
         {
             Texture2D texture = Resources.Load<Texture2D>(resourcePath);
             if (texture == null) return;
             GameObject imageObject = new GameObject("Raster:" + resourcePath, typeof(RectTransform), typeof(Image));
             imageObject.transform.SetParent(parent, false);
             RectTransform rect = imageObject.GetComponent<RectTransform>();
-            float croppedHeight = Mathf.Clamp(bottomCrop, 0f, size.y - 1f);
-            float textureCrop = texture.height * croppedHeight / size.y;
-            rect.sizeDelta = new Vector2(size.x, size.y - croppedHeight);
-            rect.anchoredPosition = position + new Vector2(0f, croppedHeight * 0.5f);
+            rect.sizeDelta = size;
+            rect.anchoredPosition = position;
             Image image = imageObject.GetComponent<Image>();
-            image.sprite = Sprite.Create(texture, new Rect(0f, textureCrop, texture.width, texture.height - textureCrop),
+            image.sprite = Sprite.Create(texture, new Rect(0f, 0f, texture.width, texture.height),
                 new Vector2(0.5f, 0.5f), 100f);
             image.type = Image.Type.Simple;
             image.preserveAspect = false;

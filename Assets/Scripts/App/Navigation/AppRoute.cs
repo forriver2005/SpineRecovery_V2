@@ -19,6 +19,7 @@ namespace SpineRecovery.App
         History,
         RoutineQuestionnaire,
         Admin,
+        AdminImuBinding,
         PreTrainingBlocked,
         PostTrainingStop,
     }

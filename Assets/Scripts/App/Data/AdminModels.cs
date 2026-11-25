@@ -117,6 +117,10 @@ namespace SpineRecovery.App
         public AdminRecommendationRule[] recommendationRules = Array.Empty<AdminRecommendationRule>();
         // Exactly five administrator-owned bindings. Patient flows only read this published snapshot.
         public AdminTrackerBinding[] trackerBindings = Array.Empty<AdminTrackerBinding>();
+        // First-time provisioning is intentionally one-way.  Once the five
+        // hardware IDs have been confirmed, normal patient accounts must not
+        // be able to replace them by discovering a different tracker.
+        public bool trackerBindingsLocked;
 
         public AdminActionDefinition[] RecommendedActions(IEnumerable<string> tags)
         {

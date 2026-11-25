@@ -16,7 +16,8 @@ namespace SpineRecovery.App
     [Serializable]
     public sealed class AdminTrackerBinding
     {
-        public FixedTrackerSlot slot;
+        public FixedTrackerSlot slot; // Legacy files only.
+        public string bodyPosition;
         public string hardwareId;
         public string ip;
         public bool online;
@@ -25,6 +26,7 @@ namespace SpineRecovery.App
 
         public string DisplayName()
         {
+            if (!string.IsNullOrWhiteSpace(bodyPosition)) return PositionLabel(bodyPosition);
             switch (slot)
             {
                 case FixedTrackerSlot.LeftAnkle: return "左脚腕";
@@ -35,21 +37,49 @@ namespace SpineRecovery.App
                 default: return slot.ToString();
             }
         }
-    }
 
-    public static class FixedTrackerSlotMapping
-    {
-        public static bool TryParse(string bodyPosition, out FixedTrackerSlot slot)
+        public static string PositionLabel(string position)
         {
-            switch ((bodyPosition ?? string.Empty).Trim().ToLowerInvariant())
+            if (string.IsNullOrWhiteSpace(position)) return "未分配部位";
+            string name = position.StartsWith("body:") ? position.Substring(5) : position;
+            string side = name.StartsWith("left_") ? "左" : name.StartsWith("right_") ? "右" : "";
+            string part = side.Length == 0 ? name : name.Substring(name.IndexOf('_') + 1);
+            switch (part)
             {
-                case "left_ankle": case "left_foot": case "left_lower_leg": slot = FixedTrackerSlot.LeftAnkle; return true;
-                case "right_ankle": case "right_foot": case "right_lower_leg": slot = FixedTrackerSlot.RightAnkle; return true;
-                case "left_wrist": case "left_forearm": slot = FixedTrackerSlot.LeftWrist; return true;
-                case "right_wrist": case "right_forearm": slot = FixedTrackerSlot.RightWrist; return true;
-                case "waist": case "abdomen": case "body:abdomen": slot = FixedTrackerSlot.Waist; return true;
-                default: slot = FixedTrackerSlot.Waist; return false;
+                case "head": return "头部";
+                case "neck": return "颈部";
+                case "upper_chest": return "上胸";
+                case "chest": return "胸部";
+                case "waist": return "腰部";
+                case "hip": return "髋部";
+                case "upper_arm": return side + "上臂";
+                case "lower_arm": return side + "前臂";
+                case "hand": return side + "手";
+                case "upper_leg": return side + "大腿";
+                case "lower_leg": return side + "小腿";
+                case "foot": return side + "脚";
+                case "shoulder": return side + "肩";
+                default: return name;
             }
+        }
+
+        public static bool CanBind(AdminTrackerBinding[] rows, out string message)
+        {
+            int count = rows.Length;
+            if (count != 5)
+                message = $"已有 {count} 台在线 IMU 分配了部位，需要恰好 5 台。";
+            else if (rows.Any(row => !row.online || string.IsNullOrEmpty(row.bodyPosition) ||
+                !System.Text.RegularExpressions.Regex.IsMatch(row.hardwareId ?? "", @"^(?:[0-9a-fA-F]{2}:){5}[0-9a-fA-F]{2}$")) ||
+                rows.Select(row => row.hardwareId).Distinct(StringComparer.OrdinalIgnoreCase).Count() != 5)
+                message = "需要五台有独立 MAC 且已分配部位的在线 IMU。";
+            else if (rows.Select(row => row.bodyPosition).Distinct().Count() != 5)
+                message = "有设备共用同一部位，请在 SlimeVR 中调整。";
+            else
+            {
+                message = "五台设备均已分配部位，可以绑定。";
+                return true;
+            }
+            return false;
         }
     }
 
@@ -121,6 +151,9 @@ namespace SpineRecovery.App
         // hardware IDs have been confirmed, normal patient accounts must not
         // be able to replace them by discovering a different tracker.
         public bool trackerBindingsLocked;
+        // Disabling a published binding stops patient-side use while retaining
+        // the MAC-to-slot configuration so an administrator can re-enable it.
+        public bool trackerBindingsDisabled;
 
         public AdminActionDefinition[] RecommendedActions(IEnumerable<string> tags)
         {

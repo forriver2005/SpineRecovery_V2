@@ -674,12 +674,14 @@ public sealed class CoachHapticFeedbackController : MonoBehaviour
         var published = app?.AdminConfigs?.CurrentPublished();
         var bindings = published?.trackerBindings ?? Array.Empty<SpineRecovery.App.AdminTrackerBinding>();
         bool hasFixedBindings = bindings.Length == 5 && bindings.Any(binding => binding != null && !string.IsNullOrWhiteSpace(binding.hardwareId));
+        if (!administrator && hasFixedBindings && published.trackerBindingsDisabled) return false;
         if (!administrator && hasFixedBindings)
         {
             SpineRecovery.App.AdminTrackerBinding binding = bindings.FirstOrDefault(candidate =>
                 candidate != null && !string.IsNullOrWhiteSpace(candidate.hardwareId) &&
                 string.Equals(candidate.hardwareId.Trim(), tracker.hardwareId?.Trim(), StringComparison.OrdinalIgnoreCase));
             if (binding == null) return false;
+            if (!string.IsNullOrEmpty(binding.bodyPosition)) return TryMapBodyPosition(binding.bodyPosition, out location);
             switch (binding.slot)
             {
                 case SpineRecovery.App.FixedTrackerSlot.LeftAnkle: location = TrackerWearLocation.LeftLowerLeg; return true;
@@ -725,9 +727,11 @@ public sealed class CoachHapticFeedbackController : MonoBehaviour
             case "body:right_upper_arm":
                 location = TrackerWearLocation.RightUpperArm;
                 return true;
+            case "body:left_hand":
             case "body:left_lower_arm":
                 location = TrackerWearLocation.LeftForearm;
                 return true;
+            case "body:right_hand":
             case "body:right_lower_arm":
                 location = TrackerWearLocation.RightForearm;
                 return true;
@@ -737,9 +741,11 @@ public sealed class CoachHapticFeedbackController : MonoBehaviour
             case "body:right_upper_leg":
                 location = TrackerWearLocation.RightThigh;
                 return true;
+            case "body:left_foot":
             case "body:left_lower_leg":
                 location = TrackerWearLocation.LeftLowerLeg;
                 return true;
+            case "body:right_foot":
             case "body:right_lower_leg":
                 location = TrackerWearLocation.RightLowerLeg;
                 return true;

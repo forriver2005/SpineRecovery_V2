@@ -63,6 +63,7 @@ namespace SpineRecovery.App
                 throw new InvalidOperationException("Only one administrator configuration may be published.");
             configurations = next;
             JsonFileStore.Save(FileName, new ConfigurationDocument { configurations = configurations.ToArray() });
+            EmbeddedSlimeVrBridge.ReloadFixedBindings();
         }
 
         public AdminTrainingConfiguration CreateDraftFromPublished()
@@ -123,27 +124,19 @@ namespace SpineRecovery.App
         {
             EnsureLoaded();
             AdminTrainingConfiguration published = CurrentPublished();
-            if (published.trackerBindingsLocked)
+            if (published.trackerBindingsLocked && !published.trackerBindingsDisabled)
             {
                 message = "这 5 个 IMU 已锁定，不能在客户端重新绑定。";
                 return false;
             }
             var next = (bindings ?? Array.Empty<AdminTrackerBinding>())
                 .Where(binding => binding != null && !string.IsNullOrWhiteSpace(binding.hardwareId))
-                .GroupBy(binding => binding.slot)
-                .Select(group => group.First())
                 .ToArray();
-            int requiredCount = Enum.GetValues(typeof(FixedTrackerSlot)).Length;
-            if (next.Length != requiredCount || next.Select(binding => binding.hardwareId.Trim())
-                .Distinct(StringComparer.OrdinalIgnoreCase).Count() != requiredCount)
-            {
-                message = "需要选择 5 个不同的在线 IMU，并分别指定左脚腕、右脚腕、左手腕、右手腕和腰。";
-                return false;
-            }
+            if (!AdminTrackerBinding.CanBind(next, out message)) return false;
             string now = DateTimeOffset.UtcNow.ToString("O");
-            published.trackerBindings = next.OrderBy(binding => binding.slot).Select(binding => new AdminTrackerBinding
+            published.trackerBindings = next.OrderBy(binding => binding.bodyPosition).Select(binding => new AdminTrackerBinding
             {
-                slot = binding.slot,
+                bodyPosition = binding.bodyPosition,
                 hardwareId = binding.hardwareId.Trim(),
                 ip = binding.ip?.Trim() ?? string.Empty,
                 online = binding.online,
@@ -151,15 +144,37 @@ namespace SpineRecovery.App
                 lastSeenAt = now,
             }).ToArray();
             published.trackerBindingsLocked = true;
+            published.trackerBindingsDisabled = false;
             published.updatedAt = DateTimeOffset.UtcNow.ToString("O");
             Persist();
             message = "已锁定 5 个 IMU 的硬件 ID/MAC 与佩戴部位。普通用户将只读取这些设备。";
             return true;
         }
 
+        public bool SetPublishedTrackerBindingsEnabled(bool enabled, out string message)
+        {
+            EnsureLoaded();
+            AdminTrainingConfiguration published = CurrentPublished();
+            if (published == null || !published.trackerBindingsLocked ||
+                published.trackerBindings == null || published.trackerBindings.Length != 5)
+            {
+                message = "请先完成 5 个 IMU 的绑定。";
+                return false;
+            }
+
+            published.trackerBindingsDisabled = !enabled;
+            published.updatedAt = DateTimeOffset.UtcNow.ToString("O");
+            Persist();
+            message = enabled
+                ? "已重新启用原有 5 个 IMU 绑定。"
+                : "已解除 IMU 使用状态；MAC 与部位配置已保留，患者训练暂不使用这些设备。";
+            return true;
+        }
+
         private void Persist()
         {
             JsonFileStore.Save(FileName, new ConfigurationDocument { configurations = configurations.ToArray() });
+            EmbeddedSlimeVrBridge.ReloadFixedBindings();
         }
 
         private void EnsureLoaded()
@@ -169,6 +184,7 @@ namespace SpineRecovery.App
             {
                 configurations = new List<AdminTrainingConfiguration> { DefaultConfiguration() };
                 JsonFileStore.Save(FileName, new ConfigurationDocument { configurations = configurations.ToArray() });
+            EmbeddedSlimeVrBridge.ReloadFixedBindings();
             }
             else
             {
@@ -179,7 +195,7 @@ namespace SpineRecovery.App
 
         private static void NormalizeTrackerBindings(AdminTrainingConfiguration config)
         {
-            if (config == null) return;
+            if (config == null || (config.trackerBindings?.Any(row => !string.IsNullOrEmpty(row?.bodyPosition)) ?? false)) return;
             var existing = (config.trackerBindings ?? Array.Empty<AdminTrackerBinding>())
                 .Where(binding => binding != null)
                 .GroupBy(binding => binding.slot)

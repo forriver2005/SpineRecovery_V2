@@ -54,7 +54,8 @@ namespace SpineRecovery.App
                                 ip = tracker.Call<string>("getIp"),
                                 bodyPosition = tracker.Call<string>("getBodyPosition"),
                                 status = tracker.Call<string>("getStatus"),
-                                connected = tracker.Call<bool>("getConnected")
+                                batteryPercent = tracker.Call<int>("getBatteryPercent"),
+                            connected = tracker.Call<bool>("getConnected")
                             });
                         }
                     }
@@ -67,6 +68,17 @@ namespace SpineRecovery.App
             return false;
         }
         private const string ActivityClass = "dev.slimevr.android.EmbeddedSlimeVrActivity";
+        internal static void ReloadFixedBindings()
+        {
+#if UNITY_ANDROID && !UNITY_EDITOR
+            using (var player = new AndroidJavaClass("com.unity3d.player.UnityPlayer"))
+            using (var activity = player.GetStatic<AndroidJavaObject>("currentActivity"))
+            using (var cls = new AndroidJavaClass("dev.slimevr.android.SlimeVrRuntimeManager"))
+            using (var manager = cls.GetStatic<AndroidJavaObject>("INSTANCE"))
+                manager.Call("reloadBindings", activity);
+#endif
+        }
+
         private const string InitialRouteExtra = "dev.slimevr.android.extra.INITIAL_ROUTE";
         private const string AllowDirectRouteExtra = "dev.slimevr.android.extra.ALLOW_DIRECT_ROUTE";
 
@@ -101,6 +113,42 @@ namespace SpineRecovery.App
             }
 #else
             error = "内嵌 SlimeVR 校准仅可在安装了 Android SlimeVR 插件的设备上使用。";
+            return false;
+#endif
+        }
+
+        /// <summary>
+        /// Opens the full embedded SlimeVR interface. Administrators use this
+        /// route to review trackers and approve unknown-device handshakes
+        /// before assigning the fixed MetaSpine tracker slots.
+        /// </summary>
+        public static bool TryOpenFullInterface(out string error)
+        {
+            error = null;
+#if UNITY_ANDROID && !UNITY_EDITOR
+            try
+            {
+                using (var unityPlayer = new AndroidJavaClass("com.unity3d.player.UnityPlayer"))
+                using (var activity = unityPlayer.GetStatic<AndroidJavaObject>("currentActivity"))
+                using (var classApi = new AndroidJavaClass("java.lang.Class"))
+                using (var activityClass = classApi.CallStatic<AndroidJavaObject>("forName", ActivityClass))
+                using (var intent = new AndroidJavaObject("android.content.Intent", activity, activityClass))
+                {
+                    intent.Call<AndroidJavaObject>("putExtra", InitialRouteExtra, "/");
+                    intent.Call<AndroidJavaObject>("putExtra", AllowDirectRouteExtra, true);
+                    activity.Call("startActivity", intent);
+                    Debug.Log("[SlimeVR] full administrator interface started");
+                    return true;
+                }
+            }
+            catch (System.Exception exception)
+            {
+                error = "无法打开完整 SlimeVR 管理界面：" + exception.Message;
+                Debug.LogError(error + "\n" + exception.StackTrace);
+                return false;
+            }
+#else
+            error = "完整 SlimeVR 管理界面仅可在安装了 Android SlimeVR 插件的设备上使用。";
             return false;
 #endif
         }

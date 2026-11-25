@@ -37,7 +37,6 @@ namespace SpineRecovery.App
         private Button trackingCompleteButton;
         private Button adminImuCommitButton;
         private RectTransform adminImuBindingContent;
-        private readonly Dictionary<string, int> adminImuSlotDraft = new Dictionary<string, int>();
         private Text trackingStatusTitle;
         private Text trainingDisplayStatus;
         private Text trainingTrackerStatus;
@@ -557,6 +556,7 @@ namespace SpineRecovery.App
         private void OnApplicationFocus(bool focused)
         {
             if (!focused) return;
+            if (adminImuBindingContent != null && adminImuBindingContent.gameObject.activeInHierarchy) RefreshAdminImuBindingPage();
             RefreshTrainingPreparationStatus();
             if (!NativeMobileService.Available || bootstrap?.State?.Session == null) return;
             var user = bootstrap.Users.Load(bootstrap.State.Session.accountId);
@@ -644,11 +644,24 @@ namespace SpineRecovery.App
         {
             RectTransform root = QuestionnaireUi.CreateScreen(parent, "AdminImuBindingPanel", RefreshAdminImuBindingPage, out GameObject panel);
             QuestionnaireUi.Header(root, "绑定 IMU", () => bootstrap.Router.Navigate(AppRoute.Admin));
-            adminImuBindingContent = QuestionnaireUi.ScrollArea(root, QuestionnaireUi.HeaderHeight, 126f, 820f);
-            RectTransform footer = QuestionnaireUi.Footer(root, 126f);
-            QuestionnaireUi.PillButton(footer, "刷新设备状态", 20f, 12f, 350f, 42f, false, RefreshAdminImuBindingPage);
-            adminImuCommitButton = QuestionnaireUi.PillButton(footer, "绑定并锁定这 5 个 IMU", 20f, 66f, 350f, 50f, true, CommitAdminImuBindings);
+            adminImuBindingContent = QuestionnaireUi.ScrollArea(root, QuestionnaireUi.HeaderHeight, 172f, 820f);
+            RectTransform footer = QuestionnaireUi.Footer(root, 172f);
+            QuestionnaireUi.PillButton(footer, "打开完整 SlimeVR 管理界面", 20f, 10f, 350f, 44f, true, OpenAdminSlimeVrInterface);
+            QuestionnaireUi.PillButton(footer, "刷新设备状态", 20f, 62f, 350f, 42f, false, RefreshAdminImuBindingPage);
+            adminImuCommitButton = QuestionnaireUi.PillButton(footer, "绑定并锁定这 5 个 IMU", 20f, 112f, 350f, 50f, true, ToggleAdminImuBindings);
             return panel;
+        }
+
+        private void OpenAdminSlimeVrInterface()
+        {
+            if (bootstrap.State.Session == null || !bootstrap.State.Session.IsAdministrator) return;
+            if (!EmbeddedSlimeVrBridge.TryOpenFullInterface(out string error))
+            {
+                if (adminImuBindingMessage != null) adminImuBindingMessage.text = error;
+                return;
+            }
+            if (adminImuBindingMessage != null)
+                adminImuBindingMessage.text = "完整 SlimeVR 已打开；先批准未知设备，返回后点击“刷新设备状态”。";
         }
 
         private void RefreshAdminImuBindingPage()
@@ -658,25 +671,28 @@ namespace SpineRecovery.App
                 Destroy(child.gameObject);
 
             AdminTrainingConfiguration published = bootstrap.AdminConfigs?.CurrentPublished();
-            bool locked = published != null && published.trackerBindingsLocked;
-            if (adminImuCommitButton != null) adminImuCommitButton.interactable = !locked;
-            SlimeVrHapticTrackerSnapshot[] trackers = ReadLiveImuSnapshots();
-            if (!locked) PruneAdminImuSlotDraft(trackers);
-            if (!locked && adminImuSlotDraft.Count == 0)
-                SeedAdminImuSlotDraft(trackers);
+            bool locked = published != null && published.trackerBindingsLocked && !published.trackerBindingsDisabled;
+            var trackers = ReadLiveImuSnapshots();
+            bool ready = AdminTrackerBinding.CanBind(AssignedBindings(trackers), out string readiness);
+            if (adminImuCommitButton != null)
+            {
+                adminImuCommitButton.interactable = locked || ready;
+                Text buttonLabel = adminImuCommitButton.GetComponentInChildren<Text>();
+                if (buttonLabel != null)
+                    buttonLabel.text = locked ? "解除绑定" : "绑定";
+            }
 
-            QuestionnaireUi.Label(adminImuBindingContent, locked ? "固定 IMU 已锁定" : "首次绑定 5 个 IMU", 26,
+            QuestionnaireUi.Label(adminImuBindingContent,
+                locked ? "固定 IMU 已绑定" : "绑定 5 台 IMU", 26,
                 QuestionnaireUi.Accent, TextAnchor.MiddleLeft, FontStyle.Bold, 20f, 22f, 350f, 42f);
             QuestionnaireUi.Label(adminImuBindingContent,
-                locked ? "MAC 与佩戴部位已经发布，普通用户只能使用下列设备。" : "确认设备在线后，为每个 IMU 指定部位；提交后不可在客户端更改。",
+                locked ? "解除绑定后，可在完整 SlimeVR 界面修改佩戴部位。" : "请在完整 SlimeVR 界面为五台设备分配部位，然后返回绑定。",
                 14, QuestionnaireUi.Muted, TextAnchor.MiddleLeft, FontStyle.Normal, 20f, 68f, 350f, 46f);
 
             adminImuBindingMessage = QuestionnaireUi.Label(adminImuBindingContent, "", 13,
                 locked ? QuestionnaireUi.BadgeText : QuestionnaireUi.Muted, TextAnchor.MiddleLeft, FontStyle.Normal,
                 20f, 121f, 350f, 32f);
-            adminImuBindingMessage.text = locked
-                ? "已锁定：如需更换设备，请由工程人员清除本机发布配置。"
-                : "已发现 " + trackers.Count(t => t.connected) + " 个在线 IMU；需要 5 个不同设备。";
+            adminImuBindingMessage.text = locked ? "已锁定以下设备和部位。" : readiness;
 
             if (locked)
             {
@@ -705,41 +721,20 @@ namespace SpineRecovery.App
         {
             if (EmbeddedSlimeVrBridge.TryReadState(out EmbeddedSlimeVrBridge.RuntimeState state, true) && state.trackers != null)
                 return state.trackers;
-            return CoachHapticFeedbackController.Instance == null
-                ? System.Array.Empty<SlimeVrHapticTrackerSnapshot>()
-                : CoachHapticFeedbackController.Instance.LatestTrackerSnapshots.Where(tracker => tracker != null).ToArray();
+            return System.Array.Empty<SlimeVrHapticTrackerSnapshot>();
         }
 
-        private void SeedAdminImuSlotDraft(IEnumerable<SlimeVrHapticTrackerSnapshot> trackers)
+        private static AdminTrackerBinding[] AssignedBindings(IEnumerable<SlimeVrHapticTrackerSnapshot> trackers)
         {
-            adminImuSlotDraft.Clear();
-            foreach (SlimeVrHapticTrackerSnapshot tracker in trackers ?? System.Array.Empty<SlimeVrHapticTrackerSnapshot>())
-            {
-                if (tracker == null || string.IsNullOrWhiteSpace(tracker.hardwareId)) continue;
-                adminImuSlotDraft[tracker.hardwareId.Trim()] = FixedTrackerSlotMapping.TryParse(tracker.bodyPosition, out FixedTrackerSlot slot)
-                    ? (int)slot : -1;
-            }
-            // SlimeVR may report duplicate or generic assignments. Leave only
-            // the first device on each slot for the administrator to resolve.
-            foreach (var duplicate in adminImuSlotDraft.Where(pair => pair.Value >= 0)
-                .GroupBy(pair => pair.Value).SelectMany(group => group.Skip(1)).ToArray())
-                adminImuSlotDraft[duplicate.Key] = -1;
-        }
-
-        private void PruneAdminImuSlotDraft(IEnumerable<SlimeVrHapticTrackerSnapshot> trackers)
-        {
-            var liveIds = new HashSet<string>((trackers ?? System.Array.Empty<SlimeVrHapticTrackerSnapshot>())
-                .Where(tracker => tracker != null && tracker.connected && !string.IsNullOrWhiteSpace(tracker.hardwareId))
-                .Select(tracker => tracker.hardwareId.Trim()), System.StringComparer.OrdinalIgnoreCase);
-            foreach (string staleId in adminImuSlotDraft.Keys.Where(id => !liveIds.Contains(id)).ToArray())
-                adminImuSlotDraft.Remove(staleId);
+            return trackers.Where(t => t != null && t.connected && !string.IsNullOrWhiteSpace(t.bodyPosition))
+                .Select(t => new AdminTrackerBinding { hardwareId = t.hardwareId?.Trim(), bodyPosition = t.bodyPosition,
+                    online = true, ip = t.ip, batteryPercent = t.batteryPercent }).ToArray();
         }
 
         private void DrawAdminImuCandidateCard(SlimeVrHapticTrackerSnapshot tracker, float top)
         {
             RectTransform card = QuestionnaireUi.Card(adminImuBindingContent, 20f, top, 350f, 112f);
             string id = tracker.hardwareId.Trim();
-            int slot = adminImuSlotDraft.TryGetValue(id, out int selected) ? selected : -1;
             QuestionnaireUi.Label(card, tracker.name ?? "IMU " + tracker.trackerNum, 16, QuestionnaireUi.Ink,
                 TextAnchor.MiddleLeft, FontStyle.Bold, 16f, 12f, 190f, 25f);
             QuestionnaireUi.Label(card, "MAC: " + id, 12, QuestionnaireUi.Muted, TextAnchor.MiddleLeft,
@@ -747,10 +742,8 @@ namespace SpineRecovery.App
             string battery = tracker.batteryPercent >= 0 ? "电量 " + tracker.batteryPercent + "%" : "电量暂不可用";
             QuestionnaireUi.Label(card, "在线 · " + battery, 12, new Color(0.12f, 0.55f, 0.30f),
                 TextAnchor.MiddleLeft, FontStyle.Bold, 16f, 62f, 160f, 22f);
-            Button select = QuestionnaireUi.MakeButton(card, "SelectSlot", QuestionnaireUi.SecondaryButton, 15f,
-                202f, 59f, 132f, 38f, () => CycleAdminImuSlot(id));
-            QuestionnaireUi.Label(select.transform, AdminImuSlotCaption(slot), 13, QuestionnaireUi.Accent,
-                TextAnchor.MiddleCenter, FontStyle.Bold, 0f, 0f, 132f, 38f);
+            QuestionnaireUi.Label(card, AdminTrackerBinding.PositionLabel(tracker.bodyPosition), 15, QuestionnaireUi.Accent,
+                TextAnchor.MiddleRight, FontStyle.Bold, 182f, 58f, 150f, 28f);
         }
 
         private void DrawLockedBindingCards(AdminTrainingConfiguration published, IEnumerable<SlimeVrHapticTrackerSnapshot> liveTrackers, float top)
@@ -772,51 +765,28 @@ namespace SpineRecovery.App
             }
         }
 
-        private void CycleAdminImuSlot(string hardwareId)
-        {
-            int current = adminImuSlotDraft.TryGetValue(hardwareId, out int slot) ? slot : -1;
-            for (int step = 1; step <= 6; step++)
-            {
-                int candidate = (current + 1 + step) % 6 - 1;
-                if (candidate < 0 || !adminImuSlotDraft.Any(pair => pair.Key != hardwareId && pair.Value == candidate))
-                {
-                    adminImuSlotDraft[hardwareId] = candidate;
-                    break;
-                }
-            }
-            RefreshAdminImuBindingPage();
-        }
-
-        private static string AdminImuSlotCaption(int slot)
-        {
-            return slot < 0 ? "选择部位" : ((FixedTrackerSlot)slot).ToString() == "LeftAnkle" ? "左脚腕" :
-                ((FixedTrackerSlot)slot).ToString() == "RightAnkle" ? "右脚腕" :
-                ((FixedTrackerSlot)slot).ToString() == "LeftWrist" ? "左手腕" :
-                ((FixedTrackerSlot)slot).ToString() == "RightWrist" ? "右手腕" : "腰";
-        }
-
         private void CommitAdminImuBindings()
         {
             if (!(bootstrap.AdminConfigs is JsonAdminConfigRepository repository)) return;
-            SlimeVrHapticTrackerSnapshot[] online = ReadLiveImuSnapshots().Where(tracker => tracker != null && tracker.connected &&
-                !string.IsNullOrWhiteSpace(tracker.hardwareId)).ToArray();
-            var bindings = online.Where(tracker => adminImuSlotDraft.TryGetValue(tracker.hardwareId.Trim(), out int slot) && slot >= 0)
-                .Select(tracker => new AdminTrackerBinding
-                {
-                    slot = (FixedTrackerSlot)adminImuSlotDraft[tracker.hardwareId.Trim()],
-                    hardwareId = tracker.hardwareId,
-                    ip = tracker.ip,
-                    online = tracker.connected,
-                    batteryPercent = tracker.batteryPercent,
-                }).ToArray();
-            bool saved = repository.BindPublishedTrackers(bindings, out string message);
-            if (saved)
-            {
-                adminImuSlotDraft.Clear();
+            if (repository.BindPublishedTrackers(AssignedBindings(ReadLiveImuSnapshots()), out string message))
                 RefreshAdminSummary();
-            }
             RefreshAdminImuBindingPage();
             if (adminImuBindingMessage != null) adminImuBindingMessage.text = message;
+        }
+
+        private void ToggleAdminImuBindings()
+        {
+            if (!(bootstrap.AdminConfigs is JsonAdminConfigRepository repository)) return;
+            AdminTrainingConfiguration published = repository.CurrentPublished();
+            if (published != null && published.trackerBindingsLocked && !published.trackerBindingsDisabled)
+            {
+                bool saved = repository.SetPublishedTrackerBindingsEnabled(false, out string message);
+                RefreshAdminImuBindingPage();
+                if (adminImuBindingMessage != null) adminImuBindingMessage.text = message;
+                if (saved) RefreshAdminSummary();
+                return;
+            }
+            CommitAdminImuBindings();
         }
 
         private GameObject CreateHistoryPanel(Transform parent)
@@ -1142,14 +1112,15 @@ namespace SpineRecovery.App
             var liveTrackers = CoachHapticFeedbackController.Instance == null
                 ? "状态源未启动"
                 : string.Join("\n", CoachHapticFeedbackController.Instance.LatestTrackerSnapshots
-                    .Where(tracker => tracker != null && FixedTrackerSlotMapping.TryParse(tracker.bodyPosition, out _))
+                    .Where(tracker => tracker != null && !string.IsNullOrWhiteSpace(tracker.bodyPosition))
                     .Select(tracker => tracker.bodyPosition + "：" + (tracker.connected ? "在线" : "离线") +
                         (tracker.batteryPercent >= 0 ? " / 电量 " + tracker.batteryPercent + "%" : " / 电量未知")));
             adminMessage.text = "当前版本：" + config.versionName + "（" + config.state + "）\n" +
                 "配置 ID：" + config.configId + "\n" +
                 "动作：" + string.Join("、", actionLines) + "\n" +
                 "推荐规则：" + (ruleLines.Length == 0 ? "暂无" : string.Join("；", ruleLines)) + "\n" +
-                "IMU 绑定：" + (config.trackerBindingsLocked ? "已锁定" : "未绑定") + "\n" +
+                "IMU 绑定：" + (!config.trackerBindingsLocked ? "未绑定" :
+                    config.trackerBindingsDisabled ? "已解除（配置保留）" : "已绑定") + "\n" +
                 "固定追踪器（5 个）：\n" + (trackerLines.Length == 0 ? "暂无" : string.Join("\n", trackerLines)) + "\n" +
                 "实时状态：\n" + (string.IsNullOrWhiteSpace(liveTrackers) ? "暂无设备状态" : liveTrackers) + "\n" +
                 "说明：患者侧只读取 Published 配置；发布前必须完成 AR 测试。";
@@ -1219,19 +1190,15 @@ namespace SpineRecovery.App
             RectTransform steps = QuestionnaireUi.Card(content, 20f, 277f, 350f, 325f);
             QuestionnaireUi.Label(steps, "校准步骤", 20, QuestionnaireUi.Ink, TextAnchor.MiddleLeft,
                 FontStyle.Bold, 20f, 18f, 310f, 34f);
-            AddCalibrationStep(steps, 1, "打开 SlimeVR 校准清单", "连接追踪器并检查设备状态", 72f);
-            AddCalibrationStep(steps, 2, "连接追踪器并完成校准", "按 SlimeVR 引导佩戴并完成校准", 151f);
+            AddCalibrationStep(steps, 1, "佩戴已绑定的追踪器", "确认五个设备已开机并戴在指定部位", 72f);
+            AddCalibrationStep(steps, 2, "打开快速校准", "按提示完成校准", 151f);
             AddCalibrationStep(steps, 3, "返回此页确认", "完成后点击下方按钮继续", 230f);
 
-            // Keep the three actions comfortably above the bottom edge and give
-            // each touch target enough separation on small phone screens.
-            RectTransform footer = QuestionnaireUi.Footer(root, 210f);
-            QuestionnaireUi.PillButton(footer, "打开 SlimeVR 校准清单", 20f, 12f, 350f, 44f, false,
-                OpenEmbeddedSlimeVrCalibration);
-            Button quick = QuestionnaireUi.PillButton(footer, "快速校准", 20f, 72f, 350f, 44f, false,
+            RectTransform footer = QuestionnaireUi.Footer(root, 152f);
+            Button quick = QuestionnaireUi.PillButton(footer, "快速校准", 20f, 12f, 350f, 44f, false,
                 OpenEmbeddedSlimeVrQuickCalibration);
             quick.GetComponent<Image>().color = Color.white;
-            trackingCompleteButton = QuestionnaireUi.PillButton(footer, "我已完成校准，继续", 20f, 136f,
+            trackingCompleteButton = QuestionnaireUi.PillButton(footer, "我已完成校准，继续", 20f, 72f,
                 350f, 52f, true, ConfirmTrackingCalibration);
             trackingCompleteButton.interactable = false;
             return panel;
@@ -1247,21 +1214,6 @@ namespace SpineRecovery.App
                 FontStyle.Bold, 68f, top - 1f, 260f, 28f);
             QuestionnaireUi.Label(parent, detail, 13, QuestionnaireUi.Muted, TextAnchor.MiddleLeft,
                 FontStyle.Normal, 68f, top + 28f, 260f, 34f);
-        }
-
-        private void OpenEmbeddedSlimeVrCalibration()
-        {
-            int height = bootstrap.State.Session != null ? bootstrap.State.Session.profile.heightCm : 0;
-            string error;
-            if (!EmbeddedSlimeVrBridge.TryOpenCalibration(height, out error))
-            {
-                trackingMessage.text = error;
-                return;
-            }
-
-            trackingCompleteButton.interactable = true;
-            trackingStatusTitle.text = "SlimeVR 校准清单已打开";
-            trackingMessage.text = "请完成校准后返回此页面确认";
         }
 
         private void OpenEmbeddedSlimeVrQuickCalibration()

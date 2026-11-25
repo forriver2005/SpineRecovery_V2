@@ -47,4 +47,7 @@ EditorBuildSettings:
   - enabled: 1
     path: Assets/Scenes/LyingCatPractice_TaikoNight.unity
     guid: eb3f95803be22a143ba2ab646f09fe31
+  - enabled: 1
+    path: Assets/Scenes/BridgeWave_StandardFollow.unity
+    guid: 5c410992cc3fe9144bd66b31f7969016
   m_configObjects: {}

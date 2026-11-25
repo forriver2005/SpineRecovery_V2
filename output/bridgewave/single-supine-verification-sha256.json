@@ -1,0 +1,7 @@
+{
+  "Assets/Scenes/BridgeWave_StandardFollow.unity": "1ec737827aace2b6d26b5117903c4b08b204454eb5b127c6a9036057dbfb4320",
+  "Assets/BridgeWave/Scripts/BridgeWaveHeightInput.cs": "8c98257b7cfa520c450332220b4df7a39e0b10c5b8910cae7e8de8643e2b057f",
+  "Assets/BridgeWave/Scripts/BridgeWaveFollowController.cs": "80636ff5a6f111ed1c7d402971726cd32688f112ad3d7e6f41c742a8910d44e0",
+  "Assets/BridgeWave/Scripts/BridgeWaveCoachPreview.cs": "29a93424f3dc9eb6936736144c90eba019c49d572d357a9630f3532a61a87f06",
+  "testedGitTree": "6ed973052520187da5a4b514d3aad03e5e3ff616"
+}

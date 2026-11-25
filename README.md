@@ -2,7 +2,7 @@
 
 ## 当前游戏
 
-Build Settings 注册以下九个正式游戏场景。
+主要游戏场景如下。
 
 | 动作 | 场景 | 视觉与阶段 |
 | --- | --- | --- |
@@ -10,6 +10,7 @@ Build Settings 注册以下九个正式游戏场景。
 | 死虫 | `Assets/Scenes/DeadBug_RingSkinC_Recorded.unity` | RingSkinC；伸展、收回 |
 | 臀桥 · 新评分 | `Assets/Scenes/HipThrust_RingBridge_NewScoring.unity` | 同一敲鼓视觉与原节奏，换用交付包 A/B 保持评分 |
 | 臀桥 · 保持30秒 | `Assets/Scenes/HipThrust_RingBridge_Hold30.unity` | 同一敲鼓视觉；最高点静止30秒后放下，精确处方次数 |
+| 臀桥 · 曲线跟随 | `Assets/Scenes/BridgeWave_StandardFollow.unity` | 按录制臀桥动作生成四段标准轨道；臀部高度单独控制小球，偏离轨道不触发 HIT |
 | 侧桥 · 动态 | `Assets/Scenes/SideBridge_RingBridge_Dynamic.unity` | 敲鼓；录制节奏与真实动作评分 |
 | 侧桥 · 保持30秒 | `Assets/Scenes/SideBridge_RingBridge_Hold30.unity` | 敲鼓；最高点保持30秒，精确处方次数 |
 | 敲鼓臀桥 | `Assets/Scenes/HipThrust_TaikoNight_Dynamic.unity` | 星轨敲鼓；抬起、保持、放下 |

@@ -214,7 +214,8 @@ namespace BridgeWave.EditorTools
                 {
                     began=EditorApplication.timeSinceStartup;report="Flow preview verification (no wearable input, no training results)\n";
                     ui=UnityEngine.Object.FindObjectOfType<BridgeWaveFollowController>();
-                    Check(ui!=null&&ui.skipCalibrationForFlowTest,"Scene must enable requested temporary bypass");
+                    Check(ui!=null&&!ui.skipCalibrationForFlowTest,"Shipped scene must restore sensor admission");
+                    ui.skipCalibrationForFlowTest=true;
                     ui.input.motion.SetAvailable(false);ui.input.Read();ui.RefreshHud();
                     Check(ui.CanStart&&ui.startButton.interactable&&!ui.input.Calibrated,"Flow start still requires calibration or sensor");
                     Check(!ui.calibrationButton.gameObject.activeInHierarchy&&!ui.calibrationStatus.gameObject.activeInHierarchy,"Calibration controls shown during bypass");

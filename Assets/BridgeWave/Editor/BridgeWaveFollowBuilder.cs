@@ -77,7 +77,7 @@ namespace BridgeWave.EditorTools
             var input=flowRoot.AddComponent<BridgeWaveHeightInput>();input.patient=patientAnimator;input.referenceHeightSpan=standardHeightSpan;
             var controller=flowRoot.AddComponent<BridgeWaveFollowController>();controller.game=game;controller.input=input;
             controller.visualRoot=root;
-            controller.skipCalibrationForFlowTest=true;
+            controller.skipCalibrationForFlowTest=false;
             var canvas=root.GetComponentInChildren<Canvas>();
             var viewport=cameraObject.AddComponent<BridgeWaveViewport>();viewport.view=camera;viewport.canvas=canvas;
             viewport.ConfigureCanvas();
@@ -86,8 +86,9 @@ namespace BridgeWave.EditorTools
             font=AssetDatabase.LoadAssetAtPath<Font>("Assets/Fonts/SourceHanSans/SourceHanSansSC-Heavy.otf");
             Text Find(string name)=>canvas.GetComponentsInChildren<Text>().First(t=>t.name==name);
             Find("Count").text="0";Find("CountTotal").text="/ 4";
-            controller.scoreText=Find("Score");controller.scoreText.text="0000 HIT";
-            controller.comboText=Find("Combo");controller.comboText.text="0 COMBO";
+            controller.totalCountText=Find("CountTotal");
+            UnityEngine.Object.DestroyImmediate(Find("Score").gameObject);
+            UnityEngine.Object.DestroyImmediate(Find("Combo").gameObject);
             // The delivered pause artwork remains beneath the actual click target.
             controller.pauseButton=Button(canvas.transform,"Pause","Ⅱ",new Rect(18,8,44,44),out controller.pauseLabel);
             controller.pauseButton.GetComponent<Image>().color=Color.clear;
@@ -104,6 +105,10 @@ namespace BridgeWave.EditorTools
             controller.replayButton=Button(finish.transform,"Replay","再来一组",new Rect(165,112,170,30),out _);
             finish.SetActive(false);
             root.SetActive(false);
+            var workout=flowRoot.AddComponent<GameWorkoutScene>();
+            workout.actionId="hipthrust_curve";workout.useRecordedCoachAnimations=true;
+            workout.bridgeWave=controller;workout.menu=controller.startMenu;workout.gameCanvas=controller.startMenu.GetComponent<Canvas>();
+            workout.font=controller.calibrationStatus.font;controller.workout=workout;
             new GameObject("EventSystem",typeof(EventSystem),typeof(StandaloneInputModule));
             EditorSceneManager.SaveScene(scene,ScenePath);
             if(!EditorBuildSettings.scenes.Any(s=>s.path==ScenePath))
@@ -167,6 +172,7 @@ namespace BridgeWave.EditorTools
             countCaption.transform.SetParent(Named("Times"),false);
             countCaption.transform.SetAsFirstSibling();
             var repetitionValue=(TMP_Text)new SerializedObject(menu).FindProperty("timesText").objectReferenceValue;
+            controller.repetitionsText=repetitionValue;
             Layout(repetitionValue.rectTransform,new Vector2(0,7),new Vector2(100,36));
             repetitionValue.fontSize=30;repetitionValue.alignment=TextAlignmentOptions.Center;repetitionValue.margin=Vector4.zero;
             Layout((RectTransform)countCaption.transform,new Vector2(0,-18),new Vector2(100,22));
@@ -183,8 +189,8 @@ namespace BridgeWave.EditorTools
             controller.calibrationStatus.text="请连接动作传感器，再进行躺姿校准";
             controller.calibrationStatus.enableWordWrapping=true;
             controller.calibrationStatus.raycastTarget=false;
-            controller.calibrationStatus.gameObject.SetActive(false);
-            controller.calibrationButton.gameObject.SetActive(false);
+            controller.calibrationStatus.gameObject.SetActive(true);
+            controller.calibrationButton.gameObject.SetActive(true);
             // Match the established BirdDog/DeadBug menu's left logo/title and right controls.
             Layout((RectTransform)Named("HipThrustTitlePanel"),new Vector2(-400,0),new Vector2(610,130));
             Layout(Named("Title").GetComponent<TMP_Text>().rectTransform,new Vector2(0,30),new Vector2(600,60));
@@ -200,7 +206,7 @@ namespace BridgeWave.EditorTools
             coach.previewCamera.allowHDR=false;
             var framing=coach.previewCamera.GetComponent<HipThrustPreviewFraming>()??coach.previewCamera.gameObject.AddComponent<HipThrustPreviewFraming>();
             framing.enabled=true;framing.avatar=coach.animator;framing.previewCamera=coach.previewCamera;framing.fitAfterLatePose=true;framing.framingPadding=.35f;
-            var panel=Panel(canvas.transform,"Recorded coach",new Rect(82,6,240,88),new Color(.055f,.055f,.16f,.85f));
+            var panel=Panel(canvas.transform,"Recorded coach",new Rect(586,6,240,88),new Color(.055f,.055f,.16f,.85f));
             coach.trainingPanel=panel;
             panel.GetComponent<Image>().raycastTarget=false;
             coach.gameImage=new GameObject("Coach",typeof(RectTransform),typeof(RawImage)).GetComponent<RawImage>();

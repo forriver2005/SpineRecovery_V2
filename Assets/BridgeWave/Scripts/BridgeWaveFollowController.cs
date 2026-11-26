@@ -1,3 +1,4 @@
+using System;
 using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
@@ -17,14 +18,20 @@ namespace BridgeWave
         public bool skipCalibrationForFlowTest;
         public GameObject visualRoot, finishPanel, countdownRoot;
         public TMP_Text calibrationStatus, countdownText, calibrationLabel, startLabel;
-        public Text statusText, scoreText, comboText, judgmentText, resultText, pauseLabel;
+        public Text statusText, judgmentText, resultText, pauseLabel, totalCountText;
+        public TMP_Text repetitionsText;
+        public GameWorkoutScene workout;
+        public event Action Completed;
+        public bool ReadyForTraining => State == RunState.Ready && input.CanStart && input.Height <= .2f;
+        public bool WorkoutRunning => workout != null && GameWorkoutSession.Instance.IsRunning;
         public Button startButton, pauseButton, calibrationButton, replayButton, menuButton;
         public enum RunState { Ready, Countdown, Playing, Paused, Finished }
         public RunState State { get; private set; }
         public BridgeWaveSession Session { get; private set; }
         public float CountdownRemaining => countdown;
         public bool IsFlowTest => State == RunState.Ready ? skipCalibrationForFlowTest : sessionFlowTest;
-        public bool CanStart => State == RunState.Ready && (skipCalibrationForFlowTest || (input.CanStart && input.Height <= .2f));
+        public bool CanStart => State == RunState.Ready && (skipCalibrationForFlowTest || ReadyForTraining) &&
+            (workout == null || GameWorkoutSession.Instance.AllowsStart(workout));
         bool sessionFlowTest;
         float countdown;
         RunState beforePause;
@@ -37,13 +44,27 @@ namespace BridgeWave
             startMenu.ExternalTrainingStart = () => { Begin(); return State == RunState.Countdown; };
             pauseButton.onClick.AddListener(TogglePause);
             calibrationButton.onClick.AddListener(input.BeginCalibration);
-            replayButton.onClick.AddListener(ReturnToSetup);
-            menuButton.onClick.AddListener(ReturnToSetup);
+            replayButton.onClick.AddListener(() => { if (!WorkoutRunning) ReturnToSetup(); });
+            menuButton.onClick.AddListener(() =>
+            {
+                if (WorkoutRunning) GameWorkoutSession.Instance.Cancel();
+                else ReturnToSetup();
+            });
             RefreshHud();
         }
         void OnDestroy()
         {
             if (startMenu != null) { startMenu.TrainingStartAllowed = null; startMenu.ExternalTrainingStart = null; }
+        }
+        public bool SetRepetitionDose(int repetitions, out string error)
+        {
+            error = null;
+            if (State != RunState.Ready || repetitions < 0 || repetitions > 100)
+            { error = "臀桥次数须为 1–100，或 0 使用默认 4 次。"; return false; }
+            game.totalCount = repetitions == 0 ? 4 : repetitions;
+            ResetSession();
+            RefreshHud();
+            return true;
         }
         public void ResetSession()
         {
@@ -101,7 +122,11 @@ namespace BridgeWave
                 bool pulse = Session.Advance(Time.unscaledDeltaTime, input.Height, input.Valid && !IsFlowTest);
                 game.presentationTime = Session.Elapsed;
                 if (pulse) game.PulseHit();
-                if (Session.Finished) State = RunState.Finished;
+                if (Session.Finished)
+                {
+                    State = RunState.Finished;
+                    Completed?.Invoke();
+                }
             }
             game.height = input.Height;
             game.judging = State == RunState.Playing && !IsFlowTest;
@@ -122,8 +147,9 @@ namespace BridgeWave
             startButton.interactable = CanStart;
             pauseButton.interactable = State == RunState.Countdown || State == RunState.Playing || State == RunState.Paused;
             pauseLabel.text = State == RunState.Paused ? "▶" : "Ⅱ";
-            scoreText.text = Session.Hits.ToString("D4") + " HIT";
-            comboText.text = Session.Combo + " COMBO";
+            replayButton.interactable = !WorkoutRunning;
+            totalCountText.text = "/ " + game.totalCount;
+            repetitionsText.text = game.totalCount.ToString();
             string status = IsFlowTest ? "流程测试 · 已跳过校准，本次不记录成绩" : input.Message;
             if (!IsFlowTest && input.CanStart && input.Height > .2f && (ready || State == RunState.Countdown))
                 status = "请回到放平位置，准备开始训练";

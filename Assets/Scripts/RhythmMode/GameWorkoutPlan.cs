@@ -21,6 +21,7 @@ public sealed class GameWorkoutPlan
         if (action == "hipthrust_taiko" || action == "hipthrust_taiko_night") return "HipThrust_TaikoNight_Dynamic";
         if (action == "crunch" || action == "crunch_taiko") return "CrunchPractice_TaikoNight";
         if (action == "lyingcat" || action == "lying_cat" || action == "lying_cat_taiko") return "LyingCatPractice_TaikoNight";
+        if (action == "hipthrust_curve" || action == "bridgewave") return "BridgeWave_StandardFollow";
         if (action == "hipthrust_newscore") return "HipThrust_RingBridge_NewScoring";
         if (action == "hipthrust_hold30") return "HipThrust_RingBridge_Hold30";
         if (action == "sidebridge") return "SideBridge_RingBridge_Dynamic";
@@ -58,6 +59,8 @@ public sealed class GameWorkoutPlan
             case "deadbug": return "死虫式";
             case "birddog": return "鸟狗式";
             case "hipthrust": return "臀桥";
+            case "hipthrust_curve":
+            case "bridgewave": return "臀桥";
             case "hipthrust_newscore": return "臀桥 · 新评分";
             case "hipthrust_hold30": return "臀桥 · 保持30秒";
             case "sidebridge": return "左侧桥 · 动态";
@@ -96,6 +99,6 @@ public sealed class GameWorkoutPlan
         if (total > 1000) throw new ArgumentException("动作串总组数不能超过 1000。");
         return copy;
     }
-    public static bool SupportsOptionalReps(string action) => IsTaikoNightAction(action) || action == "hipthrust" || action == "hipthrust_newscore";
+    public static bool SupportsOptionalReps(string action) => IsTaikoNightAction(action) || action == "hipthrust_curve" || action == "bridgewave" || action == "hipthrust" || action == "hipthrust_newscore";
     public static bool RequiresExactReps(string action) => action=="hipthrust_hold30" || action=="sidebridge" || action=="sidebridge_hold30";
 }

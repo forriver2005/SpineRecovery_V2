@@ -17,7 +17,7 @@
 | 卷腹 | `Assets/Scenes/CrunchPractice_TaikoNight.unity` | 星轨敲鼓；卷起、保持、回落 |
 | 卧位猫式 | `Assets/Scenes/LyingCatPractice_TaikoNight.unity` | 星轨敲鼓；拱背、保持、还原 |
 
-游戏支持医生动作串。动作串从首组前的准备倒计时开始，每组完成后休息30秒，再按处方动作、难度、组数和次数切换；`hipthrust` 映射到臀桥新评分场景。鸟狗与死虫保留原有评分检查；新游戏通过对应的实时传感器输入和动作评分器计分。新评分规则和处方接入方法见 [HIPTHRUST_NEW_RULES.md](HIPTHRUST_NEW_RULES.md)。
+游戏支持医生动作串。动作串从首组前的准备倒计时开始，每组完成后休息30秒，再按处方动作、难度、组数和次数切换；`hipthrust` 映射到臀桥新评分场景；`hipthrust_curve`（或 `bridgewave`）进入小球轨道臀桥，支持 `sets` 与 `reps`，并要求躺姿校准和有效传感器信号。接入参数见 [臀桥轨道说明](Assets/BridgeWave/INTEGRATION.md)。鸟狗与死虫保留原有评分检查；新游戏通过对应的实时传感器输入和动作评分器计分。新评分规则和处方接入方法见 [HIPTHRUST_NEW_RULES.md](HIPTHRUST_NEW_RULES.md)。
 
 ## 录制动画与手脚方向
 

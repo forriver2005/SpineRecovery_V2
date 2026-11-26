@@ -274,119 +274,6 @@ namespace SpineRecovery.App
         }
 
 
-        private GameObject CreateLoginPanel(Transform parent)
-        {
-            GameObject panel = CreatePanel("LoginPanel", parent, new Color(0.973f, 0.980f, 1f));
-            GameObject designRoot = new GameObject("LoginDesign390x884", typeof(RectTransform));
-            designRoot.transform.SetParent(panel.transform, false);
-            RectTransform designRect = designRoot.GetComponent<RectTransform>();
-            designRect.anchorMin = new Vector2(0.5f, 0.5f);
-            designRect.anchorMax = new Vector2(0.5f, 0.5f);
-            designRect.pivot = new Vector2(0.5f, 0.5f);
-            designRect.sizeDelta = new Vector2(390f, 884f);
-            designRect.anchoredPosition = Vector2.zero;
-            float designScale = Mathf.Min(1080f / 390f, 1920f / 884f);
-            designRoot.transform.localScale = new Vector3(designScale, designScale, 1f);
-
-            // Figma exports use top-left coordinates in a 390x884 frame. The
-            // RectTransform above uses the same local frame, so convert every
-            // component through one mapping instead of mixing center and top-
-            // left coordinates (the source of the old overlap/drift).
-            // LoginCover.png is the approved complete 390x884 Figma export.
-            // Keep it as one image so every logo, label, border, shadow and
-            // spacing remains pixel-identical to the source design. The
-            // controls below are transparent interaction overlays only.
-            CreateRasterImage(designRoot.transform, "AppUi/LoginCover", Vector2.zero,
-                new Vector2(LoginDesignWidth, LoginDesignHeight));
-
-            accountInput = CreateInput(designRoot.transform, "手机号 / 邮箱", LoginDesignPosition(45.5f, 317.5f, 299f, 51f), false);
-            passwordInput = CreateInput(designRoot.transform, "密码", LoginDesignPosition(45.5f, 385.5f, 299f, 51f), true);
-            accountInput.GetComponent<RectTransform>().sizeDelta = LoginDesignSize(299f, 51f);
-            passwordInput.GetComponent<RectTransform>().sizeDelta = LoginDesignSize(299f, 51f);
-            MakeOverlayInput(accountInput);
-            MakeOverlayInput(passwordInput);
-
-            Button loginButton = CreateButton(designRoot.transform, "登录", LoginDesignPosition(45f, 491f, 300f, 52f), HandleLoginClicked, 300f, 52f);
-            Button registerButton = CreateButton(designRoot.transform, "注册新账号", LoginDesignPosition(214.489f, 610.271f, 59.106f, 14.677f),
-                () => bootstrap.Router.Navigate(AppRoute.Register), 59.106f, 28f);
-            MakeOverlayButton(loginButton);
-            MakeOverlayButton(registerButton);
-
-            loginMessage = CreateLabel(designRoot.transform, "", LoginDesignPosition(45f, 550f, 300f, 28f), 12);
-            loginMessage.rectTransform.sizeDelta = LoginDesignSize(300f, 28f);
-            return panel;
-        }
-
-        private GameObject CreateRegisterPanel(Transform parent)
-        {
-            GameObject panel = CreatePanel("RegisterPanel", parent, new Color(0.973f, 0.980f, 1f));
-            GameObject designRoot = new GameObject("RegisterDesign390x884", typeof(RectTransform));
-            designRoot.transform.SetParent(panel.transform, false);
-            RectTransform designRect = designRoot.GetComponent<RectTransform>();
-            designRect.anchorMin = new Vector2(0.5f, 0.5f);
-            designRect.anchorMax = new Vector2(0.5f, 0.5f);
-            designRect.pivot = new Vector2(0.5f, 0.5f);
-            designRect.sizeDelta = new Vector2(LoginDesignWidth, LoginDesignHeight);
-            designRect.anchoredPosition = Vector2.zero;
-            float designScale = Mathf.Min(1080f / LoginDesignWidth, 1920f / LoginDesignHeight);
-            designRoot.transform.localScale = new Vector3(designScale, designScale, 1f);
-            CreateRasterImage(designRoot.transform, "AppUi/RegisterScreen", Vector2.zero,
-                new Vector2(LoginDesignWidth, LoginDesignHeight));
-
-            registerAccountInput = CreateInput(designRoot.transform, "设置账号", LoginDesignPosition(44f, 312f, 302f, 57f), false);
-            registerPasswordInput = CreateInput(designRoot.transform, "设置密码", LoginDesignPosition(44f, 380f, 302f, 57f), true);
-            registerConfirmInput = CreateInput(designRoot.transform, "再次输入密码", LoginDesignPosition(44f, 448f, 302f, 57f), true);
-            registerAccountInput.GetComponent<RectTransform>().sizeDelta = LoginDesignSize(302f, 57f);
-            registerPasswordInput.GetComponent<RectTransform>().sizeDelta = LoginDesignSize(302f, 57f);
-            registerConfirmInput.GetComponent<RectTransform>().sizeDelta = LoginDesignSize(302f, 57f);
-            MakeOverlayInput(registerAccountInput);
-            MakeOverlayInput(registerPasswordInput);
-            MakeOverlayInput(registerConfirmInput);
-
-            Button registerButton = CreateButton(designRoot.transform, "注册并继续激活",
-                LoginDesignPosition(44f, 530f, 302f, 52f), HandleRegisterClicked, 302f, 52f);
-            Button backButton = CreateButton(designRoot.transform, "返回登录",
-                LoginDesignPosition(190f, 604f, 110f, 28f), () => bootstrap.Router.Navigate(AppRoute.Login), 110f, 28f);
-            MakeOverlayButton(registerButton);
-            MakeOverlayButton(backButton);
-            return panel;
-        }
-
-        private GameObject CreateActivationPanel(Transform parent)
-        {
-            GameObject panel = CreatePanel("ActivationPanel", parent, new Color(0.973f, 0.980f, 1f));
-            GameObject designRoot = new GameObject("ActivationDesign390x884", typeof(RectTransform));
-            designRoot.transform.SetParent(panel.transform, false);
-            RectTransform designRect = designRoot.GetComponent<RectTransform>();
-            designRect.anchorMin = new Vector2(0.5f, 0.5f);
-            designRect.anchorMax = new Vector2(0.5f, 0.5f);
-            designRect.pivot = new Vector2(0.5f, 0.5f);
-            designRect.sizeDelta = new Vector2(LoginDesignWidth, LoginDesignHeight);
-            designRect.anchoredPosition = Vector2.zero;
-            float designScale = Mathf.Min(1080f / LoginDesignWidth, 1920f / LoginDesignHeight);
-            designRoot.transform.localScale = new Vector3(designScale, designScale, 1f);
-            CreateRasterImage(designRoot.transform, "AppUi/ActivationScreen", Vector2.zero,
-                new Vector2(LoginDesignWidth, LoginDesignHeight));
-
-            activationCodeInput = CreateInput(designRoot.transform, "激活码（11位手机号）",
-                LoginDesignPosition(44f, 400f, 302f, 57f), false);
-            activationCodeInput.GetComponent<RectTransform>().sizeDelta = LoginDesignSize(302f, 57f);
-            MakeOverlayInput(activationCodeInput);
-            activationMessage = CreateLabel(designRoot.transform, "",
-                LoginDesignPosition(44f, 475f, 302f, 30f), 12);
-            activationMessage.rectTransform.sizeDelta = LoginDesignSize(302f, 30f);
-            activationMessage.alignment = TextAnchor.MiddleLeft;
-            activationMessage.color = new Color(0.35f, 0.40f, 0.48f, 1f);
-
-            Button activateButton = CreateButton(designRoot.transform, "确认绑定",
-                LoginDesignPosition(44f, 522f, 302f, 52f), HandleActivationClicked, 302f, 52f);
-            Button backButton = CreateButton(designRoot.transform, "返回登录",
-                LoginDesignPosition(165f, 598f, 90f, 28f), () => bootstrap.State.ClearSession(), 90f, 28f);
-            MakeOverlayButton(activateButton);
-            MakeOverlayButton(backButton);
-            return panel;
-        }
-
         private GameObject CreateHomePanel(Transform parent)
         {
             homeScreen = new HomeScreen();
@@ -420,21 +307,6 @@ namespace SpineRecovery.App
             };
         }
 
-        private GameObject CreateArTrainingPanel(Transform parent)
-        {
-            GameObject panel = CreatePanel("ArTrainingPanel", parent, new Color(0.973f, 0.980f, 1f));
-            CreateLabel(panel.transform, "AR 训练", new Vector2(0, 250), 34);
-            CreateLabel(panel.transform, "连接投屏眼镜与 IMU 追踪器，进入本次训练流程。", new Vector2(0, 190), 17);
-            arTrainingMessage = CreateLabel(panel.transform, "建议先完成追踪器校准，再开始训练。", new Vector2(0, 130), 16);
-            arTrainingMessage.rectTransform.sizeDelta = new Vector2(820, 70);
-            // The Unity V2 scene owns the AR preparation screen and its action
-            // menu.  Enter it directly so the phone flow matches SpineFlowMobile.
-            CreateButton(panel.transform, "开始训练", new Vector2(0, 40), () => StartTraining("SpineV2Minimal", "dead_bug"));
-            CreateButton(panel.transform, "追踪器连接与校准", new Vector2(0, -50), OpenTrackingCalibrationFromHome);
-            CreateButton(panel.transform, "动作示范库", new Vector2(0, -140), OpenActionLibrary);
-            CreateButton(panel.transform, "返回训练首页", new Vector2(0, -230), () => bootstrap.Router.Navigate(AppRoute.Home));
-            return panel;
-        }
 
         private GameObject CreateTrainingMenuPanel(Transform parent)
         {
@@ -603,8 +475,15 @@ namespace SpineRecovery.App
                 var imported = JsonUtility.FromJson<ImportedReplayList>("{\"items\":" + ids + "}");
                 replayId = imported.items?.LastOrDefault();
             }
+            OpenReplayById(replayId);
+        }
+
+        private void OpenReplayById(string replayId)
+        {
             if (string.IsNullOrEmpty(replayId))
-            { historyMessage.text = "暂无本账号已完成的回放。"; return; }
+            { if (historyMessage != null) historyMessage.text = "暂无本账号已完成的回放。"; return; }
+            if (!Application.CanStreamedLevelBeLoaded("PlayBack"))
+            { if (historyMessage != null) historyMessage.text = "回放页面暂不可用。"; return; }
             ReplaySessionContext.SetCommitted(replayId);
             auxiliaryReturnRoute = AppRoute.History;
             auxiliaryPageOpen = true;
@@ -615,21 +494,6 @@ namespace SpineRecovery.App
             SceneManager.LoadScene("PlayBack", LoadSceneMode.Single);
         }
 
-        private GameObject CreateAdminPanel(Transform parent)
-        {
-            GameObject panel = CreatePanel("AdminPanel", parent, new Color(0.973f, 0.980f, 1f));
-            CreateLabel(panel.transform, "管理员配置（只读）", new Vector2(0, 220), 28);
-            adminMessage = CreateLabel(panel.transform, "", new Vector2(0, 80), 16);
-            adminMessage.rectTransform.sizeDelta = new Vector2(900, 260);
-            CreateButton(panel.transform, "刷新已发布配置", new Vector2(0, -80), RefreshAdminSummary);
-            CreateButton(panel.transform, "绑定 IMU", new Vector2(0, -155), OpenAdminImuBinding);
-            CreateButton(panel.transform, "从当前版本创建草稿", new Vector2(0, -230), CreateAdminDraft);
-            CreateButton(panel.transform, "标记 AR 测试通过", new Vector2(0, -305), MarkAdminArTestPassed);
-            CreateButton(panel.transform, "发布当前草稿", new Vector2(0, -380), PublishAdminDraft);
-            CreateButton(panel.transform, "回滚到最近归档版本", new Vector2(0, -455), RollbackAdminVersion);
-            CreateButton(panel.transform, "返回登录", new Vector2(0, -530), () => bootstrap.State.ClearSession());
-            return panel;
-        }
 
         private void OpenAdminImuBinding()
         {
@@ -789,35 +653,6 @@ namespace SpineRecovery.App
             CommitAdminImuBindings();
         }
 
-        private GameObject CreateHistoryPanel(Transform parent)
-        {
-            GameObject panel = CreatePanel("HistoryPanel", parent, new Color(0.973f, 0.980f, 1f));
-            CreateLabel(panel.transform, "训练历史", new Vector2(0, 700), 28);
-            var scrollObject = new GameObject("HistoryScroll", typeof(RectTransform), typeof(Image), typeof(ScrollRect));
-            scrollObject.transform.SetParent(panel.transform, false);
-            var rect = scrollObject.GetComponent<RectTransform>();
-            rect.sizeDelta = new Vector2(900, 850);
-            rect.anchoredPosition = new Vector2(0, 170);
-            scrollObject.GetComponent<Image>().color = new Color(1, 1, 1, 0.01f);
-            var viewportObject = new GameObject("Viewport", typeof(RectTransform), typeof(RectMask2D));
-            viewportObject.transform.SetParent(scrollObject.transform, false);
-            var viewport = viewportObject.GetComponent<RectTransform>();
-            viewport.anchorMin = Vector2.zero; viewport.anchorMax = Vector2.one;
-            viewport.offsetMin = viewport.offsetMax = Vector2.zero;
-            historyMessage = CreateLabel(viewport, "", Vector2.zero, 16);
-            historyMessage.rectTransform.anchorMin = historyMessage.rectTransform.anchorMax = new Vector2(0.5f, 1);
-            historyMessage.rectTransform.pivot = new Vector2(0.5f, 1);
-            historyMessage.rectTransform.sizeDelta = new Vector2(840, 0);
-            historyMessage.alignment = TextAnchor.UpperLeft;
-            historyMessage.verticalOverflow = VerticalWrapMode.Overflow;
-            historyMessage.gameObject.AddComponent<ContentSizeFitter>().verticalFit = ContentSizeFitter.FitMode.PreferredSize;
-            var scroll = scrollObject.GetComponent<ScrollRect>();
-            scroll.viewport = viewport; scroll.content = historyMessage.rectTransform;
-            scroll.horizontal = false; scroll.movementType = ScrollRect.MovementType.Clamped;
-            CreateButton(panel.transform, "查看最近完成的回放", new Vector2(0, -350), OpenReplay);
-            CreateButton(panel.transform, "返回训练首页", new Vector2(0, -450), () => bootstrap.Router.Navigate(AppRoute.Home));
-            return panel;
-        }
 
         private const string TherapistContactPending = "暂未配置治疗师联系方式，请通过医院渠道联系你的治疗师。";
 
@@ -934,7 +769,8 @@ namespace SpineRecovery.App
             // follows it always belongs to the last (or only) action of the plan.
             postActionCount = plan != null && plan.actions != null ? Mathf.Max(1, plan.prescriptionContractVersion == 2 ? plan.actions.Length / 2 : plan.actions.Length) : 1;
             postActionNumber = postActionCount;
-            if (postActionScreen != null) postActionScreen.Show(postActionNumber, postActionCount, DisplayActionName(plan));
+            if (postActionScreen != null) postActionScreen.Show(postActionNumber, postActionCount, DisplayActionName(plan),
+                bootstrap?.Training.CurrentResult?.completed == true);
             if (bootstrap != null && bootstrap.Router != null)
                 bootstrap.Router.Navigate(AppRoute.PostTrainingSurvey);
         }
@@ -999,7 +835,7 @@ namespace SpineRecovery.App
             bootstrap.State.SetSession(session);
             bootstrap.Training.RestoreForCurrentUser();
             activationCodeInput.text = "";
-            activationMessage.text = "账号已创建，请绑定医生激活码，或选择稍后激活。";
+            activationMessage.text = "账号已创建，请输入医生建档时使用的手机号以绑定档案。";
             bootstrap.Router.Navigate(AppRoute.Activation);
         }
 
@@ -1057,35 +893,7 @@ namespace SpineRecovery.App
             NavigateWithProfile(AppRoute.Home);
         }
 
-        [System.Serializable] private sealed class HistoryScore { public int overallScore; }
 
-        private void RefreshHistorySummary()
-        {
-            UserSession session = bootstrap.State.Session;
-            if (session == null || historyMessage == null) return;
-            var pain = session.painHistory ?? System.Array.Empty<PainHistoryRecord>();
-            var training = session.trainingHistory ?? System.Array.Empty<TrainingHistoryRecord>();
-            List<string> trainingLines = new List<string>();
-            foreach (TrainingHistoryRecord record in training)
-            {
-                string feedback = string.IsNullOrWhiteSpace(record.feedback) ? "" : "，反馈：" + record.feedback;
-                var result = string.IsNullOrEmpty(record.resultJson) ? null : JsonUtility.FromJson<HistoryScore>(record.resultJson);
-                string state = record.endReason == "LEGACY_IMPORT" ? "导入记录" : record.completed ? "完成" : string.IsNullOrEmpty(record.endReason) ? "进行中" : "中断";
-                trainingLines.Add(record.completedAt + "  " + record.actionId + "  " + state +
-                    (record.completed && result != null ? "  得分 " + result.overallScore : "") + feedback);
-            }
-            List<string> painLines = pain
-                .OrderByDescending(record => record.recordedAt)
-                .Take(8)
-                .Select(record => record.recordedAt + "  疼痛 " + record.painLevel + "/10" +
-                    (record.painParts == null || record.painParts.Length == 0 ? "" : "（" + string.Join("、", record.painParts) + "）"))
-                .ToList();
-            historyMessage.text = "疼痛记录：" + pain.Length + " 条\n" +
-                (painLines.Count == 0 ? "暂无疼痛记录。" : string.Join("\n", painLines)) + "\n\n" +
-                "训练记录：" + training.Length + " 条\n" +
-                (trainingLines.Count == 0 ? "完成训练并提交结果后，这里会显示训练记录。" :
-                    string.Join("\n", trainingLines));
-        }
 
         private void RefreshAdminSummary()
         {
@@ -1349,22 +1157,6 @@ namespace SpineRecovery.App
             bootstrap.Router.Navigate(AppRoute.BasicProfile);
         }
 
-        private GameObject CreateFormPanel(Transform parent, string title, string subtitle, System.Action<Transform> build)
-        {
-            GameObject panel = CreatePanel(title + "Panel", parent, new Color(0.973f, 0.980f, 1f));
-            bool admission = title == "首次动作评估";
-            Text heading = CreateLabel(panel.transform, title, new Vector2(0, admission ? 700 : 330), admission ? 36 : 28);
-            if (admission) heading.fontStyle = FontStyle.Bold;
-            Text description = CreateLabel(panel.transform, subtitle, new Vector2(0, admission ? 640 : 275), admission ? 18 : 15);
-            if (admission) description.fontStyle = FontStyle.Bold;
-            flowMessage = CreateLabel(panel.transform, "", new Vector2(0, admission ? -680 : -360), admission ? 18 : 14);
-            AppRoute route = title == "资料登记" ? AppRoute.BasicProfile : title == "基础问卷" ? AppRoute.BasicSurvey :
-                title == "疼痛记录" ? AppRoute.PainSelect : title == "首次动作评估" ? AppRoute.MobileAdmission :
-                title == "需要专业评估" ? AppRoute.AdmissionDecision : AppRoute.PreTraining;
-            flowMessages[route] = flowMessage;
-            build(panel.transform);
-            return panel;
-        }
 
         private GameObject CreateProfilePanel(Transform parent)
         {
@@ -1476,24 +1268,6 @@ namespace SpineRecovery.App
             bootstrap.Training.RestoreForCurrentUser();
         }
 
-        private void CreateSurveyForm(Transform parent)
-        {
-            situationButtons = new[]
-            {
-                CreateButton(parent, "情况：预防 / 保持健康", new Vector2(0, 195), () => SelectSituation(0)),
-                CreateButton(parent, "情况：曾有相关问题", new Vector2(0, 125), () => SelectSituation(1)),
-                CreateButton(parent, "情况：目前急性不适", new Vector2(0, 55), () => SelectSituation(2)),
-            };
-            symptomButtons = new[]
-            {
-                CreateButton(parent, "症状：没感觉", new Vector2(0, -25), () => SelectSymptom(0)),
-                CreateButton(parent, "症状：腰疼 / 腿疼 / 腿麻 / 放射痛", new Vector2(0, -95), () => SelectSymptom(1)),
-                CreateButton(parent, "症状：无力（暂停流程）", new Vector2(0, -165), () => SelectSymptom(2)),
-            };
-            surveySelectionLabel = CreateLabel(parent, "当前选择：尚未选择", new Vector2(0, -315), 14);
-            CreateButton(parent, "保存并继续", new Vector2(0, -245), SaveSurvey);
-            RefreshSurveySelection();
-        }
 
         private void SelectSituation(int index)
         {
@@ -1560,26 +1334,6 @@ namespace SpineRecovery.App
             bootstrap.Users.Save(user); bootstrap.Router.Navigate(AppRoute.PainSelect);
         }
 
-        private void CreatePainForm(Transform parent)
-        {
-            string[] parts = { "左腰部", "右腰部", "左大臂", "右大臂", "左臀部", "右臀部", "左腿", "右腿" };
-            string[] keys = { "left_waist", "right_waist", "left_upper_arm", "right_upper_arm", "left_hip", "right_hip", "left_leg", "right_leg" };
-            painPartButtons = new Button[parts.Length];
-            for (int i = 0; i < parts.Length; i++)
-            {
-                string key = keys[i];
-                painPartButtons[i] = CreateButton(parent, parts[i], new Vector2((i % 2 == 0 ? -145 : 145), 185 - (i / 2) * 65), () => TogglePainPart(key), 250);
-            }
-            noPainButton = CreateButton(parent, "没有疼痛", new Vector2(0, -72), SelectNoPain);
-            selectedPainPartLabel = CreateLabel(parent, "已选部位：未选择（可多选）", new Vector2(0, -130), 15);
-            selectedPainPartLabel.rectTransform.sizeDelta = new Vector2(760, 38);
-            painScoreLabel = CreateLabel(parent, "选中部位后设置疼痛程度：3 / 10", new Vector2(0, -180), 16);
-            CreateButton(parent, "疼痛评分 −", new Vector2(-145, -238), () => ChangePainScore(-1), 250);
-            CreateButton(parent, "疼痛评分 +", new Vector2(145, -238), () => ChangePainScore(1), 250);
-            CreateButton(parent, "记录并继续", new Vector2(0, -305), SavePain);
-            flowMessage.rectTransform.anchoredPosition = new Vector2(0, -390);
-            RefreshPainSelectionUi(keys, parts);
-        }
 
         private void SavePain()
         {
@@ -1710,96 +1464,9 @@ namespace SpineRecovery.App
             if (label != null) label.color = textColor;
         }
 
-        private void CreateAdmissionForm(Transform parent)
-        {
-            const float verticalShift = 180f;
-            flexionResponseButtons = CreateMovementAssessment(parent, true, 225f + verticalShift, "测试项 1 · 站立位前屈（FIS）", "双腿伸直，连续尝试用手摸脚尖；按产品流程完成 10 次。", new Color(0.22f, 0.55f, 0.91f));
-            flexionPhaseButtons = lastCreatedPhaseButtons;
-            extensionResponseButtons = CreateMovementAssessment(parent, false, -285f + verticalShift, "测试项 2 · 站立位后伸（EIS）", "双手托腰，以手为支点连续后仰；按产品流程完成 10 次。", new Color(0.08f, 0.61f, 0.56f));
-            extensionPhaseButtons = lastCreatedPhaseButtons;
-            Button finishButton = CreateButton(parent, "完成首次评估", new Vector2(0, -645), FinishAdmission, 560, 64);
-            Text finishLabel = finishButton.GetComponentInChildren<Text>();
-            if (finishLabel != null) { finishLabel.fontSize = 26; finishLabel.fontStyle = FontStyle.Bold; }
-            flowMessage.rectTransform.anchoredPosition = new Vector2(0, -720);
-        }
 
         private Button[] lastCreatedPhaseButtons;
 
-        private Button[] CreateMovementAssessment(Transform parent, bool flexion, float top, string title, string instruction, Color accent)
-        {
-            Text countLabel = CreateLabel(parent, "实际完成：0 次", new Vector2(-100, top + 52), 18);
-            countLabel.rectTransform.sizeDelta = new Vector2(340, 34);
-            System.Action<int> updateCount = delta =>
-            {
-                int count = Mathf.Clamp((flexion ? flexionCompletedCount : extensionCompletedCount) + delta, 0, 10);
-                if (flexion) flexionCompletedCount = count; else extensionCompletedCount = count;
-                countLabel.text = "实际完成：" + count + " 次";
-            };
-            CreateButton(parent, "−", new Vector2(170, top + 52), () => updateCount(-1), 80, 38);
-            CreateButton(parent, "+", new Vector2(270, top + 52), () => updateCount(1), 80, 38);
-            Text sectionTitle = CreateLabel(parent, title, new Vector2(0, top), 25);
-            sectionTitle.fontStyle = FontStyle.Bold;
-            sectionTitle.rectTransform.sizeDelta = new Vector2(760, 42);
-            Text repetitions = CreateLabel(parent, instruction, new Vector2(0, top - 46), 18);
-            repetitions.fontStyle = FontStyle.Bold;
-            repetitions.rectTransform.sizeDelta = new Vector2(760, 34);
-            Text responseQuestion = CreateLabel(parent, "动作后的疼痛反应", new Vector2(0, top - 82), 20);
-            responseQuestion.fontStyle = FontStyle.Bold;
-            responseQuestion.rectTransform.sizeDelta = new Vector2(760, 34);
-
-            string[] responses = { "是，明显缓解", "否，无变化", "加重" };
-            Button[] responseButtons = new Button[responses.Length];
-            for (int i = 0; i < responses.Length; i++)
-            {
-                int responseIndex = i;
-                responseButtons[i] = CreateButton(parent, responses[i], new Vector2(0, top - 120 - i * 44),
-                    () => SelectAdmissionResponse(flexion, responseIndex), 560, 40);
-                Text responseLabel = responseButtons[i].GetComponentInChildren<Text>();
-                if (responseLabel != null) { responseLabel.fontSize = 22; responseLabel.fontStyle = FontStyle.Bold; }
-                SetButtonColors(responseButtons[i], new Color(0.95f, 0.97f, 0.99f), new Color(0.88f, 0.93f, 0.98f), new Color(0.16f, 0.20f, 0.26f));
-            }
-
-            Text phaseTitle = CreateLabel(parent, "补充观察（可选）：疼痛最先出现阶段", new Vector2(0, top - 266), 18);
-            phaseTitle.fontStyle = FontStyle.Bold;
-            phaseTitle.rectTransform.sizeDelta = new Vector2(760, 30);
-            string[] phases = { "起始阶段", "中间阶段", "末端阶段", "全程无痛" };
-            Button[] phaseButtons = new Button[phases.Length];
-            for (int i = 0; i < phases.Length; i++)
-            {
-                int phaseIndex = i;
-                Vector2 pos = new Vector2(i % 2 == 0 ? -145 : 145, top - 302 - (i / 2) * 42);
-                phaseButtons[i] = CreateButton(parent, phases[i], pos,
-                    () => SelectAdmissionPhase(flexion, phaseIndex), 250, 38);
-                Text phaseLabel = phaseButtons[i].GetComponentInChildren<Text>();
-                if (phaseLabel != null) { phaseLabel.fontSize = 20; phaseLabel.fontStyle = FontStyle.Bold; }
-                SetButtonColors(phaseButtons[i], new Color(0.95f, 0.97f, 0.99f), new Color(0.88f, 0.93f, 0.98f), new Color(0.16f, 0.20f, 0.26f));
-            }
-
-            Text scoreLabel = CreateLabel(parent, "疼痛程度：未评分 / 10", new Vector2(0, top - 394), 20);
-            scoreLabel.fontStyle = FontStyle.Bold;
-            scoreLabel.rectTransform.sizeDelta = new Vector2(760, 32);
-            CreatePainSlider(parent, new Vector2(0, top - 438), accent,
-                value => SetAdmissionPain(flexion, value));
-            Text lowLabel = CreateLabel(parent, "1 轻微", new Vector2(-250, top - 468), 16);
-            lowLabel.rectTransform.sizeDelta = new Vector2(100, 28);
-            lowLabel.alignment = TextAnchor.MiddleLeft;
-            lowLabel.color = new Color(0.42f, 0.48f, 0.56f);
-            Text highLabel = CreateLabel(parent, "10 剧痛", new Vector2(250, top - 468), 16);
-            highLabel.rectTransform.sizeDelta = new Vector2(100, 28);
-            highLabel.alignment = TextAnchor.MiddleRight;
-            highLabel.color = new Color(0.42f, 0.48f, 0.56f);
-            if (flexion)
-            {
-                flexionScoreLabel = scoreLabel;
-            }
-            else
-            {
-                extensionScoreLabel = scoreLabel;
-            }
-
-            lastCreatedPhaseButtons = phaseButtons;
-            return responseButtons;
-        }
 
         private Text flexionScoreLabel;
         private Text extensionScoreLabel;
@@ -1964,11 +1631,6 @@ namespace SpineRecovery.App
             }
         }
 
-        private void CreateReviewForm(Transform parent)
-        {
-            CreateLabel(parent, "本地演示不会自动联网通知医生。请先遵循专业人员的建议，不要通过重新登录绕过此提示。", new Vector2(0, 110), 16);
-            CreateButton(parent, "退出登录", new Vector2(0, -5), () => bootstrap.State.ClearSession());
-        }
 
         private void ShowFlowMessage(string message)
         {
@@ -2042,95 +1704,6 @@ namespace SpineRecovery.App
             scaler.matchWidthOrHeight = 0.5f;
             canvasObject.AddComponent<GraphicRaycaster>();
             return canvas;
-        }
-
-        private const float LoginDesignWidth = 390f;
-        private const float LoginDesignHeight = 884f;
-
-        private static Vector2 LoginDesignSize(float width, float height)
-        {
-            return new Vector2(width, height);
-        }
-
-        private static Vector2 LoginDesignPosition(float x, float y, float width, float height)
-        {
-            return new Vector2(
-                x + width * 0.5f - LoginDesignWidth * 0.5f,
-                LoginDesignHeight * 0.5f - (y + height * 0.5f));
-        }
-
-        private static void CreateRasterImage(Transform parent, string resourcePath, Vector2 position, Vector2 size)
-        {
-            Texture2D texture = Resources.Load<Texture2D>(resourcePath);
-            if (texture == null) return;
-            GameObject imageObject = new GameObject("Raster:" + resourcePath, typeof(RectTransform), typeof(Image));
-            imageObject.transform.SetParent(parent, false);
-            RectTransform rect = imageObject.GetComponent<RectTransform>();
-            rect.sizeDelta = size;
-            rect.anchoredPosition = position;
-            Image image = imageObject.GetComponent<Image>();
-            image.sprite = Sprite.Create(texture, new Rect(0f, 0f, texture.width, texture.height),
-                new Vector2(0.5f, 0.5f), 100f);
-            image.type = Image.Type.Simple;
-            image.preserveAspect = false;
-            image.raycastTarget = false;
-        }
-
-        private static void MakeOverlayInput(InputField input)
-        {
-            if (input == null) return;
-            Image image = input.GetComponent<Image>();
-            if (image != null)
-            {
-                // This InputField is only an interaction layer over the
-                // approved phone PNG. Keep its Image transparent and detach
-                // it from Selectable's targetGraphic so Unity cannot tint it
-                // white on focus and cover the authored icon/border.
-                image.color = new Color(1f, 1f, 1f, 0f);
-                image.raycastTarget = true;
-            }
-            input.targetGraphic = null;
-            input.transition = Selectable.Transition.None;
-            RoundedBorderGraphic border = input.GetComponentInChildren<RoundedBorderGraphic>(true);
-            if (border != null)
-            {
-                border.SetBorderColor(new Color(1f, 1f, 1f, 0f));
-                border.raycastTarget = false;
-            }
-            if (input.textComponent != null)
-            {
-                input.textComponent.color = new Color(0.25f, 0.30f, 0.38f, 1f);
-                // The login design root is scaled up for the portrait canvas;
-                // generate the glyphs at a larger size so typed characters do
-                // not become soft after the transform scale.
-                // The login artwork is authored at 390 design pixels (the
-                // source PNG is now imported at 2x). Keep live glyphs at the
-                // same visual size as the artwork instead of the old 30px
-                // value, which rendered typed text oversized and soft.
-                input.textComponent.font = AppBootstrap.Instance != null && AppBootstrap.Instance.uiFont != null
-                    ? AppBootstrap.Instance.uiFont : Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
-                input.textComponent.fontSize = 17;
-                input.textComponent.alignByGeometry = false;
-                input.textComponent.horizontalOverflow = HorizontalWrapMode.Overflow;
-                input.textComponent.verticalOverflow = VerticalWrapMode.Truncate;
-            }
-            if (input.placeholder is Text placeholder)
-                placeholder.color = new Color(1f, 1f, 1f, 0f);
-        }
-
-        private static void MakeOverlayButton(Button button)
-        {
-            if (button == null) return;
-            Image image = button.GetComponent<Image>();
-            if (image != null) image.color = new Color(1f, 1f, 1f, 0f);
-            Text label = button.GetComponentInChildren<Text>();
-            if (label != null) label.color = new Color(1f, 1f, 1f, 0f);
-            ColorBlock colors = button.colors;
-            colors.normalColor = new Color(1f, 1f, 1f, 0f);
-            colors.highlightedColor = new Color(1f, 1f, 1f, 0f);
-            colors.pressedColor = new Color(1f, 1f, 1f, 0f);
-            colors.selectedColor = new Color(1f, 1f, 1f, 0f);
-            button.colors = colors;
         }
 
         private void EnsureEventSystem()

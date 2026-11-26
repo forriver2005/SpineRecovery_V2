@@ -211,8 +211,8 @@ namespace SpineRecovery.App
             var actionGroup = new GameObject("AdminActions", typeof(RectTransform)).GetComponent<RectTransform>();
             actionGroup.SetParent(content, false);
             QuestionnaireUi.Place(actionGroup, 0, 836, 390, 480);
-            string[] labels = { "刷新已发布配置", "绑定当前 5 个追踪器", "从当前版本创建草稿", "标记 AR 测试通过", "发布当前草稿", "回滚到最近归档版本" };
-            UnityEngine.Events.UnityAction[] actions = { RefreshAdminSummary, BindCurrentTrackers, CreateAdminDraft, MarkAdminArTestPassed, PublishAdminDraft, RollbackAdminVersion };
+            string[] labels = { "刷新已发布配置", "绑定 IMU", "从当前版本创建草稿", "标记 AR 测试通过", "发布当前草稿", "回滚到最近归档版本" };
+            UnityEngine.Events.UnityAction[] actions = { RefreshAdminSummary, OpenAdminImuBinding, CreateAdminDraft, MarkAdminArTestPassed, PublishAdminDraft, RollbackAdminVersion };
             for (int i = 0; i < labels.Length; i++) QuestionnaireUi.PillButton(actionGroup, labels[i], 20, i * 64, 350, 52, i == 0, actions[i]);
             QuestionnaireUi.PillButton(actionGroup, "退出登录", 20, 404, 350, 52, false, () => bootstrap.State.ClearSession());
             MobileUi.Height(content, 1320);

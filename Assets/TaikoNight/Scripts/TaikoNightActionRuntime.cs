@@ -58,7 +58,9 @@ namespace TaikoNight
         public float ActiveSeconds => activeSeconds;
         public event Action Completed;
         public bool IsMenuVisible => !running && !countdownRunning;
-        public bool CanStartTraining => motion != null && motion.IsReady && IsMenuVisible && HasFreshTracker();
+        public string StartBlockedReason => motion == null || !motion.IsReady ? "动作资源尚未就绪" :
+            !HasFreshTracker() ? "等待动作传感器连接" : !IsMenuVisible ? "游戏已开始" : null;
+        public bool CanStartTraining => StartBlockedReason == null;
         public bool IsRunning => running;
         public bool IsCountingDown => countdownRunning;
         public int RepetitionCount => repetitionCount;
@@ -101,7 +103,8 @@ namespace TaikoNight
             selection = TaikoNightSelection.Create(recorder.UserAnimator, font, crunch ? "卷腹" : "卧位猫式",
                 crunch ? "卷起　→　保持　→　回落" : "拱背　→　保持　→　还原", SelectDifficulty, () => repetitionCount,
                 menu.StartTraining, () => entry.OpenWorkoutPanelAbove(2210), () => menu.IsFlowTestCalibrationBypassed,
-                null);
+                null, () => StartBlockedReason ??
+                    (menu.TrainingStartAllowed?.Invoke() == false ? "请等待当前训练流程完成" : null));
             ApplyPrescription();
             overlayRoot.SetActive(false);
         }
@@ -172,8 +175,7 @@ namespace TaikoNight
 
         public bool StartFromMenu()
         {
-            if (motion == null || !motion.IsReady || running || countdownRunning ||
-                !HasFreshTracker()) return false;
+            if (!CanStartTraining) return false;
             completedRepetitions = 0;
             IsResultVisible = false;
             activeSeconds = 0;

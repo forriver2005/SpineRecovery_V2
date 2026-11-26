@@ -1,0 +1,18 @@
+PASS LyingCatPractice_TaikoNight: disconnected input blocks start with visible reason
+PASS LyingCatPractice_TaikoNight: action runtime ready with fresh input
+PASS LyingCatPractice_TaikoNight: missing motion resources block start with visible reason
+PASS LyingCatPractice_TaikoNight: prescription/sequence guard still blocks
+PASS LyingCatPractice_TaikoNight: visible menu agrees with game readiness
+PASS LyingCatPractice_TaikoNight: actual start button enters game countdown from copied practice menu
+PASS LyingCatPractice_TaikoNight: duplicate click cannot start twice
+PASS LyingCatPractice_TaikoNight: cancel returns to a usable game menu
+PASS LyingCatPractice_TaikoNight: disconnect after returning to menu prevents restart
+PASS CrunchPractice_TaikoNight: disconnected input blocks start with visible reason
+PASS CrunchPractice_TaikoNight: action runtime ready with fresh input
+PASS CrunchPractice_TaikoNight: missing motion resources block start with visible reason
+PASS CrunchPractice_TaikoNight: prescription/sequence guard still blocks
+PASS CrunchPractice_TaikoNight: visible menu agrees with game readiness
+PASS CrunchPractice_TaikoNight: actual start button enters game countdown from copied practice menu
+PASS CrunchPractice_TaikoNight: duplicate click cannot start twice
+PASS CrunchPractice_TaikoNight: cancel returns to a usable game menu
+PASS CrunchPractice_TaikoNight: disconnect after returning to menu prevents restart

@@ -29,10 +29,12 @@ namespace TaikoNight
         Action workout;
         Func<bool> flowTestWithoutTracker;
         Func<bool> calibrationReady;
+        Func<string> startBlockedReason;
 
         public static TaikoNightSelection Create(Animator patient, TMP_FontAsset font, string title, string steps,
             Action<string> change, Func<int> dose, Action begin, Action workout = null,
-            Func<bool> flowTestWithoutTracker = null, Func<bool> calibrationReady = null)
+            Func<bool> flowTestWithoutTracker = null, Func<bool> calibrationReady = null,
+            Func<string> startBlockedReason = null)
         {
             var host = new GameObject("Taiko Difficulty Selection", typeof(RectTransform), typeof(Canvas), typeof(CanvasScaler), typeof(GraphicRaycaster));
             var canvas = host.GetComponent<Canvas>();
@@ -47,6 +49,7 @@ namespace TaikoNight
             view.change = change; view.readDose = dose; view.begin = begin; view.workout = workout;
             view.flowTestWithoutTracker = flowTestWithoutTracker;
             view.calibrationReady = calibrationReady;
+            view.startBlockedReason = startBlockedReason;
             view.Build();
             return view;
         }
@@ -63,7 +66,7 @@ namespace TaikoNight
             identity.type = Image.Type.Filled; identity.fillMethod = Image.FillMethod.Vertical;
             identity.fillOrigin = (int)Image.OriginVertical.Bottom; identity.fillAmount = .39f;
             Label(panel, title, -400, 72, 480, 92, 51, Color.black);
-            start = Bind("StartTraining", () => { if (HasInput()) begin(); });
+            start = Bind("StartTraining", () => { if (HasInput()) begin(); RefreshInput(); });
             startLabel = start.GetComponentInChildren<TMP_Text>(true);
             selected = start.image.sprite;
             resultLabel = Label(panel, "", -400, -355, 570, 56, 28, Ink);
@@ -114,7 +117,8 @@ namespace TaikoNight
             bool tracking = HasTracking();
             bool bypass = !Prescribed && flowTestWithoutTracker != null && flowTestWithoutTracker();
             bool allowed = SpineRecovery.App.AppBootstrap.Instance?.Training.AllowsPrescriptionGame(gameObject.scene.name) ?? true;
-            return allowed && (tracking || bypass) && (calibrationReady == null || calibrationReady()) && restSecondsRemaining <= 0f;
+            return allowed && (tracking || bypass) && (calibrationReady == null || calibrationReady()) &&
+                string.IsNullOrEmpty(startBlockedReason?.Invoke()) && restSecondsRemaining <= 0f;
         }
         bool HasTracking()
         {
@@ -126,10 +130,13 @@ namespace TaikoNight
         void RefreshInput()
         {
             bool tracking = HasTracking();
-            bool flowTest = !tracking && flowTestWithoutTracker != null && flowTestWithoutTracker();
+            bool flowTest = !Prescribed && !tracking && flowTestWithoutTracker != null && flowTestWithoutTracker();
             bool ready = HasInput();
+            string blocked = startBlockedReason?.Invoke();
+            bool allowed = SpineRecovery.App.AppBootstrap.Instance?.Training.AllowsPrescriptionGame(gameObject.scene.name) ?? true;
             start.interactable = ready && restSecondsRemaining <= 0f;
             startLabel.text = restSecondsRemaining > 0f ? $"组间休息 · {Mathf.CeilToInt(restSecondsRemaining)} 秒" :
+                !allowed ? "请按处方顺序完成训练" : !string.IsNullOrEmpty(blocked) ? blocked :
                 tracking ? ready ? "开始游戏" : "请按提示完成姿态校准" : flowTest ? "流程测试（不会评分）" : "等待动作传感器连接";
             startLabel.enableAutoSizing = true;
             startLabel.fontSizeMin = 12;

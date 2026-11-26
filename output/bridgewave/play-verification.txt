@@ -7,5 +7,5 @@ PASS five-second shared countdown; pause and sensor loss freeze preparation.
 PASS actual Start button and countdown.
 PASS off-track orb continues forward; no new HIT; bursts hidden.
 PASS pause freezes progression, recorded coach and feedback; lift/hold/lower coach phases match the track.
-PASS four standard-motion tracks completed; 79 pulses, 23.17s in corridor.
+PASS four standard-motion tracks completed; 79 pulses, 23.16s in corridor.
 PASS replay resets time, counters and feedback and restores the shared sensor-gated menu.

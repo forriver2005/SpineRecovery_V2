@@ -1,4 +1,3 @@
-using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
 
@@ -11,13 +10,16 @@ namespace BridgeWave
         public BridgeWaveFollowController controller;
         public Animator animator;
         public Camera previewCamera;
-        public RawImage menuImage, gameImage;
-        public TMP_Text menuPhase;
+        public RawImage gameImage;
+        public GameObject trainingPanel;
         public Text gamePhase;
         public float SourceFrame { get; private set; }
         RenderTexture texture, previousTexture;
-        float previewTime;
-        public void RestartPreview() => previewTime = 0;
+        public void SetTrainingVisible(bool visible)
+        {
+            if (trainingPanel != null) trainingPanel.SetActive(visible);
+            previewCamera.enabled = visible;
+        }
         void Awake()
         {
             previousTexture = previewCamera.targetTexture;
@@ -25,7 +27,8 @@ namespace BridgeWave
                 { name = "BridgeWave Recorded Coach", antiAliasing = 2 };
             texture.Create();
             previewCamera.targetTexture = texture;
-            menuImage.texture = gameImage.texture = texture;
+            gameImage.texture = texture;
+            SetTrainingVisible(false);
             animator.enabled = true;
             animator.cullingMode = AnimatorCullingMode.AlwaysAnimate;
             animator.Rebind();
@@ -36,9 +39,8 @@ namespace BridgeWave
         {
             var track = controller.game.standardTrack;
             var state = controller.State;
-            bool menu = state == BridgeWaveFollowController.RunState.Ready;
-            if (menu) previewTime = Mathf.Repeat(previewTime + Time.unscaledDeltaTime, track.Duration(controller.game.totalCount) + track.restSeconds);
-            float time = menu ? previewTime : controller.Session.Elapsed;
+            if (state == BridgeWaveFollowController.RunState.Ready) return;
+            float time = controller.Session.Elapsed;
             var sample = track.Evaluate(time, controller.game.totalCount);
             int index = Mathf.Clamp(sample.cycle, 0, controller.game.totalCount - 1);
             var cycle = track.cycles[index % track.cycles.Length];
@@ -55,7 +57,6 @@ namespace BridgeWave
             if (state == BridgeWaveFollowController.RunState.Countdown) phase = "准备开始";
             if (state == BridgeWaveFollowController.RunState.Paused) phase += " · 已暂停";
             if (state == BridgeWaveFollowController.RunState.Finished) phase = "本组完成";
-            menuPhase.text = "教练演示 · " + phase;
             gamePhase.text = "教练 · " + phase;
         }
         void OnDestroy()

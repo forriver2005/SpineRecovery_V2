@@ -108,6 +108,8 @@ namespace BridgeWave.EditorTools
             Check(ui.coachPreview.animator.runtimeAnimatorController!=null && ui.coachPreview.previewCamera!=null,"Existing recorded coach rig and preview camera");
             Check(scene.GetRootGameObjects().SelectMany(g=>g.GetComponentsInChildren<Slider>(true)).Count()==0,"No manual input slider");
             Check(typeof(BridgeWaveHeightInput).GetField("manualHeight")==null,"No runtime manual input path");
+            Check(ui.startMenu.GetComponentsInChildren<RawImage>(true).Length==0,"Preparation menu has no coach window");
+            Check(ui.coachPreview.trainingPanel!=null,"Coach belongs to gameplay HUD only");
             int missing=scene.GetRootGameObjects().SelectMany(g=>g.GetComponentsInChildren<Transform>(true)).Sum(t=>GameObjectUtility.GetMonoBehavioursWithMissingScriptCount(t.gameObject));
             Check(missing==0,"No missing MonoBehaviour scripts");
             sb.AppendLine($"PASS: {pulses} continuous HIT pulse events when following; 0 when outside the band; 0 when sensor is stale; pause and reset verified.");

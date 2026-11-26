@@ -16,6 +16,7 @@ namespace BridgeWave.EditorTools
     public static class BridgeWavePlayVerification
     {
         const string Flag="BridgeWave.PlayVerification";
+        const string FlowFlag="BridgeWave.FlowVerification";
         static BridgeWaveFollowController ui;
         static double began,pauseBegan;
         static int phase,offHits;
@@ -33,14 +34,27 @@ namespace BridgeWave.EditorTools
         public static void Run()
         {
             if(EditorApplication.isPlayingOrWillChangePlaymode)throw new InvalidOperationException("Exit Play first.");
+            SessionState.SetBool(FlowFlag,false);
             phase=0;offHits=0;syntheticFrame=0;
             BridgeWaveFollowVerification.Run();
             SessionState.SetBool(Flag,true);EditorApplication.update-=Tick;EditorApplication.update+=Tick;EditorApplication.isPlaying=true;
+        }
+        public static void BuildAndRunFlow()
+        {
+            BridgeWaveFollowBuilder.Build();
+            RunFlow();
+        }
+        [MenuItem("Tools/Bridge Wave/Verify Flow Test Without Sensors")]
+        public static void RunFlow()
+        {
+            Run();
+            SessionState.SetBool(FlowFlag,true);
         }
         static void Check(bool ok,string message){if(!ok)throw new Exception(message);}
         static void Tick()
         {
             if(!EditorApplication.isPlaying||EditorApplication.isCompiling)return;
+            if(SessionState.GetBool(FlowFlag,false)){TickFlow();return;}
             try
             {
                 if(phase==0)
@@ -48,7 +62,8 @@ namespace BridgeWave.EditorTools
                     began=EditorApplication.timeSinceStartup;report="Play mode checks (synthetic input, no hardware calibration claim)\n";
                     ui=UnityEngine.Object.FindObjectOfType<BridgeWaveFollowController>();Check(ui!=null,"Controller not found");
 
-                    // The real scene defaults to sensor mode, and must not start without fresh calibrated data.
+                    // Verify strict sensor training independently of the scene's temporary flow-test switch.
+                    ui.skipCalibrationForFlowTest=false;ui.RefreshHud();
                     Check(!ui.CanStart&&ui.Session.Elapsed==0,"Uncalibrated sensor must not start");
                     ui.input.motion.SetAvailable(false);ui.Begin();Check(ui.State==BridgeWaveFollowController.RunState.Ready,"Missing sensor started session");
                     Check(ui.startMenu.IsTrainingMenuVisible&&!ui.visualRoot.activeSelf,"Shared start menu must occlude gameplay");
@@ -191,6 +206,76 @@ namespace BridgeWave.EditorTools
             }
             catch(Exception ex){File.WriteAllText("output/bridgewave/play-verification.txt",report+"FAIL "+ex);Debug.LogException(ex);Finish(1);}
         }
+        static void TickFlow()
+        {
+            try
+            {
+                if(phase==0)
+                {
+                    began=EditorApplication.timeSinceStartup;report="Flow preview verification (no wearable input, no training results)\n";
+                    ui=UnityEngine.Object.FindObjectOfType<BridgeWaveFollowController>();
+                    Check(ui!=null&&ui.skipCalibrationForFlowTest,"Scene must enable requested temporary bypass");
+                    ui.input.motion.SetAvailable(false);ui.input.Read();ui.RefreshHud();
+                    Check(ui.CanStart&&ui.startButton.interactable&&!ui.input.Calibrated,"Flow start still requires calibration or sensor");
+                    Check(!ui.calibrationButton.gameObject.activeInHierarchy&&!ui.calibrationStatus.gameObject.activeInHierarchy,"Calibration controls shown during bypass");
+                    Check(!ui.coachPreview.previewCamera.enabled&&!ui.coachPreview.trainingPanel.activeInHierarchy,"Coach must not appear on preparation page");
+                    Check(ui.startMenu.GetComponentsInChildren<RawImage>(true).Length==0,"Ready menu still contains a coach image");
+                    Check(ui.startMenu.GetComponentsInChildren<TMPro.TMP_Text>(true).Any(t=>t.name=="Title"&&t.text=="臀桥"),"Menu title must be Hip Thrust only");
+                    Check(!ui.startMenu.GetComponentsInChildren<Transform>(true).Any(t=>t.name=="Curve follow tutorial"),"Gameplay instruction popup must be removed");
+                    ui.startMenu.SelectHardDifficulty();ui.startMenu.SelectSimpleDifficulty();ui.startMenu.SelectStandardDifficulty();
+                    phase=1;networkBegan=EditorApplication.timeSinceStartup;return;
+                }
+                Check(EditorApplication.timeSinceStartup-began<55,"Flow preview timed out");
+                ui.input.motion.SetAvailable(false);ui.input.Read();
+                if(phase==1)
+                {
+                    if(EditorApplication.timeSinceStartup-networkBegan<.25)return;
+                    Capture("flow-ready");Capture("flow-ready-16x9",1280,720);Capture("flow-ready-4x3",1024,768);
+                    ui.startButton.onClick.Invoke();Check(ui.State==BridgeWaveFollowController.RunState.Countdown,"Sensor-free Start did not enter countdown");
+                    Check(ui.coachPreview.previewCamera.enabled&&ui.coachPreview.trainingPanel.activeInHierarchy,"Training coach missing after Start");
+                    report+="PASS preparation layout: logo/title, difficulty and Start; no coach, tutorial popup or calibration controls.\n";
+                    phase=2;return;
+                }
+                if(phase==2)
+                {
+                    if(ui.CountdownRemaining>4.5f)return;
+                    Capture("flow-countdown");ui.TogglePause();pauseTime=ui.CountdownRemaining;pauseBegan=EditorApplication.timeSinceStartup;phase=3;return;
+                }
+                if(phase==3)
+                {
+                    if(EditorApplication.timeSinceStartup-pauseBegan<.3)return;
+                    Check(ui.CountdownRemaining==pauseTime,"Paused countdown moved");ui.TogglePause();phase=4;return;
+                }
+                if(phase==4)
+                {
+                    if(ui.State!=BridgeWaveFollowController.RunState.Playing||ui.Session.Elapsed<2)return;
+                    Capture("flow-playing");ui.TogglePause();pauseTime=ui.Session.Elapsed;coachFrame=ui.coachPreview.SourceFrame;pauseBegan=EditorApplication.timeSinceStartup;phase=5;return;
+                }
+                if(phase==5)
+                {
+                    if(EditorApplication.timeSinceStartup-pauseBegan<.3)return;
+                    Check(ui.Session.Elapsed==pauseTime&&ui.coachPreview.SourceFrame==coachFrame,"Paused track or coach moved");
+                    Capture("flow-paused");ui.TogglePause();phase=6;return;
+                }
+                if(phase==6)
+                {
+                    Check(!ui.game.judging&&ui.Session.Hits==0,"Flow preview recorded training feedback");
+                    if(ui.State!=BridgeWaveFollowController.RunState.Finished)return;
+                    Check(ui.finishPanel.activeInHierarchy&&ui.game.counterText.text=="4","Flow did not finish all repetitions");
+                    Capture("flow-result");ui.replayButton.onClick.Invoke();
+                    Check(ui.State==BridgeWaveFollowController.RunState.Ready&&ui.CanStart&&ui.Session.Elapsed==0,"Replay failed without sensors");
+                    Check(!ui.coachPreview.previewCamera.enabled&&!ui.coachPreview.trainingPanel.activeInHierarchy,"Coach visible after replay");
+                    ui.skipCalibrationForFlowTest=false;ui.RefreshHud();
+                    Check(!ui.CanStart&&!ui.startButton.interactable&&ui.calibrationButton.gameObject.activeInHierarchy,"Disabling bypass failed to restore admission");
+                    ui.skipCalibrationForFlowTest=true;ui.RefreshHud();ui.startButton.onClick.Invoke();ui.menuButton.onClick.Invoke();
+                    Check(ui.CanStart&&ui.State==BridgeWaveFollowController.RunState.Ready,"Return to setup from countdown failed");
+                    report+="PASS no-device Start -> five-second countdown -> four repetitions -> result -> replay; pause/resume and return to preparation.\n";
+                    report+="PASS coach only appears after Start and freezes on pause; no HIT or training results in flow preview; disabling bypass restores sensor/calibration gate.\n";
+                    Directory.CreateDirectory("output/bridgewave");File.WriteAllText("output/bridgewave/flow-verification.txt",report);Debug.Log(report);Finish(0);
+                }
+            }
+            catch(Exception ex){Directory.CreateDirectory("output/bridgewave");File.WriteAllText("output/bridgewave/flow-verification.txt",report+"FAIL "+ex);Debug.LogException(ex);Finish(1);}
+        }
         static void SendVmcFrame()
         {
             using(var socket=new UdpClient())
@@ -296,7 +381,7 @@ namespace BridgeWave.EditorTools
         static void Capture(string name,int width=1688,int height=780)
         {
             var view=UnityEngine.Object.FindObjectOfType<BridgeWaveViewport>();var camera=view.view;
-            view.ConfigureCanvas();typeof(BridgeWaveCoachPreview).GetMethod("LateUpdate",BindingFlags.Instance|BindingFlags.NonPublic).Invoke(ui.coachPreview,null);ui.coachPreview.previewCamera.Render();
+            view.ConfigureCanvas();typeof(BridgeWaveCoachPreview).GetMethod("LateUpdate",BindingFlags.Instance|BindingFlags.NonPublic).Invoke(ui.coachPreview,null);if(ui.coachPreview.previewCamera.enabled)ui.coachPreview.previewCamera.Render();
             var canvases=UnityEngine.Object.FindObjectsOfType<Canvas>().Where(c=>c.isRootCanvas&&c.isActiveAndEnabled&&c.renderMode==RenderMode.ScreenSpaceOverlay).ToArray();
             var cameras=canvases.Select(c=>c.worldCamera).ToArray();var distances=canvases.Select(c=>c.planeDistance).ToArray();
             var previousRect=camera.rect;var previousTarget=camera.targetTexture;var previous=RenderTexture.active;

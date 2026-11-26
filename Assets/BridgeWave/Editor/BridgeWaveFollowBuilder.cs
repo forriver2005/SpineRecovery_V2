@@ -77,6 +77,7 @@ namespace BridgeWave.EditorTools
             var input=flowRoot.AddComponent<BridgeWaveHeightInput>();input.patient=patientAnimator;input.referenceHeightSpan=standardHeightSpan;
             var controller=flowRoot.AddComponent<BridgeWaveFollowController>();controller.game=game;controller.input=input;
             controller.visualRoot=root;
+            controller.skipCalibrationForFlowTest=true;
             var canvas=root.GetComponentInChildren<Canvas>();
             var viewport=cameraObject.AddComponent<BridgeWaveViewport>();viewport.view=camera;viewport.canvas=canvas;
             viewport.ConfigureCanvas();
@@ -93,7 +94,7 @@ namespace BridgeWave.EditorTools
             controller.pauseLabel.color=Color.white;
             root.GetComponentsInChildren<SpriteRenderer>().First(r=>r.name=="bw_hud_pause").enabled=false;
             controller.pauseButton.GetComponent<Image>().color=new Color(.19f,.18f,.4f,.9f);
-            controller.judgmentText=Text(canvas.transform,"Judgement","臀桥 · 曲线跟随",new Rect(270,312,304,25),16,TextAnchor.MiddleCenter);
+            controller.judgmentText=Text(canvas.transform,"Judgement","臀桥",new Rect(270,312,304,25),16,TextAnchor.MiddleCenter);
             controller.statusText=Text(canvas.transform,"Input status","未收到动作传感器信号，请连接设备",new Rect(160,365,524,18),9,TextAnchor.MiddleCenter);
             Text(canvas.transform,"Rep label","轨道次数",new Rect(380,4,84,10),7,TextAnchor.MiddleCenter).color=new Color(.8f,.8f,1,.75f);
             controller.menuButton=Button(canvas.transform,"Return setup","返回设置",new Rect(22,351,104,28),out _);
@@ -136,15 +137,16 @@ namespace BridgeWave.EditorTools
             foreach(var name in new[]{"simpleTimes","standardTimes","hardTimes"})serialized.FindProperty(name).intValue=4;
             serialized.FindProperty("hideAllPracticeVisualsWhileMenuVisible").boolValue=false;
             serialized.ApplyModifiedPropertiesWithoutUndo();
-            Named("Title").GetComponent<TMP_Text>().text="臀桥 · 曲线跟随";
+            Named("Title").GetComponent<TMP_Text>().text="臀桥";
             Named("Description").GetComponent<TMP_Text>().text="抬臀向上，放臀向下，让光球保持在轨道内";
             Named("Description").GetComponent<TMP_Text>().fontSize=20;
-            foreach(var name in new[]{"Logo","DBUI","DvsInfo","Break"})Named(name).gameObject.SetActive(false);
+            Named("Logo").gameObject.SetActive(true);
+            foreach(var name in new[]{"DBUI","DvsInfo","Break"})Named(name).gameObject.SetActive(false);
             controller.startButton=Named("StartTraining").GetComponent<Button>();
             controller.startLabel=controller.startButton.GetComponentInChildren<TMP_Text>(true);
-            controller.startLabel.text="开始训练";controller.startLabel.fontSize=28;
+            controller.startLabel.text="开始游戏";controller.startLabel.fontSize=24;
             var guide=Named("guide").GetComponent<Button>();
-            guide.GetComponentInChildren<TMP_Text>(true).text="重播教练演示";
+            guide.gameObject.SetActive(false);
             var back=Named("Return").GetComponent<Button>();
             var switcher=back.GetComponent<SceneSwitcher>()??back.gameObject.AddComponent<SceneSwitcher>();
             UnityEventTools.AddPersistentListener(back.onClick,switcher.ReturnToMobileApp);
@@ -181,6 +183,13 @@ namespace BridgeWave.EditorTools
             controller.calibrationStatus.text="请连接动作传感器，再进行躺姿校准";
             controller.calibrationStatus.enableWordWrapping=true;
             controller.calibrationStatus.raycastTarget=false;
+            controller.calibrationStatus.gameObject.SetActive(false);
+            controller.calibrationButton.gameObject.SetActive(false);
+            // Match the established BirdDog/DeadBug menu's left logo/title and right controls.
+            Layout((RectTransform)Named("HipThrustTitlePanel"),new Vector2(-400,0),new Vector2(610,130));
+            Layout(Named("Title").GetComponent<TMP_Text>().rectTransform,new Vector2(0,30),new Vector2(600,60));
+            Named("Title").GetComponent<TMP_Text>().fontSize=38;
+            Layout(Named("Description").GetComponent<TMP_Text>().rectTransform,new Vector2(0,-18),new Vector2(600,40));
             var coach=controller.gameObject.AddComponent<BridgeWaveCoachPreview>();controller.coachPreview=coach;coach.controller=controller;
             coach.animator=previewRoot.GetComponentInChildren<Animator>(true);
             coach.animator.runtimeAnimatorController=AssetDatabase.LoadAssetAtPath<RuntimeAnimatorController>("Assets/Movements/Recorded20261018/HipThrust_Recorded.controller");
@@ -191,14 +200,8 @@ namespace BridgeWave.EditorTools
             coach.previewCamera.allowHDR=false;
             var framing=coach.previewCamera.GetComponent<HipThrustPreviewFraming>()??coach.previewCamera.gameObject.AddComponent<HipThrustPreviewFraming>();
             framing.enabled=true;framing.avatar=coach.animator;framing.previewCamera=coach.previewCamera;framing.fitAfterLatePose=true;framing.framingPadding=.35f;
-            coach.menuImage=new GameObject("Recorded coach preview",typeof(RectTransform),typeof(RawImage)).GetComponent<RawImage>();
-            coach.menuImage.transform.SetParent(buttonParent,false);coach.menuImage.raycastTarget=false;
-            Layout(coach.menuImage.rectTransform,new Vector2(-410,240),new Vector2(440,157));
-            coach.menuPhase=UnityEngine.Object.Instantiate(template,buttonParent);
-            coach.menuPhase.name="Coach phase";coach.menuPhase.text="教练演示 · 放平准备";
-            Layout(coach.menuPhase.rectTransform,new Vector2(-410,136),new Vector2(440,35));coach.menuPhase.fontSize=24;
-            UnityEventTools.AddPersistentListener(guide.onClick,coach.RestartPreview);
             var panel=Panel(canvas.transform,"Recorded coach",new Rect(82,6,240,88),new Color(.055f,.055f,.16f,.85f));
+            coach.trainingPanel=panel;
             panel.GetComponent<Image>().raycastTarget=false;
             coach.gameImage=new GameObject("Coach",typeof(RectTransform),typeof(RawImage)).GetComponent<RawImage>();
             coach.gameImage.transform.SetParent(panel.transform,false);coach.gameImage.raycastTarget=false;

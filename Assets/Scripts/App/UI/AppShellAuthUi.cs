@@ -8,17 +8,109 @@ namespace SpineRecovery.App
     {
         private GameObject CreateLoginPanel(Transform parent)
         {
-            var content = CreateAuthPage(parent, "LoginPanel", out var panel, out var card);
-            AuthText(card, "欢迎回来", 24, 24, 302, 36, 24, true);
-            AuthText(card, "请登录以继续您的康复旅程", 24, 68, 302, 28, 15, false, QuestionnaireUi.Muted);
-            accountInput = AuthInput(card, "手机号 / 邮箱", 120, false);
-            passwordInput = AuthInput(card, "密码", 194, true);
-            loginMessage = AuthText(card, "", 24, 264, 302, 42, 13, false, QuestionnaireUi.DangerText);
-            var login = AuthButton(card, "登录", 322, HandleLoginClicked);
-            var register = AuthButton(card, "还没有账号？立即注册", 388,
-                () => bootstrap.Router.Navigate(AppRoute.Register), false);
-            AuthLayout(content, card, loginMessage, login, register, 264);
+            // The supplied artwork uses a 390 x 844 frame. Keep the image and
+            // all hit targets in one coordinate system inside the safe area.
+            RectTransform root = QuestionnaireUi.CreateScreen(parent, "LoginPanel", null, out GameObject panel);
+            panel.GetComponent<Image>().color = new Color32(245, 249, 255, 255);
+            Vector2 At(float x, float y) => new Vector2(x - 195f, 422f - y);
+            CreateRasterImage(root, "AppUi/LoginCover", Vector2.zero, new Vector2(390, 844));
+
+            accountInput = CreateInput(root, "请输入手机号或邮箱", At(195, 377), false);
+            passwordInput = CreateInput(root, "请输入密码", At(195, 469), true);
+            foreach (var input in new[] { accountInput, passwordInput })
+            {
+                input.GetComponent<RectTransform>().sizeDelta = new Vector2(306, 50);
+                MakeOverlayInput(input);
+                input.textComponent.horizontalOverflow = HorizontalWrapMode.Wrap;
+                input.textComponent.rectTransform.offsetMax = new Vector2(-40, -4);
+            }
+            var eye = CreateButton(root, "显示或隐藏密码", At(323, 469), () => {
+                passwordInput.inputType = passwordInput.inputType == InputField.InputType.Password
+                    ? InputField.InputType.Standard : InputField.InputType.Password;
+                passwordInput.ForceLabelUpdate();
+            }, 44, 44);
+            MakeOverlayButton(eye);
+            MakeOverlayButton(CreateButton(root, "立即注册", At(307, 521),
+                () => bootstrap.Router.Navigate(AppRoute.Register), 82, 44));
+            MakeOverlayButton(CreateButton(root, "登录", At(195, 576), HandleLoginClicked, 306, 52));
+            loginMessage = CreateLabel(root, "", At(148, 521), 12);
+            loginMessage.rectTransform.sizeDelta = new Vector2(208, 48);
+            loginMessage.raycastTarget = false;
             return panel;
+        }
+
+        private static void CreateRasterImage(Transform parent, string resourcePath, Vector2 position, Vector2 size)
+        {
+            Texture2D texture = Resources.Load<Texture2D>(resourcePath);
+            if (texture == null) return;
+            GameObject imageObject = new GameObject("Raster:" + resourcePath, typeof(RectTransform), typeof(Image));
+            imageObject.transform.SetParent(parent, false);
+            RectTransform rect = imageObject.GetComponent<RectTransform>();
+            rect.sizeDelta = size;
+            rect.anchoredPosition = position;
+            Image image = imageObject.GetComponent<Image>();
+            image.sprite = Sprite.Create(texture, new Rect(0f, 0f, texture.width, texture.height),
+                new Vector2(0.5f, 0.5f), 100f);
+            image.type = Image.Type.Simple;
+            image.preserveAspect = false;
+            image.raycastTarget = false;
+        }
+
+        private static void MakeOverlayInput(InputField input)
+        {
+            if (input == null) return;
+            Image image = input.GetComponent<Image>();
+            if (image != null)
+            {
+                // This InputField is only an interaction layer over the
+                // approved phone PNG. Keep its Image transparent and detach
+                // it from Selectable's targetGraphic so Unity cannot tint it
+                // white on focus and cover the authored icon/border.
+                image.color = new Color(1f, 1f, 1f, 0f);
+                image.raycastTarget = true;
+            }
+            input.targetGraphic = null;
+            input.transition = Selectable.Transition.None;
+            RoundedBorderGraphic border = input.GetComponentInChildren<RoundedBorderGraphic>(true);
+            if (border != null)
+            {
+                border.SetBorderColor(new Color(1f, 1f, 1f, 0f));
+                border.raycastTarget = false;
+            }
+            if (input.textComponent != null)
+            {
+                input.textComponent.color = new Color(0.25f, 0.30f, 0.38f, 1f);
+                // The login design root is scaled up for the portrait canvas;
+                // generate the glyphs at a larger size so typed characters do
+                // not become soft after the transform scale.
+                // The login artwork is authored at 390 design pixels (the
+                // source PNG is now imported at 2x). Keep live glyphs at the
+                // same visual size as the artwork instead of the old 30px
+                // value, which rendered typed text oversized and soft.
+                input.textComponent.font = AppBootstrap.Instance != null && AppBootstrap.Instance.uiFont != null
+                    ? AppBootstrap.Instance.uiFont : Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+                input.textComponent.fontSize = 17;
+                input.textComponent.alignByGeometry = false;
+                input.textComponent.horizontalOverflow = HorizontalWrapMode.Overflow;
+                input.textComponent.verticalOverflow = VerticalWrapMode.Truncate;
+            }
+            if (input.placeholder is Text placeholder)
+                placeholder.color = new Color(1f, 1f, 1f, 0f);
+        }
+
+        private static void MakeOverlayButton(Button button)
+        {
+            if (button == null) return;
+            Image image = button.GetComponent<Image>();
+            if (image != null) image.color = new Color(1f, 1f, 1f, 0f);
+            Text label = button.GetComponentInChildren<Text>();
+            if (label != null) label.color = new Color(1f, 1f, 1f, 0f);
+            ColorBlock colors = button.colors;
+            colors.normalColor = new Color(1f, 1f, 1f, 0f);
+            colors.highlightedColor = new Color(1f, 1f, 1f, 0f);
+            colors.pressedColor = new Color(1f, 1f, 1f, 0f);
+            colors.selectedColor = new Color(1f, 1f, 1f, 0f);
+            button.colors = colors;
         }
 
         private GameObject CreateRegisterPanel(Transform parent)

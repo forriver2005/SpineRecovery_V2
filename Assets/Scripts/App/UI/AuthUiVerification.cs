@@ -33,15 +33,6 @@ namespace SpineRecovery.App
                 foreach (string screen in new[] { "Login", "Register", "Activation" })
                 {
                     var panel = (GameObject)typeof(AppShellUi).GetMethod("Create" + screen + "Panel", Flags).Invoke(shell, new object[] { canvas.transform });
-                    if (screen == "Login")
-                    {
-                        var cover = panel.GetComponentsInChildren<Image>().First(i => i.name == "Raster:AppUi/LoginCover");
-                        Check(cover.sprite != null, "v6.2 login artwork loaded");
-                        Check(panel.GetComponentsInChildren<Button>().Any(b => b.GetComponentInChildren<Text>().text == "立即注册"), "Register link present");
-                        Check(panel.GetComponentsInChildren<InputField>().Length == 2, "Account and password inputs present");
-                        panel.SetActive(false);
-                        continue;
-                    }
                     foreach (var size in new[] { new Vector2Int(390, 844), new Vector2Int(320, 568), new Vector2Int(396, 930) })
                     {
                         foreach (bool populated in new[] { false, true })

@@ -276,44 +276,34 @@ namespace SpineRecovery.App
 
         private GameObject CreateLoginPanel(Transform parent)
         {
-            GameObject panel = CreatePanel("LoginPanel", parent, new Color(0.973f, 0.980f, 1f));
-            GameObject designRoot = new GameObject("LoginDesign390x884", typeof(RectTransform));
-            designRoot.transform.SetParent(panel.transform, false);
-            RectTransform designRect = designRoot.GetComponent<RectTransform>();
-            designRect.anchorMin = new Vector2(0.5f, 0.5f);
-            designRect.anchorMax = new Vector2(0.5f, 0.5f);
-            designRect.pivot = new Vector2(0.5f, 0.5f);
-            designRect.sizeDelta = new Vector2(390f, 884f);
-            designRect.anchoredPosition = Vector2.zero;
-            float designScale = Mathf.Min(1080f / 390f, 1920f / 884f);
-            designRoot.transform.localScale = new Vector3(designScale, designScale, 1f);
+            // The supplied artwork uses a 390 x 844 frame. Keep the image and
+            // all hit targets in one coordinate system inside the safe area.
+            RectTransform root = QuestionnaireUi.CreateScreen(parent, "LoginPanel", null, out GameObject panel);
+            panel.GetComponent<Image>().color = new Color32(245, 249, 255, 255);
+            Vector2 At(float x, float y) => new Vector2(x - 195f, 422f - y);
+            CreateRasterImage(root, "AppUi/LoginCover", Vector2.zero, new Vector2(390, 844));
 
-            // Figma exports use top-left coordinates in a 390x884 frame. The
-            // RectTransform above uses the same local frame, so convert every
-            // component through one mapping instead of mixing center and top-
-            // left coordinates (the source of the old overlap/drift).
-            // LoginCover.png is the approved complete 390x884 Figma export.
-            // Keep it as one image so every logo, label, border, shadow and
-            // spacing remains pixel-identical to the source design. The
-            // controls below are transparent interaction overlays only.
-            CreateRasterImage(designRoot.transform, "AppUi/LoginCover", Vector2.zero,
-                new Vector2(LoginDesignWidth, LoginDesignHeight));
-
-            accountInput = CreateInput(designRoot.transform, "手机号 / 邮箱", LoginDesignPosition(45.5f, 317.5f, 299f, 51f), false);
-            passwordInput = CreateInput(designRoot.transform, "密码", LoginDesignPosition(45.5f, 385.5f, 299f, 51f), true);
-            accountInput.GetComponent<RectTransform>().sizeDelta = LoginDesignSize(299f, 51f);
-            passwordInput.GetComponent<RectTransform>().sizeDelta = LoginDesignSize(299f, 51f);
-            MakeOverlayInput(accountInput);
-            MakeOverlayInput(passwordInput);
-
-            Button loginButton = CreateButton(designRoot.transform, "登录", LoginDesignPosition(45f, 491f, 300f, 52f), HandleLoginClicked, 300f, 52f);
-            Button registerButton = CreateButton(designRoot.transform, "注册新账号", LoginDesignPosition(214.489f, 610.271f, 59.106f, 14.677f),
-                () => bootstrap.Router.Navigate(AppRoute.Register), 59.106f, 28f);
-            MakeOverlayButton(loginButton);
-            MakeOverlayButton(registerButton);
-
-            loginMessage = CreateLabel(designRoot.transform, "", LoginDesignPosition(45f, 550f, 300f, 28f), 12);
-            loginMessage.rectTransform.sizeDelta = LoginDesignSize(300f, 28f);
+            accountInput = CreateInput(root, "请输入手机号或邮箱", At(195, 377), false);
+            passwordInput = CreateInput(root, "请输入密码", At(195, 469), true);
+            foreach (var input in new[] { accountInput, passwordInput })
+            {
+                input.GetComponent<RectTransform>().sizeDelta = new Vector2(306, 50);
+                MakeOverlayInput(input);
+                input.textComponent.horizontalOverflow = HorizontalWrapMode.Wrap;
+                input.textComponent.rectTransform.offsetMax = new Vector2(-40, -4);
+            }
+            var eye = CreateButton(root, "显示或隐藏密码", At(323, 469), () => {
+                passwordInput.inputType = passwordInput.inputType == InputField.InputType.Password
+                    ? InputField.InputType.Standard : InputField.InputType.Password;
+                passwordInput.ForceLabelUpdate();
+            }, 44, 44);
+            MakeOverlayButton(eye);
+            MakeOverlayButton(CreateButton(root, "立即注册", At(307, 521),
+                () => bootstrap.Router.Navigate(AppRoute.Register), 82, 44));
+            MakeOverlayButton(CreateButton(root, "登录", At(195, 576), HandleLoginClicked, 306, 52));
+            loginMessage = CreateLabel(root, "", At(148, 521), 12);
+            loginMessage.rectTransform.sizeDelta = new Vector2(208, 48);
+            loginMessage.raycastTarget = false;
             return panel;
         }
 
@@ -420,21 +410,6 @@ namespace SpineRecovery.App
             };
         }
 
-        private GameObject CreateArTrainingPanel(Transform parent)
-        {
-            GameObject panel = CreatePanel("ArTrainingPanel", parent, new Color(0.973f, 0.980f, 1f));
-            CreateLabel(panel.transform, "AR 训练", new Vector2(0, 250), 34);
-            CreateLabel(panel.transform, "连接投屏眼镜与 IMU 追踪器，进入本次训练流程。", new Vector2(0, 190), 17);
-            arTrainingMessage = CreateLabel(panel.transform, "建议先完成追踪器校准，再开始训练。", new Vector2(0, 130), 16);
-            arTrainingMessage.rectTransform.sizeDelta = new Vector2(820, 70);
-            // The Unity V2 scene owns the AR preparation screen and its action
-            // menu.  Enter it directly so the phone flow matches SpineFlowMobile.
-            CreateButton(panel.transform, "开始训练", new Vector2(0, 40), () => StartTraining("SpineV2Minimal", "dead_bug"));
-            CreateButton(panel.transform, "追踪器连接与校准", new Vector2(0, -50), OpenTrackingCalibrationFromHome);
-            CreateButton(panel.transform, "动作示范库", new Vector2(0, -140), OpenActionLibrary);
-            CreateButton(panel.transform, "返回训练首页", new Vector2(0, -230), () => bootstrap.Router.Navigate(AppRoute.Home));
-            return panel;
-        }
 
         private GameObject CreateTrainingMenuPanel(Transform parent)
         {
@@ -603,8 +578,14 @@ namespace SpineRecovery.App
                 var imported = JsonUtility.FromJson<ImportedReplayList>("{\"items\":" + ids + "}");
                 replayId = imported.items?.LastOrDefault();
             }
+            OpenReplayById(replayId);
+        }
+
+        private void OpenReplayById(string replayId)
+        {
+            if (!Application.CanStreamedLevelBeLoaded("PlayBack")) return;
             if (string.IsNullOrEmpty(replayId))
-            { historyMessage.text = "暂无本账号已完成的回放。"; return; }
+            { if (historyMessage != null) historyMessage.text = "暂无本账号已完成的回放。"; return; }
             ReplaySessionContext.SetCommitted(replayId);
             auxiliaryReturnRoute = AppRoute.History;
             auxiliaryPageOpen = true;
@@ -613,22 +594,6 @@ namespace SpineRecovery.App
             HideAppShell();
             ScreenOrientationService.SetLandscape();
             SceneManager.LoadScene("PlayBack", LoadSceneMode.Single);
-        }
-
-        private GameObject CreateAdminPanel(Transform parent)
-        {
-            GameObject panel = CreatePanel("AdminPanel", parent, new Color(0.973f, 0.980f, 1f));
-            CreateLabel(panel.transform, "管理员配置（只读）", new Vector2(0, 220), 28);
-            adminMessage = CreateLabel(panel.transform, "", new Vector2(0, 80), 16);
-            adminMessage.rectTransform.sizeDelta = new Vector2(900, 260);
-            CreateButton(panel.transform, "刷新已发布配置", new Vector2(0, -80), RefreshAdminSummary);
-            CreateButton(panel.transform, "绑定 IMU", new Vector2(0, -155), OpenAdminImuBinding);
-            CreateButton(panel.transform, "从当前版本创建草稿", new Vector2(0, -230), CreateAdminDraft);
-            CreateButton(panel.transform, "标记 AR 测试通过", new Vector2(0, -305), MarkAdminArTestPassed);
-            CreateButton(panel.transform, "发布当前草稿", new Vector2(0, -380), PublishAdminDraft);
-            CreateButton(panel.transform, "回滚到最近归档版本", new Vector2(0, -455), RollbackAdminVersion);
-            CreateButton(panel.transform, "返回登录", new Vector2(0, -530), () => bootstrap.State.ClearSession());
-            return panel;
         }
 
         private void OpenAdminImuBinding()
@@ -789,35 +754,6 @@ namespace SpineRecovery.App
             CommitAdminImuBindings();
         }
 
-        private GameObject CreateHistoryPanel(Transform parent)
-        {
-            GameObject panel = CreatePanel("HistoryPanel", parent, new Color(0.973f, 0.980f, 1f));
-            CreateLabel(panel.transform, "训练历史", new Vector2(0, 700), 28);
-            var scrollObject = new GameObject("HistoryScroll", typeof(RectTransform), typeof(Image), typeof(ScrollRect));
-            scrollObject.transform.SetParent(panel.transform, false);
-            var rect = scrollObject.GetComponent<RectTransform>();
-            rect.sizeDelta = new Vector2(900, 850);
-            rect.anchoredPosition = new Vector2(0, 170);
-            scrollObject.GetComponent<Image>().color = new Color(1, 1, 1, 0.01f);
-            var viewportObject = new GameObject("Viewport", typeof(RectTransform), typeof(RectMask2D));
-            viewportObject.transform.SetParent(scrollObject.transform, false);
-            var viewport = viewportObject.GetComponent<RectTransform>();
-            viewport.anchorMin = Vector2.zero; viewport.anchorMax = Vector2.one;
-            viewport.offsetMin = viewport.offsetMax = Vector2.zero;
-            historyMessage = CreateLabel(viewport, "", Vector2.zero, 16);
-            historyMessage.rectTransform.anchorMin = historyMessage.rectTransform.anchorMax = new Vector2(0.5f, 1);
-            historyMessage.rectTransform.pivot = new Vector2(0.5f, 1);
-            historyMessage.rectTransform.sizeDelta = new Vector2(840, 0);
-            historyMessage.alignment = TextAnchor.UpperLeft;
-            historyMessage.verticalOverflow = VerticalWrapMode.Overflow;
-            historyMessage.gameObject.AddComponent<ContentSizeFitter>().verticalFit = ContentSizeFitter.FitMode.PreferredSize;
-            var scroll = scrollObject.GetComponent<ScrollRect>();
-            scroll.viewport = viewport; scroll.content = historyMessage.rectTransform;
-            scroll.horizontal = false; scroll.movementType = ScrollRect.MovementType.Clamped;
-            CreateButton(panel.transform, "查看最近完成的回放", new Vector2(0, -350), OpenReplay);
-            CreateButton(panel.transform, "返回训练首页", new Vector2(0, -450), () => bootstrap.Router.Navigate(AppRoute.Home));
-            return panel;
-        }
 
         private const string TherapistContactPending = "暂未配置治疗师联系方式，请通过医院渠道联系你的治疗师。";
 
@@ -934,7 +870,8 @@ namespace SpineRecovery.App
             // follows it always belongs to the last (or only) action of the plan.
             postActionCount = plan != null && plan.actions != null ? Mathf.Max(1, plan.prescriptionContractVersion == 2 ? plan.actions.Length / 2 : plan.actions.Length) : 1;
             postActionNumber = postActionCount;
-            if (postActionScreen != null) postActionScreen.Show(postActionNumber, postActionCount, DisplayActionName(plan));
+            if (postActionScreen != null) postActionScreen.Show(postActionNumber, postActionCount, DisplayActionName(plan),
+                bootstrap?.Training.CurrentResult?.completed == true);
             if (bootstrap != null && bootstrap.Router != null)
                 bootstrap.Router.Navigate(AppRoute.PostTrainingSurvey);
         }
@@ -1059,116 +996,6 @@ namespace SpineRecovery.App
 
         [System.Serializable] private sealed class HistoryScore { public int overallScore; }
 
-        private void RefreshHistorySummary()
-        {
-            UserSession session = bootstrap.State.Session;
-            if (session == null || historyMessage == null) return;
-            var pain = session.painHistory ?? System.Array.Empty<PainHistoryRecord>();
-            var training = session.trainingHistory ?? System.Array.Empty<TrainingHistoryRecord>();
-            List<string> trainingLines = new List<string>();
-            foreach (TrainingHistoryRecord record in training)
-            {
-                string feedback = string.IsNullOrWhiteSpace(record.feedback) ? "" : "，反馈：" + record.feedback;
-                var result = string.IsNullOrEmpty(record.resultJson) ? null : JsonUtility.FromJson<HistoryScore>(record.resultJson);
-                string state = record.endReason == "LEGACY_IMPORT" ? "导入记录" : record.completed ? "完成" : string.IsNullOrEmpty(record.endReason) ? "进行中" : "中断";
-                trainingLines.Add(record.completedAt + "  " + record.actionId + "  " + state +
-                    (record.completed && result != null ? "  得分 " + result.overallScore : "") + feedback);
-            }
-            List<string> painLines = pain
-                .OrderByDescending(record => record.recordedAt)
-                .Take(8)
-                .Select(record => record.recordedAt + "  疼痛 " + record.painLevel + "/10" +
-                    (record.painParts == null || record.painParts.Length == 0 ? "" : "（" + string.Join("、", record.painParts) + "）"))
-                .ToList();
-            historyMessage.text = "疼痛记录：" + pain.Length + " 条\n" +
-                (painLines.Count == 0 ? "暂无疼痛记录。" : string.Join("\n", painLines)) + "\n\n" +
-                "训练记录：" + training.Length + " 条\n" +
-                (trainingLines.Count == 0 ? "完成训练并提交结果后，这里会显示训练记录。" :
-                    string.Join("\n", trainingLines));
-        }
-
-        private void RefreshAdminSummary()
-        {
-            if (adminMessage == null || bootstrap.AdminConfigs == null) return;
-            var config = bootstrap.AdminConfigs.CurrentPublished();
-            var actions = config.actions ?? System.Array.Empty<AdminActionDefinition>();
-            List<string> actionLines = new List<string>();
-            foreach (AdminActionDefinition action in actions)
-            {
-                actionLines.Add(action.displayName + " [" + action.actionId + "]");
-            }
-            var ruleLines = (config.recommendationRules ?? System.Array.Empty<AdminRecommendationRule>())
-                .Where(rule => rule != null && rule.enabled)
-                .OrderByDescending(rule => rule.priority)
-                .Select(rule => rule.userTag + " → " + string.Join("、", rule.actionIds ?? System.Array.Empty<string>()))
-                .ToArray();
-            var trackerLines = (config.trackerBindings ?? System.Array.Empty<AdminTrackerBinding>())
-                .OrderBy(binding => binding.slot)
-                .Select(binding => binding.DisplayName() + "：" +
-                    (string.IsNullOrWhiteSpace(binding.hardwareId) ? "未绑定" : binding.hardwareId) +
-                    " / " + (binding.online ? "在线" : "离线") +
-                    (binding.batteryPercent >= 0 ? " / 电量 " + binding.batteryPercent + "%" : " / 电量未知"))
-                .ToArray();
-            var liveTrackers = CoachHapticFeedbackController.Instance == null
-                ? "状态源未启动"
-                : string.Join("\n", CoachHapticFeedbackController.Instance.LatestTrackerSnapshots
-                    .Where(tracker => tracker != null && !string.IsNullOrWhiteSpace(tracker.bodyPosition))
-                    .Select(tracker => tracker.bodyPosition + "：" + (tracker.connected ? "在线" : "离线") +
-                        (tracker.batteryPercent >= 0 ? " / 电量 " + tracker.batteryPercent + "%" : " / 电量未知")));
-            adminMessage.text = "当前版本：" + config.versionName + "（" + config.state + "）\n" +
-                "配置 ID：" + config.configId + "\n" +
-                "动作：" + string.Join("、", actionLines) + "\n" +
-                "推荐规则：" + (ruleLines.Length == 0 ? "暂无" : string.Join("；", ruleLines)) + "\n" +
-                "IMU 绑定：" + (!config.trackerBindingsLocked ? "未绑定" :
-                    config.trackerBindingsDisabled ? "已解除（配置保留）" : "已绑定") + "\n" +
-                "固定追踪器（5 个）：\n" + (trackerLines.Length == 0 ? "暂无" : string.Join("\n", trackerLines)) + "\n" +
-                "实时状态：\n" + (string.IsNullOrWhiteSpace(liveTrackers) ? "暂无设备状态" : liveTrackers) + "\n" +
-                "说明：患者侧只读取 Published 配置；发布前必须完成 AR 测试。";
-        }
-
-        private AdminTrainingConfiguration LatestAdminDraft()
-        {
-            return bootstrap.AdminConfigs?.ListConfigurations()
-                .FirstOrDefault(config => config.state == AdminConfigState.Draft || config.state == AdminConfigState.ArTestPassed);
-        }
-
-        private void CreateAdminDraft()
-        {
-            if (!(bootstrap.AdminConfigs is JsonAdminConfigRepository repository)) return;
-            repository.CreateDraftFromPublished();
-            RefreshAdminSummary();
-            if (adminMessage != null) adminMessage.text += "\n已创建草稿，可先执行 AR 测试。";
-        }
-
-        private void MarkAdminArTestPassed()
-        {
-            if (!(bootstrap.AdminConfigs is JsonAdminConfigRepository repository)) return;
-            AdminTrainingConfiguration draft = LatestAdminDraft();
-            bool passed = draft != null && repository.MarkArTestPassed(draft.configId, "unity-demo-ar-proof-" + System.DateTimeOffset.UtcNow.ToUnixTimeMilliseconds());
-            RefreshAdminSummary();
-            if (adminMessage != null) adminMessage.text += passed ? "\nAR 测试已通过，可发布。" : "\n没有可测试的草稿。请先创建草稿。";
-        }
-
-        private void PublishAdminDraft()
-        {
-            if (!(bootstrap.AdminConfigs is JsonAdminConfigRepository repository)) return;
-            AdminTrainingConfiguration draft = LatestAdminDraft();
-            bool published = draft != null && repository.Publish(draft.configId);
-            RefreshAdminSummary();
-            if (adminMessage != null) adminMessage.text += published ? "\n配置已发布，患者侧将读取此版本。" : "\n发布失败：必须先完成 AR 测试。";
-        }
-
-        private void RollbackAdminVersion()
-        {
-            if (!(bootstrap.AdminConfigs is JsonAdminConfigRepository repository)) return;
-            AdminTrainingConfiguration archived = bootstrap.AdminConfigs.ListConfigurations()
-                .Where(config => config.state == AdminConfigState.Archived)
-                .OrderByDescending(config => config.updatedAt)
-                .FirstOrDefault();
-            bool rolledBack = archived != null && repository.RollbackTo(archived.configId);
-            RefreshAdminSummary();
-            if (adminMessage != null) adminMessage.text += rolledBack ? "\n已回滚到归档版本。" : "\n没有可回滚的归档版本。";
-        }
 
         private GameObject CreateTrackingCalibrationPanel(Transform parent)
         {
@@ -1349,22 +1176,6 @@ namespace SpineRecovery.App
             bootstrap.Router.Navigate(AppRoute.BasicProfile);
         }
 
-        private GameObject CreateFormPanel(Transform parent, string title, string subtitle, System.Action<Transform> build)
-        {
-            GameObject panel = CreatePanel(title + "Panel", parent, new Color(0.973f, 0.980f, 1f));
-            bool admission = title == "首次动作评估";
-            Text heading = CreateLabel(panel.transform, title, new Vector2(0, admission ? 700 : 330), admission ? 36 : 28);
-            if (admission) heading.fontStyle = FontStyle.Bold;
-            Text description = CreateLabel(panel.transform, subtitle, new Vector2(0, admission ? 640 : 275), admission ? 18 : 15);
-            if (admission) description.fontStyle = FontStyle.Bold;
-            flowMessage = CreateLabel(panel.transform, "", new Vector2(0, admission ? -680 : -360), admission ? 18 : 14);
-            AppRoute route = title == "资料登记" ? AppRoute.BasicProfile : title == "基础问卷" ? AppRoute.BasicSurvey :
-                title == "疼痛记录" ? AppRoute.PainSelect : title == "首次动作评估" ? AppRoute.MobileAdmission :
-                title == "需要专业评估" ? AppRoute.AdmissionDecision : AppRoute.PreTraining;
-            flowMessages[route] = flowMessage;
-            build(panel.transform);
-            return panel;
-        }
 
         private GameObject CreateProfilePanel(Transform parent)
         {
@@ -1476,24 +1287,6 @@ namespace SpineRecovery.App
             bootstrap.Training.RestoreForCurrentUser();
         }
 
-        private void CreateSurveyForm(Transform parent)
-        {
-            situationButtons = new[]
-            {
-                CreateButton(parent, "情况：预防 / 保持健康", new Vector2(0, 195), () => SelectSituation(0)),
-                CreateButton(parent, "情况：曾有相关问题", new Vector2(0, 125), () => SelectSituation(1)),
-                CreateButton(parent, "情况：目前急性不适", new Vector2(0, 55), () => SelectSituation(2)),
-            };
-            symptomButtons = new[]
-            {
-                CreateButton(parent, "症状：没感觉", new Vector2(0, -25), () => SelectSymptom(0)),
-                CreateButton(parent, "症状：腰疼 / 腿疼 / 腿麻 / 放射痛", new Vector2(0, -95), () => SelectSymptom(1)),
-                CreateButton(parent, "症状：无力（暂停流程）", new Vector2(0, -165), () => SelectSymptom(2)),
-            };
-            surveySelectionLabel = CreateLabel(parent, "当前选择：尚未选择", new Vector2(0, -315), 14);
-            CreateButton(parent, "保存并继续", new Vector2(0, -245), SaveSurvey);
-            RefreshSurveySelection();
-        }
 
         private void SelectSituation(int index)
         {
@@ -1560,26 +1353,6 @@ namespace SpineRecovery.App
             bootstrap.Users.Save(user); bootstrap.Router.Navigate(AppRoute.PainSelect);
         }
 
-        private void CreatePainForm(Transform parent)
-        {
-            string[] parts = { "左腰部", "右腰部", "左大臂", "右大臂", "左臀部", "右臀部", "左腿", "右腿" };
-            string[] keys = { "left_waist", "right_waist", "left_upper_arm", "right_upper_arm", "left_hip", "right_hip", "left_leg", "right_leg" };
-            painPartButtons = new Button[parts.Length];
-            for (int i = 0; i < parts.Length; i++)
-            {
-                string key = keys[i];
-                painPartButtons[i] = CreateButton(parent, parts[i], new Vector2((i % 2 == 0 ? -145 : 145), 185 - (i / 2) * 65), () => TogglePainPart(key), 250);
-            }
-            noPainButton = CreateButton(parent, "没有疼痛", new Vector2(0, -72), SelectNoPain);
-            selectedPainPartLabel = CreateLabel(parent, "已选部位：未选择（可多选）", new Vector2(0, -130), 15);
-            selectedPainPartLabel.rectTransform.sizeDelta = new Vector2(760, 38);
-            painScoreLabel = CreateLabel(parent, "选中部位后设置疼痛程度：3 / 10", new Vector2(0, -180), 16);
-            CreateButton(parent, "疼痛评分 −", new Vector2(-145, -238), () => ChangePainScore(-1), 250);
-            CreateButton(parent, "疼痛评分 +", new Vector2(145, -238), () => ChangePainScore(1), 250);
-            CreateButton(parent, "记录并继续", new Vector2(0, -305), SavePain);
-            flowMessage.rectTransform.anchoredPosition = new Vector2(0, -390);
-            RefreshPainSelectionUi(keys, parts);
-        }
 
         private void SavePain()
         {
@@ -1710,96 +1483,9 @@ namespace SpineRecovery.App
             if (label != null) label.color = textColor;
         }
 
-        private void CreateAdmissionForm(Transform parent)
-        {
-            const float verticalShift = 180f;
-            flexionResponseButtons = CreateMovementAssessment(parent, true, 225f + verticalShift, "测试项 1 · 站立位前屈（FIS）", "双腿伸直，连续尝试用手摸脚尖；按产品流程完成 10 次。", new Color(0.22f, 0.55f, 0.91f));
-            flexionPhaseButtons = lastCreatedPhaseButtons;
-            extensionResponseButtons = CreateMovementAssessment(parent, false, -285f + verticalShift, "测试项 2 · 站立位后伸（EIS）", "双手托腰，以手为支点连续后仰；按产品流程完成 10 次。", new Color(0.08f, 0.61f, 0.56f));
-            extensionPhaseButtons = lastCreatedPhaseButtons;
-            Button finishButton = CreateButton(parent, "完成首次评估", new Vector2(0, -645), FinishAdmission, 560, 64);
-            Text finishLabel = finishButton.GetComponentInChildren<Text>();
-            if (finishLabel != null) { finishLabel.fontSize = 26; finishLabel.fontStyle = FontStyle.Bold; }
-            flowMessage.rectTransform.anchoredPosition = new Vector2(0, -720);
-        }
 
         private Button[] lastCreatedPhaseButtons;
 
-        private Button[] CreateMovementAssessment(Transform parent, bool flexion, float top, string title, string instruction, Color accent)
-        {
-            Text countLabel = CreateLabel(parent, "实际完成：0 次", new Vector2(-100, top + 52), 18);
-            countLabel.rectTransform.sizeDelta = new Vector2(340, 34);
-            System.Action<int> updateCount = delta =>
-            {
-                int count = Mathf.Clamp((flexion ? flexionCompletedCount : extensionCompletedCount) + delta, 0, 10);
-                if (flexion) flexionCompletedCount = count; else extensionCompletedCount = count;
-                countLabel.text = "实际完成：" + count + " 次";
-            };
-            CreateButton(parent, "−", new Vector2(170, top + 52), () => updateCount(-1), 80, 38);
-            CreateButton(parent, "+", new Vector2(270, top + 52), () => updateCount(1), 80, 38);
-            Text sectionTitle = CreateLabel(parent, title, new Vector2(0, top), 25);
-            sectionTitle.fontStyle = FontStyle.Bold;
-            sectionTitle.rectTransform.sizeDelta = new Vector2(760, 42);
-            Text repetitions = CreateLabel(parent, instruction, new Vector2(0, top - 46), 18);
-            repetitions.fontStyle = FontStyle.Bold;
-            repetitions.rectTransform.sizeDelta = new Vector2(760, 34);
-            Text responseQuestion = CreateLabel(parent, "动作后的疼痛反应", new Vector2(0, top - 82), 20);
-            responseQuestion.fontStyle = FontStyle.Bold;
-            responseQuestion.rectTransform.sizeDelta = new Vector2(760, 34);
-
-            string[] responses = { "是，明显缓解", "否，无变化", "加重" };
-            Button[] responseButtons = new Button[responses.Length];
-            for (int i = 0; i < responses.Length; i++)
-            {
-                int responseIndex = i;
-                responseButtons[i] = CreateButton(parent, responses[i], new Vector2(0, top - 120 - i * 44),
-                    () => SelectAdmissionResponse(flexion, responseIndex), 560, 40);
-                Text responseLabel = responseButtons[i].GetComponentInChildren<Text>();
-                if (responseLabel != null) { responseLabel.fontSize = 22; responseLabel.fontStyle = FontStyle.Bold; }
-                SetButtonColors(responseButtons[i], new Color(0.95f, 0.97f, 0.99f), new Color(0.88f, 0.93f, 0.98f), new Color(0.16f, 0.20f, 0.26f));
-            }
-
-            Text phaseTitle = CreateLabel(parent, "补充观察（可选）：疼痛最先出现阶段", new Vector2(0, top - 266), 18);
-            phaseTitle.fontStyle = FontStyle.Bold;
-            phaseTitle.rectTransform.sizeDelta = new Vector2(760, 30);
-            string[] phases = { "起始阶段", "中间阶段", "末端阶段", "全程无痛" };
-            Button[] phaseButtons = new Button[phases.Length];
-            for (int i = 0; i < phases.Length; i++)
-            {
-                int phaseIndex = i;
-                Vector2 pos = new Vector2(i % 2 == 0 ? -145 : 145, top - 302 - (i / 2) * 42);
-                phaseButtons[i] = CreateButton(parent, phases[i], pos,
-                    () => SelectAdmissionPhase(flexion, phaseIndex), 250, 38);
-                Text phaseLabel = phaseButtons[i].GetComponentInChildren<Text>();
-                if (phaseLabel != null) { phaseLabel.fontSize = 20; phaseLabel.fontStyle = FontStyle.Bold; }
-                SetButtonColors(phaseButtons[i], new Color(0.95f, 0.97f, 0.99f), new Color(0.88f, 0.93f, 0.98f), new Color(0.16f, 0.20f, 0.26f));
-            }
-
-            Text scoreLabel = CreateLabel(parent, "疼痛程度：未评分 / 10", new Vector2(0, top - 394), 20);
-            scoreLabel.fontStyle = FontStyle.Bold;
-            scoreLabel.rectTransform.sizeDelta = new Vector2(760, 32);
-            CreatePainSlider(parent, new Vector2(0, top - 438), accent,
-                value => SetAdmissionPain(flexion, value));
-            Text lowLabel = CreateLabel(parent, "1 轻微", new Vector2(-250, top - 468), 16);
-            lowLabel.rectTransform.sizeDelta = new Vector2(100, 28);
-            lowLabel.alignment = TextAnchor.MiddleLeft;
-            lowLabel.color = new Color(0.42f, 0.48f, 0.56f);
-            Text highLabel = CreateLabel(parent, "10 剧痛", new Vector2(250, top - 468), 16);
-            highLabel.rectTransform.sizeDelta = new Vector2(100, 28);
-            highLabel.alignment = TextAnchor.MiddleRight;
-            highLabel.color = new Color(0.42f, 0.48f, 0.56f);
-            if (flexion)
-            {
-                flexionScoreLabel = scoreLabel;
-            }
-            else
-            {
-                extensionScoreLabel = scoreLabel;
-            }
-
-            lastCreatedPhaseButtons = phaseButtons;
-            return responseButtons;
-        }
 
         private Text flexionScoreLabel;
         private Text extensionScoreLabel;
@@ -1964,11 +1650,6 @@ namespace SpineRecovery.App
             }
         }
 
-        private void CreateReviewForm(Transform parent)
-        {
-            CreateLabel(parent, "本地演示不会自动联网通知医生。请先遵循专业人员的建议，不要通过重新登录绕过此提示。", new Vector2(0, 110), 16);
-            CreateButton(parent, "退出登录", new Vector2(0, -5), () => bootstrap.State.ClearSession());
-        }
 
         private void ShowFlowMessage(string message)
         {

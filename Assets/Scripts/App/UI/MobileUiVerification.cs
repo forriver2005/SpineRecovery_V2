@@ -23,7 +23,10 @@ namespace SpineRecovery.App
         private static AppState state;
         private static MemoryUsers users;
 
-        public static void Run()
+        public static void RunAdmin() => RunChecks(true);
+        public static void Run() => RunChecks(false);
+
+        private static void RunChecks(bool adminOnly)
         {
             if (!Application.isBatchMode) throw new InvalidOperationException("Run in an isolated batch editor.");
             checks.Clear();
@@ -55,15 +58,14 @@ namespace SpineRecovery.App
             camera.transform.position = new Vector3(0, 0, -20);
             try
             {
+                if (adminOnly) { VerifyAdmin(app); return; }
                 VerifyAssets();
                 VerifyHistory();
                 VerifyIntake();
                 VerifyRoutine();
                 var ar = (GameObject)Call(shell, "CreateArTrainingPanel", canvas.transform);
                 Render(ar, "ar-training"); ar.SetActive(false);
-                var admin = (GameObject)Call(shell, "CreateAdminPanel", canvas.transform);
-                Get<Text>(shell, "adminMessage").text = "当前版本：康复训练配置\n状态：已发布\n\n训练动作：鸟狗、死虫、臀桥、侧桥、卷腹、猫式\n\n固定追踪器（5 个）\n左前臂：离线\n右前臂：离线\n左小腿：离线\n右小腿：离线\n腰部：离线\n\n患者端读取当前发布的训练配置。";
-                Render(admin, "admin"); admin.SetActive(false);
+                VerifyAdmin(app);
                 File.WriteAllLines(Path.Combine(output, "checks.txt"), checks);
                 Debug.Log("MOBILE_UI_VERIFICATION_PASS " + checks.Count + " checks; " + output);
             }
@@ -75,6 +77,24 @@ namespace SpineRecovery.App
                 UnityEngine.Object.DestroyImmediate(camera.gameObject);
                 UnityEngine.Object.DestroyImmediate(host);
             }
+        }
+
+        private static void VerifyAdmin(AppBootstrap app)
+        {
+            var repo = new JsonAdminConfigRepository();
+            var config = (AdminTrainingConfiguration)typeof(JsonAdminConfigRepository)
+                .GetMethod("DefaultConfiguration", Private).Invoke(null, null);
+            Set(repo, "configurations", new List<AdminTrainingConfiguration> { config });
+            SetAuto(typeof(AppBootstrap), app, "AdminConfigs", repo);
+            var panel = (GameObject)Call(shell, "CreateAdminPanel", canvas.transform);
+            Check(panel.GetComponentsInChildren<Button>().Length == 2, "Default admin only offers binding and logout");
+            Render(panel, "admin");
+            Render(panel, "admin-small", 320, 568);
+            config.trackerBindingsLocked = true;
+            Call(shell, "RefreshAdminSummary");
+            Check(Button(panel, "管理已绑定设备").interactable, "Bound trackers stay manageable");
+            panel.SetActive(false);
+            Debug.Log("ADMIN_UI_VERIFIED " + output);
         }
 
         private static void VerifyAssets()

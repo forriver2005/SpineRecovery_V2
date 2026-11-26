@@ -200,27 +200,96 @@ namespace SpineRecovery.App
             MobileUi.Height((RectTransform)parent, 430);
         }
 
+        private RectTransform adminContent;
+
         private GameObject CreateAdminPanel(Transform parent)
         {
-            var root = QuestionnaireUi.CreateScreen(parent, "AdminPanel", null, out var panel);
-            var content = QuestionnaireUi.ScrollArea(root, 56, 20, 1500);
-            MobileUi.Text(content, "训练配置管理", 20, 20, 350, 36, 24, true, QuestionnaireUi.Accent);
-            MobileUi.Text(content, "查看发布版本、追踪器状态与配置草稿", 20, 64, 350, 34, 13, false, QuestionnaireUi.Muted);
-            var card = QuestionnaireUi.Card(content, 20, 116, 350, 700);
-            adminMessage = MobileUi.Text(card, "正在读取配置…", 20, 20, 310, 660, 13, false, QuestionnaireUi.Muted, TextAnchor.UpperLeft);
-            var actionGroup = new GameObject("AdminActions", typeof(RectTransform)).GetComponent<RectTransform>();
-            actionGroup.SetParent(content, false);
-            QuestionnaireUi.Place(actionGroup, 0, 836, 390, 480);
-            string[] labels = { "刷新已发布配置", "绑定当前 5 个追踪器", "从当前版本创建草稿", "标记 AR 测试通过", "发布当前草稿", "回滚到最近归档版本" };
-            UnityEngine.Events.UnityAction[] actions = { RefreshAdminSummary, BindCurrentTrackers, CreateAdminDraft, MarkAdminArTestPassed, PublishAdminDraft, RollbackAdminVersion };
-            for (int i = 0; i < labels.Length; i++) QuestionnaireUi.PillButton(actionGroup, labels[i], 20, i * 64, 350, 52, i == 0, actions[i]);
-            QuestionnaireUi.PillButton(actionGroup, "退出登录", 20, 404, 350, 52, false, () => bootstrap.State.ClearSession());
-            MobileUi.Height(content, 1320);
-            var layout = content.gameObject.AddComponent<MobileSummaryLayout>();
-            layout.Summary = adminMessage; layout.Card = card; layout.Actions = actionGroup;
-            layout.Shadow = content.Find("CardShadow") as RectTransform;
-            MobileUi.Header(root, "管理员配置", () => bootstrap.State.ClearSession());
+            var root = QuestionnaireUi.CreateScreen(parent, "AdminPanel", RefreshAdminSummary, out var panel);
+            MobileUi.Header(root, "管理员工作台", null);
+            adminContent = QuestionnaireUi.ScrollArea(root, 56, 0, 480);
+            RefreshAdminSummary();
             return panel;
+        }
+
+        private void RefreshAdminSummary()
+        {
+            if (adminContent == null) return;
+            MobileUi.Clear(adminContent);
+            var repo = bootstrap?.AdminConfigs;
+            var config = repo?.CurrentPublished();
+            bool locked = config != null && config.trackerBindingsLocked && !config.trackerBindingsDisabled;
+            var device = QuestionnaireUi.Card(adminContent, 20, 20, 350, 186);
+            MobileUi.Text(device, "IMU 追踪器", 20, 17, 200, 32, 20, true);
+            var chip = QuestionnaireUi.Box(device, "BindingStatus", QuestionnaireUi.SecondaryButton, 10, 242, 19, 88, 28);
+            MobileUi.Text(chip.transform, locked ? "已绑定" : config == null ? "状态未知" : "未绑定",
+                0, 0, 88, 28, 13, true, QuestionnaireUi.Accent, TextAnchor.MiddleCenter);
+            MobileUi.Text(device, locked ? "查看五台设备的佩戴部位、连接状态和电量。" :
+                "为五台追踪器分配佩戴部位，再绑定到患者端。", 20, 58, 310, 54, 15, false, QuestionnaireUi.Muted);
+            AdminButton(device, locked ? "管理已绑定设备" : "管理 IMU 绑定", 20, 120, 310, true, OpenAdminImuBinding);
+
+            var plan = QuestionnaireUi.Card(adminContent, 20, 222, 350, 156);
+            MobileUi.Text(plan, "已发布训练方案", 20, 16, 310, 34, 20, true);
+            float y = 62;
+            void Detail(string value, bool bold)
+            {
+                var label = MobileUi.Text(plan, value, 20, y, 310, 24, bold ? 15 : 14, bold,
+                    bold ? QuestionnaireUi.Ink : QuestionnaireUi.Muted, TextAnchor.UpperLeft);
+                float h = Mathf.Max(24, label.preferredHeight * label.rectTransform.localScale.y);
+                label.rectTransform.SetSizeWithCurrentAnchors(RectTransform.Axis.Vertical, h / label.rectTransform.localScale.y);
+                y += h + 8;
+            }
+            if (config == null) Detail("暂无已发布的训练配置", false);
+            else
+            {
+                Detail("当前版本   " + config.versionName, true);
+                var names = new System.Collections.Generic.List<string>();
+                foreach (var item in config.actions ?? Array.Empty<AdminActionDefinition>())
+                    if (item != null && !string.IsNullOrWhiteSpace(item.displayName)) names.Add(item.displayName);
+                Detail("训练动作   " + (names.Count == 0 ? "暂无" : string.Join("、", names)), false);
+                foreach (var rule in config.recommendationRules ?? Array.Empty<AdminRecommendationRule>())
+                {
+                    if (rule == null || !rule.enabled) continue;
+                    var targets = Array.ConvertAll(rule.ResolveActions(config.actions), action => action.displayName);
+                    if (targets.Length > 0) Detail(rule.userTag + "：推荐" + string.Join("、", targets), false);
+                }
+            }
+            var versions = repo?.ListConfigurations();
+            if (versions != null && repo is JsonAdminConfigRepository editable)
+            {
+                AdminTrainingConfiguration ready = null, archived = null;
+                foreach (var v in versions)
+                {
+                    if (v.state == AdminConfigState.ArTestPassed && ready == null) ready = v;
+                    if (v.state == AdminConfigState.Archived &&
+                        (archived == null || string.CompareOrdinal(v.updatedAt, archived.updatedAt) > 0)) archived = v;
+                }
+                void VersionAction(string caption, Func<bool> apply)
+                {
+                    AdminButton(plan, caption, 20, y, 310, false, () => {
+                        bool ok = apply(); RefreshAdminSummary();
+                        adminMessage.text = ok ? "配置已更新" : "配置未更新，请检查版本状态";
+                    });
+                    y += 60;
+                }
+                if (ready != null) VersionAction("发布已验证版本 " + ready.versionName, () => editable.Publish(ready.configId));
+                if (archived != null) VersionAction("回滚至 " + archived.versionName, () => editable.RollbackTo(archived.configId));
+            }
+            plan.sizeDelta = new Vector2(350, y + 12);
+            var shadow = (RectTransform)adminContent.GetChild(plan.GetSiblingIndex() - 1);
+            shadow.sizeDelta = new Vector2(352, y + 16);
+            float bottom = 222 + y + 28;
+            adminMessage = MobileUi.Text(adminContent, "", 22, bottom, 346, 26, 13, false, QuestionnaireUi.Accent);
+            AdminButton(adminContent, "退出登录", 20, bottom + 32, 350, false, () => bootstrap.State.ClearSession());
+            MobileUi.Height(adminContent, bottom + 104);
+        }
+
+        private static void AdminButton(Transform parent, string caption, float x, float y, float width,
+            bool primary, UnityEngine.Events.UnityAction action)
+        {
+            var b = QuestionnaireUi.MakeButton(parent, caption, primary ? QuestionnaireUi.Accent : QuestionnaireUi.SecondaryButton,
+                12, x, y, width, 48, action);
+            MobileUi.Text(b.transform, caption, 8, 0, width - 16, 48, 16, true,
+                primary ? Color.white : QuestionnaireUi.Accent, TextAnchor.MiddleCenter);
         }
     }
 }

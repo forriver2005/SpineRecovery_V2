@@ -522,6 +522,17 @@ public class DeadBugStartMenuController : MonoBehaviour
     {
         if (TrainingStartAllowed != null && !TrainingStartAllowed()) return;
 
+        // Recorded-action games reuse a practice menu, but own their start and
+        // readiness checks. Dispatch before the copied practice/calibration flow.
+        if (ExternalTrainingStart != null)
+        {
+            if (!ExternalTrainingStart()) return;
+            TrainingStarted?.Invoke();
+            if (startButton != null) startButton.interactable = false;
+            if (menuRoot != null) menuRoot.SetActive(false);
+            return;
+        }
+
         if (IsPracticeCoachMode && practiceSessionController != null)
         {
             SpineFlowTrainingSession.AcknowledgePracticeStartConfirmation();
@@ -536,15 +547,6 @@ public class DeadBugStartMenuController : MonoBehaviour
             {
                 poseScorer.BeginCalibration();
             }
-            return;
-        }
-
-        if (ExternalTrainingStart != null)
-        {
-            if (!ExternalTrainingStart()) return;
-            TrainingStarted?.Invoke();
-            if (startButton != null) startButton.interactable = false;
-            if (menuRoot != null) menuRoot.SetActive(false);
             return;
         }
 

@@ -49,7 +49,7 @@ namespace TaikoNight
 
         private void Start()
         {
-            selection = TaikoNightSelection.Create(entry.scorer.UserAnimator, font, "敲鼓臀桥", "抬起　→　保持　→　放下",
+            selection = TaikoNightSelection.Create(entry.scorer.UserAnimator, font, "敲鼓臀桥",
                 key => {
                     if (key == "hard") entry.menu.SelectHardDifficulty();
                     else if (key == "simple") entry.menu.SelectSimpleDifficulty();

@@ -103,6 +103,8 @@ public class DeadBugStartMenuController : MonoBehaviour
     private bool originalStartButtonTextActive;
     private bool calibrationStatusCached;
     private Sprite pauseOriginalStartSprite;
+    private GameObject gameVersionPicker;
+    private readonly List<GameObject> controlsHiddenByGamePicker = new List<GameObject>();
 
     private bool IsPracticeCoachMode =>
         hideMenuOnlyOnStart || practiceCoachController != null;
@@ -317,6 +319,7 @@ public class DeadBugStartMenuController : MonoBehaviour
             return;
         }
 
+        CloseGameVersionPicker();
         if (practiceActionMenu.transform.Find("ActionLibrary") == null)
         {
             Transform start = practiceActionMenu.transform.Find("Start");
@@ -931,7 +934,7 @@ public class DeadBugStartMenuController : MonoBehaviour
         HideSceneVisualsExceptMenus();
         ConfigurePracticeActionMenu();
         ConfigurePauseButton("Start", ResumePracticeFromPause);
-        ConfigurePauseButton("Game", () => CoachModeNavigation.OpenGameFromCoach());
+        ConfigurePauseButton("Game", ShowGameVersionPicker);
         ConfigurePauseButton("ActionLibrary", CoachModeNavigation.OpenActionLibraryFromCoach);
         bool gameAvailable = CoachModeNavigation.IsSupportedCoachScene(gameObject.scene.name);
         foreach (Transform child in practiceActionMenu.transform)
@@ -1011,6 +1014,68 @@ public class DeadBugStartMenuController : MonoBehaviour
             rect.anchoredPosition = new Vector2(0f, (1 - i) * PracticeControlVerticalSpacing);
             rect.sizeDelta = new Vector2(380f, 140f);
         }
+    }
+
+    private void ShowGameVersionPicker()
+    {
+        if (gameVersionPicker != null) return;
+        var games = new List<(string Scene, string Title)>(
+            CoachModeNavigation.GetGameVersionsForCoach(gameObject.scene.name));
+        if (games.Count == 0) return;
+
+        TMP_FontAsset font = practiceActionMenu.transform.Find("Game")
+            ?.GetComponentInChildren<TMP_Text>(true)?.font;
+        foreach (Transform control in practiceActionMenu.transform)
+        {
+            if (!control.gameObject.activeSelf) continue;
+            controlsHiddenByGamePicker.Add(control.gameObject);
+            control.gameObject.SetActive(false);
+        }
+
+        var shade = TutorialUI.Box(practiceActionMenu.transform, "Game Version Picker",
+            Vector2.zero, Vector2.zero, new Color(.025f, .055f, .075f, .96f));
+        shade.anchorMin = Vector2.zero;
+        shade.anchorMax = Vector2.one;
+        shade.offsetMin = shade.offsetMax = Vector2.zero;
+        gameVersionPicker = shade.gameObject;
+
+        int rows = (games.Count + 1) / 2;
+        float halfHeight = rows == 1 ? 226f : 286f;
+        var card = TutorialUI.Box(shade, "Card", Vector2.zero, new Vector2(1010f, halfHeight * 2f),
+            new Color(.06f, .14f, .18f));
+        TutorialUI.Text(card, font, "选择游戏版本", new Vector2(0f, halfHeight - 72f),
+            new Vector2(910f, 66f), 46f).fontStyle = FontStyles.Bold;
+        TutorialUI.Box(card, "Accent", new Vector2(0f, halfHeight - 120f),
+            new Vector2(60f, 4f), new Color(.36f, .77f, .73f));
+
+        for (int i = 0; i < games.Count; i++)
+        {
+            var game = games[i];
+            float x = (i % 2 - .5f) * 460f;
+            float y = halfHeight - 206f - (i / 2) * 124f;
+            var button = TutorialUI.Button(card, font, game.Title, new Vector2(x, y),
+                new Vector2(432f, 106f), () =>
+                {
+                    CloseGameVersionPicker();
+                    CoachModeNavigation.OpenSelectedGameFromCoach(game.Scene);
+                }, 34f);
+            button.image.color = new Color(.10f, .33f, .37f);
+        }
+
+        var cancel = TutorialUI.Button(card, font, "取消", new Vector2(0f, -halfHeight + 65f),
+            new Vector2(240f, 72f), CloseGameVersionPicker, 28f);
+        cancel.image.color = new Color(.17f, .25f, .29f);
+    }
+
+    private void CloseGameVersionPicker()
+    {
+        if (gameVersionPicker == null) return;
+        gameVersionPicker.SetActive(false);
+        Destroy(gameVersionPicker);
+        gameVersionPicker = null;
+        foreach (GameObject control in controlsHiddenByGamePicker)
+            control.SetActive(true);
+        controlsHiddenByGamePicker.Clear();
     }
 
     private void SetPracticeToolbarVisible(bool visible)
@@ -1218,7 +1283,7 @@ public class DeadBugStartMenuController : MonoBehaviour
                     choice.onClick = new Button.ButtonClickedEvent();
                     if (available)
                     {
-                        choice.onClick.AddListener(() => CoachModeNavigation.OpenGameFromCoach());
+                        choice.onClick.AddListener(ShowGameVersionPicker);
                     }
                     choice.interactable = available;
                 }
@@ -1269,7 +1334,7 @@ public class DeadBugStartMenuController : MonoBehaviour
                 button.onClick = new Button.ButtonClickedEvent();
                 if (available)
                 {
-                    button.onClick.AddListener(() => CoachModeNavigation.OpenGameFromCoach());
+                    button.onClick.AddListener(ShowGameVersionPicker);
                 }
                 button.interactable = available;
             }
@@ -1402,6 +1467,7 @@ public class DeadBugStartMenuController : MonoBehaviour
 
     private void SetPracticeActionMenuCanvasVisible(bool visible)
     {
+        if (!visible) CloseGameVersionPicker();
         ResolvePracticeActionMenu();
         if (practiceActionMenu == null)
         {

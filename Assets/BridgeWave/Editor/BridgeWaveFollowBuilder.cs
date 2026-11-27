@@ -150,8 +150,9 @@ namespace BridgeWave.EditorTools
             controller.startButton=Named("StartTraining").GetComponent<Button>();
             controller.startLabel=controller.startButton.GetComponentInChildren<TMP_Text>(true);
             controller.startLabel.text="开始游戏";controller.startLabel.fontSize=24;
-            var guide=Named("guide").GetComponent<Button>();
-            guide.gameObject.SetActive(false);
+            var guide=Named("guide").gameObject;
+            guide.AddComponent<GamingGuideButtonController>();
+            guide.SetActive(true);
             var back=Named("Return").GetComponent<Button>();
             var switcher=back.GetComponent<SceneSwitcher>()??back.gameObject.AddComponent<SceneSwitcher>();
             UnityEventTools.AddPersistentListener(back.onClick,switcher.ReturnToMobileApp);

@@ -96,7 +96,7 @@ namespace TaikoNight
             overlayRoot.SetActive(true);
             bool crunch = actionKind == TaikoNightActionKind.Crunch;
             selection = TaikoNightSelection.Create(recorder.UserAnimator, font, crunch ? "卷腹" : "卧位猫式",
-                crunch ? "卷起　→　保持　→　回落" : "拱背　→　保持　→　还原", SelectDifficulty, () => repetitionCount,
+                SelectDifficulty, () => repetitionCount,
                 menu.StartTraining, () => entry.OpenWorkoutPanelAbove(2210), () => menu.IsFlowTestCalibrationBypassed,
                 null);
             overlayRoot.SetActive(false);

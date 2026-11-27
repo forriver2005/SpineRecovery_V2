@@ -22,7 +22,7 @@ namespace TaikoNight
         AvatarMotionSource source;
         Animator patient;
         Sprite selected, normal;
-        string title, steps, difficulty;
+        string title, difficulty;
         float restSecondsRemaining;
         Func<int> readDose;
         Action begin;
@@ -31,7 +31,7 @@ namespace TaikoNight
         Func<bool> flowTestWithoutTracker;
         Func<bool> calibrationReady;
 
-        public static TaikoNightSelection Create(Animator patient, TMP_FontAsset font, string title, string steps,
+        public static TaikoNightSelection Create(Animator patient, TMP_FontAsset font, string title,
             Action<string> change, Func<int> dose, Action begin, Action workout = null,
             Func<bool> flowTestWithoutTracker = null, Func<bool> calibrationReady = null)
         {
@@ -44,7 +44,7 @@ namespace TaikoNight
             scaler.referenceResolution = new Vector2(1920, 1080);
             scaler.screenMatchMode = CanvasScaler.ScreenMatchMode.Expand;
             var view = host.AddComponent<TaikoNightSelection>();
-            view.patient = patient; view.font = font; view.title = title; view.steps = steps;
+            view.patient = patient; view.font = font; view.title = title;
             view.change = change; view.readDose = dose; view.begin = begin; view.workout = workout;
             view.flowTestWithoutTracker = flowTestWithoutTracker;
             view.calibrationReady = calibrationReady;
@@ -75,7 +75,7 @@ namespace TaikoNight
                 difficulties[i] = Bind(ButtonNames[i], () => SetDifficulty(key));
             }
             normal = difficulties[0].image.sprite;
-            Bind("guide", OpenGuide);
+            Bind("guide", () => CoachModeNavigation.OpenCoachFromGame(gameObject.scene.name, difficulty));
             Bind("Return", OpenGames);
             var planButton = ExtraButton(panel, "动作串  >\n" + title, new Color(.19f,.29f,.40f), 0, 0, 210, 100, OpenWorkout, 25);
             Corner(planButton, false);
@@ -144,13 +144,6 @@ namespace TaikoNight
             var button = panel.Find(name).GetComponent<Button>();
             button.onClick.AddListener(() => click());
             return button;
-        }
-        void OpenGuide()
-        {
-            OpenDialog("查看教程");
-            Label(dialog, steps, 0, 30, 1080, 80, 42, Ink);
-            Label(dialog, "跟随左侧教练动作。保持段结束后，跟随教练放下。\n传感器记录到达标动作时，鼓面会亮起。", 0, -75, 1080, 120, 30, Ink);
-            DialogButton("跟随教练练习", -195, () => { CloseDialog(); begin(); });
         }
         void OpenGames()
         {

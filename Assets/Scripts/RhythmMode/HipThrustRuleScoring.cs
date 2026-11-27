@@ -8,6 +8,7 @@ public sealed class HipThrustRuleScoring : MonoBehaviour
     public HipThrustTaikoController transport;
     public DeadBugGamingPoseScorer calibration;
     public SideBridgePoseScoring sideBridge;
+    public RecordedActionHoldScoring recordedAction;
     public readonly HipThrustHoldRule Rule = new HipThrustHoldRule();
     public float Progress { get; private set; }
     public float Quality { get; private set; }
@@ -19,16 +20,17 @@ public sealed class HipThrustRuleScoring : MonoBehaviour
     public float MatchedDelay { get; private set; }
     sealed class CoachPoseSample {public double time;public HipThrustHoldGeometry.TargetPose pose;public float progress;}
     readonly List<CoachPoseSample> coachHistory=new List<CoachPoseSample>();
-    public float LiveScore => sideBridge!=null?sideBridge.Rule.LiveScore:Rule.LiveScore;
-    public float LastRoundBest => sideBridge!=null?sideBridge.Rule.LastRoundBest:Rule.LastRoundBest;
+    public float LiveScore => recordedAction!=null?recordedAction.LiveScore:sideBridge!=null?sideBridge.Rule.LiveScore:Rule.LiveScore;
+    public float LastRoundBest => recordedAction!=null?recordedAction.LastBest:sideBridge!=null?sideBridge.Rule.LastRoundBest:Rule.LastRoundBest;
     public string Status => !TargetsReady ? "动作参考不可用" :
+        recordedAction!=null ? !InputFresh?"等待动作数据":recordedAction.Accepted?"姿势达标 · 有效保持中":recordedAction.Instruction :
         sideBridge!=null&&(calibration==null||!calibration.IsCalibrated)
             ? calibration!=null&&calibration.IsCalibrationBypassed?"流程预览 · 未记录训练成绩":"请先完成动作校准" :
         !InputFresh ? "等待动作数据" :
-        sideBridge!=null && !sideBridge.PostureReady ? "请保持左侧支撑、肩髋叠放" :
+        sideBridge!=null && !sideBridge.PostureReady ? (sideBridge.RightSupport ? "请保持右侧支撑、肩髋叠放" : "请保持左侧支撑、肩髋叠放") :
         sideBridge!=null ? SideStatus :
         Rule.Phase == HipThrustHoldRule.Stage.Holding ? "保持计分" : "抬起进入保持位后计分";
-    string SideStatus => !sideBridge.SupportReady?"请调整支撑肘和肩髋排列":
+    string SideStatus => !sideBridge.SupportReady?(sideBridge.RightSupport?"请调整右侧支撑肘和肩髋排列":"请调整左侧支撑肘和肩髋排列"):
         sideBridge.Rule.RoundFinished?"本次已记录 · 跟随下一次示范":
         !sideBridge.Rule.LowConfirmed?"请先回到低位":
         sideBridge.Rule.HoldingCorrectly?"姿势达标 · 有效保持中":
@@ -67,16 +69,11 @@ public sealed class HipThrustRuleScoring : MonoBehaviour
         progressTolerance=GameDifficultyPolicy.BridgeProgressTolerance(difficulty);
         if(sideBridge!=null) sideBridge.Begin(difficulty);
         bool continuous=transport.Hold30Timeline!=null&&!transport.Hold30Timeline.UsesRecordedTiming;
-        Rule.ContinuousHold=continuous;
-        if(continuous)
-        {
-            var first=transport.Hold30Timeline.Repetitions[0];
-            Rule.SetFullScoreSeconds((float)(first.lower-first.top));
-        }
+        Rule.ContinuousHold=continuous;if(continuous)Rule.SetFullScoreSeconds(transport.Hold30Timeline.PrescribedHoldSeconds);
         motion=FindObjectOfType<AvatarMotionSource>();
         lastCounter=motion!=null?motion.LastPacketframeCounterInFrame:0;
         lastFrameAt=float.NegativeInfinity;
-        TargetsReady=CaptureTargets();
+        TargetsReady=recordedAction!=null?recordedAction.Begin(difficulty):CaptureTargets();
         if(!TargetsReady) Debug.LogError(transport.ActionDisplayName+"评分无法采样录制动作的 A/B 参考姿态。",this);
     }
 
@@ -123,13 +120,19 @@ public sealed class HipThrustRuleScoring : MonoBehaviour
         ObserveInput();
         InputFresh=motion!=null && motion.HasFreshFrame && Time.unscaledTime-lastFrameAt<=(sideBridge!=null?.35f:.5f);
         bool valid=TargetsReady && InputFresh && deltaTime>0 && deltaTime<=.1001f && calibration!=null && calibration.IsCalibrated;
+        if(recordedAction!=null)
+        {
+            recordedAction.Tick(deltaTime,valid);HasMeasurement=recordedAction.Measured;
+            Progress=recordedAction.Progress;Quality=TrackingQuality=recordedAction.Quality;
+            return;
+        }
         if(sideBridge!=null&&TargetsReady)sideBridge.UpdateReference();
         Progress=Quality=TrackingQuality=CoachProgress=0;HasMeasurement=false;
         if(valid)
         {
             if(sideBridge!=null)
             {
-                HasMeasurement=SideBridgePoseGeometry.TryMeasure(calibration.UserAnimator,out _);
+                HasMeasurement=SideBridgePoseGeometry.TryMeasure(calibration.UserAnimator,sideBridge.SupportSide,out _);
                 valid=sideBridge.Evaluate(calibration.UserAnimator,out float progress,out float quality,deltaTime);
                 Progress=progress;Quality=quality;
                 TrackingQuality=sideBridge.TrackingQuality;
@@ -182,9 +185,16 @@ public sealed class HipThrustRuleScoring : MonoBehaviour
             Rule.Step(Progress,holdQuality,deltaTime,valid,eligible);
         }
     }
-    public void BreakContinuity(){Rule.BreakContinuity();if(sideBridge!=null)sideBridge.Rule.BreakContinuity();}
+    public void BreakContinuity()
+    {
+        recordedAction?.BreakContinuity();
+        Rule.BreakContinuity();
+        if (sideBridge != null) sideBridge.Rule.BreakContinuity();
+    }
+
     public bool MatchesHipCoach() => externalCoachingMode
         ? externalHipPredicate != null && externalHipPredicate()
+        : recordedAction != null ? recordedAction.Matches
         : sideBridge==null&&TargetsReady&&InputFresh&&HasMeasurement&&calibration!=null&&calibration.IsCalibrated&&
         TrackingQuality>=minimumTrackingQuality&&Mathf.Abs(Progress-CoachProgress)<=progressTolerance;
 

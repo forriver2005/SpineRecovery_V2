@@ -22,7 +22,7 @@ namespace TaikoNight
     /// Taiko Night prefab supplies the visual game layer.
     /// </summary>
     [DefaultExecutionOrder(-100)]
-    public sealed class TaikoNightActionRuntime : MonoBehaviour
+    public sealed partial class TaikoNightActionRuntime : MonoBehaviour
     {
         public TaikoNightActionKind actionKind;
         public DeadBugStartMenuController menu;
@@ -65,6 +65,7 @@ namespace TaikoNight
         public bool IsCountingDown => countdownRunning;
         public int RepetitionCount => repetitionCount;
         public int CompletedRepetitions => completedRepetitions;
+        public TrainingResultPanel ResultPanel { get; private set; }
 
         private void Awake()
         {
@@ -88,6 +89,7 @@ namespace TaikoNight
             avatar.SetPositionAndRotation(Vector3.zero, Quaternion.identity);
             avatar.localScale = Vector3.one;
             entry = FindObjectOfType<GameWorkoutScene>();
+            ResultPanel = TrainingResultPanel.Create(font, () => { StopTraining(); selection.ResetResult(); });
             ConfigureAction();
             BuildOverlay();
             card = gameObject.AddComponent<TaikoNightCoachCard>();
@@ -111,6 +113,7 @@ namespace TaikoNight
 
         private void OnDestroy()
         {
+            if (ResultPanel != null) Destroy(ResultPanel.gameObject);
             if (scorer != null) scorer.RoundCompleted -= OnRoundCompleted;
             TaikoNightPracticeClock.IsPaused = false;
             DesignSpace.ExternalNow = null;
@@ -156,10 +159,6 @@ namespace TaikoNight
             if (training?.IsV2Prescription != true) return;
             SelectDifficulty(training.CurrentPrescriptionDifficulty);
             repetitionCount = SpineFlowTrainingSession.GetPlannedTrainingVolume("game", 1, 1).TotalRepetitions;
-            float recordedHold = phaseSeconds.y - holdExtension;
-            phaseSeconds.y = SpineFlowTrainingSession.PlannedPrescriptionGameHoldSeconds;
-            holdExtension = phaseSeconds.y - recordedHold;
-            scorer.SetTargetHoldSeconds(phaseSeconds.y);
             selection.SyncDifficulty(difficultyKey);
         }
 
@@ -175,7 +174,10 @@ namespace TaikoNight
 
         public bool StartFromMenu()
         {
-            if (!CanStartTraining) return false;
+            if (motion == null || !motion.IsReady || running || countdownRunning ||
+                !HasFreshTracker()) return false;
+            ResultPanel.Hide();
+            BeginFinalScore();
             completedRepetitions = 0;
             IsResultVisible = false;
             activeSeconds = 0;
@@ -197,8 +199,7 @@ namespace TaikoNight
 
         private void StopTraining()
         {
-            if (running && Assessment != null && Assessment.IsCollecting) Assessment.Finish();
-            IsResultVisible = false;
+            ResultPanel?.Hide();
             TaikoNightPracticeClock.IsPaused = running = countdownRunning = false;
             scorer.CancelSession();
             motion.ReturnIdle();
@@ -217,6 +218,7 @@ namespace TaikoNight
 
         public void SetWorkoutDifficulty(string key)
         {
+            ResultPanel?.Hide();
             SelectDifficulty(key);
             selection?.SyncDifficulty(difficultyKey);
             SetMenuRootVisible(false);
@@ -276,11 +278,13 @@ namespace TaikoNight
             double extraBefore = HipThrustPhaseTimeline.ConsumedHoldExtension(previous, top, lower, holdExtension);
             double extraNow = HipThrustPhaseTimeline.ConsumedHoldExtension(clock, top, lower, holdExtension);
             motion.Tick((float)(clock - previous - (extraNow - extraBefore)));
+            ObserveFinalScore(Time.deltaTime);
             if (motion.HasReachedSegmentEnd())
             {
                 if (playbackSegment == 1) { playbackSegment = 2; motion.PlaySegment(2); }
                 else
                 {
+                    FinishFinalRepetition();
                     completedRepetitions++;
                     if (completedRepetitions < repetitionCount)
                     {
@@ -292,10 +296,10 @@ namespace TaikoNight
                         chart.SetPlayerNotes(new[] { new Vector2(phaseSeconds.x, phaseSeconds.x + phaseSeconds.y) });
                         return;
                     }
+                    FinalScore.Finish();
                     Assessment?.Finish();
                     StopTraining();
-                    selection.Show(false);
-                    IsResultVisible = true;
+                    ShowFinalResult();
                     Completed?.Invoke();
                 }
             }
@@ -364,10 +368,11 @@ namespace TaikoNight
             scorer.SetDifficultyMode(mode);
         }
 
-        private void TogglePause()
+        public void TogglePause()
         {
             if (!running) return;
             TaikoNightPracticeClock.IsPaused = !TaikoNightPracticeClock.IsPaused;
+            if (TaikoNightPracticeClock.IsPaused) FinalScore.BreakContinuity();
             if (TaikoNightPracticeClock.IsPaused) motion.Freeze(); else motion.Resume();
             SetPausePanel(TaikoNightPracticeClock.IsPaused);
         }

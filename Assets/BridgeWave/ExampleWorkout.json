@@ -1,0 +1,20 @@
+{
+  "actions": [
+    {
+      "action": "hipthrust_curve",
+      "difficulty": "standard",
+      "sets": 2,
+      "reps": 4
+    },
+    {
+      "action": "deadbug",
+      "difficulty": "simple",
+      "sets": 1
+    },
+    {
+      "action": "birddog",
+      "difficulty": "standard",
+      "sets": 1
+    }
+  ]
+}

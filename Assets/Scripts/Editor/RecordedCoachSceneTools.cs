@@ -24,6 +24,9 @@ public static class RecordedCoachSceneTools
         public float bodyYawDegrees;
         public bool alignBodyOrientation;
         public bool mirrorArmChannels;
+        // Mirror every left/right humanoid channel. Used by the right-side
+        // bridge recording, while mirrorArmChannels remains bird-dog-specific.
+        public bool mirrorSideChannels;
         public int routineStart, routineEnd;
         public int[] boundaries;
         public int[] peaks;

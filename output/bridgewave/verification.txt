@@ -1,0 +1,8 @@
+Standard follow scene verification
+Cycle 1: lift 1.533s, hold 1.367s, lower 3.367s; recorded phase timing, smooth standard S-curve.
+Cycle 2: lift 1.633s, hold 1.367s, lower 3.033s; recorded phase timing, smooth standard S-curve.
+Cycle 3: lift 1.633s, hold 1.567s, lower 3.367s; recorded phase timing, smooth standard S-curve.
+Cycle 4: lift 1.367s, hold 1.400s, lower 2.533s; recorded phase timing, smooth standard S-curve.
+PASS: equal-width stroke judgement tested at 90%/110% of the normal half-width on lift, hold and lowering.
+PASS: above-qualified hip height saturates at 1.0 and earns plateau HIT; lowering still requires following the descending track; stale input still rejected.
+PASS: 82 continuous HIT pulse events when following; 0 when outside the band; 0 when sensor is stale; pause and reset verified.

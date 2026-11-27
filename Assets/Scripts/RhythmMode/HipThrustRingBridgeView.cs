@@ -34,7 +34,8 @@ public sealed class HipThrustRingBridgeView : MonoBehaviour
     TMP_Text qualityMetric,holdMetric,repetitionMetric;
     readonly Image[] phaseBadges = new Image[3];
     readonly TMP_Text[] phaseBadgeLabels = new TMP_Text[3];
-    static readonly string[] PhaseNames = { "抬起", "保持", "放下" };
+    string[] PhaseNames => transport.RuleScoring!=null&&transport.RuleScoring.recordedAction!=null
+        ? transport.RuleScoring.recordedAction.PhaseNames : new[]{"抬起", "保持", "放下"};
     static readonly Color[] PhaseColors = { new Color(1,.49f,.67f), new Color(1,.84f,.39f), new Color(.73f,.61f,1) };
     SpriteRenderer background;
     RectTransform hudRect;
@@ -246,7 +247,7 @@ public sealed class HipThrustRingBridgeView : MonoBehaviour
     {
         float height = presentationCamera.orthographicSize * 2f;
         float width = height * presentationCamera.aspect;
-        float scale = Screen.height / (height * 100f);
+        float scale = (composition != null ? composition.height : Screen.height) / (height * 100f);
         Place(pauseButton, new Vector2(40,30), new Vector2(44,44));
         Place(menuButton, new Vector2(65,369), new Vector2(94,28));
         Place(previewPanelRect, new Vector2(720,217), new Vector2(224,185));

@@ -1,0 +1,27 @@
+{
+  "checkedFiles": 20,
+  "changedFiles": [],
+  "scope": "Compared with working files at the start of final-score-only implementation; preexisting edits are excluded from this commit.",
+  "sha256": {
+    "Assets/Scripts/RhythmMode/RhythmPoseJudge.cs": "55cefd729726c75e1e9f8c3d5a083b27a3d9929ba5fb12ad81dc05ad9860a404",
+    "Assets/Scripts/RhythmMode/RhythmMovementRange.cs": "3a52d89eecf046f4cd4fa6545de2176cc58c452c05383198ddf788bcc2ae07ea",
+    "Assets/Scripts/RhythmMode/HipThrustRuleScoring.cs": "54b92573466aaadbdb800b5b773f12bdb81f95999885943bab345b32332c5503",
+    "Assets/Scripts/RhythmMode/SideBridgePoseScoring.cs": "7161c0181e3b7c5ee30a7059a864b888bd949dfd0fa1308f0f2c22c5895c4d5d",
+    "Assets/Scripts/RhythmMode/SideBridgePoseGeometry.cs": "838114e891faf1e2e6ed4d8f3abe8c9a24cb9589e5a497ac2918156752ef4302",
+    "Assets/Scripts/RhythmMode/HipThrustHoldGeometry.cs": "88d4a7d7e8940c05fddbd3be83104ccfb170345d79f88b672722c091df91c9b3",
+    "Assets/Scripts/RhythmMode/HipThrustHoldRule.cs": "8e4105984cb23227b0a3999d05b5228c896dd9f6698169c33d867e3e0050ae23",
+    "Assets/Scripts/RhythmMode/SideBridgeHoldRule.cs": "d806676acdbd77b15ec1763c96448f579e1a87f7cd529fb2ba7c2d2e328fa322",
+    "Assets/Scripts/RhythmMode/GameDifficultyPolicy.cs": "7e0a640fac856b07607935a686485f6b664b9d45e57ecd01f0390a5454c5197a",
+    "Assets/Scripts/RhythmMode/TrainingScoringTolerance.cs": "2d8703da1634546ef58e18f57a88add8687581fe35232fd57a73ab7fdd481d82",
+    "Assets/Scripts/DeadBugGamingPoseScorer.cs": "d47c57c8e001c53f4f8a763659b8bf42e4d6a976d0ad644c47a8d20e2515fc9d",
+    "Assets/Scripts/CoachActionController.cs": "d4596302128cd2f672ffe726ac066c10d6eeabf863c54b858398b2de3abd77ba",
+    "Assets/BridgeWave/Scripts/BridgeWaveTrack.cs": "37c8feacf8fa3471f7d4993122563008fe53c0b52d2ef3485d817b3397cd96b8",
+    "Assets/BridgeWave/Scripts/BridgeWaveGame.cs": "1f57b4efb3cd9988367bf96b2f43ebc97ae753da5be43593e3925c4404be622c",
+    "Assets/Scripts/GameRules/CrunchHoldScorer.cs": "e1d61d55eebf14a26cd66cd3d73b518d02458b77960a14efdf35b5a3ba1355bb",
+    "Assets/Scripts/GameRules/LyingCatAnatomicalConstraint.cs": "75efc4c4701cf9be16a85b4b3dec54d1fac6d65c058003e392fb67d331e2f007",
+    "Assets/Scripts/GameRules/LyingCatHoldScorer.cs": "4c7df6803a7e15b72cfd94648e88229e526b0e5859e041483f9ffbce64503368",
+    "Assets/Scripts/GameRules/LyingCatPoseReader.cs": "1ba6a058ea0c8663f8c47c954a02768be69181935948a284ebb576a705299104",
+    "Assets/Scripts/GameRules/RecordedCrunchCoachMotion.cs": "be89f5fe626dff7040baaa48d8ef2f0804eb214f57b96da2e56b2613d0b00b9e",
+    "Assets/Scripts/GameRules/RecordedLyingCatCoachMotion.cs": "f1310ec46569884423634a294d4045b221d9d710a64c0046fb5fd7af30125175"
+  }
+}

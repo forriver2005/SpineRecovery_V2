@@ -1,10 +1,11 @@
 using System;
 using UnityEngine;
 
-/// <summary>Resamples the recorded poses, freezes the actual peak for 30 seconds, and executes an exact dose.</summary>
+/// <summary>Resamples the recorded poses, freezes the actual peak for the prescribed duration, and executes an exact dose.</summary>
 public sealed class HipThrustHold30Timeline
 {
-    public const float HoldSeconds = 30;
+    public const float HoldSeconds = TrainingHoldDuration.DefaultSeconds; // Legacy default for existing callers.
+    public float PrescribedHoldSeconds { get; }
     public readonly struct Repetition
     {
         public readonly int cycle, peakFrame;
@@ -21,11 +22,12 @@ public sealed class HipThrustHold30Timeline
     public bool PreservesSourceGaps { get; }
     public const float WrapSeconds=.5f;
 
-    public HipThrustHold30Timeline(HipThrustPhaseTimeline source, int count, bool preserveRecordedTiming=false, bool skipRecordedPlateauAfterHold=false, bool preserveSourceGaps=false, float holdSeconds=HoldSeconds, float extraRecordedHoldSeconds=0)
+    public HipThrustHold30Timeline(HipThrustPhaseTimeline source, int count, bool preserveRecordedTiming=false, bool skipRecordedPlateauAfterHold=false, bool preserveSourceGaps=false, float extraRecordedHoldSeconds=0, float holdSeconds=0)
     {
         if (count < 1 || count > 2000) throw new ArgumentOutOfRangeException(nameof(count), "处方总次数必须为 1–2000。");
         source.Validate(); this.source=source; fps=source.sourceClip.frameRate;
         UsesRecordedTiming=preserveRecordedTiming;
+        PrescribedHoldSeconds=TrainingHoldDuration.Resolve(holdSeconds);
         skipPlateau=skipRecordedPlateauAfterHold&&!preserveRecordedTiming;
         PreservesSourceGaps=preserveSourceGaps;
         Repetitions=new Repetition[count];
@@ -35,7 +37,7 @@ public sealed class HipThrustHold30Timeline
             int index=i%source.cycles.Length; var cycle=source.cycles[index];
             int peak=PeakFrame(source, index);
             double top=start+((UsesRecordedTiming?cycle.holdStartFrame:peak)-cycle.liftStartFrame)/(double)fps;
-            double hold=UsesRecordedTiming?(cycle.lowerStartFrame-cycle.holdStartFrame)/(double)fps+extraRecordedHoldSeconds:holdSeconds;
+            double hold=UsesRecordedTiming?(cycle.lowerStartFrame-cycle.holdStartFrame)/(double)fps+extraRecordedHoldSeconds:PrescribedHoldSeconds;
             double end=top+hold+(cycle.lowerEndFrame-(UsesRecordedTiming||skipPlateau?cycle.lowerStartFrame:peak))/(double)fps;
             Repetitions[i]=new Repetition(index,peak,start,top,end,hold); start=end;
             if(PreservesSourceGaps && i<count-1)
@@ -86,7 +88,7 @@ public sealed class HipThrustHold30Timeline
                 sample.phase=2; begin=rep.lower; end=rep.end;
                 sourceFrame=(UsesRecordedTiming||skipPlateau?c.lowerStartFrame:rep.peakFrame)+(float)(time-begin)*fps;
                 // The side-bridge capture contains a long stationary plateau after
-                // its peak. Do not append that plateau to the requested 30 seconds.
+                // its peak. Do not append that plateau to the prescribed hold duration.
                 if(skipPlateau) sourceFrame=Mathf.Lerp(rep.peakFrame,sourceFrame,Mathf.SmoothStep(0,1,(float)(time-begin)/.15f));
             }
             sample.progress=Mathf.Clamp01((float)((time-begin)/(end-begin)));

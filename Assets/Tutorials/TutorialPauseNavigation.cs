@@ -18,7 +18,9 @@ public sealed class TutorialPauseNavigation : MonoBehaviour
     GameObject fallbackPanel, pauseButton;
     bool installed;
     static TutorialPauseNavigation owner;
-    bool IsPaused => entry != null && (entry.taiko != null ? entry.taiko.IsPaused : entry.coach.IsActionPaused);
+    bool IsPaused => entry != null && (entry.bridgeWave!=null?entry.bridgeWave.State==BridgeWave.BridgeWaveFollowController.RunState.Paused:
+        entry.taikoNightAction!=null?TaikoNight.TaikoNightPracticeClock.IsPaused:entry.taiko!=null?entry.taiko.IsPaused:entry.coach!=null&&entry.coach.IsActionPaused);
+    void TogglePause(){if(entry.bridgeWave!=null)entry.bridgeWave.TogglePause();else if(entry.taikoNightAction!=null)entry.taikoNightAction.TogglePause();else if(entry.taiko!=null)entry.taiko.TogglePause();else entry.coach?.TogglePause();}
 
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
     static void ResetState()
@@ -41,10 +43,10 @@ public sealed class TutorialPauseNavigation : MonoBehaviour
         if (entry == null) return;
         if (!installed) Install();
         if (fallbackPanel != null) fallbackPanel.SetActive(IsPaused && !IsTutorialOpen);
-        if (pauseButton != null) pauseButton.SetActive(!IsTutorialOpen && !entry.menu.IsTrainingMenuVisible && !IsPaused);
+        if (pauseButton != null) pauseButton.SetActive(!IsTutorialOpen && !entry.IsMenuVisible && !IsPaused);
         if (IsTutorialOpen || menu != null) return;
-        if (Input.GetKeyDown(KeyCode.Escape) && !entry.menu.IsTrainingMenuVisible)
-        { if (entry.taiko != null) entry.taiko.TogglePause(); else entry.coach.TogglePause(); }
+        if (Input.GetKeyDown(KeyCode.Escape) && !entry.IsMenuVisible)
+        { TogglePause(); }
     }
     void Install()
     {
@@ -52,10 +54,10 @@ public sealed class TutorialPauseNavigation : MonoBehaviour
         if (menu != null && menu.Panel == null) return;
         fallback = TutorialUI.Canvas("Tutorial navigation", 2000, new Vector2(1920, 1080));
         SceneManager.MoveGameObjectToScene(fallback.gameObject, gameObject.scene);
-        if (entry.taiko == null)
+        if (entry.taiko == null && entry.taikoNightAction == null && entry.bridgeWave == null)
         {
             var button = TutorialUI.Button(fallback.transform, entry.font, "暂停", Vector2.zero, new Vector2(150, 60), () =>
-            { if (menu != null) menu.Open(); else entry.coach.TogglePause(); });
+            { if (menu != null) menu.Open(); else TogglePause(); });
             var rect = (RectTransform)button.transform;
             rect.anchorMin = rect.anchorMax = new Vector2(1, 1); rect.anchoredPosition = new Vector2(-120, -70);
             pauseButton = button.gameObject;
@@ -63,9 +65,9 @@ public sealed class TutorialPauseNavigation : MonoBehaviour
         if (menu != null)
         {
             var card = (RectTransform)menu.Panel.transform.Find("Card");
-            card.sizeDelta = new Vector2(card.sizeDelta.x, 1020);
+            card.sizeDelta = new Vector2(card.sizeDelta.x, 1040);
             foreach (RectTransform child in card) child.anchoredPosition += Vector2.up * 80;
-            AddLinks(card, -338, -404, -470);
+            AddLinks(card, -365, -425, -485);
         }
         else
         {
@@ -73,7 +75,7 @@ public sealed class TutorialPauseNavigation : MonoBehaviour
             fallbackPanel = panel.gameObject;
             AddLinks(panel, 86, 18, -46);
             if (entry.taiko == null)
-                TutorialUI.Button(panel, entry.font, "继续游戏", new Vector2(0, -96), new Vector2(280, 44), () => entry.coach.TogglePause(), 24);
+                TutorialUI.Button(panel, entry.font, "继续游戏", new Vector2(0, -96), new Vector2(280, 44), () => TogglePause(), 24);
         }
         installed = true;
     }
@@ -93,7 +95,7 @@ public sealed class TutorialPauseNavigation : MonoBehaviour
         if (IsLoading || IsTutorialOpen || index < 0 || index >= Scenes.Length) return;
         if (!Application.CanStreamedLevelBeLoaded(Scenes[index])) { Debug.LogError("Tutorial scene missing from build: " + Scenes[index]); return; }
         if (!IsPaused)
-        { if (menu != null) menu.Open(); else if (entry.taiko != null) entry.taiko.TogglePause(); else entry.coach.TogglePause(); }
+        { if (menu != null) menu.Open(); else TogglePause(); }
         // Keep the existing scene loaded and paused. Never cancel its workout or scoring session.
         ReturnScene = gameObject.scene.name; IsLoading = IsTutorialOpen = true; owner = this;
         // Prevent the original menu from also processing Escape while the tutorial is on top.

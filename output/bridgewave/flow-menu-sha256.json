@@ -1,0 +1,19 @@
+{
+  "Assets\\BridgeWave\\Editor\\BridgeWaveBuilder.cs": "e18517188b446121de2261d04995e4b9a5ef688720dc1d14eda6dd58cfd437e9",
+  "Assets\\BridgeWave\\Editor\\BridgeWaveFollowBuilder.cs": "0165dafc227fb94c440f678254d4d554609f26a26c1316f0b055522bcce5d614",
+  "Assets\\BridgeWave\\Editor\\BridgeWaveFollowVerification.cs": "f53182099af93fd9a0884a966858c76e5787d3e9f3eaef9f165a43db845087b2",
+  "Assets\\BridgeWave\\Editor\\BridgeWavePlayVerification.cs": "cbbb909e181f66e9bd771d70417f8902b7e8ce82abe7d3c9df340c93442c1acf",
+  "Assets\\BridgeWave\\Scripts\\BridgeWaveCoachPreview.cs": "03058d633fb5d11500edb006b04da5e6b414c331020417dd5d2468fe48bf62e8",
+  "Assets\\BridgeWave\\Scripts\\BridgeWaveFollowController.cs": "b208bd46407be645b5bfed5f99fa41f7938ad10b9a602192e18937f8327d156d",
+  "Assets\\BridgeWave\\Scripts\\BridgeWaveGame.cs": "1f57b4efb3cd9988367bf96b2f43ebc97ae753da5be43593e3925c4404be622c",
+  "Assets\\BridgeWave\\Scripts\\BridgeWaveHeightInput.cs": "8c98257b7cfa520c450332220b4df7a39e0b10c5b8910cae7e8de8643e2b057f",
+  "Assets\\BridgeWave\\Scripts\\BridgeWaveTrack.cs": "37c8feacf8fa3471f7d4993122563008fe53c0b52d2ef3485d817b3397cd96b8",
+  "Assets\\BridgeWave\\Scripts\\BridgeWaveViewport.cs": "c91ae89d4d77d7427ec069a9d055a54ffbc0c444bb30f3cff2d4d0aafba041cc",
+  "Assets\\BridgeWave\\Scripts\\DesignSpace.cs": "6b9bdfd5f908b9055c716db1efcca787d94dc81447341b846f21ad512914e6e2",
+  "Assets\\BridgeWave\\Scripts\\FloatBob.cs": "358e57e78bf31eac6e3768c7b54dbb6e2cc03feb25e4fe4fb0695cada2c9ead5",
+  "Assets\\BridgeWave\\Scripts\\MeteorLoop.cs": "905c7fa3cd32d6ad82090b6ea8144d0bde347836a529cdc815d028818b4ae9b7",
+  "Assets\\BridgeWave\\Scripts\\SimulatedPatient.cs": "063924e11a03018ddc25c080f10979a988da0f0538fbbff467b945c8c2416d2b",
+  "Assets\\BridgeWave\\Scripts\\Twinkle.cs": "10cd8cab20363e5e98b9bbeef2bd3332004cf34ea25582dbf4cfe58da157d351",
+  "Assets\\BridgeWave\\Scripts\\WaveLayout.cs": "4b54f6955d93ff542b96878cf687d07657d651cd6dffa1f9c3390b90b8fd6239",
+  "Assets/Scenes/BridgeWave_StandardFollow.unity": "1009803d7127c582e90ed8122abee670bd7a1daa8fcabbdc2854593d4a3c6e10"
+}

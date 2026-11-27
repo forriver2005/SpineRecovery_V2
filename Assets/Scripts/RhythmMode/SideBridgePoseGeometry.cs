@@ -1,6 +1,6 @@
 using UnityEngine;
 
-/// <summary>Left-side support geometry. Translation, body scale and horizontal heading invariant.</summary>
+/// <summary>Side-bridge support geometry. Translation, body scale and horizontal heading invariant.</summary>
 public sealed class SideBridgePoseGeometry
 {
     public enum SupportSide { Left, Right }
@@ -12,18 +12,21 @@ public sealed class SideBridgePoseGeometry
         public float shoulderOverElbow;
         public float armAngle, stackAngle;
         public Vector3 thigh, shin, shoulderAxis, pelvisAxis;
-        public bool IsLeftSupport => shoulderStack > .35f && pelvisStack > .25f && torsoVertical < .75f;
+        public bool rightSupport;
+        public bool IsLeftSupport => !rightSupport && IsStacked;
+        public bool IsRightSupport => rightSupport && IsStacked;
+        private bool IsStacked => shoulderStack > .35f && pelvisStack > .25f && torsoVertical < .75f;
     }
     public Pose Rest { get; private set; }
     public Pose Top { get; private set; }
     public float RestLift { get; private set; }
     public float TopLift { get; private set; }
 
-    public bool SetTargets(Pose rest, Pose top, float restLift, float topLift)
+    public bool SetTargets(Pose rest, Pose top, float restLift, float topLift, float minimumLift = .015f)
     {
         Rest=rest; Top=top; RestLift=restLift; TopLift=topLift;
         return rest!=null && top!=null && IsSupport(rest) && IsSupport(top) &&
-            Finite(restLift) && Finite(topLift) && topLift-restLift>.015f;
+            Finite(restLift) && Finite(topLift) && topLift-restLift>minimumLift;
     }
 
     public float RawProgress(Pose pose) => (pose.lift-RestLift)/(TopLift-RestLift);
@@ -64,11 +67,13 @@ public sealed class SideBridgePoseGeometry
     }
 
     public bool IsSupport(Pose pose) => pose != null && (Side == SupportSide.Left
-        ? pose.IsLeftSupport
-        : pose.shoulderStack < -.35f && pose.pelvisStack < -.25f && pose.torsoVertical < .75f);
+        ? pose.IsLeftSupport : pose.IsRightSupport);
 
     public static bool TryMeasure(Animator avatar, out Pose pose)
         => TryMeasure(avatar, SupportSide.Left, out pose);
+
+    public static bool TryMeasure(Animator avatar, bool rightSupport, out Pose pose)
+        => TryMeasure(avatar, rightSupport ? SupportSide.Right : SupportSide.Left, out pose);
 
     public static bool TryMeasure(Animator avatar, SupportSide side, out Pose pose)
     {
@@ -84,6 +89,10 @@ public sealed class SideBridgePoseGeometry
         var rightKnee=avatar.GetBoneTransform(HumanBodyBones.RightLowerLeg);
         var lf=avatar.GetBoneTransform(HumanBodyBones.LeftFoot);var rf=avatar.GetBoneTransform(HumanBodyBones.RightFoot);
         if(hip==null || chest==null || ls==null || rs==null || elbow==null || wrist==null || lt==null || rt==null || knee==null || rightKnee==null || lf==null || rf==null) return false;
+        bool rightSupport = side == SupportSide.Right;
+        Transform supportShoulder = rightSupport ? rs : ls, freeShoulder = rightSupport ? ls : rs;
+        Vector3 shoulderStack = freeShoulder.position - supportShoulder.position;
+        Vector3 pelvisStack = rightSupport ? lt.position - rt.position : rt.position - lt.position;
         Vector3 shoulder=(ls.position+rs.position)*.5f,feet=(lf.position+rf.position)*.5f;
         float span=Vector3.Distance(shoulder,feet);
         Transform supportFoot = side == SupportSide.Left ? lf : rf;
@@ -101,15 +110,16 @@ public sealed class SideBridgePoseGeometry
             lift=Vector3.Dot(hip.position-onSupport,Vector3.up)/span,
             trunkAngle=Vector3.Angle(shoulder-hip.position,feet-hip.position),
             kneeAngle=.5f*(Vector3.Angle(hip.position-knee.position,lf.position-knee.position)+Vector3.Angle(hip.position-rightKnee.position,rf.position-rightKnee.position)),
-            armAngle=Vector3.Angle(ls.position-elbow.position,Vector3.up),
-            stackAngle=Vector3.Angle(rs.position-ls.position,Vector3.up),
-            elbowAngle=Vector3.Angle(ls.position-elbow.position,wrist.position-elbow.position),
-            shoulderStack=Vector3.Dot((rs.position-ls.position).normalized,Vector3.up),
-            pelvisStack=Vector3.Dot((rt.position-lt.position).normalized,Vector3.up),
+            armAngle=Vector3.Angle(supportShoulder.position-elbow.position,Vector3.up),
+            stackAngle=Vector3.Angle(shoulderStack,Vector3.up),
+            elbowAngle=Vector3.Angle(supportShoulder.position-elbow.position,wrist.position-elbow.position),
+            shoulderStack=Vector3.Dot(shoulderStack.normalized,Vector3.up),
+            pelvisStack=Vector3.Dot(pelvisStack.normalized,Vector3.up),
             torsoVertical=Mathf.Abs(Vector3.Dot((chest.position-hip.position).normalized,Vector3.up)),
-            shoulderOverElbow=Vector3.ProjectOnPlane(ls.position-elbow.position,Vector3.up).magnitude/span,
+            shoulderOverElbow=Vector3.ProjectOnPlane(supportShoulder.position-elbow.position,Vector3.up).magnitude/span,
             thigh=Local(knee.position-lt.position),shin=Local(lf.position-knee.position),
-            shoulderAxis=Local(rs.position-ls.position),pelvisAxis=Local(rt.position-lt.position)
+            shoulderAxis=Local(shoulderStack),pelvisAxis=Local(pelvisStack),
+            rightSupport=rightSupport
         };
         return Finite(pose.lift)&&Finite(pose.trunkAngle)&&Finite(pose.kneeAngle)&&Finite(pose.elbowAngle)&&Finite(pose.shoulderStack)&&Finite(pose.pelvisStack)&&Finite(pose.torsoVertical)&&Finite(pose.shoulderOverElbow);
     }

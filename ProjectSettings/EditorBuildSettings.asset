@@ -113,4 +113,25 @@ EditorBuildSettings:
   - enabled: 1
     path: Assets/Scenes/LyingCatPractice_TaikoNight.unity
     guid: eb3f95803be22a143ba2ab646f09fe31
+  - enabled: 1
+    path: Assets/Scenes/SideBridgeRight_RingBridge_Dynamic.unity
+    guid: 08438edb02fd0e04dbbbd9ddd9571fc5
+  - enabled: 1
+    path: Assets/Scenes/SideBridgeRight_RingBridge_Hold30.unity
+    guid: bfeef80178d5bc14f934a9df19b41d18
+  - enabled: 1
+    path: Assets/Scenes/BridgeWave_StandardFollow.unity
+    guid: 5c410992cc3fe9144bd66b31f7969016
+  - enabled: 1
+    path: Assets/Scenes/BirdDog_RingBridge_Hold30.unity
+    guid: e6a7a3cc30bfb6540ab7ebaccee97cac
+  - enabled: 1
+    path: Assets/Scenes/DeadBug_RingBridge_Hold30.unity
+    guid: 281812f12a7340149829e79feb1b02dc
+  - enabled: 1
+    path: Assets/Scenes/Crunch_RingBridge_Hold30.unity
+    guid: 931305d2271ea37438da4a84a2323b0c
+  - enabled: 1
+    path: Assets/Scenes/LyingCat_RingBridge_Hold30.unity
+    guid: 2218ba924bbc02644a7287290b8bdae2
   m_configObjects: {}

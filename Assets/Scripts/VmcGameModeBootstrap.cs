@@ -59,12 +59,25 @@ public sealed class VmcGameModeBootstrap : MonoBehaviour
             return;
         }
 
-        EVMC4U.ExternalReceiver receiver =
-            gameObject.AddComponent<EVMC4U.ExternalReceiver>();
-        uOSC.uOscServer server = gameObject.AddComponent<uOSC.uOscServer>();
-        AvatarMotionSource source = gameObject.AddComponent<AvatarMotionSource>();
-        VmcGameModeSourceBridge bridge =
-            gameObject.AddComponent<VmcGameModeSourceBridge>();
+        // Imported practice scenes may already contain the patient's receiver.
+        // Reuse it instead of opening a second socket on the same VMC port.
+        EVMC4U.ExternalReceiver receiver = null;
+        foreach(var candidate in FindObjectsOfType<EVMC4U.ExternalReceiver>(true))
+            if(candidate.gameObject.scene==gameObject.scene&&candidate.Model==userAnimator.gameObject)
+            {receiver=candidate;break;}
+        GameObject receiverRoot;
+        bool activate=false;
+        if(receiver==null)
+        {
+            receiverRoot=new GameObject("Patient VMC Input");receiverRoot.transform.SetParent(transform,false);
+            receiverRoot.SetActive(false);activate=true;
+            receiver=receiverRoot.AddComponent<EVMC4U.ExternalReceiver>();
+        }
+        else receiverRoot=receiver.gameObject;
+        uOSC.uOscServer server=receiverRoot.GetComponent<uOSC.uOscServer>()??receiverRoot.AddComponent<uOSC.uOscServer>();
+        if(server.port!=VmcInputPort)server.StopServer();
+        AvatarMotionSource source=receiverRoot.GetComponent<AvatarMotionSource>()??receiverRoot.AddComponent<AvatarMotionSource>();
+        VmcGameModeSourceBridge bridge=receiverRoot.GetComponent<VmcGameModeSourceBridge>()??receiverRoot.AddComponent<VmcGameModeSourceBridge>();
 
         server.port = VmcInputPort;
         server.autoStart = true;
@@ -97,6 +110,7 @@ public sealed class VmcGameModeBootstrap : MonoBehaviour
         receiver.CutBoneJaw = true;
         source.Configure(userAnimator);
         bridge.Configure(receiver, source);
+        if(activate)receiverRoot.SetActive(true);
     }
 
     private static Animator FindUserAnimator()

@@ -1,0 +1,259 @@
+{
+  "Assets/Scripts/CoachActionController.cs": {
+    "sha256": "bbacf88fc23667ca5fea15ddbbfe32b029854c485d817473e53379da5fdfb97d",
+    "matchingValidationProjects": [
+      "tmp/bridgewave-staged-validation",
+      "tmp/four-hold-focused-validation"
+    ]
+  },
+  "Assets/Scripts/DeadBugGamingPoseScorer.cs": {
+    "sha256": "927c44203a9dca367a9d9fc251a1d310c00934c06cfd983a0df61228ee405d7f",
+    "matchingValidationProjects": [
+      "tmp/bridgewave-staged-validation",
+      "tmp/four-hold-focused-validation"
+    ]
+  },
+  "Assets/Scripts/Editor/AllGamePrescriptionFlowVerification.cs": {
+    "sha256": "3bd81bd0843a00d57884d7b081ed718f3bb5ed13ed852cfc0b86b4c54a380939",
+    "matchingValidationProjects": [
+      "tmp/bridgewave-staged-validation",
+      "tmp/four-hold-focused-validation"
+    ]
+  },
+  "Assets/Scripts/Editor/AllGameVmcVerification.cs": {
+    "sha256": "3150e60ba28fc71cefae7ba2f8cbc86d1a49a561c60b6e5ba1dad2316daf0f12",
+    "matchingValidationProjects": [
+      "tmp/bridgewave-staged-validation"
+    ]
+  },
+  "Assets/Scripts/Editor/DoctorPrescriptionHoldVerification.cs": {
+    "sha256": "dfdf0a0c7779423795377f28bd029c217542e1f632c3e6f3d6338c68902ca69f",
+    "matchingValidationProjects": [
+      "tmp/bridgewave-staged-validation",
+      "tmp/four-hold-focused-validation"
+    ]
+  },
+  "Assets/Scripts/Editor/PrescribedHoldVerification.cs": {
+    "sha256": "cbbbfec09f0aee6d14c158f3d48d6b2f089c00c15099afec054ec0f59350cf2d",
+    "matchingValidationProjects": [
+      "tmp/bridgewave-staged-validation",
+      "tmp/four-hold-focused-validation"
+    ]
+  },
+  "Assets/Scripts/Editor/RecordedCoachMotionImporter.cs": {
+    "sha256": "c9113da3f7ef8bfeb263da049554ecbe97122cf50a7894a80e56f9378f138974",
+    "matchingValidationProjects": [
+      "tmp/bridgewave-staged-validation",
+      "tmp/four-hold-focused-validation"
+    ]
+  },
+  "Assets/Scripts/Editor/RecordedCoachSceneTools.cs": {
+    "sha256": "d73519f059faa04ec2597a08bff38cc726eabe9df0af5e4f74a5f9261a12c804",
+    "matchingValidationProjects": [
+      "tmp/bridgewave-staged-validation",
+      "tmp/four-hold-focused-validation"
+    ]
+  },
+  "Assets/Scripts/Editor/RecordedHoldGamesBuilder.cs": {
+    "sha256": "3cde1547c50f1918f5593e4fe11909ba558f58a8ef29349a304fff6e7799255d",
+    "matchingValidationProjects": [
+      "tmp/bridgewave-staged-validation",
+      "tmp/four-hold-focused-validation"
+    ]
+  },
+  "Assets/Scripts/Editor/RecordedHoldGamesVerification.cs": {
+    "sha256": "d9149d952adba416e9ae294357b934e234d825d16838485f82433e0eaffa4bbf",
+    "matchingValidationProjects": [
+      "tmp/bridgewave-staged-validation",
+      "tmp/four-hold-focused-validation"
+    ]
+  },
+  "Assets/Scripts/Editor/SideBridgeRightGameBuilder.cs": {
+    "sha256": "70ced4c8128b501b0bebf92025bb8f3bfcedc315236300bcd6972759d61d99dd",
+    "matchingValidationProjects": [
+      "tmp/bridgewave-staged-validation",
+      "tmp/four-hold-focused-validation"
+    ]
+  },
+  "Assets/Scripts/Editor/TrainingDeliveryVerification.cs": {
+    "sha256": "fcb8b929a6920d019b80ef0554d2d7b2417f01e38b5fc0ce4ef3d446beb28dfa",
+    "matchingValidationProjects": [
+      "tmp/bridgewave-staged-validation"
+    ]
+  },
+  "Assets/Scripts/Editor/TrainingMusicInstaller.cs": {
+    "sha256": "962678ce634b9de8dac1079d879fa1cff83eaa4c3488d19d607902f540d4b018",
+    "matchingValidationProjects": [
+      "tmp/bridgewave-staged-validation",
+      "tmp/four-hold-focused-validation"
+    ]
+  },
+  "Assets/Scripts/GameRules/CrunchHoldScorer.cs": {
+    "sha256": "d77e2f9076e51ba13fcbdeb9550911667bdf0fbd59201ee9dd44b8f19b332992",
+    "matchingValidationProjects": [
+      "tmp/bridgewave-staged-validation",
+      "tmp/four-hold-focused-validation"
+    ]
+  },
+  "Assets/Scripts/GameRules/LyingCatHoldScorer.cs": {
+    "sha256": "4c555cd4f16bbed979555a322686caad76c8f8caf0aa41c78c3cfd64f1c256c1",
+    "matchingValidationProjects": [
+      "tmp/bridgewave-staged-validation",
+      "tmp/four-hold-focused-validation"
+    ]
+  },
+  "Assets/Scripts/RhythmMode/GameTestMenu.cs": {
+    "sha256": "2a88900388f7991cff53483d3b8d46c4e83038c3c0f7ee3e5a0db3d6bb3fe2a9",
+    "matchingValidationProjects": [
+      "tmp/bridgewave-staged-validation",
+      "tmp/four-hold-focused-validation"
+    ]
+  },
+  "Assets/Scripts/RhythmMode/GameTrainingAssessment.Final.cs": {
+    "sha256": "dc20bf97256800d52f6885ff3ef393cb157c6a7a38b1ebcbcb0d8f43e02f105d",
+    "matchingValidationProjects": [
+      "tmp/bridgewave-staged-validation",
+      "tmp/four-hold-focused-validation"
+    ]
+  },
+  "Assets/Scripts/RhythmMode/GameTrainingAssessment.cs": {
+    "sha256": "69c64067fc9fe3b131ded677733bdf96fe944653be65e2257047fc4d139179db",
+    "matchingValidationProjects": [
+      "tmp/bridgewave-staged-validation",
+      "tmp/four-hold-focused-validation"
+    ]
+  },
+  "Assets/Scripts/RhythmMode/GameTrainingMusic.cs": {
+    "sha256": "085e5f127edcb30ef2cc0a36c859f2505d9ded42d93750dce39f77209c687766",
+    "matchingValidationProjects": [
+      "tmp/bridgewave-staged-validation",
+      "tmp/four-hold-focused-validation"
+    ]
+  },
+  "Assets/Scripts/RhythmMode/GameWorkoutPlan.cs": {
+    "sha256": "7fb0a1414c15aa93ed4634eb1a625e2f2cc69d0698a98e2351e8c77184ec4c63",
+    "matchingValidationProjects": [
+      "tmp/bridgewave-staged-validation",
+      "tmp/four-hold-focused-validation"
+    ]
+  },
+  "Assets/Scripts/RhythmMode/GameWorkoutScene.cs": {
+    "sha256": "a35917f2aad2a5f347c81fb75fe273a4b083bac3ad8ea99dc7ea4ef0bd05a759",
+    "matchingValidationProjects": [
+      "tmp/bridgewave-staged-validation",
+      "tmp/four-hold-focused-validation"
+    ]
+  },
+  "Assets/Scripts/RhythmMode/HipThrustHold30Timeline.cs": {
+    "sha256": "37a8282f3458f246581df2793545d662ed25d888ec23d0d94e3946e4a7d6bdda",
+    "matchingValidationProjects": [
+      "tmp/bridgewave-staged-validation",
+      "tmp/four-hold-focused-validation"
+    ]
+  },
+  "Assets/Scripts/RhythmMode/HipThrustPrescriptionDose.cs": {
+    "sha256": "33488d4921c8448a0eb2b7afee3e94278a978d3faf713bf553f9491fbc562749",
+    "matchingValidationProjects": [
+      "tmp/bridgewave-staged-validation",
+      "tmp/four-hold-focused-validation"
+    ]
+  },
+  "Assets/Scripts/RhythmMode/HipThrustRingBridgeView.cs": {
+    "sha256": "12403a262ba8b1a138ddfc0bd71f16c4572185b98d6ff76e0c3e624932b346cc",
+    "matchingValidationProjects": [
+      "tmp/bridgewave-staged-validation",
+      "tmp/four-hold-focused-validation"
+    ]
+  },
+  "Assets/Scripts/RhythmMode/HipThrustRuleScoring.cs": {
+    "sha256": "a9544058b6ceac448cf7bb88c595ba516b6bb3b6d6d2d235e59f2ce97502c64c",
+    "matchingValidationProjects": [
+      "tmp/bridgewave-staged-validation",
+      "tmp/four-hold-focused-validation"
+    ]
+  },
+  "Assets/Scripts/RhythmMode/HipThrustTaikoController.cs": {
+    "sha256": "80832b05b8a4f24513896eca8930f45b1eb417249d09b01fa8f0252ea0ca1f0f",
+    "matchingValidationProjects": [
+      "tmp/bridgewave-staged-validation",
+      "tmp/four-hold-focused-validation"
+    ]
+  },
+  "Assets/Scripts/RhythmMode/RecordedActionHoldScoring.cs": {
+    "sha256": "c11cc81e336ae6acf9f4b6eab9d987a184154f364fc192b98bdf6333848581b4",
+    "matchingValidationProjects": [
+      "tmp/bridgewave-staged-validation",
+      "tmp/four-hold-focused-validation"
+    ]
+  },
+  "Assets/Scripts/RhythmMode/RecordedHoldPreparation.cs": {
+    "sha256": "a2cbe3132765f071d9f9c2e95c809e962b4448ba56528c67da6a1606cd734ee3",
+    "matchingValidationProjects": [
+      "tmp/bridgewave-staged-validation",
+      "tmp/four-hold-focused-validation"
+    ]
+  },
+  "Assets/Scripts/RhythmMode/RhythmHitHapticAdapter.cs": {
+    "sha256": "cad15ad2f70af70ee14ae0f9889bc672c6b3b24a36373e91b6d7fe8e6a6f9d9d",
+    "matchingValidationProjects": [
+      "tmp/bridgewave-staged-validation",
+      "tmp/four-hold-focused-validation"
+    ]
+  },
+  "Assets/Scripts/RhythmMode/RhythmSongClock.cs": {
+    "sha256": "f243ada4c4d43ec4ed6faafe257f2306a60a002d22d808f2c58ff8d67f3aa5a6",
+    "matchingValidationProjects": [
+      "tmp/bridgewave-staged-validation",
+      "tmp/four-hold-focused-validation"
+    ]
+  },
+  "Assets/Scripts/RhythmMode/SideBridgePoseGeometry.cs": {
+    "sha256": "838114e891faf1e2e6ed4d8f3abe8c9a24cb9589e5a497ac2918156752ef4302",
+    "matchingValidationProjects": [
+      "tmp/bridgewave-staged-validation",
+      "tmp/four-hold-focused-validation"
+    ]
+  },
+  "Assets/Scripts/RhythmMode/SideBridgePoseScoring.cs": {
+    "sha256": "4a0357aa850aa05df76d6d371c864a2612145dd1b4236669b50128605e9963fa",
+    "matchingValidationProjects": [
+      "tmp/bridgewave-staged-validation",
+      "tmp/four-hold-focused-validation"
+    ]
+  },
+  "Assets/Scripts/RhythmMode/SupineGameCalibration.cs": {
+    "sha256": "25fb3fdfc6b2684f6d3ef6a1b43b0c8219ca422633d653542d4ded3136e50826",
+    "matchingValidationProjects": [
+      "tmp/bridgewave-staged-validation",
+      "tmp/four-hold-focused-validation"
+    ]
+  },
+  "Assets/Scripts/RhythmMode/TrainingHoldDuration.cs": {
+    "sha256": "dd78066238555efd4baac71d188723849ed889f60b9ac29d3b84e3d3befd6444",
+    "matchingValidationProjects": [
+      "tmp/bridgewave-staged-validation",
+      "tmp/four-hold-focused-validation"
+    ]
+  },
+  "Assets/Scripts/VmcGameModeBootstrap.cs": {
+    "sha256": "f1fa7d485d423ba8fa495ff660d9e64f71c464035682ae8afb2450ddc06906de",
+    "matchingValidationProjects": [
+      "tmp/bridgewave-staged-validation",
+      "tmp/four-hold-focused-validation"
+    ]
+  },
+  "Assets/TaikoNight/Scripts/TaikoNightActionRuntime.cs": {
+    "sha256": "cf0cd88a8dfe3aa33a2eef4757eb679dcd13d59d47163191dd4cda9dbc4690b2",
+    "matchingValidationProjects": [
+      "tmp/bridgewave-staged-validation",
+      "tmp/four-hold-focused-validation"
+    ]
+  },
+  "Assets/Tutorials/TutorialPauseNavigation.cs": {
+    "sha256": "1d234afcb7b36bbd450fd3f9dedc261083874541013424e0bab97482651e0d33",
+    "matchingValidationProjects": [
+      "tmp/bridgewave-staged-validation",
+      "tmp/four-hold-focused-validation"
+    ]
+  }
+}

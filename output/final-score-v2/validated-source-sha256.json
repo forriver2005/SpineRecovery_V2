@@ -1,0 +1,16 @@
+{
+  "Assets/BridgeWave/Editor/BridgeWavePlayVerification.cs": "0bfefb43ff5078b4598511b5e1d009cc65adedf34aeda76953f914a38c7bffbe",
+  "Assets/BridgeWave/Editor/BridgeWaveWorkoutVerification.cs": "520a5a6c5df844d207c0e18e8a97bdc385fb25655f376e4e5182096e1f74a6be",
+  "Assets/BridgeWave/Scripts/BridgeWaveFollowController.Final.cs": "df6df9db8f0a8adcf0265bf512385b9812bde2206147b086852ac58d976a908d",
+  "Assets/BridgeWave/Scripts/BridgeWaveFollowController.cs": "b04888c042c6bb2f0170b291886f12d46b7624f13ae16756bb07f8b6e0dd6c1c",
+  "Assets/Scripts/Editor/FinalScoringV2Verification.cs": "2fb3b0a8aef6a216b49f42c3889e94ffd1cc715db324fe36d59419dc50742edc",
+  "Assets/Scripts/Editor/FinalSpecialGameVerification.cs": "f36f0022230b99b961a6ccf5158bbdcfa9d616aef8157a6508f69e442ef41cd8",
+  "Assets/Scripts/Editor/TrainingAssessmentVerification.cs": "d7451db283d92a6ea1b9cd7d9a0c22a8bbdd1cce9b456deade5f42aef8b467d6",
+  "Assets/Scripts/RhythmMode/FinalTrainingScore.cs": "c5c2f3ffb61ef6424b05a192377081dd8e0fee6c8da5ff31eeefd40f9b6b600e",
+  "Assets/Scripts/RhythmMode/GameTrainingAssessment.Final.cs": "c904d54d9fbece0ff0564604e8e4276902d7ba53ed28f2a899a594fff9ecda10",
+  "Assets/Scripts/RhythmMode/GameTrainingAssessment.cs": "d508c9708f49f1d9233424d537c95009f3a8fe098b80a630fb0bbbca1ace9f8d",
+  "Assets/Scripts/RhythmMode/TrainingResultPanel.cs": "db2f468d1c936899df18f6e5762603cf4e7a0f0bbc6b0b9721e1bb8147d6ea05",
+  "Assets/Scripts/RhythmMode/TrainingResultView.cs": "0029554188d73cdae1d0bd5c19e671aaa47dc16248066c523efa505901498a90",
+  "Assets/TaikoNight/Scripts/TaikoNightActionRuntime.Final.cs": "12db10ae6e2d54f05a445907e515c1943c780f259adbb7b3f1aae4433606357c",
+  "Assets/TaikoNight/Scripts/TaikoNightActionRuntime.cs": "aaf49066249375d74f5a4f115f9b056a0e31666a80da66fae7c64879dccc2b06"
+}

@@ -107,6 +107,8 @@ public sealed class CrunchHoldScorer : MonoBehaviour, ITaikoHoldScorer
     public bool TrackingAvailable { get; private set; }
     public float ValidHoldSeconds => validHoldSeconds;
     public float TargetHoldSeconds => targetHoldSeconds;
+    // Read-only threshold for prescribed hold tasks; the existing recognizer is unchanged.
+    public float HoldEntryProgress => enterProgress;
 
     public event Action<HipThrustPhase> PhaseChanged;
     public event Action<int> SessionStarted;

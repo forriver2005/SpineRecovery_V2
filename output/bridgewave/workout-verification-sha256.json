@@ -1,0 +1,8 @@
+{
+  "Assets/Scenes/BridgeWave_StandardFollow.unity": "bdc22b4fae9dce5c57a7358399a2e040c0f7c7c828b96318c6b3fe8fdb1b0e33",
+  "Assets/BridgeWave/Scripts/BridgeWaveFollowController.cs": "940c1c1fcc6a0435a9691b0f1695817d0e067f70f3933a90559a68178cbcff22",
+  "Assets/BridgeWave/Editor/BridgeWaveWorkoutVerification.cs": "ae57be7688150a0d76bc266134c26345809d8f616f7479e5b1fbc9e4b16ed272",
+  "Assets/Scripts/RhythmMode/GameWorkoutScene.cs": "93e20291a23fc8e5ec67af76351426549d78d4a0891007c2164ad2e150569b0f",
+  "Assets/Scripts/RhythmMode/GameWorkoutPlan.cs": "d567f5ababcfaa023438f215e153b7b1a8ef1fafb26a9f26ea158f8c747046b0",
+  "testedGitTree": "fc73a7e5b443991c640f27ee0cae9cfca97fc279"
+}

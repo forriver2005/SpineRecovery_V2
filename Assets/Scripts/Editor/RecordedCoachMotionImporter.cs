@@ -38,7 +38,7 @@ public sealed class RecordedCoachMotionImporter : ScriptedImporter
         void Add(string name, int first, int last)
         {
             if (first < 0 || last <= first || last >= frames.Length) throw new InvalidDataException("Invalid phase " + name);
-            var clip = Bake(name, frames, first, last, map.fps, map.bodyYawDegrees, map.mirrorArmChannels);
+            var clip = Bake(name, frames, first, last, map.fps, map.bodyYawDegrees, map.mirrorArmChannels, map.mirrorSideChannels);
             context.AddObjectToAsset(name, clip);
         }
     }
@@ -46,13 +46,20 @@ public sealed class RecordedCoachMotionImporter : ScriptedImporter
     // The bird-dog source raises the same-side arm and leg. Mirror only the anatomical
     // arm muscle channels (shoulder through fingers), retaining leg motion and timing.
     // Humanoid left/right muscle channels express the same anatomical range on each side.
-    public static int SourceMuscleIndex(int index, bool mirrorArms)
+    public static int SourceMuscleIndex(int index, bool mirrorArms) => SourceMuscleIndex(index,mirrorArms,false);
+    public static int SourceMuscleIndex(int index, bool mirrorArms, bool mirrorSides)
     {
-        if (!mirrorArms) return index;
+        if (!mirrorArms && !mirrorSides) return index;
         string name = HumanTrait.MuscleName[index];
         bool left = name.StartsWith("Left");
         bool right = name.StartsWith("Right");
         if (!left && !right) return index;
+        if (mirrorSides)
+        {
+            int mirrored = Array.IndexOf(HumanTrait.MuscleName, (left ? "Right" : "Left") + name.Substring(left ? 4 : 5));
+            if (mirrored < 0) throw new InvalidDataException("Missing mirrored muscle: " + name);
+            return mirrored;
+        }
         string suffix = name.Substring(left ? 4 : 5);
         string part = suffix.TrimStart();
         if (!(part.StartsWith("Shoulder") || part.StartsWith("Arm") || part.StartsWith("Forearm") ||
@@ -63,12 +70,14 @@ public sealed class RecordedCoachMotionImporter : ScriptedImporter
         return other;
     }
 
-    public static AnimationClip Bake(string name, CoachMotionFrame[] frames, int first, int last, float fps, float yaw, bool mirrorArms)
+    public static AnimationClip Bake(string name, CoachMotionFrame[] frames, int first, int last, float fps, float yaw, bool mirrorArms) =>
+        Bake(name,frames,first,last,fps,yaw,mirrorArms,false);
+    public static AnimationClip Bake(string name, CoachMotionFrame[] frames, int first, int last, float fps, float yaw, bool mirrorArms, bool mirrorSides)
     {
         var clip = new AnimationClip { name = name, frameRate = fps };
         string[] properties = HumanTrait.MuscleName.Concat(new[] { "RootT.x", "RootT.y", "RootT.z", "RootQ.x", "RootQ.y", "RootQ.z", "RootQ.w" }).ToArray();
         var values = properties.Select(_ => new float[last - first + 1]).ToArray();
-        var sourceMuscles = Enumerable.Range(0, HumanTrait.MuscleCount).Select(m => SourceMuscleIndex(m,mirrorArms)).ToArray();
+        var sourceMuscles = Enumerable.Range(0, HumanTrait.MuscleCount).Select(m => SourceMuscleIndex(m,mirrorArms,mirrorSides)).ToArray();
         Quaternion heading = Quaternion.Euler(0, yaw, 0), previous = Quaternion.identity;
         for (int f = first; f <= last; f++)
         {
@@ -76,6 +85,12 @@ public sealed class RecordedCoachMotionImporter : ScriptedImporter
             for (int m = 0; m < HumanTrait.MuscleCount; m++) values[m][index] = frames[f].muscles[sourceMuscles[m]];
             Vector3 position = heading * frames[f].bodyPosition;
             Quaternion rotation = heading * frames[f].bodyRotation;
+            if (mirrorSides)
+            {
+                // Reflect the humanoid body frame for the opposite support side
+                // while limb channel swapping supplies the anatomical exchange.
+                rotation = new Quaternion(rotation.x, -rotation.y, rotation.z, -rotation.w);
+            }
             if (index > 0 && Quaternion.Dot(previous, rotation) < 0) rotation = new Quaternion(-rotation.x, -rotation.y, -rotation.z, -rotation.w);
             previous = rotation;
             float[] root = { position.x, position.y, position.z, rotation.x, rotation.y, rotation.z, rotation.w };

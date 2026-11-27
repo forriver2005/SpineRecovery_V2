@@ -1,0 +1,4 @@
+Flow preview verification (no wearable input, no training results)
+PASS preparation layout: logo/title, difficulty and Start; no coach, tutorial popup or calibration controls.
+PASS no-device Start -> five-second countdown -> four repetitions -> result -> replay; pause/resume and return to preparation.
+PASS coach only appears after Start and freezes on pause; no HIT or training results in flow preview; disabling bypass restores sensor/calibration gate.

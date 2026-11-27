@@ -1,0 +1,21 @@
+Delivery integrity: actual build paths and all serialized components.
+PASS Assets/Scenes/BirdDog_RingSkinC_Recorded.unity
+PASS Assets/Scenes/DeadBug_RingSkinC_Recorded.unity
+PASS Assets/Scenes/HipThrust_RingBridge_NewScoring.unity
+PASS Assets/Scenes/HipThrust_RingBridge_Hold30.unity
+PASS Assets/Scenes/SideBridge_RingBridge_Dynamic.unity
+PASS Assets/Scenes/SideBridge_RingBridge_Hold30.unity
+PASS Assets/Scenes/Tutorial/Tutorial_Limbs.unity
+PASS Assets/Scenes/Tutorial/Tutorial_BridgeDynamic.unity
+PASS Assets/Scenes/Tutorial/Tutorial_BridgeHold.unity
+PASS Assets/Scenes/HipThrust_TaikoNight_Dynamic.unity
+PASS Assets/Scenes/CrunchPractice_TaikoNight.unity
+PASS Assets/Scenes/LyingCatPractice_TaikoNight.unity
+PASS Assets/Scenes/SideBridgeRight_RingBridge_Dynamic.unity
+PASS Assets/Scenes/SideBridgeRight_RingBridge_Hold30.unity
+PASS Assets/Scenes/BridgeWave_StandardFollow.unity
+PASS Assets/Scenes/BirdDog_RingBridge_Hold30.unity
+PASS Assets/Scenes/DeadBug_RingBridge_Hold30.unity
+PASS Assets/Scenes/Crunch_RingBridge_Hold30.unity
+PASS Assets/Scenes/LyingCat_RingBridge_Hold30.unity
+PASS 19 build scenes, no missing scripts.

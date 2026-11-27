@@ -1,0 +1,14 @@
+Taiko settlement v2 replay; source action scorers are unchanged.
+DETAIL CrunchPractice_TaikoNight 30fps missingFirst=False missing=False: target=100.0, process=52.5, return=100.0, coverage=1.000, complete=2/2
+DETAIL CrunchPractice_TaikoNight 30fps missingFirst=True missing=False: target=50.0, process=26.3, return=50.0, coverage=1.000, complete=1/2
+DETAIL CrunchPractice_TaikoNight 60fps missingFirst=False missing=False: target=100.0, process=52.8, return=100.0, coverage=1.000, complete=2/2
+CrunchPractice_TaikoNight: all repetitions=97.63; one of two=48.81; 60fps=97.64
+DETAIL CrunchPractice_TaikoNight 30fps missingFirst=False missing=True: target=0.0, process=0.0, return=0.0, coverage=0.000, complete=0/2
+DETAIL CrunchPractice_TaikoNight 30fps missingFirst=False missing=False: target=100.0, process=52.5, return=100.0, coverage=1.000, complete=2/2
+DETAIL LyingCatPractice_TaikoNight 30fps missingFirst=False missing=False: target=100.0, process=8.6, return=100.0, coverage=1.000, complete=2/2
+DETAIL LyingCatPractice_TaikoNight 30fps missingFirst=True missing=False: target=50.0, process=4.3, return=50.0, coverage=1.000, complete=1/2
+DETAIL LyingCatPractice_TaikoNight 60fps missingFirst=False missing=False: target=100.0, process=8.8, return=100.0, coverage=1.000, complete=2/2
+LyingCatPractice_TaikoNight: all repetitions=95.43; one of two=47.71; 60fps=95.44
+DETAIL LyingCatPractice_TaikoNight 30fps missingFirst=False missing=True: target=0.0, process=0.0, return=0.0, coverage=0.000, complete=0/2
+DETAIL LyingCatPractice_TaikoNight 30fps missingFirst=False missing=False: target=100.0, process=8.6, return=100.0, coverage=1.000, complete=2/2
+PASS both special games: per-planned-repetition aggregation and missing-data status.

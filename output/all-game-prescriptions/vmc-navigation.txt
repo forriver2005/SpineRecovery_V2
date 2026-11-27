@@ -1,0 +1,18 @@
+All 16 game navigation and localhost UDP bone telemetry. No wearable/doctor-network claim. Test receiver port 39549.
+PASS BirdDog_RingSkinC_Recorded: one receiver, real UDP reaches all tested bones, length preserved, signal expires, menu navigation.
+PASS BirdDog_RingBridge_Hold30: one receiver, real UDP reaches all tested bones, length preserved, signal expires, menu navigation.
+PASS DeadBug_RingSkinC_Recorded: one receiver, real UDP reaches all tested bones, length preserved, signal expires, menu navigation.
+PASS DeadBug_RingBridge_Hold30: one receiver, real UDP reaches all tested bones, length preserved, signal expires, menu navigation.
+PASS HipThrust_RingBridge_NewScoring: one receiver, real UDP reaches all tested bones, length preserved, signal expires, menu navigation.
+PASS HipThrust_RingBridge_Hold30: one receiver, real UDP reaches all tested bones, length preserved, signal expires, menu navigation.
+PASS SideBridge_RingBridge_Dynamic: one receiver, real UDP reaches all tested bones, length preserved, signal expires, menu navigation.
+PASS SideBridge_RingBridge_Hold30: one receiver, real UDP reaches all tested bones, length preserved, signal expires, menu navigation.
+PASS SideBridgeRight_RingBridge_Dynamic: one receiver, real UDP reaches all tested bones, length preserved, signal expires, menu navigation.
+PASS SideBridgeRight_RingBridge_Hold30: one receiver, real UDP reaches all tested bones, length preserved, signal expires, menu navigation.
+PASS CrunchPractice_TaikoNight: one receiver, real UDP reaches all tested bones, length preserved, signal expires, menu navigation.
+PASS Crunch_RingBridge_Hold30: one receiver, real UDP reaches all tested bones, length preserved, signal expires, menu navigation.
+PASS LyingCatPractice_TaikoNight: one receiver, real UDP reaches all tested bones, length preserved, signal expires, menu navigation.
+PASS LyingCat_RingBridge_Hold30: one receiver, real UDP reaches all tested bones, length preserved, signal expires, menu navigation.
+PASS HipThrust_TaikoNight_Dynamic: one receiver, real UDP reaches all tested bones, length preserved, signal expires, menu navigation.
+PASS BridgeWave_StandardFollow: one receiver, real UDP reaches all tested bones, length preserved, signal expires, menu navigation.
+PASS all VMC/navigation cases, checks=107226

@@ -1,0 +1,52 @@
+Final score v2: settlement-only model and scene replay; no physical device validation.
+UNIT 30 fps: target95/process0/return95 -> 90.25, complete=1.
+UNIT 60 fps: target95/process0/return95 -> 90.25, complete=1.
+UNIT 120 fps: target95/process0/return95 -> 90.25, complete=1.
+PASS pure: 80/5/15, frame rate invariance, 27/30=90, 5/30=16.7, cumulative/continuous separation, no input, coverage and bounded filtering.
+SCENE BirdDog_RingSkinC_Recorded 30fps Repetition: score=100.00, target=100.0, process=100.0, return=100.0, coverage=1.000, hold=0.000/0.000, complete=8/8
+SCENE BirdDog_RingSkinC_Recorded 60fps Repetition: score=100.00, target=100.0, process=100.0, return=100.0, coverage=1.000, hold=0.000/0.000, complete=8/8
+ZERO PROCESS BirdDog_RingSkinC_Recorded: score=95, complete=8
+PROBE BirdDog_RingSkinC_Recorded follow: score=100.00 target=100.0 process=100.0 return=100.0 coverage=1.000 publish=True
+PROBE BirdDog_RingSkinC_Recorded range_90: score=100.00 target=100.0 process=100.0 return=100.0 coverage=1.000 publish=True
+PROBE BirdDog_RingSkinC_Recorded range_80: score=82.90 target=78.9 process=95.4 return=100.0 coverage=1.000 publish=True
+PROBE BirdDog_RingSkinC_Recorded delay_350ms: score=100.00 target=100.0 process=100.0 return=100.0 coverage=1.000 publish=True
+PROBE BirdDog_RingSkinC_Recorded delay_500ms: score=100.00 target=100.0 process=100.0 return=100.0 coverage=1.000 publish=True
+PROBE BirdDog_RingSkinC_Recorded jitter_3deg: score=100.00 target=100.0 process=100.0 return=100.0 coverage=1.000 publish=True
+PROBE BirdDog_RingSkinC_Recorded jitter_5deg: score=100.00 target=100.0 process=100.0 return=100.0 coverage=1.000 publish=True
+PROBE BirdDog_RingSkinC_Recorded gap_1frame_mid: score=99.95 target=100.0 process=99.1 return=100.0 coverage=0.991 publish=True
+PROBE BirdDog_RingSkinC_Recorded gap_1frame_end: score=99.95 target=100.0 process=99.0 return=100.0 coverage=0.990 publish=True
+PROBE BirdDog_RingSkinC_Recorded gap_100ms_mid: score=99.86 target=100.0 process=97.3 return=100.0 coverage=0.974 publish=True
+PROBE BirdDog_RingSkinC_Recorded spike_100ms_mid: score=99.93 target=100.0 process=98.7 return=100.0 coverage=1.000 publish=True
+PROBE BirdDog_RingSkinC_Recorded gap_300ms_mid: score=99.59 target=100.0 process=91.9 return=100.0 coverage=0.922 publish=False
+PROBE BirdDog_RingSkinC_Recorded rest: score=0.00 target=0.0 process=0.0 return=0.0 coverage=1.000 publish=True
+PROBE BirdDog_RingSkinC_Recorded half_range: score=22.47 target=5.5 process=61.4 return=100.0 coverage=1.000 publish=True
+PROBE BirdDog_RingSkinC_Recorded wrong_orientation: score=0.00 target=0.0 process=0.0 return=0.0 coverage=1.000 publish=True
+PROBE BirdDog_RingSkinC_Recorded disconnect: score=68.95 target=66.7 process=49.8 return=87.5 coverage=0.498 publish=False
+PROBE BirdDog_RingSkinC_Recorded heartbeat_only: score=0.00 target=0.0 process=0.0 return=0.0 coverage=0.000 publish=False
+PROBE BirdDog_RingSkinC_Recorded wrong_arm: score=0.00 target=0.0 process=0.0 return=0.0 coverage=1.000 publish=True
+PROBE BirdDog_RingSkinC_Recorded wrong_leg_direction: score=0.00 target=0.0 process=0.0 return=0.0 coverage=1.000 publish=True
+PROBE BirdDog_RingSkinC_Recorded wrong_knee: score=0.00 target=0.0 process=0.0 return=0.0 coverage=1.000 publish=True
+SCENE DeadBug_RingSkinC_Recorded 30fps Repetition: score=99.77, target=99.7, process=100.0, return=100.0, coverage=1.000, hold=0.000/0.000, complete=8/8
+SCENE DeadBug_RingSkinC_Recorded 60fps Repetition: score=99.57, target=99.5, process=100.0, return=100.0, coverage=1.000, hold=0.000/0.000, complete=8/8
+ZERO PROCESS DeadBug_RingSkinC_Recorded: score=95, complete=8
+PROBE DeadBug_RingSkinC_Recorded follow: score=100.00 target=100.0 process=100.0 return=100.0 coverage=1.000 publish=True
+PROBE DeadBug_RingSkinC_Recorded range_90: score=98.91 target=98.6 process=100.0 return=100.0 coverage=1.000 publish=True
+PROBE DeadBug_RingSkinC_Recorded range_80: score=85.55 target=82.1 process=97.0 return=100.0 coverage=1.000 publish=True
+PROBE DeadBug_RingSkinC_Recorded delay_350ms: score=97.39 target=96.7 process=100.0 return=100.0 coverage=1.000 publish=True
+PROBE DeadBug_RingSkinC_Recorded delay_500ms: score=97.33 target=96.7 process=100.0 return=100.0 coverage=1.000 publish=True
+PROBE DeadBug_RingSkinC_Recorded jitter_3deg: score=100.00 target=100.0 process=100.0 return=100.0 coverage=1.000 publish=True
+PROBE DeadBug_RingSkinC_Recorded jitter_5deg: score=100.00 target=100.0 process=100.0 return=100.0 coverage=1.000 publish=True
+PROBE DeadBug_RingSkinC_Recorded gap_1frame_mid: score=99.92 target=100.0 process=98.4 return=100.0 coverage=0.984 publish=True
+PROBE DeadBug_RingSkinC_Recorded gap_1frame_end: score=99.05 target=98.9 process=97.8 return=100.0 coverage=0.979 publish=True
+PROBE DeadBug_RingSkinC_Recorded gap_100ms_mid: score=99.76 target=100.0 process=95.3 return=100.0 coverage=0.953 publish=True
+PROBE DeadBug_RingSkinC_Recorded spike_100ms_mid: score=99.88 target=100.0 process=97.5 return=100.0 coverage=1.000 publish=True
+PROBE DeadBug_RingSkinC_Recorded gap_300ms_mid: score=99.29 target=100.0 process=85.8 return=100.0 coverage=0.860 publish=False
+PROBE DeadBug_RingSkinC_Recorded rest: score=0.00 target=0.0 process=0.0 return=0.0 coverage=1.000 publish=True
+PROBE DeadBug_RingSkinC_Recorded half_range: score=26.92 target=10.5 process=70.9 return=100.0 coverage=1.000 publish=True
+PROBE DeadBug_RingSkinC_Recorded wrong_orientation: score=0.00 target=0.0 process=0.0 return=0.0 coverage=1.000 publish=True
+PROBE DeadBug_RingSkinC_Recorded disconnect: score=68.94 target=66.7 process=49.6 return=87.5 coverage=0.496 publish=False
+PROBE DeadBug_RingSkinC_Recorded heartbeat_only: score=0.00 target=0.0 process=0.0 return=0.0 coverage=0.000 publish=False
+PROBE DeadBug_RingSkinC_Recorded wrong_arm: score=0.00 target=0.0 process=0.0 return=0.0 coverage=1.000 publish=True
+PROBE DeadBug_RingSkinC_Recorded wrong_leg_direction: score=0.00 target=0.0 process=0.0 return=0.0 coverage=1.000 publish=True
+PROBE DeadBug_RingSkinC_Recorded wrong_knee: score=0.00 target=0.0 process=0.0 return=0.0 coverage=1.000 publish=True
+PASS all shared game scenes. Checks=2373

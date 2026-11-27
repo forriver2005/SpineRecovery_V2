@@ -1,0 +1,11 @@
+Play mode checks (synthetic input, no hardware calibration claim)
+PASS real localhost UDP 39539 -> uOSC -> EVMC4U -> motion-source input; silence invalidates freshness.
+PASS sensor-mode controller + orb rendering: low Y=-1.010, high Y=0.830; 150% input saturates at high Y; returning low moves orb down.
+PASS one stable supine pose completes calibration; no high-pose step; non-lying posture, motion, repeated frames and disconnect cannot complete it.
+PASS shared start menu, working difficulty controls, one-button supine calibration and no manual slider.
+PASS five-second shared countdown; pause and sensor loss freeze preparation.
+PASS actual Start button and countdown.
+PASS off-track orb continues forward; no new HIT; bursts hidden.
+PASS pause freezes progression, recorded coach and feedback; lift/hold/lower coach phases match the track.
+PASS four standard-motion tracks completed; 79 pulses, 23.17s in corridor.
+PASS replay resets time, counters and feedback and restores the shared sensor-gated menu.

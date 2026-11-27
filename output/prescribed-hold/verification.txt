@@ -1,0 +1,19 @@
+Prescribed duration: real Unity scenes and recorded poses; synthetic input, no wearable validation.
+PASS contract: omitted/zero=30; 1/12.5/20/30/45/600 seconds; D01 item selection; invalid updates atomic; exact counts; dynamic timing unchanged; 90% hold=90 at 30/60/120 fps.
+REPLAY HipThrust_RingBridge_Hold30 20s: 40.000/40.000s, score=100.00, continuous=2/2
+REPLAY HipThrust_RingBridge_Hold30 45s: 89.999/90.000s, score=100.00, continuous=2/2
+REPLAY HipThrust_RingBridge_Hold30 30s: 60.000/60.000s, score=100.00, continuous=2/2
+PASS HipThrust_RingBridge_Hold30: 20/45/default30, menu, coach/preview freeze, ring shader progress, remaining time, targets, actual-pose scoring, no-data and pause/completion.
+REPLAY SideBridge_RingBridge_Hold30 20s: 40.000/40.000s, score=100.00, continuous=2/2
+REPLAY SideBridge_RingBridge_Hold30 45s: 90.000/90.000s, score=100.00, continuous=2/2
+REPLAY SideBridge_RingBridge_Hold30 30s: 60.000/60.000s, score=100.00, continuous=2/2
+PASS SideBridge_RingBridge_Hold30: 20/45/default30, menu, coach/preview freeze, ring shader progress, remaining time, targets, actual-pose scoring, no-data and pause/completion.
+REPLAY SideBridgeRight_RingBridge_Hold30 20s: 20.000/40.000s, score=50.00, continuous=1/2
+REPLAY SideBridgeRight_RingBridge_Hold30 45s: 45.000/90.000s, score=50.00, continuous=1/2
+REPLAY SideBridgeRight_RingBridge_Hold30 30s: 30.000/60.000s, score=50.00, continuous=1/2
+PASS SideBridgeRight_RingBridge_Hold30: 20/45/default30, menu, coach/preview freeze, ring shader progress, remaining time, targets, actual-pose scoring, no-data and pause/completion.
+WORKOUT completed 1/3: 2 x 20s, rest=30, next=1
+WORKOUT completed 2/3: 1 x 45s, rest=30, next=2
+WORKOUT completed 3/3: 1 x 30s, rest=0, next=3
+PASS live workout: 2 reps x 20s -> 1 rep x 45s -> omitted/default30; real automatic countdown and 30s rests; accelerated playback completion, synthetic calibration.
+PASS all prescribed-hold checks: 103370

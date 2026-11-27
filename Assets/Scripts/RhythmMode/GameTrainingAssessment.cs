@@ -5,8 +5,9 @@ using UnityEngine;
 /// <summary>Observes existing training clocks and poses; does not drive animation,
 /// HIT, vibration, phase transitions or the prescription executor.</summary>
 [DefaultExecutionOrder(250)]
-public sealed class GameTrainingAssessment : MonoBehaviour
+public sealed partial class GameTrainingAssessment : MonoBehaviour
 {
+    // Legacy diagnostic measurements; all end-of-game views use FinalScore (v2).
     public TrainingQualitySummary Summary { get; } = new TrainingQualitySummary();
     public bool IsCollecting { get; private set; }
     public bool IsFinished { get; private set; }
@@ -80,6 +81,7 @@ public sealed class GameTrainingAssessment : MonoBehaviour
         if(IsCollecting && Entry.taiko!=null && Entry.taiko.IsPaused && bridgeAttempts!=null)
             foreach(var attempt in bridgeAttempts)attempt.BreakContinuity();
         if(IsCollecting&&Entry.taiko==null&&Entry.coach.IsActionPaused){pendingEndpoints.Clear();endpointGood=0;}
+        if(IsCollecting && (Entry.taiko!=null?Entry.taiko.IsPaused:Entry.coach.IsActionPaused))FinalScore.BreakContinuity();
     }
     bool Fresh => Entry.scorer!=null && Entry.scorer.IsCalibrated && motion!=null &&
         motion.HasFreshFrame && Time.unscaledTime-lastPacketTime<=.5f;
@@ -101,12 +103,14 @@ public sealed class GameTrainingAssessment : MonoBehaviour
             bridgeAttempts[i]=new TrainingBridgeAttempt();
         }
         Summary.Reset(durations,targets,true,continuous,Threshold,following);
+        FinalBeginBridge(continuous);
         ResetMotionEvidence();
     }
 
     public void ObserveBridge(float deltaTime)
     {
         if(!IsCollecting||Entry.taiko.IsPaused||bridgePlan==null)return;
+        FinalObserveBridge(deltaTime);
         var rules=Entry.taiko.RuleScoring;
         double now=Entry.taiko.Elapsed,dt=Math.Max(0,deltaTime),before=now-dt;
         bool tracked=rules!=null && rules.HasMeasurement && rules.InputFresh && Entry.scorer.IsCalibrated &&
@@ -130,6 +134,13 @@ public sealed class GameTrainingAssessment : MonoBehaviour
         int index=0;
         for(int i=1;i<bridgePlan.Length&&now>=bridgePlan[i].start;i++)index=i;
         if(bridgePlan.Length==0)return;
+        if(rules.recordedAction!=null)
+        {
+            var actionHold=rules.recordedAction;
+            Summary.RecordDose(index,actionHold.ValidSeconds,actionHold.LongestSeconds,now>=bridgePlan[index].end,
+                TrainingScoringTolerance.HoldQualified(actionHold.ValidSeconds,Summary.Repetitions[index].targetSeconds,true));
+            return;
+        }
         if(rules.sideBridge!=null)
         {
             var rule=rules.sideBridge.Rule;
@@ -162,6 +173,7 @@ public sealed class GameTrainingAssessment : MonoBehaviour
         movementRange=new RhythmMovementRange();
         var durations=Entry.coach.AssessmentDurations;
         Summary.Reset(durations,durations,false,false,Threshold);
+        FinalBeginRhythm(durations);
         qualifiedPhases=new bool[durations.Length*2];
         ResetMotionEvidence();
     }
@@ -175,6 +187,7 @@ public sealed class GameTrainingAssessment : MonoBehaviour
         string up=info.stateName.EndsWith("_down",StringComparison.Ordinal)?info.stateName.Substring(0,info.stateName.Length-5)+"_up":info.stateName;
         hasTargets=Entry.rhythm!=null && Entry.rhythm.TryGetSegmentTargets(up,out first,out second);
         if(hasTargets)movementRange.Begin(Entry.scorer,up);
+        FinalBeginSegment();
     }
     void LateUpdate()
     {
@@ -182,7 +195,7 @@ public sealed class GameTrainingAssessment : MonoBehaviour
         if(finishing)
         {
             ProcessPendingEndpoints(Time.deltaTime);finishElapsed+=Time.deltaTime;
-            if(pendingEndpoints.Count==0||finishElapsed>=TrainingScoringTolerance.MaximumResponseDelay)Finish();
+            if((pendingEndpoints.Count==0&&finalPending.Count==0)||finishElapsed>=TrainingScoringTolerance.MaximumResponseDelay)Finish();
             return;
         }
         if(segmentIndex<0||Entry.coach.IsHoldingPose)return;
@@ -207,12 +220,14 @@ public sealed class GameTrainingAssessment : MonoBehaviour
         endpointGood=good&&atEndpoint?endpointGood+dt:0;
         if(endpointGood+.00001>=.08)endpointConfirmedAt=segmentObserved;
         Summary.Observe(segmentIndex/2,dt,tracked,quality,good);
+        FinalObserveRhythm(dt,tracked,quality);
     }
     void EndSegment(CoachActionController.ScoringCheckpointInfo info)
     {
         if(!IsCollecting||segmentIndex<0)return;
         double remaining=segmentDuration-segmentObserved;
         if(remaining>0&&remaining<=.1)SampleRhythm(remaining);
+        FinalEndSegment();
         float fraction=GameDifficultyPolicy.QualifiedPhaseFraction(Entry.menu.SelectedDifficultyKey);
         bool success=segmentDuration>0 && segmentQualified/segmentDuration>=fraction && segmentDuration-endpointConfirmedAt<=.3;
         if(success)ConfirmPhase(segmentIndex);
@@ -229,6 +244,7 @@ public sealed class GameTrainingAssessment : MonoBehaviour
     }
     void ProcessPendingEndpoints(double seconds)
     {
+        FinalProcessPending(seconds);
         for(int i=pendingEndpoints.Count-1;i>=0;i--)
         {
             var p=pendingEndpoints[i];p.elapsed+=Math.Max(0,seconds);
@@ -242,7 +258,7 @@ public sealed class GameTrainingAssessment : MonoBehaviour
     {
         // Keep observing the patient's final return during the existing outro.
         // No coach hold is added and these samples add no time or quality credit.
-        if(pendingEndpoints.Count==0)Finish();else{finishing=true;finishElapsed=0;}
+        if(pendingEndpoints.Count==0&&finalPending.Count==0)Finish();else{finishing=true;finishElapsed=0;}
     }
     static AnatomicalPoseScore Limb(AnatomicalLimbScores s,RhythmBodyTarget target)
     {
@@ -266,6 +282,7 @@ public sealed class GameTrainingAssessment : MonoBehaviour
     }
     public void Finish()
     {
+        FinalFinish();
         if(minimumMotion!=null)for(int i=0;i<Summary.Planned;i++)
         {
             var range=maximumMotion[i]-minimumMotion[i];

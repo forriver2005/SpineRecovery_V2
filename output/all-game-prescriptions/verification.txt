@@ -1,0 +1,35 @@
+All 16 training scenes: public JSON doses and real UI/executor. Synthetic calibrated patient; no hardware/network doctor delivery claim. Playback speed=4, countdown=5 game seconds, workout rests=30 real seconds.
+PASS standalone birddog: JSON sets=2, per-run reps=5, hold=0; sensor gate, actual 5s countdown, pause, natural completion, shared result.
+PASS standalone birddog_hold30: JSON sets=2, per-run reps=2, hold=3; sensor gate, actual 5s countdown, pause, natural completion, shared result.
+PASS standalone deadbug: JSON sets=2, per-run reps=5, hold=0; sensor gate, actual 5s countdown, pause, natural completion, shared result.
+PASS standalone deadbug_hold30: JSON sets=2, per-run reps=2, hold=3; sensor gate, actual 5s countdown, pause, natural completion, shared result.
+PASS standalone hipthrust: JSON sets=2, per-run reps=2, hold=0; sensor gate, actual 5s countdown, pause, natural completion, shared result.
+PASS standalone hipthrust_hold30: JSON sets=2, per-run reps=2, hold=3; sensor gate, actual 5s countdown, pause, natural completion, shared result.
+PASS standalone sidebridge: JSON sets=2, per-run reps=2, hold=0; sensor gate, actual 5s countdown, pause, natural completion, shared result.
+PASS standalone sidebridge_hold30: JSON sets=2, per-run reps=2, hold=3; sensor gate, actual 5s countdown, pause, natural completion, shared result.
+PASS standalone rightsidebridge: JSON sets=2, per-run reps=2, hold=0; sensor gate, actual 5s countdown, pause, natural completion, shared result.
+PASS standalone rightsidebridge_hold30: JSON sets=2, per-run reps=2, hold=3; sensor gate, actual 5s countdown, pause, natural completion, shared result.
+PASS standalone crunch: JSON sets=2, per-run reps=2, hold=0; sensor gate, actual 5s countdown, pause, natural completion, shared result.
+PASS standalone crunch_hold30: JSON sets=2, per-run reps=2, hold=3; sensor gate, actual 5s countdown, pause, natural completion, shared result.
+PASS standalone lying_cat: JSON sets=2, per-run reps=2, hold=0; sensor gate, actual 5s countdown, pause, natural completion, shared result.
+PASS standalone lyingcat_hold30: JSON sets=2, per-run reps=2, hold=3; sensor gate, actual 5s countdown, pause, natural completion, shared result.
+PASS standalone hipthrust_taiko: JSON sets=2, per-run reps=2, hold=0; sensor gate, actual 5s countdown, pause, natural completion, shared result.
+PASS standalone hipthrust_curve: JSON sets=2, per-run reps=2, hold=0; sensor gate, actual 5s countdown, pause, natural completion, shared result.
+PASS workout set 1/17 birddog: completion once, next action=1, rest=30s.
+PASS workout set 2/17 birddog_hold30: completion once, next action=1, rest=30s.
+PASS workout set 3/17 birddog_hold30: completion once, next action=2, rest=30s.
+PASS workout set 4/17 deadbug: completion once, next action=3, rest=30s.
+PASS workout set 5/17 deadbug_hold30: completion once, next action=4, rest=30s.
+PASS workout set 6/17 hipthrust: completion once, next action=5, rest=30s.
+PASS workout set 7/17 hipthrust_hold30: completion once, next action=6, rest=30s.
+PASS workout set 8/17 sidebridge: completion once, next action=7, rest=30s.
+PASS workout set 9/17 sidebridge_hold30: completion once, next action=8, rest=30s.
+PASS workout set 10/17 rightsidebridge: completion once, next action=9, rest=30s.
+PASS workout set 11/17 rightsidebridge_hold30: completion once, next action=10, rest=30s.
+PASS workout set 12/17 crunch: completion once, next action=11, rest=30s.
+PASS workout set 13/17 crunch_hold30: completion once, next action=12, rest=30s.
+PASS workout set 14/17 lying_cat: completion once, next action=13, rest=30s.
+PASS workout set 15/17 lyingcat_hold30: completion once, next action=14, rest=30s.
+PASS workout set 16/17 hipthrust_taiko: completion once, next action=15, rest=30s.
+PASS mixed JSON workout: all 16 game scenes, 17 sets, per-action difficulty/reps/holdSeconds, real 30s rests and automatic transitions.
+PASS ALL GAME FLOWS checks=4047463

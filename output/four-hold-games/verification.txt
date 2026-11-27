@@ -1,0 +1,42 @@
+Four new ring hold scenes. Recorded coach, synthetic patient input, no wearable validation.
+PASS BirdDog: actual posture calibration coroutine using fresh synthetic bone frames.
+BirdDog 20s: score=100.00, hold=40.000/40.000, coverage=1.000, continuous=2/2
+BirdDog 45s: score=100.00, hold=90.000/90.000, coverage=1.000, continuous=2/2
+BirdDog 30s: score=100.00, hold=60.000/60.000, coverage=1.000, continuous=2/2
+BirdDog rest: score=0, hold=0.00/10.00, publish=True, continuous=0
+BirdDog half: score=0, hold=0.00/10.00, publish=True, continuous=0
+BirdDog missing: score=0, hold=0.00/10.00, publish=False, continuous=0
+BirdDog gap: score=93, hold=9.27/10.00, publish=False, continuous=0
+BirdDog wrong: score=0, hold=0.00/10.00, publish=True, continuous=0
+PASS BirdDog: real start/countdown, pause, shared result, return, countdown cancellation.
+PASS DeadBug: actual posture calibration coroutine using fresh synthetic bone frames.
+DeadBug 20s: score=100.00, hold=40.000/40.000, coverage=1.000, continuous=2/2
+DeadBug 45s: score=100.00, hold=90.000/90.000, coverage=1.000, continuous=2/2
+DeadBug 30s: score=100.00, hold=60.000/60.000, coverage=1.000, continuous=2/2
+DeadBug rest: score=0, hold=0.00/10.00, publish=True, continuous=0
+DeadBug half: score=0, hold=0.00/10.00, publish=True, continuous=0
+DeadBug missing: score=0, hold=0.00/10.00, publish=False, continuous=0
+DeadBug gap: score=93, hold=9.27/10.00, publish=False, continuous=0
+DeadBug wrong: score=0, hold=0.00/10.00, publish=True, continuous=0
+PASS DeadBug: real start/countdown, pause, shared result, return, countdown cancellation.
+PASS Crunch: actual posture calibration coroutine using fresh synthetic bone frames.
+Crunch 20s: score=100.00, hold=40.000/40.000, coverage=1.000, continuous=2/2
+Crunch 45s: score=100.00, hold=90.000/90.000, coverage=1.000, continuous=2/2
+Crunch 30s: score=100.00, hold=60.000/60.000, coverage=1.000, continuous=2/2
+Crunch rest: score=0, hold=0.00/10.00, publish=True, continuous=0
+Crunch half: score=0, hold=0.00/10.00, publish=True, continuous=0
+Crunch missing: score=0, hold=0.00/10.00, publish=False, continuous=0
+Crunch gap: score=94, hold=9.40/10.00, publish=False, continuous=0
+Crunch wrong: score=0, hold=0.00/10.00, publish=True, continuous=0
+PASS Crunch: real start/countdown, pause, shared result, return, countdown cancellation.
+PASS LyingCat: actual posture calibration coroutine using fresh synthetic bone frames.
+LyingCat 20s: score=100.00, hold=40.000/40.000, coverage=1.000, continuous=2/2
+LyingCat 45s: score=100.00, hold=90.000/90.000, coverage=1.000, continuous=2/2
+LyingCat 30s: score=100.00, hold=60.000/60.000, coverage=1.000, continuous=2/2
+LyingCat rest: score=0, hold=0.00/10.00, publish=True, continuous=0
+LyingCat half: score=0, hold=0.00/10.00, publish=True, continuous=0
+LyingCat missing: score=0, hold=0.00/10.00, publish=False, continuous=0
+LyingCat gap: score=94, hold=9.40/10.00, publish=False, continuous=0
+LyingCat wrong: score=0, hold=0.00/10.00, publish=True, continuous=0
+PASS LyingCat: real start/countdown, pause, shared result, return, countdown cancellation.
+PASS all new holds, checks=60800

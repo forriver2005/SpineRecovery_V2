@@ -10,6 +10,8 @@ public sealed class RhythmSongClock : MonoBehaviour
 
     private double startDspTime;
     private bool running;
+    private bool pausedByCoach;
+    private GameWorkoutScene entry;
 
     public bool IsRunning => running;
     public double SongTime => running
@@ -27,6 +29,15 @@ public sealed class RhythmSongClock : MonoBehaviour
         musicSource.loop = true;
         musicSource.spatialBlend = 0f;
         musicSource.volume = musicVolume;
+    }
+
+    private void LateUpdate()
+    {
+        if(entry==null)entry=FindObjectOfType<GameWorkoutScene>();
+        if(entry==null||entry.taiko!=null||entry.coach==null)return;
+        bool paused=entry.coach.IsActionPaused;
+        if(paused&&!pausedByCoach&&musicSource.isPlaying){musicSource.Pause();pausedByCoach=true;}
+        else if(!paused&&pausedByCoach){musicSource.UnPause();pausedByCoach=false;}
     }
 
     public void StartMusicImmediately()
@@ -68,5 +79,6 @@ public sealed class RhythmSongClock : MonoBehaviour
             musicSource.Stop();
         }
         running = false;
+        pausedByCoach = false;
     }
 }

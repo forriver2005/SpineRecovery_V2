@@ -429,7 +429,7 @@ public bool HasCurrentUserInput
             {
                 calibrating = false;
                 calibrationRoutine = null;
-                ReportCalibrationProgress(0f, "躺姿校准参考动作缺失");
+                ReportCalibrationProgress(0f, $"{supine.PoseName}校准参考动作缺失");
                 yield break;
             }
         }
@@ -451,7 +451,7 @@ public bool HasCurrentUserInput
                 : "\u6709\u6548\u9aa8\u9abc\u4e0d\u8db3\uff0c\u8bf7\u68c0\u67e5\u4f20\u611f\u5668");
 
         Debug.Log(
-            $"[DeadBugScore] Anatomical {(supine != null ? "supine" : "standing")} calibration complete: " +
+            $"[DeadBugScore] Anatomical {(supine != null ? supine.PoseName : "standing")} calibration complete: " +
             $"segments={scoringEngine.CalibratedSegmentCount}, success={calibrated}.",
             this);
         calibrationRoutine = null;
@@ -530,13 +530,13 @@ public bool HasCurrentUserInput
             {
                 ReportCalibrationProgress(
                     0f,
-                    supine != null ? "检测到晃动，请保持仰卧稳定" : "检测到晃动，请保持自然站立");
+                    supine != null ? $"检测到晃动，请保持{supine.PoseName}稳定" : "检测到晃动，请保持自然站立");
             }
             else if (stableElapsed < calibrationStableDuration)
             {
                 ReportCalibrationProgress(
                     0f,
-                    $"保持{(supine != null ? "仰卧" : "站立")} {calibrationStableDuration - stableElapsed:0.0}s");
+                    $"保持{(supine != null ? supine.PoseName : "站立")} {calibrationStableDuration - stableElapsed:0.0}s");
             }
             else
             {

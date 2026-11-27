@@ -1,0 +1,28 @@
+D01 JSON -> SetPrescriptionJson -> real game timeline / UI. No doctor frontend, server or Android Intent delivery simulated.
+AUDIT legacy mobile PlannedAction.holdSeconds exists=False; direct D01 consumer is the test boundary.
+PASS JSON hip 20s: goal=20s; countdown and actual ring checked at 0/5/10/half/end; target=20s; peak frozen until lowering.
+PASS JSON hip 45s: goal=45s; countdown and actual ring checked at 0/5/10/half/end; target=45s; peak frozen until lowering.
+PASS JSON hip default: goal=30s; countdown and actual ring checked at 0/5/10/half/end; target=30s; peak frozen until lowering.
+PASS JSON hip zero: goal=30s; countdown and actual ring checked at 0/5/10/half/end; target=30s; peak frozen until lowering.
+PASS JSON left 20s: goal=20s; countdown and actual ring checked at 0/5/10/half/end; target=20s; peak frozen until lowering.
+PASS JSON left 45s: goal=45s; countdown and actual ring checked at 0/5/10/half/end; target=45s; peak frozen until lowering.
+PASS JSON left default: goal=30s; countdown and actual ring checked at 0/5/10/half/end; target=30s; peak frozen until lowering.
+PASS JSON left zero: goal=30s; countdown and actual ring checked at 0/5/10/half/end; target=30s; peak frozen until lowering.
+PASS JSON right 20s: goal=20s; countdown and actual ring checked at 0/5/10/half/end; target=20s; peak frozen until lowering.
+PASS JSON right 45s: goal=45s; countdown and actual ring checked at 0/5/10/half/end; target=45s; peak frozen until lowering.
+PASS JSON right default: goal=30s; countdown and actual ring checked at 0/5/10/half/end; target=30s; peak frozen until lowering.
+PASS JSON right zero: goal=30s; countdown and actual ring checked at 0/5/10/half/end; target=30s; peak frozen until lowering.
+LIVE starting doctor JSON 20s through real menu countdown.
+LIVE 20s entered hold: 剩余 20.0 秒
+LIVE 20s at 10.002s: 剩余 10.0 秒; ring=0.5001.
+PASS real-time pause: prescribed countdown and arc frozen, then resumed.
+PASS LIVE 20s: automatic Start/countdown, hold observed 19.998s (target 20.0s), no seek or time scaling, normal completion.
+LIVE starting doctor JSON 45s through real menu countdown.
+LIVE 45s entered hold: 剩余 45.0 秒
+LIVE 45s at 10.001s: 剩余 35.0 秒; ring=0.2222.
+PASS LIVE 45s: automatic Start/countdown, hold observed 44.999s (target 45.0s), no seek or time scaling, normal completion.
+LIVE starting doctor JSON default through real menu countdown.
+LIVE default entered hold: 剩余 30.0 秒
+LIVE default at 10.001s: 剩余 20.0 秒; ring=0.3334.
+PASS LIVE default: automatic Start/countdown, hold observed 30.000s (target 30.0s), no seek or time scaling, normal completion.
+PASS all doctor-prescription simulation checks: 3037398

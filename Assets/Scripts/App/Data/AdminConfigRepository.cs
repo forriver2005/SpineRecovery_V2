@@ -29,6 +29,7 @@ namespace SpineRecovery.App
         [Serializable]
         private sealed class ConfigurationDocument
         {
+            public int trackerBindingVersion;
             public AdminTrainingConfiguration[] configurations = Array.Empty<AdminTrainingConfiguration>();
         }
 
@@ -62,7 +63,7 @@ namespace SpineRecovery.App
             if (next.Count(c => c.state == AdminConfigState.Published) > 1)
                 throw new InvalidOperationException("Only one administrator configuration may be published.");
             configurations = next;
-            JsonFileStore.Save(FileName, new ConfigurationDocument { configurations = configurations.ToArray() });
+            JsonFileStore.Save(FileName, Document());
             EmbeddedSlimeVrBridge.ReloadFixedBindings();
         }
 
@@ -124,11 +125,6 @@ namespace SpineRecovery.App
         {
             EnsureLoaded();
             AdminTrainingConfiguration published = CurrentPublished();
-            if (published.trackerBindingsLocked && !published.trackerBindingsDisabled)
-            {
-                message = "这 5 个 IMU 已锁定，不能在客户端重新绑定。";
-                return false;
-            }
             var next = (bindings ?? Array.Empty<AdminTrackerBinding>())
                 .Where(binding => binding != null && !string.IsNullOrWhiteSpace(binding.hardwareId))
                 .ToArray();
@@ -147,35 +143,37 @@ namespace SpineRecovery.App
             published.trackerBindingsDisabled = false;
             published.updatedAt = DateTimeOffset.UtcNow.ToString("O");
             Persist();
-            message = "已锁定 5 个 IMU 的硬件 ID/MAC 与佩戴部位。普通用户将只读取这些设备。";
+            message = "已保存这 5 个 IMU，可随时重新匹配。";
             return true;
         }
 
-        public bool SetPublishedTrackerBindingsEnabled(bool enabled, out string message)
+        public void ClearTrackerBindings()
         {
             EnsureLoaded();
-            AdminTrainingConfiguration published = CurrentPublished();
-            if (published == null || !published.trackerBindingsLocked ||
-                published.trackerBindings == null || published.trackerBindings.Length != 5)
-            {
-                message = "请先完成 5 个 IMU 的绑定。";
-                return false;
-            }
-
-            published.trackerBindingsDisabled = !enabled;
-            published.updatedAt = DateTimeOffset.UtcNow.ToString("O");
+            // Also clear archived/draft snapshots so publishing or rollback cannot
+            // silently reinstate a previous device's MAC allowlist.
+            foreach (var config in configurations) ClearBindings(config);
             Persist();
-            message = enabled
-                ? "已重新启用原有 5 个 IMU 绑定。"
-                : "已解除 IMU 使用状态；MAC 与部位配置已保留，患者训练暂不使用这些设备。";
-            return true;
+        }
+
+        private static void ClearBindings(AdminTrainingConfiguration config)
+        {
+            config.trackerBindings = Array.Empty<AdminTrackerBinding>();
+            config.trackerBindingsLocked = false;
+            config.trackerBindingsDisabled = false;
         }
 
         private void Persist()
         {
-            JsonFileStore.Save(FileName, new ConfigurationDocument { configurations = configurations.ToArray() });
+            JsonFileStore.Save(FileName, Document());
             EmbeddedSlimeVrBridge.ReloadFixedBindings();
         }
+
+        private ConfigurationDocument Document() => new ConfigurationDocument
+        {
+            trackerBindingVersion = 1,
+            configurations = configurations.ToArray()
+        };
 
         private void EnsureLoaded()
         {
@@ -183,12 +181,16 @@ namespace SpineRecovery.App
             if (!JsonFileStore.TryLoad(FileName, out ConfigurationDocument document) || document?.configurations == null || document.configurations.Length == 0)
             {
                 configurations = new List<AdminTrainingConfiguration> { DefaultConfiguration() };
-                JsonFileStore.Save(FileName, new ConfigurationDocument { configurations = configurations.ToArray() });
-            EmbeddedSlimeVrBridge.ReloadFixedBindings();
+                Persist();
             }
             else
             {
                 configurations = document.configurations.Where(c => c != null).ToList();
+                if (document.trackerBindingVersion < 1)
+                {
+                    foreach (var config in configurations) ClearBindings(config);
+                    Persist();
+                }
                 foreach (AdminTrainingConfiguration config in configurations) NormalizeTrackerBindings(config);
             }
         }

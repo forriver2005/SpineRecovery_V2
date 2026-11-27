@@ -118,9 +118,8 @@ namespace SpineRecovery.App
         }
 
         /// <summary>
-        /// Opens the full embedded SlimeVR interface. Administrators use this
-        /// route to review trackers and approve unknown-device handshakes
-        /// before assigning the fixed MetaSpine tracker slots.
+        /// Opens discovery and body-position assignment, including replacement
+        /// sensors whose hardware identifiers were not in the previous selection.
         /// </summary>
         public static bool TryOpenFullInterface(out string error)
         {

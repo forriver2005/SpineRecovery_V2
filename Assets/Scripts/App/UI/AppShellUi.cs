@@ -644,10 +644,10 @@ namespace SpineRecovery.App
             AdminTrainingConfiguration published = repository.CurrentPublished();
             if (published != null && published.trackerBindingsLocked && !published.trackerBindingsDisabled)
             {
-                bool saved = repository.SetPublishedTrackerBindingsEnabled(false, out string message);
+                repository.ClearTrackerBindings();
                 RefreshAdminImuBindingPage();
-                if (adminImuBindingMessage != null) adminImuBindingMessage.text = message;
-                if (saved) RefreshAdminSummary();
+                if (adminImuBindingMessage != null) adminImuBindingMessage.text = "已清除旧绑定，可以重新匹配传感器。";
+                RefreshAdminSummary();
                 return;
             }
             CommitAdminImuBindings();
@@ -900,7 +900,7 @@ namespace SpineRecovery.App
         {
             RectTransform root = QuestionnaireUi.CreateScreen(parent, "TrackingCalibrationPanel", null, out GameObject panel);
             QuestionnaireUi.Header(root, "追踪器校准", ReturnFromTrackingCalibration);
-            RectTransform content = QuestionnaireUi.ScrollArea(root, QuestionnaireUi.HeaderHeight, 152f, 670f);
+            RectTransform content = QuestionnaireUi.ScrollArea(root, QuestionnaireUi.HeaderHeight, 212f, 670f);
             QuestionnaireUi.Label(content, "IMU 追踪器校准", 29, QuestionnaireUi.Accent, TextAnchor.MiddleLeft,
                 FontStyle.Bold, 20f, 36f, 350f, 48f);
             QuestionnaireUi.Label(content, "训练前需要连接并校准追踪器，动作识别才准确", 15,
@@ -916,15 +916,17 @@ namespace SpineRecovery.App
             RectTransform steps = QuestionnaireUi.Card(content, 20f, 277f, 350f, 325f);
             QuestionnaireUi.Label(steps, "校准步骤", 20, QuestionnaireUi.Ink, TextAnchor.MiddleLeft,
                 FontStyle.Bold, 20f, 18f, 310f, 34f);
-            AddCalibrationStep(steps, 1, "佩戴已绑定的追踪器", "确认五个设备已开机并戴在指定部位", 72f);
+            AddCalibrationStep(steps, 1, "连接并佩戴追踪器", "更换设备时先重新匹配传感器", 72f);
             AddCalibrationStep(steps, 2, "打开快速校准", "按提示完成校准", 151f);
             AddCalibrationStep(steps, 3, "返回此页确认", "完成后点击下方按钮继续", 230f);
 
-            RectTransform footer = QuestionnaireUi.Footer(root, 152f);
-            Button quick = QuestionnaireUi.PillButton(footer, "快速校准", 20f, 12f, 350f, 44f, false,
+            RectTransform footer = QuestionnaireUi.Footer(root, 212f);
+            QuestionnaireUi.PillButton(footer, "重新匹配传感器", 20f, 12f, 350f, 44f, false,
+                RematchTrackers);
+            Button quick = QuestionnaireUi.PillButton(footer, "快速校准", 20f, 72f, 350f, 44f, false,
                 OpenEmbeddedSlimeVrQuickCalibration);
             quick.GetComponent<Image>().color = Color.white;
-            trackingCompleteButton = QuestionnaireUi.PillButton(footer, "我已完成校准，继续", 20f, 72f,
+            trackingCompleteButton = QuestionnaireUi.PillButton(footer, "我已完成校准，继续", 20f, 132f,
                 350f, 52f, true, ConfirmTrackingCalibration);
             trackingCompleteButton.interactable = false;
             return panel;
@@ -954,6 +956,23 @@ namespace SpineRecovery.App
             trackingCompleteButton.interactable = true;
             trackingStatusTitle.text = "快速校准已打开";
             trackingMessage.text = "完成后返回此页面确认";
+        }
+
+        private void RematchTrackers()
+        {
+            if (!(bootstrap.AdminConfigs is JsonAdminConfigRepository repository)) return;
+            repository.ClearTrackerBindings();
+            UserSession session = bootstrap.State.Session;
+            if (session != null)
+            {
+                session.trackingCalibratedAt = "";
+                bootstrap.Users.Save(session);
+            }
+            trackingCompleteButton.interactable = false;
+            RefreshTrainingPreparationStatus();
+            bool opened = EmbeddedSlimeVrBridge.TryOpenFullInterface(out string error);
+            trackingStatusTitle.text = opened ? "传感器匹配已打开" : "无法打开传感器匹配";
+            trackingMessage.text = opened ? "连接并分配部位后返回快速校准" : error;
         }
 
         private void ConfirmTrackingCalibration()

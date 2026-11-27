@@ -22,7 +22,8 @@ class BuiltInPrescriptionTest {
 
     @Test fun onlyCompleteBuiltInRoutesAreSelectable() {
         assertEquals(setOf("dead_bug", "bird_dog", "hip_thrust", "side_bridge", "side_bridge_right",
-            "cat_camel", "curl_up", "hip_thrust_taiko", "hip_thrust_hold30", "side_bridge_hold30", "side_bridge_right_hold30"),
+            "cat_camel", "curl_up", "hip_thrust_taiko", "hip_thrust_hold30", "side_bridge_hold30", "side_bridge_right_hold30",
+            "dead_bug_hold30", "bird_dog_hold30", "curl_up_hold30", "cat_camel_hold30", "hip_thrust_curve"),
             BuiltInExercise.entries.map { it.key }.toSet())
         assertNull(BuiltInExercise.forKey("8"))
         assertNull(BuiltInExercise.forKey("unknown_exercise"))
@@ -42,11 +43,18 @@ class BuiltInPrescriptionTest {
             assertEquals(order, AdmissionPrescriptionV2.fromJson(order.toJson()))
             val actions = UnifiedPrescriptionV2.actionsFor(order)
             assertEquals(exercise.coach, actions.getJSONObject(0).getString("sceneName"))
-            assertEquals(exercise.game, actions.getJSONObject(1).getString("sceneName"))
-            for (index in 0..1) {
+            val variants = UnifiedPrescriptionV2.exercisesFor(order.items.single())
+            val bilateral = variants.size == 2
+            val firstGame = if (bilateral) 2 else 1
+            assertEquals(variants.first().game, actions.getJSONObject(firstGame).getString("sceneName"))
+            for (index in 0 until actions.length()) {
                 val action = actions.getJSONObject(index)
-                assertEquals(2, action.getInt("sets")); assertEquals(3, action.getInt("reps"))
-                assertEquals(hold, action.getInt("holdSeconds")); assertEquals("hard", action.getString("level"))
+                val coach = index < firstGame
+                assertEquals(if (coach || bilateral) 1 else 2, action.getInt("sets"))
+                assertEquals(if (coach) (if (bilateral) 2 else 4) else 3, action.getInt("reps"))
+                val holding = variants.first().key.endsWith("hold30")
+                assertEquals(if (coach || !holding) 0 else if (hold > 0) hold else 30, action.getInt("holdSeconds"))
+                assertEquals("hard", action.getString("level"))
             }
             val modes = ResultMode.ORDER.map { ResultModeResult(it, ResultSessionStatus.NOT_STARTED, 0, 0, null, ResultModeSource.NotStarted) }
             val result = PrescriptionResultV2("library_${exercise.key}","request1","patient1","2026-11-24T01:02:03.000Z",

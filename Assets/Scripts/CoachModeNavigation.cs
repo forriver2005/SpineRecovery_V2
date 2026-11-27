@@ -137,6 +137,19 @@ public static class CoachModeNavigation
         LoadScene(coachScene);
     }
 
+    public static void SkipCoachAndOpenGame()
+    {
+        var training = SpineRecovery.App.AppBootstrap.Instance?.Training;
+        if (training?.IsV2Prescription == true)
+        {
+            UnityEngine.Object.FindObjectOfType<PracticeSessionController>(true)?.SkipToPrescriptionGame();
+            string next = training.SkipRemainingPrescriptionCoaches();
+            if (next != null) { StopCurrentPractice(); LoadScene(next); }
+            return;
+        }
+        OpenGameFromCoach();
+    }
+
     public static void OpenGameFromCoach(string coachScene = null)
     {
         string source = string.IsNullOrWhiteSpace(coachScene)
@@ -151,8 +164,8 @@ public static class CoachModeNavigation
         var training = SpineRecovery.App.AppBootstrap.Instance?.Training;
         if (training?.IsV2Prescription == true)
         {
-            gameScene = training.CurrentPrescriptionGameScene;
-            if (!training.AllowsPrescriptionGame(gameScene)) return;
+            gameScene = training.AdvancePrescriptionCoach();
+            if (gameScene == null) return;
         }
         else gameScene = ResolvePreferredGameScene(source, gameScene);
         StopCurrentPractice();

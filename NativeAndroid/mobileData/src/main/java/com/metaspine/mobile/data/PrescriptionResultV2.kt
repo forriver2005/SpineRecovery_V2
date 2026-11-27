@@ -14,7 +14,10 @@ import java.time.format.DateTimeFormatter
 enum class ResultSessionStatus(val wireValue: String) {
     NOT_STARTED("NOT_STARTED"),
     INTERRUPTED("INTERRUPTED"),
+    SKIPPED("SKIPPED"),
     COMPLETED("COMPLETED");
+
+    val isFinished: Boolean get() = this == COMPLETED || this == SKIPPED
 
     companion object {
         fun fromWire(value: String): ResultSessionStatus? = entries.firstOrNull { it.wireValue == value }
@@ -75,7 +78,7 @@ data class ResultItem(
     /** 与服务器一致：两种模式都完成才完成，都未开始才未开始，否则中断。 */
     val derivedStatus: ResultSessionStatus
         get() = when {
-            modeResults.all { it.status == ResultSessionStatus.COMPLETED } -> ResultSessionStatus.COMPLETED
+            modeResults.all { it.status.isFinished } -> ResultSessionStatus.COMPLETED
             modeResults.all { it.status == ResultSessionStatus.NOT_STARTED } -> ResultSessionStatus.NOT_STARTED
             else -> ResultSessionStatus.INTERRUPTED
         }
@@ -226,7 +229,7 @@ data class PrescriptionResultV2(
             val statusValue = raw.opt("status")
             val status = (statusValue as? String)?.let(ResultSessionStatus::fromWire)
                 ?: throw invalid("训练结果状态不合法: $statusValue")
-            if (status == ResultSessionStatus.NOT_STARTED) throw invalid("会话状态只能是 INTERRUPTED 或 COMPLETED")
+            if (status !in listOf(ResultSessionStatus.INTERRUPTED, ResultSessionStatus.COMPLETED)) throw invalid("会话状态只能是 INTERRUPTED 或 COMPLETED")
             val completed = raw.opt("completed") as? Boolean
                 ?: throw invalid("训练结果缺少完成标记")
             if (completed != (status == ResultSessionStatus.COMPLETED)) {
@@ -329,10 +332,14 @@ data class PrescriptionResultV2(
                     if (mode.opt("mode") != expected.wireValue) {
                         throw invalid("训练条目模式顺序必须是 coach、game")
                     }
-                    parseMode(expected, mode, snapshotSource, seenUnfinished).also { parsed ->
-                        if (parsed.status != ResultSessionStatus.COMPLETED) seenUnfinished = true
-                    }
+                    parseMode(expected, mode, snapshotSource, seenUnfinished)
                 }
+                // Side bridge alternates left coach/game and right coach/game.
+                // Its aggregate coach and game can both be interrupted.
+                val bilateral = actionId in listOf("5", "side_bridge", "side_bridge_hold30")
+                if (!bilateral && !modes[0].status.isFinished && modes[1].status != ResultSessionStatus.NOT_STARTED)
+                    throw invalid("游戏开始前须完成或跳过教练")
+                if (modes.any { !it.status.isFinished }) seenUnfinished = true
                 val itemStatus = (item.opt("status") as? String)
                     ?.let(ResultSessionStatus::fromWire)
                     ?: throw invalid("训练条目状态不合法")
@@ -362,7 +369,7 @@ data class PrescriptionResultV2(
             val status = (json.opt("status") as? String)
                 ?.let(ResultSessionStatus::fromWire)
                 ?: throw invalid("${mode.wireValue} 模式状态不合法")
-            val completedReps = integer(json.opt("completedReps"), 0, 2_000)
+            val completedReps = integer(json.opt("completedReps"), 0, 4_000)
                 ?: throw invalid("${mode.wireValue} 模式完成次数不合法")
             val durationSeconds = integer(json.opt("durationSeconds"), 0, 86_400)
                 ?: throw invalid("${mode.wireValue} 模式时长不合法")
@@ -380,6 +387,8 @@ data class PrescriptionResultV2(
                 ?.let(ResultModeSource::fromWire)
                 ?: throw invalid("${mode.wireValue} 模式数据来源不合法")
 
+            if (status == ResultSessionStatus.SKIPPED && mode != ResultMode.Coach)
+                throw invalid("只有教练模式可以跳过")
             if (status == ResultSessionStatus.NOT_STARTED) {
                 if (source != ResultModeSource.NotStarted ||
                     completedReps != 0L || durationSeconds != 0L || score != null

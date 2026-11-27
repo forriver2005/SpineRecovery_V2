@@ -94,7 +94,8 @@ public sealed class GameWorkoutScene : MonoBehaviour
     {
         IsPlaying = false; session.OnSetCompleted(this);
         if (SpineRecovery.App.AppBootstrap.Instance?.Training.IsV2Prescription == true)
-            SpineFlowTrainingSession.MarkPrescriptionGameCompleted(taiko != null ? taiko.CompletedDemonstrations :
+            SpineFlowTrainingSession.MarkPrescriptionGameCompleted(bridgeWave != null ? bridgeWave.CompletedRepetitions :
+                taiko != null ? taiko.CompletedDemonstrations :
                 taikoNightAction != null ? taikoNightAction.CompletedRepetitions : coach != null ? coach.CompletedActionRepetitions : 0);
         Refresh();
     }

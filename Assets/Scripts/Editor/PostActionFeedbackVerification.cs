@@ -71,6 +71,8 @@ public static class PostActionFeedbackVerification
             Check(SpineFlowTrainingSession.BeginUnifiedTraining(plan), "Live multi-action prescription starts");
             Check(!(bool)Call(service, "PrepareActionFeedback"), "Unfinished action cannot open a completion questionnaire");
             for (int index = 0; index < 2; index++) {
+                SpineFlowTrainingSession.SkipPrescriptionCoach();
+                Check(service.AdvancePrescriptionCoach() == "DeadBugGaming", "Coach advances to its game");
                 typeof(SpineFlowTrainingSession).GetField("prescriptionGameCompleted", Private).SetValue(live, true);
                 var measurement = typeof(SpineFlowTrainingSession).GetMethod("CreateUnavailableMeasurement", Private)
                     .Invoke(null, new object[] { "coach" });

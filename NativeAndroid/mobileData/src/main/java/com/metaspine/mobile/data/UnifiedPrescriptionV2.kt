@@ -61,24 +61,39 @@ internal object UnifiedPrescriptionV2 {
     internal fun actionsFor(order: AdmissionPrescriptionV2): JSONArray {
         val actions = JSONArray()
         for (item in order.items) {
-            val exercise = requireNotNull(BuiltInExercise.forKey(item.action)) {
-                "处方动作暂未接入训练场景：${item.actionName}"
-            }
-            for ((mode, scene) in listOf("coach" to exercise.coach, "game" to exercise.game)) {
+            val exercises = exercisesFor(item)
+            fun add(exercise: BuiltInExercise, coach: Boolean, sets: Int, reps: Int) {
+                val mode = if (coach) "coach" else "game"
                 actions.put(JSONObject()
                     .put("actionId", "${exercise.key}_$mode")
-                    .put("actionName", item.actionName)
+                    .put("actionName", if (exercises.size == 2) "侧桥" else exercise.names.first())
                     .put("arTaskType", "${mode}_training")
                     .put("level", item.level ?: "standard")
-                    .put("sets", item.sets)
-                    .put("reps", item.reps)
-                    .put("holdSeconds", item.holdSeconds)
+                    .put("sets", sets).put("reps", reps)
+                    .put("holdSeconds", if (coach) 0 else if (exercise.key.endsWith("hold30")) item.holdSeconds.takeIf { it > 0 } ?: 30 else 0)
                     .put("prescriptionItemId", item.itemId)
                     .put("prescriptionPosition", item.position)
-                    .put("sceneName", scene))
+                    .put("sceneName", if (coach) exercise.coach else exercise.game))
             }
+            exercises.forEach { add(it, true, 1, if (exercises.size == 2) 2 else 4) }
+            if (exercises.size == 2) repeat(item.sets) {
+                exercises.forEach { add(it, false, 1, item.reps) }
+            } else add(exercises.single(), false, item.sets, item.reps)
         }
         return actions
+    }
+
+    internal fun exercisesFor(item: AdmissionPrescriptionItemV2): List<BuiltInExercise> {
+        val holding = item.holdSeconds > 0 || item.action.endsWith("hold30")
+        return when (item.action) {
+            "side_bridge", "side_bridge_hold30" -> if (holding)
+                listOf(BuiltInExercise.SIDE_BRIDGE_HOLD, BuiltInExercise.SIDE_BRIDGE_RIGHT_HOLD)
+                else listOf(BuiltInExercise.SIDE_BRIDGE, BuiltInExercise.SIDE_BRIDGE_RIGHT)
+            "hip_thrust", "hip_thrust_taiko", "hip_thrust_curve", "hip_thrust_hold30" -> listOf(if (holding)
+                BuiltInExercise.HIP_THRUST_HOLD else requireNotNull(BuiltInExercise.forKey(item.action)))
+            else -> listOf(requireNotNull(BuiltInExercise.forKey(
+                if (holding && !item.action.endsWith("hold30")) "${item.action}_hold30" else item.action)))
+        }
     }
 
     fun result(record: TrainingHistoryRecord, session: JSONObject): JSONObject? {
@@ -87,31 +102,36 @@ internal object UnifiedPrescriptionV2 {
         if (plan.optInt("prescriptionContractVersion") != 2) return null
         val order = AdmissionPrescriptionV2.fromJson(JSONObject(plan.getString("prescriptionJson")))
         val measurements = session.getJSONArray("actionResults")
-        val byMode = (0 until measurements.length()).associate { index ->
-            val row = measurements.getJSONObject(index)
-            (row.getLong("prescriptionItemId") to row.getString("trainingMode")) to row
-        }
+        val byMode = (0 until measurements.length()).map(measurements::getJSONObject)
+            .groupBy { it.getLong("prescriptionItemId") to it.getString("trainingMode") }
+        val planned = plan.optJSONArray("actions")
         val items = order.items.map { item ->
             val modes = ResultMode.ORDER.map { mode ->
-                val row = byMode[item.itemId to mode.wireValue]
-                // Playback completion alone is not evidence of a completed patient repetition.
-                // The wire contract requires at least one repetition for COMPLETED.
-                val completed = row?.optBoolean("prescriptionModeCompleted") == true &&
-                    row.optInt("completedRepetitions") > 0
+                val rows = byMode[item.itemId to mode.wireValue].orEmpty()
+                val expected = if (planned == null) 1 else (0 until planned.length()).count {
+                    val action = planned.getJSONObject(it)
+                    action.getLong("prescriptionItemId") == item.itemId &&
+                        action.getString("arTaskType") == "${mode.wireValue}_training"
+                }
+                val settled = rows.size == expected && rows.all {
+                    it.optBoolean("prescriptionModeSkipped") ||
+                        it.optBoolean("prescriptionModeCompleted") && it.optInt("completedRepetitions") > 0
+                }
                 val status = when {
-                    completed -> ResultSessionStatus.COMPLETED
-                    row != null -> ResultSessionStatus.INTERRUPTED
+                    settled && rows.any { it.optBoolean("prescriptionModeSkipped") } -> ResultSessionStatus.SKIPPED
+                    settled -> ResultSessionStatus.COMPLETED
+                    rows.isNotEmpty() -> ResultSessionStatus.INTERRUPTED
                     else -> ResultSessionStatus.NOT_STARTED
                 }
+                val scores = rows.filter { it.optBoolean("scoreAvailable", it.optInt("scoreSampleCount") >= 10) }
                 ResultModeResult(mode, status,
-                    row?.optInt("completedRepetitions") ?: 0,
-                    row?.optInt("durationSeconds") ?: 0,
-                    row?.takeIf { it.optBoolean("scoreAvailable", it.optInt("scoreSampleCount") >= 10) }
-                        ?.getDouble("overallScore"),
-                    if (row == null) ResultModeSource.NotStarted else ResultModeSource.ArMeasured)
+                    rows.sumOf { it.optInt("completedRepetitions") },
+                    rows.sumOf { it.optInt("durationSeconds") },
+                    scores.takeIf { it.isNotEmpty() }?.map { it.getDouble("overallScore") }?.average(),
+                    if (rows.isEmpty()) ResultModeSource.NotStarted else ResultModeSource.ArMeasured)
             }
             val status = when {
-                modes.all { it.status == ResultSessionStatus.COMPLETED } -> ResultSessionStatus.COMPLETED
+                modes.all { it.status.isFinished } -> ResultSessionStatus.COMPLETED
                 modes.all { it.status == ResultSessionStatus.NOT_STARTED } -> ResultSessionStatus.NOT_STARTED
                 else -> ResultSessionStatus.INTERRUPTED
             }

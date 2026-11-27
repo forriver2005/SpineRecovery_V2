@@ -152,6 +152,7 @@ public sealed class SpineFlowTrainingSession : MonoBehaviour
         public long prescriptionItemId;
         public int prescriptionPosition;
         public bool prescriptionModeCompleted;
+        public bool prescriptionModeSkipped;
         public int plannedRepetitions;
         public int completedRepetitions;
         public int durationSeconds;
@@ -229,6 +230,7 @@ public sealed class SpineFlowTrainingSession : MonoBehaviour
     {
         public string playedGameId;
         public TrainingQualitySummary gameAssessment;
+        public FinalTrainingScore finalGameAssessment;
         public int averageScore;
         public int rawAverageScore;
         public int bestScore;
@@ -272,6 +274,7 @@ public sealed class SpineFlowTrainingSession : MonoBehaviour
     private CoachTimelineStatus coachTimelineStatus = CoachTimelineStatus.Interrupted;
     private CoachEndReason coachEndReason = CoachEndReason.TechnicalError;
     private bool coachOutcomeSet;
+    private bool prescriptionCoachSkipped;
     private bool gameTiming;
     private bool resultSent;
     private string pendingGameLevel = "standard";
@@ -629,6 +632,7 @@ public sealed class SpineFlowTrainingSession : MonoBehaviour
             userProfile = new UserProfilePayload { gender = plan.gender },
             trainingPlan = new TrainingPlanPayload { recommendedActions = new[] { actions[0], actions[1] } }
         };
+        if (plan.prescriptionContractVersion == 2) instance.SelectPrescriptionStep(0);
         if (!instance.HasValidStartPayload()) return false;
         instance.ResetMeasurementsForNewSession();
         instance.PublishPendingMotionPackage();
@@ -645,6 +649,31 @@ public sealed class SpineFlowTrainingSession : MonoBehaviour
     public static bool CurrentPrescriptionCoachCompleted => instance != null && instance.coachOutcomeSet &&
         instance.coachTimelineStatus == CoachTimelineStatus.Completed;
 
+    public static bool CurrentPrescriptionCoachReady => instance != null && instance.CoachesReady();
+
+    private bool CoachesReady()
+    {
+        if (unifiedSession && unifiedActions != null && ResolveMode(unifiedActions[unifiedActionOffset]) == "game")
+        {
+            long itemId = unifiedActions[unifiedActionOffset].prescriptionItemId;
+            int expected = 0, completed = 0;
+            foreach (var action in unifiedActions)
+                if (action.prescriptionItemId == itemId && ResolveMode(action) == "coach") expected++;
+            foreach (var action in previousPrescriptionActions)
+                if (action.prescriptionItemId == itemId && action.trainingMode == "coach" &&
+                    (action.prescriptionModeCompleted || action.prescriptionModeSkipped)) completed++;
+            return expected > 0 && completed == expected;
+        }
+        return CurrentPrescriptionCoachCompleted || prescriptionCoachSkipped;
+    }
+
+    public static void SkipPrescriptionCoach()
+    {
+        instance.prescriptionCoachSkipped = true;
+        instance.coachMeasurement ??= CreateUnavailableMeasurement("coach");
+        instance.SaveUnifiedCheckpoint();
+    }
+
     public static bool CurrentPrescriptionGameCompleted => instance != null && instance.prescriptionGameCompleted;
 
     public static int PlannedPrescriptionGameHoldSeconds =>
@@ -654,7 +683,7 @@ public sealed class SpineFlowTrainingSession : MonoBehaviour
     public static void MarkPrescriptionGameCompleted(int completedRepetitions)
     {
         if (instance == null || SpineRecovery.App.AppBootstrap.Instance?.Training.IsV2Prescription != true ||
-            !CurrentPrescriptionCoachCompleted ||
+            !CurrentPrescriptionCoachReady ||
             completedRepetitions != GetPlannedTrainingVolume("game", 1, 1).TotalRepetitions) return;
         instance.prescriptionGameCompleted = true;
         instance.SaveUnifiedCheckpoint();
@@ -663,19 +692,30 @@ public sealed class SpineFlowTrainingSession : MonoBehaviour
     public static void AdvanceUnifiedPrescription(int offset)
     {
         var session = instance;
-        var actions = session.startPayload.trainingPlan.recommendedActions;
-        session.previousPrescriptionActions.Add(session.BuildActionResult(actions[0], "coach", session.coachMeasurement));
-        session.previousPrescriptionActions.Add(session.BuildActionResult(actions[1], "game",
-            session.gameMeasurement ?? CreateUnavailableMeasurement("game")));
-        if (session.gameMeasurement != null)
-            session.previousPrescriptionGames.Add(session.BuildGameResult(actions[1], session.gameMeasurement));
-        session.unifiedActionOffset = offset;
+        var action = session.unifiedActions[session.unifiedActionOffset];
+        string mode = ResolveMode(action);
+        var measurement = mode == "coach" ? session.coachMeasurement : session.gameMeasurement;
+        session.previousPrescriptionActions.Add(session.BuildActionResult(action, mode,
+            measurement ?? CreateUnavailableMeasurement(mode)));
+        if (mode == "game" && measurement != null)
+            session.previousPrescriptionGames.Add(session.BuildGameResult(action, measurement));
+        session.SelectPrescriptionStep(offset);
         session.prescriptionGameCompleted = false;
-        session.startPayload.trainingPlan.recommendedActions =
-            new[] { session.unifiedActions[offset], session.unifiedActions[offset + 1] };
         session.ResetMeasurementsForNewSession();
         session.PublishPendingMotionPackage();
         session.SaveUnifiedCheckpoint();
+    }
+
+    private void SelectPrescriptionStep(int offset)
+    {
+        unifiedActionOffset = offset;
+        var step = unifiedActions[offset];
+        var entry = TrainingActionCatalog.Find(step.actionId);
+        PlannedAction coach = Array.Find(unifiedActions, a => a.prescriptionItemId == step.prescriptionItemId &&
+            ResolveMode(a) == "coach" && TrainingActionCatalog.Find(a.actionId) == entry);
+        PlannedAction game = ResolveMode(step) == "game" ? step : Array.Find(unifiedActions,
+            a => a.prescriptionItemId == step.prescriptionItemId && ResolveMode(a) == "game" && TrainingActionCatalog.Find(a.actionId) == entry);
+        startPayload.trainingPlan.recommendedActions = new[] { coach, game };
     }
 
     public static int PlannedCoachHoldSeconds => instance != null ? instance.FindPlannedAction("coach")?.holdSeconds ?? -1 : -1;
@@ -831,6 +871,22 @@ public sealed class SpineFlowTrainingSession : MonoBehaviour
                 ? instance.ElapsedSeconds(instance.gameStartedAt, true, instance.gamePausedSecondsAtStart)
                 : instance.gameMeasurement?.durationSeconds ?? Mathf.CeilToInt((float)summary.ObservedSeconds)),
             level = difficulty
+        };
+        instance.gameTiming = false;
+        instance.SaveUnifiedCheckpoint();
+    }
+
+    public static void SaveUnifiedFinalGameAssessment(string playedGameId, string difficulty,
+        FinalTrainingScore assessment, int validSamples, int activeSeconds, int completedRepetitions)
+    {
+        if (instance == null || !instance.unifiedSession || !instance.HasValidStartPayload()) return;
+        int score = assessment.CanPublish ? assessment.Score : 0;
+        instance.gameMeasurement = new ModeMeasurement
+        {
+            playedGameId = playedGameId, finalGameAssessment = assessment,
+            averageScore = score, rawAverageScore = score, bestScore = score, rawBestScore = score,
+            scoreSampleCount = validSamples, durationSeconds = activeSeconds,
+            completedRepetitions = completedRepetitions, level = difficulty
         };
         instance.gameTiming = false;
         instance.SaveUnifiedCheckpoint();
@@ -1220,14 +1276,14 @@ public sealed class SpineFlowTrainingSession : MonoBehaviour
     {
         var actions = new List<ActionResultPayload>(previousPrescriptionActions);
         var games = new List<GameResultPayload>(previousPrescriptionGames);
-        var current = startPayload.trainingPlan.recommendedActions;
-        if (coachMeasurement != null)
-            actions.Add(BuildActionResult(current[0], "coach", coachMeasurement));
-        if (gameMeasurement != null || prescriptionGameCompleted)
-            actions.Add(BuildActionResult(current[1], "game", gameMeasurement ?? CreateUnavailableMeasurement("game")));
-        if (gameMeasurement != null)
-            games.Add(BuildGameResult(current[1], gameMeasurement));
-        bool completed = prescriptionGameCompleted && unifiedActionOffset + 2 == unifiedActions.Length;
+        var current = unifiedActions[unifiedActionOffset];
+        string mode = ResolveMode(current);
+        var measurement = mode == "coach" ? coachMeasurement : gameMeasurement;
+        if (measurement != null || mode == "game" && prescriptionGameCompleted)
+            actions.Add(BuildActionResult(current, mode, measurement ?? CreateUnavailableMeasurement(mode)));
+        if (mode == "game" && gameMeasurement != null)
+            games.Add(BuildGameResult(current, gameMeasurement));
+        bool completed = prescriptionGameCompleted && unifiedActionOffset + 1 == unifiedActions.Length;
         int duration = 0, score = 0, raw = 0, measured = 0;
         foreach (var action in actions)
         {
@@ -1386,6 +1442,7 @@ public sealed class SpineFlowTrainingSession : MonoBehaviour
             prescriptionPosition = action.prescriptionPosition,
             prescriptionModeCompleted = mode == "coach" ? coachOutcomeSet &&
                 coachTimelineStatus == CoachTimelineStatus.Completed : prescriptionGameCompleted,
+            prescriptionModeSkipped = mode == "coach" && prescriptionCoachSkipped,
             plannedRepetitions = SafeRepetitionProduct(action.sets, action.reps),
             completedRepetitions = mode == "game" && prescriptionGameCompleted && action.prescriptionItemId > 0
                 ? SafeRepetitionProduct(action.sets, action.reps) : measurement.completedRepetitions,
@@ -1395,7 +1452,7 @@ public sealed class SpineFlowTrainingSession : MonoBehaviour
             bestScore = measurement.bestScore,
             rawBestScore = measurement.rawBestScore,
             scoreSampleCount = measurement.scoreSampleCount,
-            scoreAvailable = measurement.gameAssessment?.HasAssessment ?? measurement.HasScoreSummary,
+            scoreAvailable = measurement.finalGameAssessment?.CanPublish ?? measurement.gameAssessment?.HasAssessment ?? measurement.HasScoreSummary,
             trackingQuality = measurement.trackingQuality,
             timelineStatus = coachOutcomeSet
                 ? CoachTimelineStatusToWire(coachTimelineStatus)
@@ -1420,11 +1477,11 @@ public sealed class SpineFlowTrainingSession : MonoBehaviour
         return new GameResultPayload
         {
             playedGameId = measurement.playedGameId,
-            plannedRepetitions = measurement.gameAssessment?.Planned ?? SafeRepetitionProduct(action.sets, action.reps),
-            trackingCoverage = measurement.gameAssessment?.Coverage ?? 0f,
+            plannedRepetitions = measurement.finalGameAssessment?.Planned ?? measurement.gameAssessment?.Planned ?? SafeRepetitionProduct(action.sets, action.reps),
+            trackingCoverage = measurement.finalGameAssessment?.Coverage ?? measurement.gameAssessment?.Coverage ?? 0f,
             creditedSeconds = (float)(measurement.gameAssessment?.CreditedSeconds ?? 0),
             targetSeconds = (float)(measurement.gameAssessment?.TargetSeconds ?? 0),
-            assessmentAvailable = measurement.gameAssessment?.HasAssessment ?? measurement.HasScoreSummary,
+            assessmentAvailable = measurement.finalGameAssessment?.CanPublish ?? measurement.gameAssessment?.HasAssessment ?? measurement.HasScoreSummary,
             gameId = baseId + "_challenge",
             gameName = string.IsNullOrWhiteSpace(action.actionName)
                 ? "Dead Bug Challenge"
@@ -1720,6 +1777,7 @@ public sealed class SpineFlowTrainingSession : MonoBehaviour
     {
         coachMeasurement = null;
         coachOutcomeSet = false;
+        prescriptionCoachSkipped = false;
         gameMeasurement = null;
         coachTiming = false;
         gameTiming = false;

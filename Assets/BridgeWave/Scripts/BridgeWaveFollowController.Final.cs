@@ -7,8 +7,10 @@ namespace BridgeWave
     {
         public FinalTrainingScore FinalScore {get;}=new FinalTrainingScore();
         FinalScoreWindow[] finalReturns;
+        int validScoreSamples;
         void ResetFinalScore()
         {
+            validScoreSamples = 0;
             var plans=new FinalTrainingScore.Plan[game.totalCount];finalReturns=new FinalScoreWindow[plans.Length];
             for(int i=0;i<plans.Length;i++)
             {
@@ -20,6 +22,7 @@ namespace BridgeWave
         void ObserveFinalScore(double before,double now,float frameSeconds)
         {
             bool valid=input.Valid&&!IsFlowTest&&frameSeconds<=.1001f;
+            if (valid && now > before) validScoreSamples++;
             bool onTrack=valid&&Session.IsInsideCurve((float)now,input.Height,true);
             for(int i=0;i<FinalScore.Planned;i++)
             {

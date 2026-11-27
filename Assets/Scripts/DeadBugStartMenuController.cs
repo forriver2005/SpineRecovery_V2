@@ -940,7 +940,7 @@ public class DeadBugStartMenuController : MonoBehaviour
         HideSceneVisualsExceptMenus();
         ConfigurePracticeActionMenu();
         ConfigurePauseButton("Start", ResumePracticeFromPause);
-        ConfigurePauseButton("Game", () => CoachModeNavigation.OpenGameFromCoach());
+        ConfigurePauseButton("Game", CoachModeNavigation.SkipCoachAndOpenGame);
         ConfigurePauseButton("ActionLibrary", CoachModeNavigation.OpenActionLibraryFromCoach);
         bool gameAvailable = CoachModeNavigation.IsSupportedCoachScene(gameObject.scene.name);
         foreach (Transform child in practiceActionMenu.transform)
@@ -951,6 +951,18 @@ public class DeadBugStartMenuController : MonoBehaviour
             if (!visible) continue;
             TMP_Text label = child.GetComponentInChildren<TMP_Text>(true);
             if (label != null) label.gameObject.SetActive(false);
+            if (child.name == "Game" && SpineRecovery.App.AppBootstrap.Instance?.Training.IsV2Prescription == true)
+            {
+                var background = child.GetComponent<Image>();
+                background.sprite = null;
+                background.color = new Color(0.08f, 0.38f, 0.46f, 1f);
+                label.gameObject.SetActive(true);
+                label.text = "跳过教练，进入游戏";
+                label.color = Color.white;
+                label.enableAutoSizing = true;
+                label.fontSizeMin = 20;
+                label.fontSizeMax = 48;
+            }
         }
         Button gameButton = practiceActionMenu.transform.Find("Game")?.GetComponent<Button>();
         if (gameButton != null) gameButton.interactable = gameAvailable;
@@ -1217,7 +1229,7 @@ public class DeadBugStartMenuController : MonoBehaviour
                 label.rectTransform.anchorMax = Vector2.one;
                 label.rectTransform.offsetMin = new Vector2(20f, 10f);
                 label.rectTransform.offsetMax = new Vector2(-20f, -10f);
-                label.text = game && training?.IsV2Prescription == true ? "进入本项游戏" :
+                label.text = game && training?.IsV2Prescription == true ? training.CoachContinueLabel :
                     game && prescribed ? "完成处方，进入游戏" : replay
                     ? "还需要学习，再来一次教练模式"
                     : IsGameUnavailableForCurrentPractice()

@@ -31,7 +31,12 @@ namespace BridgeWave
         public TrainingResultPanel ResultPanel { get; private set; }
         public float CountdownRemaining => countdown;
         public bool IsFlowTest => State == RunState.Ready ? skipCalibrationForFlowTest : sessionFlowTest;
+        bool Prescribed => SpineRecovery.App.AppBootstrap.Instance?.Training.IsV2Prescription == true;
+        public int CompletedRepetitions => Session.Finished ? Session.Repetitions :
+            game.standardTrack.Completed(Session.Elapsed, Session.Repetitions);
         public bool CanStart => State == RunState.Ready && (skipCalibrationForFlowTest || ReadyForTraining) &&
+            (!Prescribed || (!skipCalibrationForFlowTest &&
+                SpineRecovery.App.AppBootstrap.Instance.Training.AllowsPrescriptionGame(gameObject.scene.name))) &&
             (workout == null || GameWorkoutSession.Instance.AllowsStart(workout));
         bool sessionFlowTest;
         float countdown;
@@ -41,6 +46,7 @@ namespace BridgeWave
         {
             ResultPanel = TrainingResultPanel.Create(startLabel.font, ReturnToSetup);
             game.controlledClock = true;
+            ApplyPrescriptionDose();
             ResetSession();
             startMenu.TrainingStartAllowed = () => CanStart;
             startMenu.ExternalTrainingStart = () => { Begin(); return State == RunState.Countdown; };
@@ -77,16 +83,26 @@ namespace BridgeWave
             game.ResetFeedback();
             ResetFinalScore();
         }
+        public void ApplyPrescriptionDose()
+        {
+            if (Prescribed)
+            {
+                skipCalibrationForFlowTest = false;
+                game.totalCount = SpineFlowTrainingSession.GetPlannedTrainingVolume("game", 1, 4).TotalRepetitions;
+            }
+        }
         public void Begin()
         {
             input.Read();
             if (!CanStart) return;
-            // The four standard cycles stay fixed; difficulty changes the visible corridor and judgement together.
+            ApplyPrescriptionDose();
+            // Repeat the standard chart to the prescribed count; difficulty changes corridor width.
             game.tolerance = startMenu.SelectedDifficultyKey == "simple" ? .11f :
                 startMenu.SelectedDifficultyKey == "hard" ? .06f : .08f;
             sessionFlowTest = skipCalibrationForFlowTest;
             input.CancelCalibration();
             ResetSession();
+            SpineFlowTrainingSession.BeginGameTraining(startMenu.SelectedDifficultyKey);
             countdown = DeadBugCountdownController.DefaultCountdownSeconds;
             State = RunState.Countdown;
             input.EditingAllowed = false;
@@ -132,6 +148,10 @@ namespace BridgeWave
                 if (Session.Finished)
                 {
                     FinishFinalScore();
+                    if (!IsFlowTest)
+                        SpineFlowTrainingSession.SaveUnifiedFinalGameAssessment("hip_thrust_curve",
+                            startMenu.SelectedDifficultyKey, FinalScore, validScoreSamples,
+                            Mathf.CeilToInt(Session.Elapsed), CompletedRepetitions);
                     State = RunState.Finished;
                     Completed?.Invoke();
                 }

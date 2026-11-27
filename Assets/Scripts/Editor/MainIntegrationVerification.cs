@@ -118,7 +118,7 @@ public static class MainIntegrationVerification
     private static void VerifyFullCatalog()
     {
         var packaged = EditorBuildSettings.scenes.Where(s => s.enabled).Select(s => Path.GetFileNameWithoutExtension(s.path)).ToArray();
-        Check(TrainingActionCatalog.Entries.Length == 11, "Full library has eleven game routes");
+        Check(TrainingActionCatalog.Entries.Length == 16, "Full library has sixteen game routes");
         foreach(var entry in TrainingActionCatalog.Entries)
         {
             Check(packaged.Contains(entry.Coach) && packaged.Contains(entry.Game), "Coach/game packaged: " + entry.Key);

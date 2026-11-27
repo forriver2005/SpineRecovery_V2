@@ -10,6 +10,7 @@ public static class TrackerRematchingVerification
 
     public static void Run()
     {
+        ClinicalPrescriptionVerification.Run();
         string path = JsonFileStore.PathFor("spine-admin-configurations.json");
         byte[] original = File.Exists(path) ? File.ReadAllBytes(path) : null;
         try

@@ -22,7 +22,12 @@ public static class TrainingActionCatalog
         new Entry("hip_thrust_taiko", "臀桥 · 星轨敲鼓", "HipThrustPractice", "HipThrust_TaikoNight_Dynamic", "hipthrust_taiko", "hipthrust_taiko_night"),
         new Entry("hip_thrust_hold30", "臀桥 · 保持", "HipThrustPractice", "HipThrust_RingBridge_Hold30", "hipthrust_hold30"),
         new Entry("side_bridge_hold30", "左侧桥 · 保持", "SideBridgePractice", "SideBridge_RingBridge_Hold30", "sidebridge_hold30"),
-        new Entry("side_bridge_right_hold30", "右侧桥 · 保持", "SideBridgeOppositePractice", "SideBridgeOpposite_RingBridge_Hold30", "sidebridge_right_hold30")
+        new Entry("side_bridge_right_hold30", "右侧桥 · 保持", "SideBridgeOppositePractice", "SideBridgeOpposite_RingBridge_Hold30", "sidebridge_right_hold30"),
+        new Entry("dead_bug_hold30", "死虫 · 保持", "DeadBugPractice", "DeadBug_RingBridge_Hold30", "deadbug_hold30"),
+        new Entry("bird_dog_hold30", "鸟狗 · 保持", "BirdDogPractice", "BirdDog_RingBridge_Hold30", "birddog_hold30"),
+        new Entry("curl_up_hold30", "卷腹 · 保持", "CurlUpPractice", "Crunch_RingBridge_Hold30", "crunch_hold30"),
+        new Entry("cat_camel_hold30", "卧位猫 · 保持", "CatCamelPractice", "LyingCat_RingBridge_Hold30", "lyingcat_hold30"),
+        new Entry("hip_thrust_curve", "臀桥 · 曲线", "HipThrustPractice", "BridgeWave_StandardFollow", "hipthrust_curve", "bridgewave")
     };
 
     public static Entry Find(string action)

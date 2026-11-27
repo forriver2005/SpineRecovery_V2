@@ -657,14 +657,9 @@ public class PracticeSessionController : MonoBehaviour
             return;
         }
 
-        SpineFlowTrainingVolume volume =
-            SpineFlowTrainingSession.GetPlannedTrainingVolume(
-                "coach",
-                1,
-                4);
+        var volume = SpineFlowTrainingSession.GetPlannedTrainingVolume("coach", 1, 4);
         coachActionController.SetTrainingVolume(volume.sets, volume.repetitionsPerSet);
-        bool prescribed = SpineRecovery.App.AppBootstrap.Instance?.Training?.IsPrescribedTraining == true;
-        coachActionController.SetPrescribedHoldSeconds(prescribed ? SpineFlowTrainingSession.PlannedCoachHoldSeconds : -1);
+        coachActionController.SetPrescribedHoldSeconds(-1);
     }
 
     private void BeginPracticeIntroduction()
@@ -1995,6 +1990,21 @@ public class PracticeSessionController : MonoBehaviour
         }
 
         return null;
+    }
+
+    public void SkipToPrescriptionGame()
+    {
+        // Finalize measured progress before stopping the timeline, without the
+        // interrupted-session navigation used by an ordinary early exit.
+        coachResultFinalized = true;
+        SpineFlowTrainingSession.EndCoachTraining(
+            poseScorer != null ? poseScorer.SessionScores : null,
+            poseScorer != null ? poseScorer.MaximumUserMotionDegrees : 0f,
+            poseScorer != null ? poseScorer.MaximumCoachMotionDegrees : 0f,
+            coachActionController != null ? coachActionController.CompletedRepetitions : 0,
+            CoachTimelineStatus.EndedEarly, CoachEndReason.UserEnded);
+        StopPractice();
+        SpineFlowTrainingSession.SkipPrescriptionCoach();
     }
 
     public void StopPractice()

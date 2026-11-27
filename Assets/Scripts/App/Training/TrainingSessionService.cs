@@ -1,6 +1,7 @@
 using System;
 using System.IO;
 using System.Collections.Generic;
+using System.Linq;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 
@@ -26,7 +27,17 @@ namespace SpineRecovery.App
 
         private int actionOffset;
         private bool openingSurvey;
-        public int FeedbackActionCount => IsV2Prescription ? CurrentPlan.actions.Length / 2 : 1;
+        // Pending questionnaires from the former left/right pair format keep
+        // their original indices. New prescriptions always use grouped stages.
+        private bool LegacyBilateralPairs => CurrentPlan.actions.GroupBy(a => a.prescriptionItemId).Any(g =>
+            g.Count() > 2 && g.ElementAt(1).arTaskType == "game_training" && g.Skip(2).Any(a => a.arTaskType == "coach_training"));
+        private TrainingAction[] PrescriptionItems => LegacyBilateralPairs
+            ? CurrentPlan.actions.Where((a, index) => index % 2 == 0).ToArray()
+            : CurrentPlan.actions.GroupBy(a => a.prescriptionItemId).Select(g => g.First()).ToArray();
+        private TrainingAction CurrentStep => CurrentPlan.actions[actionOffset];
+        private int CurrentItemIndex => LegacyBilateralPairs ? actionOffset / 2 :
+            Array.FindIndex(PrescriptionItems, a => a.prescriptionItemId == CurrentStep.prescriptionItemId);
+        public int FeedbackActionCount => IsV2Prescription ? PrescriptionItems.Length : 1;
         public int FeedbackActionIndex
         {
             get
@@ -40,27 +51,62 @@ namespace SpineRecovery.App
             }
         }
         private TrainingAction FeedbackAction => CurrentPlan?.actions != null && CurrentPlan.actions.Length > 0 ?
-            CurrentPlan.actions[Mathf.Clamp(IsV2Prescription ? FeedbackActionIndex * 2 : 0, 0, CurrentPlan.actions.Length - 1)] : null;
+            (IsV2Prescription ? PrescriptionItems[Mathf.Clamp(FeedbackActionIndex, 0, FeedbackActionCount - 1)] : CurrentPlan.actions[0]) : null;
         public string FeedbackActionName => !string.IsNullOrEmpty(FeedbackAction?.actionName) ? FeedbackAction.actionName :
             GameWorkoutPlan.ActionName(FeedbackAction?.actionId ?? CurrentPlan?.actionId);
         public bool CanContinueAfterFeedback => IsV2Prescription && HasNextPrescriptionItem &&
             string.IsNullOrEmpty(CurrentResult?.endReason) && SpineFlowTrainingSession.CurrentPrescriptionGameCompleted;
         public bool IsV2Prescription => IsPrescribedTraining && CurrentPlan.prescriptionContractVersion == 2;
-        // The active item advances by a coach/game pair; both modes use the same prescribed difficulty.
-        public string CurrentPrescriptionDifficulty => IsV2Prescription && CurrentPlan.actions != null &&
-            actionOffset < CurrentPlan.actions.Length ? CurrentPlan.actions[actionOffset].level : null;
-        public bool HasNextPrescriptionItem => IsV2Prescription && actionOffset + 2 < CurrentPlan.actions.Length;
-        public string CurrentPrescriptionGameScene => IsV2Prescription ? CurrentPlan.actions[actionOffset + 1].sceneName : null;
+        public string CurrentPrescriptionDifficulty => IsV2Prescription ? CurrentStep.level : null;
+        public bool HasNextPrescriptionItem => IsV2Prescription && CurrentItemIndex + 1 < FeedbackActionCount;
+        public bool HasNextStepInItem => IsV2Prescription && actionOffset + 1 < CurrentPlan.actions.Length &&
+            CurrentPlan.actions[actionOffset + 1].prescriptionItemId == CurrentStep.prescriptionItemId;
+        public string CoachContinueLabel => HasNextStepInItem && CurrentPlan.actions[actionOffset + 1].arTaskType == "coach_training"
+            ? "继续下一侧教练" : "进入本项游戏";
+        public string CurrentPrescriptionGameScene => !IsV2Prescription ? null : CurrentStep.arTaskType == "game_training"
+            ? CurrentStep.sceneName : CurrentPlan.actions.First(a => a.prescriptionItemId == CurrentStep.prescriptionItemId && a.arTaskType == "game_training").sceneName;
         public bool AllowsPrescriptionCoach(string scene) => !IsV2Prescription ||
-            SameCoachScene(CurrentPlan.actions[actionOffset].sceneName, scene);
+            CurrentStep.arTaskType == "coach_training" && SameCoachScene(CurrentStep.sceneName, scene);
 
         private static bool SameCoachScene(string planned, string actual) => planned == actual ||
             (TrainingActionCatalog.ForCoach(planned) != null &&
              TrainingActionCatalog.ForCoach(planned) == TrainingActionCatalog.ForCoach(actual));
 
         public bool AllowsPrescriptionGame(string scene) => !IsV2Prescription ||
-            (CurrentPlan.actions[actionOffset + 1].sceneName == scene &&
-                SpineFlowTrainingSession.CurrentPrescriptionCoachCompleted);
+            (CurrentStep.arTaskType == "game_training" && CurrentStep.sceneName == scene &&
+                SpineFlowTrainingSession.CurrentPrescriptionCoachReady);
+
+        public string AdvancePrescriptionCoach()
+        {
+            if (!IsV2Prescription || CurrentStep.arTaskType != "coach_training" ||
+                !SpineFlowTrainingSession.CurrentPrescriptionCoachReady) return null;
+            return AdvanceStep();
+        }
+
+        public string SkipRemainingPrescriptionCoaches()
+        {
+            string next = null;
+            while (IsV2Prescription && CurrentStep.arTaskType == "coach_training")
+            {
+                SpineFlowTrainingSession.SkipPrescriptionCoach();
+                next = AdvanceStep();
+            }
+            return next;
+        }
+
+        private string AdvanceStep()
+        {
+            actionOffset++;
+            SpineFlowTrainingSession.AdvanceUnifiedPrescription(actionOffset);
+            return CurrentStep.sceneName;
+        }
+
+        public string AdvanceWithinPrescriptionItem()
+        {
+            if (!HasNextStepInItem || CurrentStep.arTaskType != "game_training" ||
+                !SpineFlowTrainingSession.CurrentPrescriptionGameCompleted) return null;
+            return AdvanceStep();
+        }
 
         private const string SessionFile = "unified-training-session.json";
         public TrainingPlan CurrentPlan { get; private set; }
@@ -136,29 +182,10 @@ namespace SpineRecovery.App
 
         private bool StartV2Training(TrainingPlan plan)
         {
-            if (plan.prescriptionOrderId <= 0 || plan.actions.Length > 20 || plan.actions.Length % 2 != 0 ||
-                (HasPendingFeedback && CurrentPlan.accountId == plan.accountId)) return false;
+            if (HasPendingFeedback && CurrentPlan.accountId == plan.accountId) return false;
             plan = JsonUtility.FromJson<TrainingPlan>(JsonUtility.ToJson(plan));
-            for (int offset = 0; offset < plan.actions.Length; offset += 2)
-            {
-                TrainingAction coach = plan.actions[offset];
-                TrainingAction game = plan.actions[offset + 1];
-                var entry = TrainingActionCatalog.Find(coach?.actionId);
-                if (entry == null || TrainingActionCatalog.Find(game?.actionId) != entry ||
-                    !SameCoachScene(entry.Coach, coach.sceneName) || game.sceneName != entry.Game) return false;
-                coach.sceneName = SpineFlowTrainingSession.ResolveSceneForGender(entry.Coach, plan.gender == "male");
-                if (coach == null || game == null || coach.arTaskType != "coach_training" ||
-                    game.arTaskType != "game_training" || coach.prescriptionItemId <= 0 ||
-                    game.prescriptionItemId != coach.prescriptionItemId ||
-                    coach.prescriptionPosition != offset / 2 || game.prescriptionPosition != offset / 2 ||
-                    coach.sets < 1 || coach.sets > 20 || coach.reps < 1 || coach.reps > 100 ||
-                    coach.holdSeconds < 0 || coach.holdSeconds > 600 ||
-                    (coach.level != "simple" && coach.level != "standard" && coach.level != "hard") ||
-                    coach.level != game.level ||
-                    coach.sets != game.sets || coach.reps != game.reps || coach.holdSeconds != game.holdSeconds ||
-                    !Application.CanStreamedLevelBeLoaded(coach.sceneName) ||
-                    !Application.CanStreamedLevelBeLoaded(game.sceneName)) return false;
-            }
+            if (!PreparePrescriptionPlan(plan)) return false;
+            if (Array.Exists(plan.actions, action => !Application.CanStreamedLevelBeLoaded(action.sceneName))) return false;
             plan.sessionId = Guid.NewGuid().ToString("N");
             plan.startedAt = DateTime.UtcNow.ToString("yyyy-MM-ddTHH:mm:ss.fffZ", System.Globalization.CultureInfo.InvariantCulture);
             plan.targetScene = plan.actions[0].sceneName;
@@ -174,8 +201,24 @@ namespace SpineRecovery.App
             return true;
         }
 
+        public static bool PreparePrescriptionPlan(TrainingPlan plan)
+        {
+            if (!PrescriptionSequence.IsValid(plan)) return false;
+            foreach (var action in plan.actions)
+                if (action.arTaskType == "coach_training")
+                    action.sceneName = SpineFlowTrainingSession.ResolveSceneForGender(action.sceneName, plan.gender == "male");
+            return true;
+        }
+
         public void ContinuePrescription()
         {
+            string next = AdvanceWithinPrescriptionItem();
+            if (next != null)
+            {
+                ScreenOrientationService.SetLandscape();
+                SceneManager.LoadScene(next, LoadSceneMode.Single);
+                return;
+            }
             if (!PrepareActionFeedback()) return;
             ScreenOrientationService.SetPortrait();
             SceneManager.LoadScene("AppShell", LoadSceneMode.Single);
@@ -183,7 +226,7 @@ namespace SpineRecovery.App
 
         private bool PrepareActionFeedback()
         {
-            if (!IsV2Prescription || !SpineFlowTrainingSession.CurrentPrescriptionGameCompleted || openingSurvey) return false;
+            if (!IsV2Prescription || !SpineFlowTrainingSession.CurrentPrescriptionGameCompleted || HasNextStepInItem || openingSurvey) return false;
             openingSurvey = true;
             SaveCheckpoint(SpineFlowTrainingSession.CaptureUnifiedResult());
             CurrentResult.feedbackPending = true;
@@ -205,7 +248,7 @@ namespace SpineRecovery.App
                 endReason = state.completed ? state.endReason : "", feedbackPending = state.completed || previous?.feedbackPending == true,
                 planJson = JsonUtility.ToJson(CurrentPlan),
                 replaySessionId = ReplaySessionContext.SessionId ?? previous?.replaySessionId,
-                feedbackActionIndex = IsV2Prescription ? actionOffset / 2 : 0,
+                feedbackActionIndex = IsV2Prescription ? CurrentItemIndex : 0,
                 actionFeedbacks = previous?.actionFeedbacks ?? Array.Empty<ActionTrainingFeedback>()
             };
             Persist();
@@ -243,7 +286,8 @@ namespace SpineRecovery.App
                     if (!row.feedbackPending || string.IsNullOrEmpty(row.planJson)) continue;
                     CurrentResult = row;
                     CurrentPlan = JsonUtility.FromJson<TrainingPlan>(row.planJson);
-                    actionOffset = row.feedbackActionIndex * 2;
+                    actionOffset = LegacyBilateralPairs ? row.feedbackActionIndex * 2 : IsV2Prescription ? Array.FindIndex(CurrentPlan.actions,
+                        a => a.prescriptionItemId == PrescriptionItems[row.feedbackActionIndex].prescriptionItemId) : 0;
                 }
             }
             if (CurrentPlan == null) return;
@@ -277,9 +321,7 @@ namespace SpineRecovery.App
             openingSurvey = false;
             if (CanContinueAfterFeedback)
             {
-                actionOffset += 2;
-                SpineFlowTrainingSession.AdvanceUnifiedPrescription(actionOffset);
-                return CurrentPlan.actions[actionOffset].sceneName;
+                return AdvanceStep();
             }
             ClearCurrentPlan();
             return null;

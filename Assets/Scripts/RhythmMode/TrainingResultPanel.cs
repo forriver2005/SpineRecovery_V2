@@ -34,7 +34,7 @@ public sealed class TrainingResultPanel : MonoBehaviour
         ReturnButton.onClick.AddListener(ReturnOrContinue);
         var training=SpineRecovery.App.AppBootstrap.Instance?.Training;
         bool prescribed=training?.IsV2Prescription==true;
-        var caption=Label(prescribed?(training.HasNextPrescriptionItem?"下一项训练":"完成训练"):"返回选择",new Vector2(0,-390),new Vector2(350,65),30);
+        var caption=Label(prescribed?"填写本动作问卷":"返回选择",new Vector2(0,-390),new Vector2(350,65),30);
         if(prescribed&&training.HasNextPrescriptionItem)
         {
             buttonRect.anchoredPosition+=Vector2.left*205;
@@ -42,7 +42,7 @@ public sealed class TrainingResultPanel : MonoBehaviour
             var at=new Vector2(205,-390);
             var rect=Box("Calibrate",at,buttonRect.sizeDelta,ReturnButton.targetGraphic.color);
             var calibrate=rect.gameObject.AddComponent<Button>();calibrate.targetGraphic=rect.GetComponent<Image>();
-            Label("校准并继续",at,rect.sizeDelta,30);
+            Label("校准后填写问卷",at,rect.sizeDelta,30);
             var calibration=gameObject.AddComponent<BetweenActionCalibrationPanel>();
             calibration.Initialize(font,()=>training.ContinuePrescription());
             calibrate.onClick.AddListener(()=>{if(SpineFlowTrainingSession.CurrentPrescriptionGameCompleted)calibration.Open();});

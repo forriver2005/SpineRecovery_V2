@@ -847,13 +847,13 @@ namespace SpineRecovery.App
         }
 
         /// <summary>Starts a fresh questionnaire for action <paramref name="actionNumber"/> of <paramref name="actionCount"/>.</summary>
-        public void Show(int actionNumber, int actionCount, string actionName, bool completed)
+        public void Show(int actionNumber, int actionCount, string actionName, bool completed, bool continueTraining = false)
         {
             intensity = -1;
             pain = -1;
-            chipLabel.text = "训练反馈";
+            chipLabel.text = "动作 " + actionNumber + "/" + actionCount;
             titleLabel.text = actionName + (completed ? " 完成" : " 已结束");
-            nextLabel.text = "保存反馈";
+            nextLabel.text = continueTraining ? "保存并继续下一动作" : actionNumber < actionCount ? "保存并继续" : "保存反馈";
             contentRect.anchoredPosition = Vector2.zero;
             RefreshNotice();
             Refresh();
@@ -866,7 +866,7 @@ namespace SpineRecovery.App
                 FontStyle.Bold, 0f, 0f, 84f, 27f);
             titleLabel = QuestionnaireUi.Label(content, "", 26, QuestionnaireUi.Accent, TextAnchor.MiddleLeft,
                 FontStyle.Bold, 20f, 58f, 350f, 36f);
-            QuestionnaireUi.Label(content, "记录本次训练感受，完成后查看训练记录", 14, QuestionnaireUi.Muted,
+            QuestionnaireUi.Label(content, "每个动作单独记录强度与疼痛感受", 14, QuestionnaireUi.Muted,
                 TextAnchor.MiddleLeft, FontStyle.Normal, 20f, 100f, 350f, 20f);
 
             BuildQuestionCard(content, 143f, "运动强度", "刚才这个动作，你感觉强度如何？", "0 休息", "10 最大",

@@ -13,6 +13,18 @@ namespace SpineRecovery.App
     }
 
     [Serializable]
+    public sealed class ActionTrainingFeedback
+    {
+        public int actionIndex;
+        public string actionId;
+        public string actionName;
+        public long prescriptionItemId;
+        public string recordedAt;
+        public string feeling;
+        public string difficulty;
+    }
+
+    [Serializable]
     public sealed class TrainingHistoryRecord
     {
         public string sessionId;
@@ -26,5 +38,7 @@ namespace SpineRecovery.App
         public string endReason;
         public string planJson;
         public string replaySessionId;
+        public int feedbackActionIndex;
+        public ActionTrainingFeedback[] actionFeedbacks = Array.Empty<ActionTrainingFeedback>();
     }
 }

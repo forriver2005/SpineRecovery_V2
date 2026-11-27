@@ -71,7 +71,8 @@ object UnifiedMobileBridge {
                 feedback.takeIf { row.optString("feedback").isNotBlank() }?.let {
                     PostTrainingFeedback(it[0], it.getOrElse(1) { "" })
                 }, row.optString("preTrainingEventId"), row.optString("planJson"),
-                row.optBoolean("feedbackPending"), row.optString("endReason"), row.optString("replaySessionId"))
+                row.optBoolean("feedbackPending"), row.optString("endReason"), row.optString("replaySessionId"),
+                row.optInt("feedbackActionIndex"), ActionTrainingFeedback.fromJson(row.optJSONArray("actionFeedbacks")))
         }
         val painRecords = objects(input.optJSONArray("painHistory")).map { row ->
             PainHistoryRecord(row.getString("id"), row.getString("recordedAt"), row.optInt("painLevel"),
@@ -107,8 +108,9 @@ object UnifiedMobileBridge {
             record.endReason.isNotBlank() && old.history.none { it.sessionId == record.sessionId && it.endReason == record.endReason }
         }
         val feedbackSubmitted = records.any { record ->
-            !record.feedbackPending && record.feedback != null &&
-                old.history.none { it.sessionId == record.sessionId && it.feedback == record.feedback && !it.feedbackPending }
+            (!record.feedbackPending && record.feedback != null &&
+                old.history.none { it.sessionId == record.sessionId && it.feedback == record.feedback && !it.feedbackPending }) ||
+                record.actionFeedbacks.any { feedback -> old.history.none { it.sessionId == record.sessionId && feedback in it.actionFeedbacks } }
         }
         main.post { sync.onUserChanged(syncable(saved), immediate = finalizedSessionSaved || feedbackSubmitted) }
     }
@@ -354,7 +356,8 @@ object UnifiedMobileBridge {
                     .put("actionId", result?.optJSONArray("actionResults")?.optJSONObject(0)?.optString("actionId").orEmpty())
                     .put("preTrainingEventId", row.preTrainingEventId).put("feedback", row.feedback?.let { "${it.feeling} / ${it.difficulty}" }.orEmpty())
                     .put("completed", result?.optBoolean("completed") ?: false).put("planJson", row.planJson)
-                    .put("feedbackPending", row.feedbackPending).put("endReason", row.endReason).put("replaySessionId", row.replaySessionId))
+                    .put("feedbackPending", row.feedbackPending).put("endReason", row.endReason).put("replaySessionId", row.replaySessionId)
+                    .put("feedbackActionIndex", row.feedbackActionIndex).put("actionFeedbacks", row.actionFeedbacks.toFeedbackJson()))
             } })
     }
 

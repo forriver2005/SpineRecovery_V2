@@ -51,6 +51,38 @@ class LanTrainingSyncTest {
         assertSame(first, nextPatientRequest(queued))
     }
 
+    @Test fun eachActionHasAnIndependentReceiptEvenForTheSameMovement() {
+        val first = ActionTrainingFeedback(0, "deadbug", "死虫", 11,
+            "2026-11-27T10:00:00Z", "疼痛 1", "强度 3")
+        val second = first.copy(actionIndex = 1, prescriptionItemId = 12, feeling = "疼痛 2")
+        val record = saved.copy(actionFeedbacks = listOf(first, second),
+            feedback = PostTrainingFeedback("legacy", "legacy"))
+        val diff = buildPendingDiff(user(record), PatientSyncClient.SyncSnapshot(), patient)
+        val answers = diff.syncBody!!.getJSONArray("postTrainingFeedbacks")
+        assertEquals(2, answers.length())
+        assertNotEquals(answers.getJSONObject(0).getString("eventId"), answers.getJSONObject(1).getString("eventId"))
+        assertEquals(12L, answers.getJSONObject(1).getLong("prescriptionItemId"))
+        assertEquals("疼痛 2", answers.getJSONObject(1).getString("feeling"))
+        assertEquals(listOf(first, second), ActionTrainingFeedback.fromJson(record.actionFeedbacks.toFeedbackJson()))
+        val accepted = PatientSyncClient.SyncSnapshot(syncedSessionIds = setOf(record.sessionId),
+            questionnaireHashes = diff.newQuestionnaireHashes)
+        assertNull(buildPendingDiff(user(record), accepted, patient).syncBody?.optJSONArray("postTrainingFeedbacks"))
+    }
+
+    @Test fun laterActionAnswerIsSyncedAfterSessionReceiptWithoutResendingEarlierAnswer() {
+        val first = ActionTrainingFeedback(0, "deadbug", "死虫", 11,
+            "2026-11-27T10:00:00Z", "疼痛 1", "强度 3")
+        val second = first.copy(actionIndex = 1, actionId = "birddog", actionName = "鸟狗", prescriptionItemId = 12)
+        val accepted = PatientSyncClient.SyncSnapshot(syncedSessionIds = setOf(saved.sessionId),
+            questionnaireHashes = mapOf(first.eventId(saved.sessionId) to "sent"))
+        val diff = buildPendingDiff(user(saved.copy(actionFeedbacks = listOf(first, second))), accepted, patient)
+        assertTrue(diff.uploadRecords.isEmpty())
+        val answers = diff.syncBody!!.getJSONArray("postTrainingFeedbacks")
+        assertEquals(1, answers.length())
+        assertEquals(second.eventId(saved.sessionId), answers.getJSONObject(0).getString("eventId"))
+        assertEquals("鸟狗", answers.getJSONObject(0).getString("actionName"))
+    }
+
     @Test fun discoveryRequiresAMatchingReplyAndVerifiedHospitalIdentity() {
         val cert = "public certificate".toByteArray()
         val trust = LocalServerTrust(LocalServerProtocol.sha256(cert), "hospital-a", "hospital-a")

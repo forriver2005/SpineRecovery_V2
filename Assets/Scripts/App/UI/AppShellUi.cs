@@ -765,12 +765,12 @@ namespace SpineRecovery.App
         public void ShowPostTrainingSurvey()
         {
             TrainingPlan plan = bootstrap != null && bootstrap.Training != null ? bootstrap.Training.CurrentPlan : null;
-            // The AR scene runs one action per launch today, so the survey that
-            // follows it always belongs to the last (or only) action of the plan.
-            postActionCount = plan != null && plan.actions != null ? Mathf.Max(1, plan.prescriptionContractVersion == 2 ? plan.actions.Length / 2 : plan.actions.Length) : 1;
-            postActionNumber = postActionCount;
-            if (postActionScreen != null) postActionScreen.Show(postActionNumber, postActionCount, DisplayActionName(plan),
-                bootstrap?.Training.CurrentResult?.completed == true);
+            postActionCount = bootstrap?.Training.FeedbackActionCount ?? 1;
+            postActionNumber = (bootstrap?.Training.FeedbackActionIndex ?? 0) + 1;
+            if (postActionScreen != null) postActionScreen.Show(postActionNumber, postActionCount,
+                bootstrap?.Training.FeedbackActionName ?? DisplayActionName(plan),
+                bootstrap?.Training.CurrentResult?.completed == true || bootstrap?.Training.CanContinueAfterFeedback == true,
+                bootstrap?.Training.CanContinueAfterFeedback == true);
             if (bootstrap != null && bootstrap.Router != null)
                 bootstrap.Router.Navigate(AppRoute.PostTrainingSurvey);
         }
@@ -786,7 +786,8 @@ namespace SpineRecovery.App
         {
             // Keep the existing feedback transport. Its separator is " / ", so
             // score captions must not contain that separator themselves.
-            bootstrap.Training.SubmitFeedback("疼痛 " + pain + "（0–10）", "运动强度 " + intensity + "（0–10）");
+            if (bootstrap.Training.SubmitFeedback("疼痛 " + pain + "（0–10）", "运动强度 " + intensity + "（0–10）")) return;
+            if (bootstrap.Training.HasPendingFeedback) { ShowPostTrainingSurvey(); return; }
             RefreshHistorySummary();
             bootstrap.Router.Navigate(AppRoute.History);
         }

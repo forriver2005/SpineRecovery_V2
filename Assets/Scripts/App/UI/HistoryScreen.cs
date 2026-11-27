@@ -85,7 +85,7 @@ namespace SpineRecovery.App
 
         private float Training(TrainingHistoryRecord[] records, float y)
         {
-            float height = 56 + (records.Length == 0 ? 92 : records.Sum(r => r.sessionId == expandedSession ? 306 : 146));
+            float height = 56 + (records.Length == 0 ? 92 : records.Sum(r => r.sessionId == expandedSession ? 262 + FeedbackHeight(r) : 146));
             var card = QuestionnaireUi.Card(content, 20, y, 350, height);
             MobileUi.Text(card, "训练记录", 20, 16, 200, 26, 17, true);
             MobileUi.Text(card, "共 " + records.Length + " 次", 230, 16, 100, 26, 13, false, QuestionnaireUi.Muted, TextAnchor.MiddleRight);
@@ -99,7 +99,7 @@ namespace SpineRecovery.App
             foreach (var row in records)
             {
                 bool expanded = row.sessionId == expandedSession;
-                var tile = QuestionnaireUi.Box(card, "TrainingRecord", QuestionnaireUi.OptionBackground, 14, 20, top, 310, expanded ? 292 : 132);
+                var tile = QuestionnaireUi.Box(card, "TrainingRecord", QuestionnaireUi.OptionBackground, 14, 20, top, 310, expanded ? 248 + FeedbackHeight(row) : 132);
                 var hit = QuestionnaireUi.MakeButton(tile.transform, "RecordDetails", Color.clear, 12, 0, 0, 310, 132,
                     () => { expandedSession = expanded ? null : row.sessionId; float scroll = content.anchoredPosition.y; Refresh(); content.anchoredPosition = new Vector2(0, scroll); });
                 MobileUi.Text(hit.transform, MobileUi.Date(row.completedAt), 14, 9, 220, 26, 15, true);
@@ -122,14 +122,20 @@ namespace SpineRecovery.App
                 {
                     string actions = plan?.actions == null ? ActionName(row.actionId) : string.Join("、", plan.actions.Where(a => a != null).Select(a => string.IsNullOrEmpty(a.actionName) ? ActionName(a.actionId) : a.actionName));
                     MobileUi.Text(tile.transform, "本次动作：" + actions, 14, 140, 282, 48, 13);
-                    MobileUi.Text(tile.transform, "训练反馈：" + (string.IsNullOrWhiteSpace(row.feedback) ? "暂无反馈" : row.feedback), 14, 192, 282, 44, 13, false, QuestionnaireUi.Muted);
-                    var view = QuestionnaireUi.PillButton(tile.transform, "查看本次回放", 14, 244, 282, 36, false, () => replay(row.replaySessionId));
+                    string feedback = row.actionFeedbacks != null && row.actionFeedbacks.Length > 0 ?
+                        string.Join("\n", row.actionFeedbacks.OrderBy(a => a.actionIndex).Select(a =>
+                            (a.actionIndex + 1) + ". " + a.actionName + "\n" + a.difficulty + " · " + a.feeling)) :
+                        "训练反馈：" + (string.IsNullOrWhiteSpace(row.feedback) ? "暂无反馈" : row.feedback);
+                    MobileUi.Text(tile.transform, feedback, 14, 192, 282, FeedbackHeight(row), 13, false, QuestionnaireUi.Muted);
+                    var view = QuestionnaireUi.PillButton(tile.transform, "查看本次回放", 14, 200 + FeedbackHeight(row), 282, 36, false, () => replay(row.replaySessionId));
                     view.interactable = row.completed && !string.IsNullOrEmpty(row.replaySessionId);
                 }
-                top += expanded ? 306 : 146;
+                top += expanded ? 262 + FeedbackHeight(row) : 146;
             }
             return y + height + 16;
         }
+
+        private static int FeedbackHeight(TrainingHistoryRecord row) => Math.Max(44, (row.actionFeedbacks?.Length ?? 0) * 64);
 
         private static void Metric(Transform tile, float x, string label, string value, float width)
         {

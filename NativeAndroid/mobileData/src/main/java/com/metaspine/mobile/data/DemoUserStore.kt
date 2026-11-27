@@ -84,7 +84,9 @@ data class TrainingHistoryRecord(
     val planJson: String = "",
     val feedbackPending: Boolean = false,
     val endReason: String = "",
-    val replaySessionId: String = ""
+    val replaySessionId: String = "",
+    val feedbackActionIndex: Int = 0,
+    val actionFeedbacks: List<ActionTrainingFeedback> = emptyList(),
 )
 
 data class RememberedLogin(
@@ -554,6 +556,8 @@ class DemoUserStore(
                             .put("feedbackPending", record.feedbackPending)
                             .put("endReason", record.endReason)
                             .put("replaySessionId", record.replaySessionId)
+                            .put("feedbackActionIndex", record.feedbackActionIndex)
+                            .put("actionFeedbacks", record.actionFeedbacks.toFeedbackJson())
                             .put("feedback", record.feedback?.let { feedback ->
                                 JSONObject()
                                     .put("feeling", feedback.feeling)
@@ -617,6 +621,8 @@ class DemoUserStore(
                     feedbackPending = item.optBoolean("feedbackPending"),
                     endReason = item.optString("endReason"),
                     replaySessionId = item.optString("replaySessionId"),
+                    feedbackActionIndex = item.optInt("feedbackActionIndex"),
+                    actionFeedbacks = ActionTrainingFeedback.fromJson(item.optJSONArray("actionFeedbacks")),
                     feedback = item.optJSONObject("feedback")?.let { feedback ->
                         PostTrainingFeedback(
                             feeling = feedback.optString("feeling"),

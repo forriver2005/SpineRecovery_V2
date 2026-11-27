@@ -397,7 +397,7 @@ internal fun buildPendingDiff(
     // 其余训练的 post_training 问卷永久缺失。改为数组，每条反馈一个事件（eventId 用 sessionId，重试稳定）
     val feedbacks = user.history.distinctBy { it.sessionId }.filter { record ->
         val key = "post:${record.sessionId}"
-        !record.feedbackPending && record.feedback != null && TrainingSyncClient.isUploadable(record) &&
+        record.actionFeedbacks.isEmpty() && !record.feedbackPending && record.feedback != null && TrainingSyncClient.isUploadable(record) &&
             snapshot.questionnaireHashes[key] != "sent" &&
             (record.sessionId !in snapshot.syncedSessionIds || snapshot.questionnaireHashes[key] == "pending")
     }.mapNotNull { record ->
@@ -408,6 +408,15 @@ internal fun buildPendingDiff(
                 .put("difficulty", feedback.difficulty)
                 .put("recordedAt", record.completedAt)
                 .put("eventId", "post:${record.sessionId}")
+        }
+    }.toMutableList()
+    // Each completed answer is immutable and has its own receipt, including answers added after session upload.
+    for (record in user.history.distinctBy { it.sessionId }.filter(TrainingSyncClient::isUploadable)) {
+        for (feedback in record.actionFeedbacks.distinctBy { it.actionIndex }) {
+            val eventId = feedback.eventId(record.sessionId)
+            if (snapshot.questionnaireHashes[eventId] == "sent") continue
+            feedbacks.add(feedback.toJson().put("eventId", eventId).put("sessionId", record.sessionId))
+            newQuestionnaireHashes[eventId] = "sent"
         }
     }
     if (feedbacks.isNotEmpty()) {

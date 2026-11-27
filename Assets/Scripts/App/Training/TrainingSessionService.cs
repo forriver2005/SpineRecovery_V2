@@ -1,5 +1,6 @@
 using System;
 using System.IO;
+using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 
@@ -12,6 +13,7 @@ namespace SpineRecovery.App
         {
             public TrainingPlan plan;
             public TrainingHistoryRecord result;
+            public int actionOffset;
         }
 
         [Serializable]
@@ -23,6 +25,26 @@ namespace SpineRecovery.App
         }
 
         private int actionOffset;
+        private bool openingSurvey;
+        public int FeedbackActionCount => IsV2Prescription ? CurrentPlan.actions.Length / 2 : 1;
+        public int FeedbackActionIndex
+        {
+            get
+            {
+                if (CurrentResult == null) return -1;
+                int last = CurrentResult.completed ? FeedbackActionCount - 1 :
+                    Mathf.Min(CurrentResult.feedbackActionIndex, FeedbackActionCount - 1);
+                for (int index = 0; index <= last; index++)
+                    if (!Array.Exists(CurrentResult.actionFeedbacks ?? Array.Empty<ActionTrainingFeedback>(), row => row.actionIndex == index)) return index;
+                return -1;
+            }
+        }
+        private TrainingAction FeedbackAction => CurrentPlan?.actions != null && CurrentPlan.actions.Length > 0 ?
+            CurrentPlan.actions[Mathf.Clamp(IsV2Prescription ? FeedbackActionIndex * 2 : 0, 0, CurrentPlan.actions.Length - 1)] : null;
+        public string FeedbackActionName => !string.IsNullOrEmpty(FeedbackAction?.actionName) ? FeedbackAction.actionName :
+            GameWorkoutPlan.ActionName(FeedbackAction?.actionId ?? CurrentPlan?.actionId);
+        public bool CanContinueAfterFeedback => IsV2Prescription && HasNextPrescriptionItem &&
+            string.IsNullOrEmpty(CurrentResult?.endReason) && SpineFlowTrainingSession.CurrentPrescriptionGameCompleted;
         public bool IsV2Prescription => IsPrescribedTraining && CurrentPlan.prescriptionContractVersion == 2;
         // The active item advances by a coach/game pair; both modes use the same prescribed difficulty.
         public string CurrentPrescriptionDifficulty => IsV2Prescription && CurrentPlan.actions != null &&
@@ -52,6 +74,7 @@ namespace SpineRecovery.App
             if (!JsonFileStore.TryLoad(SessionFile, out SavedSession saved)) return;
             CurrentPlan = saved.plan;
             CurrentResult = saved.result;
+            actionOffset = saved.actionOffset;
             // A restarted process cannot continue an in-memory tracking attempt.
             if (CurrentResult != null && !CurrentResult.completed && string.IsNullOrEmpty(CurrentResult.endReason))
             {
@@ -65,6 +88,8 @@ namespace SpineRecovery.App
         {
             CurrentPlan = null;
             CurrentResult = null;
+            actionOffset = 0;
+            openingSurvey = false;
             SpineFlowTrainingSession.EndUnifiedTraining();
             string path = JsonFileStore.PathFor(SessionFile);
             if (File.Exists(path)) File.Delete(path);
@@ -151,29 +176,37 @@ namespace SpineRecovery.App
 
         public void ContinuePrescription()
         {
-            if (!IsV2Prescription || !SpineFlowTrainingSession.CurrentPrescriptionGameCompleted) return;
-            if (!HasNextPrescriptionItem)
-            {
-                FinishAndReturn();
-                return;
-            }
-            actionOffset += 2;
-            SpineFlowTrainingSession.AdvanceUnifiedPrescription(actionOffset);
-            SceneManager.LoadScene(CurrentPlan.actions[actionOffset].sceneName);
+            if (!PrepareActionFeedback()) return;
+            ScreenOrientationService.SetPortrait();
+            SceneManager.LoadScene("AppShell", LoadSceneMode.Single);
+        }
+
+        private bool PrepareActionFeedback()
+        {
+            if (!IsV2Prescription || !SpineFlowTrainingSession.CurrentPrescriptionGameCompleted || openingSurvey) return false;
+            openingSurvey = true;
+            SaveCheckpoint(SpineFlowTrainingSession.CaptureUnifiedResult());
+            CurrentResult.feedbackPending = true;
+            Persist();
+            SaveToUser();
+            return true;
         }
 
         public void SaveCheckpoint(string resultJson)
         {
             if (CurrentPlan == null || string.IsNullOrEmpty(resultJson)) return;
             ResultState state = JsonUtility.FromJson<ResultState>(resultJson);
+            TrainingHistoryRecord previous = CurrentResult;
             CurrentResult = new TrainingHistoryRecord
             {
                 sessionId = CurrentPlan.sessionId, actionId = CurrentPlan.actionId,
                 completedAt = state.createdAt, completed = state.completed,
                 resultJson = resultJson, preTrainingEventId = CurrentPlan.preTrainingEventId,
-                endReason = state.completed ? state.endReason : "", feedbackPending = state.completed,
+                endReason = state.completed ? state.endReason : "", feedbackPending = state.completed || previous?.feedbackPending == true,
                 planJson = JsonUtility.ToJson(CurrentPlan),
-                replaySessionId = ReplaySessionContext.SessionId ?? CurrentResult?.replaySessionId
+                replaySessionId = ReplaySessionContext.SessionId ?? previous?.replaySessionId,
+                feedbackActionIndex = IsV2Prescription ? actionOffset / 2 : 0,
+                actionFeedbacks = previous?.actionFeedbacks ?? Array.Empty<ActionTrainingFeedback>()
             };
             Persist();
             SaveToUser();
@@ -210,6 +243,7 @@ namespace SpineRecovery.App
                     if (!row.feedbackPending || string.IsNullOrEmpty(row.planJson)) continue;
                     CurrentResult = row;
                     CurrentPlan = JsonUtility.FromJson<TrainingPlan>(row.planJson);
+                    actionOffset = row.feedbackActionIndex * 2;
                 }
             }
             if (CurrentPlan == null) return;
@@ -217,14 +251,38 @@ namespace SpineRecovery.App
             if (HasPendingFeedback) AppBootstrap.Instance.GetComponent<AppShellUi>()?.ShowPostTrainingSurvey();
         }
 
-        public void SubmitFeedback(string feeling, string difficulty)
+        public bool SubmitFeedback(string feeling, string difficulty)
         {
-            if (CurrentResult == null) return;
-            CurrentResult.feedback = feeling + " / " + difficulty;
-            CurrentResult.feedbackPending = false;
+            string nextScene = RecordFeedback(feeling, difficulty);
+            if (string.IsNullOrEmpty(nextScene)) return false;
+            ScreenOrientationService.SetLandscape();
+            SceneManager.LoadScene(nextScene, LoadSceneMode.Single);
+            return true;
+        }
+
+        private string RecordFeedback(string feeling, string difficulty)
+        {
+            if (!HasPendingFeedback || FeedbackActionIndex < 0) return null;
+            int index = FeedbackActionIndex;
+            TrainingAction action = FeedbackAction;
+            var answers = new List<ActionTrainingFeedback>(CurrentResult.actionFeedbacks ?? Array.Empty<ActionTrainingFeedback>());
+            answers.Add(new ActionTrainingFeedback { actionIndex = index, actionId = action?.actionId ?? CurrentPlan.actionId,
+                actionName = FeedbackActionName, prescriptionItemId = action?.prescriptionItemId ?? 0,
+                recordedAt = DateTimeOffset.UtcNow.ToString("O"), feeling = feeling, difficulty = difficulty });
+            CurrentResult.actionFeedbacks = answers.ToArray();
+            CurrentResult.feedbackPending = FeedbackActionIndex >= 0;
             Persist();
             SaveToUser();
+            if (HasPendingFeedback) return null;
+            openingSurvey = false;
+            if (CanContinueAfterFeedback)
+            {
+                actionOffset += 2;
+                SpineFlowTrainingSession.AdvanceUnifiedPrescription(actionOffset);
+                return CurrentPlan.actions[actionOffset].sceneName;
+            }
             ClearCurrentPlan();
+            return null;
         }
 
         public void DeferFeedback()
@@ -232,6 +290,7 @@ namespace SpineRecovery.App
             // Results remain durable; the next login can resume this questionnaire.
             Persist();
             SaveToUser();
+            openingSurvey = false;
         }
 
         private void SaveToUser()
@@ -245,7 +304,7 @@ namespace SpineRecovery.App
 
         private void Persist()
         {
-            JsonFileStore.Save(SessionFile, new SavedSession { plan = CurrentPlan, result = CurrentResult });
+            JsonFileStore.Save(SessionFile, new SavedSession { plan = CurrentPlan, result = CurrentResult, actionOffset = actionOffset });
         }
     }
 }

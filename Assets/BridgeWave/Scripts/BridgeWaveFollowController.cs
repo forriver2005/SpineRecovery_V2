@@ -7,7 +7,7 @@ namespace BridgeWave
 {
     /// <summary>Sensor-only transport and geometric judgement with the shared training menu.</summary>
     [DefaultExecutionOrder(300)]
-    public sealed class BridgeWaveFollowController : MonoBehaviour
+    public sealed partial class BridgeWaveFollowController : MonoBehaviour
     {
         public BridgeWaveGame game;
         public BridgeWaveHeightInput input;
@@ -28,6 +28,7 @@ namespace BridgeWave
         public enum RunState { Ready, Countdown, Playing, Paused, Finished }
         public RunState State { get; private set; }
         public BridgeWaveSession Session { get; private set; }
+        public TrainingResultPanel ResultPanel { get; private set; }
         public float CountdownRemaining => countdown;
         public bool IsFlowTest => State == RunState.Ready ? skipCalibrationForFlowTest : sessionFlowTest;
         public bool CanStart => State == RunState.Ready && (skipCalibrationForFlowTest || ReadyForTraining) &&
@@ -38,6 +39,7 @@ namespace BridgeWave
 
         void Awake()
         {
+            ResultPanel = TrainingResultPanel.Create(startLabel.font, ReturnToSetup);
             game.controlledClock = true;
             ResetSession();
             startMenu.TrainingStartAllowed = () => CanStart;
@@ -54,6 +56,7 @@ namespace BridgeWave
         }
         void OnDestroy()
         {
+            if (ResultPanel != null) Destroy(ResultPanel.gameObject);
             if (startMenu != null) { startMenu.TrainingStartAllowed = null; startMenu.ExternalTrainingStart = null; }
         }
         public bool SetRepetitionDose(int repetitions, out string error)
@@ -72,6 +75,7 @@ namespace BridgeWave
                 game.speedPx, game.bottomY - game.topY, game.stepPx);
             game.presentationTime = 0;
             game.ResetFeedback();
+            ResetFinalScore();
         }
         public void Begin()
         {
@@ -100,6 +104,7 @@ namespace BridgeWave
         }
         public void ReturnToSetup()
         {
+            ResultPanel.Hide();
             State = RunState.Ready;
             input.EditingAllowed = true;
             input.CancelCalibration();
@@ -119,11 +124,14 @@ namespace BridgeWave
             }
             if (State == RunState.Playing)
             {
+                double before = Session.Elapsed;
                 bool pulse = Session.Advance(Time.unscaledDeltaTime, input.Height, input.Valid && !IsFlowTest);
+                ObserveFinalScore(before,Session.Elapsed,Time.unscaledDeltaTime);
                 game.presentationTime = Session.Elapsed;
                 if (pulse) game.PulseHit();
                 if (Session.Finished)
                 {
+                    FinishFinalScore();
                     State = RunState.Finished;
                     Completed?.Invoke();
                 }
@@ -137,7 +145,9 @@ namespace BridgeWave
         {
             bool ready = State == RunState.Ready;
             visualRoot.SetActive(!ready);
-            finishPanel.SetActive(State == RunState.Finished);
+            finishPanel.SetActive(false);
+            if(State == RunState.Finished) ResultPanel.Show("臀桥",FinalScore,IsFlowTest);
+            else ResultPanel.Hide();
             calibrationButton.gameObject.SetActive(!IsFlowTest);
             calibrationStatus.gameObject.SetActive(!IsFlowTest);
             coachPreview.SetTrainingVisible(!ready && State != RunState.Finished);
@@ -166,9 +176,6 @@ namespace BridgeWave
             else if (game.PhaseAt(Session.Elapsed) == BridgeWaveGame.Phase.Rest) judgmentText.text = "放平准备";
             else judgmentText.text = game.inTrack ? "HIT · 轨道内" : input.Height > game.Level(Session.Elapsed) ? "偏高 · 缓慢放低" : "偏低 · 适当抬高";
             judgmentText.color = game.inTrack ? new Color(1, .84f, .42f) : Color.white;
-            float percent = Session.SampledSeconds > 0 ? Session.InTrackSeconds / Session.SampledSeconds * 100 : 0;
-            resultText.text = IsFlowTest ? $"流程测试完成\n\n已播放 {game.totalCount} 次标准轨道\n本次未记录训练成绩" : "本组训练完成\n\n" +
-                $"轨道完成 {game.totalCount} 次   ·   轨道内 {percent:0}%\n有效跟随 {Session.InTrackSeconds:0.0} 秒   ·   {Session.Hits} HIT";
         }
     }
 }

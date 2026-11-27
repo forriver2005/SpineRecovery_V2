@@ -23,7 +23,10 @@ public static class TrainingAssessmentVerification
     static TrainingResultView view;
     static TrainingAssessmentVerification(){if(SessionState.GetBool(Flag,false))EditorApplication.update+=Tick;}
     [MenuItem("Tools/Training/Verify Percentage Settlement")]
-    public static void Run()
+    public static void Run() => FinalScoringV2Verification.Run();
+
+    // Kept for diagnosing historical reports; not the game result implementation.
+    private static void RunLegacyDiagnostics()
     {
         Directory.CreateDirectory(Output);File.WriteAllText(Output+"verification.txt","Assessment v1. Synthetic replay; no wearable or clinical validation.\n");
         PureTests();TrainingUsageScenarios.Begin();EditorSceneManager.OpenScene("Assets/Scenes/"+Scenes[0]+".unity");

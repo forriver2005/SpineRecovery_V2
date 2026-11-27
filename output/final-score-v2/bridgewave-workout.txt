@@ -1,0 +1,14 @@
+Workout integration using synthetic patient poses and legacy completion events.
+PASS bridge workout waits for fresh data and stable supine calibration before automatic Start.
+PASS final score for 1 repetitions: 100, return=100.0.
+PASS bridge action 0, set 1: exact 1 repetitions completed.
+PASS existing 30-second group rest prevents manual restart.
+PASS final score for 1 repetitions: 100, return=100.0.
+PASS bridge action 0, set 2: exact 1 repetitions completed.
+INFO legacy scene calibration is an editor fixture; completion is injected after the real countdown.
+PASS transition into DeadBug, real Start/countdown, completion dispatch and return to bridge.
+PASS bridge workout waits for fresh data and stable supine calibration before automatic Start.
+PASS final score for 3 repetitions: 100, return=100.0.
+PASS bridge action 2, set 1: exact 3 repetitions completed.
+PASS plan completed: 2 x 1 bridge, 1 DeadBug set, 1 x 3 bridge; aliases, doses and difficulties.
+PASS Return to setup during countdown cancels workout and returns to preparation with no delayed restart.

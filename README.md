@@ -19,6 +19,10 @@
 
 游戏支持医生动作串。动作串从首组前的准备倒计时开始，每组完成后休息30秒，再按处方动作、难度、组数和次数切换；`hipthrust` 映射到臀桥新评分场景；`hipthrust_curve`（或 `bridgewave`）进入小球轨道臀桥，支持 `sets` 与 `reps`，并要求躺姿校准和有效传感器信号。接入参数见 [臀桥轨道说明](Assets/BridgeWave/INTEGRATION.md)。鸟狗与死虫保留原有评分检查；新游戏通过对应的实时传感器输入和动作评分器计分。新评分规则和处方接入方法见 [HIPTHRUST_NEW_RULES.md](HIPTHRUST_NEW_RULES.md)。
 
+## 最终总分与结算界面
+
+所有游戏统一使用训练报告页，准备界面不显示上一组成绩。往复类按“到位/目标保持 80% + 往复过程 5% + 回位 15%”逐次汇总；保持类按规定保持窗口内的合格时间占比计分，累计与连续保持分别展示。具体动作评分、HIT 和传感器准入保持原样。公式、适用场景、数据不足处理及回归入口见 [FINAL_SCORING_V2.md](FINAL_SCORING_V2.md)。
+
 ## 录制动画与手脚方向
 
 资源位于 `Assets/Movements/Recorded20261018/`，全部为 30 fps。完整 FBX 未修改；`*.coachrecording` 是原始 `.motion.json` 改扩展名后的同一内容，来源和校验值见 `*.source.json`。游戏分段及肢体配置见 `*.phases.json`。

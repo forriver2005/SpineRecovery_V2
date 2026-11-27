@@ -121,6 +121,8 @@ namespace BridgeWave.EditorTools
                             completionHandler=()=>
                             {
                                 completed++;
+                                Check(ui.FinalScore.CanPublish&&ui.FinalScore.Score>=90&&ui.FinalScore.ReturnQuality>=90,"Custom repetition dose did not settle all endpoint windows");
+                                report+=$"PASS final score for {action.reps} repetitions: {ui.FinalScore.Score}, return={ui.FinalScore.ReturnQuality:0.0}.\n";
                                 int next=session.ActionIndex,sets=session.CompletedSets;
                                 session.OnSetCompleted(entry);
                                 Check(next==session.ActionIndex&&sets==session.CompletedSets,"Duplicate completion advanced twice");

@@ -22,7 +22,7 @@ namespace TaikoNight
     /// Taiko Night prefab supplies the visual game layer.
     /// </summary>
     [DefaultExecutionOrder(-100)]
-    public sealed class TaikoNightActionRuntime : MonoBehaviour
+    public sealed partial class TaikoNightActionRuntime : MonoBehaviour
     {
         public TaikoNightActionKind actionKind;
         public DeadBugStartMenuController menu;
@@ -58,6 +58,7 @@ namespace TaikoNight
         public bool IsCountingDown => countdownRunning;
         public int RepetitionCount => repetitionCount;
         public int CompletedRepetitions => completedRepetitions;
+        public TrainingResultPanel ResultPanel { get; private set; }
 
         private void Awake()
         {
@@ -81,6 +82,7 @@ namespace TaikoNight
             avatar.SetPositionAndRotation(Vector3.zero, Quaternion.identity);
             avatar.localScale = Vector3.one;
             entry = FindObjectOfType<GameWorkoutScene>();
+            ResultPanel = TrainingResultPanel.Create(font, () => { StopTraining(); selection.ResetResult(); });
             ConfigureAction();
             BuildOverlay();
             card = gameObject.AddComponent<TaikoNightCoachCard>();
@@ -102,6 +104,7 @@ namespace TaikoNight
 
         private void OnDestroy()
         {
+            if (ResultPanel != null) Destroy(ResultPanel.gameObject);
             if (scorer != null) scorer.RoundCompleted -= OnRoundCompleted;
             TaikoNightPracticeClock.IsPaused = false;
             DesignSpace.ExternalNow = null;
@@ -152,6 +155,8 @@ namespace TaikoNight
         {
             if (motion == null || !motion.IsReady || running || countdownRunning ||
                 !HasFreshTracker()) return false;
+            ResultPanel.Hide();
+            BeginFinalScore();
             completedRepetitions = 0;
             lastCompletedScore = 0f;
             clock = 0f;
@@ -171,6 +176,7 @@ namespace TaikoNight
 
         private void StopTraining()
         {
+            ResultPanel?.Hide();
             TaikoNightPracticeClock.IsPaused = running = countdownRunning = false;
             scorer.CancelSession();
             motion.ReturnIdle();
@@ -189,6 +195,7 @@ namespace TaikoNight
 
         public void SetWorkoutDifficulty(string key)
         {
+            ResultPanel?.Hide();
             SelectDifficulty(key);
             selection.SyncDifficulty(difficultyKey);
             SetMenuRootVisible(false);
@@ -240,11 +247,13 @@ namespace TaikoNight
             double extraBefore = HipThrustPhaseTimeline.ConsumedHoldExtension(previous, top, lower, TaikoNightChart.AddedHoldSeconds);
             double extraNow = HipThrustPhaseTimeline.ConsumedHoldExtension(clock, top, lower, TaikoNightChart.AddedHoldSeconds);
             motion.Tick((float)(clock - previous - (extraNow - extraBefore)));
+            ObserveFinalScore(Time.deltaTime);
             if (motion.HasReachedSegmentEnd())
             {
                 if (playbackSegment == 1) { playbackSegment = 2; motion.PlaySegment(2); }
                 else
                 {
+                    FinishFinalRepetition();
                     completedRepetitions++;
                     if (completedRepetitions < repetitionCount)
                     {
@@ -256,10 +265,9 @@ namespace TaikoNight
                         chart.SetPlayerNotes(new[] { new Vector2(phaseSeconds.x, phaseSeconds.x + phaseSeconds.y) });
                         return;
                     }
-                    bool measured = scorer.TrackingAvailable;
-                    float finalScore = Mathf.Max(scorer.LastRoundScore, lastCompletedScore);
+                    FinalScore.Finish();
                     StopTraining();
-                    selection.SetResult(measured ? $"本轮得分　{Mathf.FloorToInt(finalScore)}" : "示范完成 · 无动作数据");
+                    ShowFinalResult();
                     Completed?.Invoke();
                 }
             }
@@ -330,6 +338,7 @@ namespace TaikoNight
         {
             if (!running) return;
             TaikoNightPracticeClock.IsPaused = !TaikoNightPracticeClock.IsPaused;
+            if (TaikoNightPracticeClock.IsPaused) FinalScore.BreakContinuity();
             if (TaikoNightPracticeClock.IsPaused) motion.Freeze(); else motion.Resume();
             SetPausePanel(TaikoNightPracticeClock.IsPaused);
         }

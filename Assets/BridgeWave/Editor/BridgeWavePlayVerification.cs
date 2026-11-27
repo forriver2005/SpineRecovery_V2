@@ -194,9 +194,12 @@ namespace BridgeWave.EditorTools
                     if(ui.Session.Elapsed>5.7f&&ui.Session.Elapsed<5.8f){CheckCoachPhase(BridgeWaveGame.Phase.Lower);Capture("smooth-lower-hit");}
                     if(ui.State==BridgeWaveFollowController.RunState.Finished)
                     {
-                        ui.RefreshHud();Check(ui.finishPanel.activeSelf&&ui.game.counterText.text=="4","End panel / count incorrect");Capture("result");
+                        ui.RefreshHud();Check(ui.ResultPanel.gameObject.activeInHierarchy&&!ui.finishPanel.activeSelf&&ui.game.counterText.text=="4","End panel / count incorrect");Capture("result",1688,950);Capture("result-wide",1688,780);Capture("result-4x3",1024,768);
+                        Check(ui.FinalScore.Kind==FinalTrainingScore.Mode.Repetition&&ui.FinalScore.CanPublish,"BridgeWave final score mode/data coverage");
+                        Check(ui.FinalScore.Score>=70&&ui.ResultPanel.ScoreLabel.text==ui.FinalScore.Score.ToString(),"BridgeWave v2 result not visible");
+                        report+=$"PASS final v2 score={ui.FinalScore.Score}, target={ui.FinalScore.TargetQuality:0.0}, process={ui.FinalScore.ProcessQuality:0.0}, return={ui.FinalScore.ReturnQuality:0.0}.\n";
                         report+=$"PASS four standard-motion tracks completed; {ui.Session.Hits} pulses, {ui.Session.InTrackSeconds:0.00}s in corridor.\n";
-                        ui.replayButton.onClick.Invoke();Check(ui.State==BridgeWaveFollowController.RunState.Ready&&ui.Session.Hits==0&&ui.Session.Elapsed==0,"Replay didn't reset");
+                        ui.ResultPanel.ReturnButton.onClick.Invoke();Check(ui.State==BridgeWaveFollowController.RunState.Ready&&ui.Session.Hits==0&&ui.Session.Elapsed==0,"Replay didn't reset");
                         Check(ui.startMenu.IsTrainingMenuVisible&&!ui.visualRoot.activeSelf,"Replay must return to unified menu");
                         ui.input.motion.SetAvailable(false);ui.input.Read();ui.RefreshHud();
                         Check(!ui.startButton.interactable,"Replay cannot bypass disconnected sensor");
@@ -262,8 +265,8 @@ namespace BridgeWave.EditorTools
                 {
                     Check(!ui.game.judging&&ui.Session.Hits==0,"Flow preview recorded training feedback");
                     if(ui.State!=BridgeWaveFollowController.RunState.Finished)return;
-                    Check(ui.finishPanel.activeInHierarchy&&ui.game.counterText.text=="4","Flow did not finish all repetitions");
-                    Capture("flow-result");ui.replayButton.onClick.Invoke();
+                    Check(ui.ResultPanel.gameObject.activeInHierarchy&&ui.game.counterText.text=="4","Flow did not finish all repetitions");
+                    Capture("flow-result");ui.ResultPanel.ReturnButton.onClick.Invoke();
                     Check(ui.State==BridgeWaveFollowController.RunState.Ready&&ui.CanStart&&ui.Session.Elapsed==0,"Replay failed without sensors");
                     Check(!ui.coachPreview.previewCamera.enabled&&!ui.coachPreview.trainingPanel.activeInHierarchy,"Coach visible after replay");
                     ui.skipCalibrationForFlowTest=false;ui.RefreshHud();
@@ -391,6 +394,8 @@ namespace BridgeWave.EditorTools
             {
                 camera.rect=new Rect(0,0,1,1);camera.targetTexture=target;
                 foreach(var c in canvases){c.renderMode=RenderMode.ScreenSpaceCamera;c.worldCamera=camera;c.planeDistance=1;}
+                foreach(var c in canvases)if(c.GetComponent<TrainingResultPanel>()!=null)
+                    typeof(UnityEngine.UI.CanvasScaler).GetMethod("Handle",BindingFlags.Instance|BindingFlags.NonPublic).Invoke(c.GetComponent<UnityEngine.UI.CanvasScaler>(),null);
                 Canvas.ForceUpdateCanvases();camera.Render();RenderTexture.active=target;
                 var image=new Texture2D(target.width,target.height,TextureFormat.RGBA32,false);image.ReadPixels(new Rect(0,0,target.width,target.height),0,0);image.Apply();
                 Directory.CreateDirectory("output/bridgewave");File.WriteAllBytes("output/bridgewave/"+name+".png",image.EncodeToPNG());UnityEngine.Object.DestroyImmediate(image);

@@ -28,7 +28,7 @@ class ClinicalPrescriptionTest {
                 assertEquals(if (index < 2) 2 else 3, step.getInt("reps"))
                 assertEquals(if (index < 2) "coach_training" else "game_training", step.getString("arTaskType"))
                 assertEquals(if (index < 2) (if (index == 0) "SideBridgePractice" else "SideBridgeOppositePractice")
-                    else (if (index % 2 == 0) "SideBridge_RingBridge_Dynamic" else "SideBridgeOpposite_RingBridge_Dynamic"), step.getString("sceneName"))
+                    else (if (index % 2 == 0) "SideBridge_RingBridge_Dynamic" else "SideBridgeRight_RingBridge_Dynamic"), step.getString("sceneName"))
             }
         }
         for (key in listOf("dead_bug", "bird_dog", "hip_thrust", "curl_up", "cat_camel")) {
@@ -47,7 +47,7 @@ class ClinicalPrescriptionTest {
             assertEquals(seconds, bridge.getJSONObject(1).getInt("holdSeconds"))
             val side = UnifiedPrescriptionV2.actionsFor(order("side_bridge", seconds))
             assertEquals("SideBridge_RingBridge_Hold30", side.getJSONObject(2).getString("sceneName"))
-            assertEquals("SideBridgeOpposite_RingBridge_Hold30", side.getJSONObject(3).getString("sceneName"))
+            assertEquals("SideBridgeRight_RingBridge_Hold30", side.getJSONObject(3).getString("sceneName"))
             assertEquals(seconds, side.getJSONObject(3).getInt("holdSeconds"))
         }
     }

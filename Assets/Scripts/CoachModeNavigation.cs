@@ -18,7 +18,7 @@ public static class CoachModeNavigation
     public const string BirdDogGameScene = "BirdDog_RingSkinC_Recorded";
     public const string HipThrustGameScene = "HipThrust_RingBridge_NewScoring";
     public const string SideBridgeGameScene = "SideBridge_RingBridge_Dynamic";
-    public const string SideBridgeRightGameScene = "SideBridgeOpposite_RingBridge_Dynamic";
+    public const string SideBridgeRightGameScene = "SideBridgeRight_RingBridge_Dynamic";
 
     private static string replayPracticeScene;
     private static string replayGameScene;
@@ -98,7 +98,7 @@ public static class CoachModeNavigation
                 coachScene = SideBridgeCoachScene;
                 return true;
             case SideBridgeRightGameScene:
-            case "SideBridgeOpposite_RingBridge_Hold30":
+            case "SideBridgeRight_RingBridge_Hold30":
                 coachScene = SideBridgeRightCoachScene;
                 return true;
             default:
@@ -289,7 +289,7 @@ public static class CoachModeNavigation
             string.Equals(sceneName, SideBridgeRightGameScene, StringComparison.Ordinal) ||
             string.Equals(sceneName, "HipThrust_RingBridge_Hold30", StringComparison.Ordinal) ||
             string.Equals(sceneName, "SideBridge_RingBridge_Hold30", StringComparison.Ordinal) ||
-            string.Equals(sceneName, "SideBridgeOpposite_RingBridge_Hold30", StringComparison.Ordinal);
+            string.Equals(sceneName, "SideBridgeRight_RingBridge_Hold30", StringComparison.Ordinal);
     }
 
     private static string NormalizeSceneName(string sceneName)

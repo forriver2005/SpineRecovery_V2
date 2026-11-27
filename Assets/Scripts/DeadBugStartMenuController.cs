@@ -26,6 +26,7 @@ public class DeadBugStartMenuController : MonoBehaviour
     }
     public event Action TrainingStarted;
     public Func<bool> TrainingStartAllowed { get; set; }
+    public Func<string> TrainingStartBlockedReason { get; set; }
     public Func<bool> ExternalTrainingStart { get; set; }
     public bool IsFlowTestCalibrationBypassed => poseScorer != null && poseScorer.IsFlowTestCalibrationBypassed;
     public string SelectedDifficultyKey => selectedDifficulty == Difficulty.Simple ? "simple" : selectedDifficulty == Difficulty.Hard ? "hard" : "standard";
@@ -520,7 +521,11 @@ public class DeadBugStartMenuController : MonoBehaviour
 
     public void StartTraining()
     {
-        if (TrainingStartAllowed != null && !TrainingStartAllowed()) return;
+        if (TrainingStartAllowed != null && !TrainingStartAllowed())
+        {
+            ShowCalibrationStatus(TrainingStartBlockedReason?.Invoke() ?? "请先完成校准并连接传感器");
+            return;
+        }
 
         // Recorded-action games reuse a practice menu, but own their start and
         // readiness checks. Dispatch before the copied practice/calibration flow.
@@ -1828,7 +1833,12 @@ public class DeadBugStartMenuController : MonoBehaviour
         startButton.interactable = ready;
         if (ready)
         {
-            RestoreStartButtonText();
+            if (TrainingStartAllowed != null && !TrainingStartAllowed() && TrainingStartBlockedReason != null)
+            {
+                startButton.interactable = false;
+                ShowCalibrationStatus(TrainingStartBlockedReason());
+            }
+            else RestoreStartButtonText();
         }
         else if (!poseScorer.IsCalibrating)
         {

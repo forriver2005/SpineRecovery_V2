@@ -60,6 +60,11 @@ public sealed class GameWorkoutScene : MonoBehaviour
         menu.TrainingStartAllowed = () => session.AllowsStart(this) && (taiko == null || taiko.CanStart) &&
             (training?.AllowsPrescriptionGame(gameObject.scene.name) ?? true) &&
             (CanStartTraining || (training?.IsV2Prescription != true && !session.IsRunning && IsCalibrationBypassed));
+        menu.TrainingStartBlockedReason = () =>
+            !session.AllowsStart(this) ? "请等待当前组结束" :
+            training?.AllowsPrescriptionGame(gameObject.scene.name) == false ? "请先完成或跳过本动作教练训练" :
+            taiko != null && !taiko.CanStart ? "游戏训练次数尚未就绪" :
+            scorer != null && scorer.CanStartTraining && !scorer.HasCurrentUserInput ? "等待传感器动作数据，请检查连接" : ReadinessStatus;
         if (taikoNightAction != null)
         {
             menu.ExternalTrainingStart = taikoNightAction.StartFromMenu;
@@ -80,7 +85,7 @@ public sealed class GameWorkoutScene : MonoBehaviour
 
     private void OnDestroy()
     {
-        if (menu != null) { menu.TrainingStarted -= OnStarted; menu.TrainingStartAllowed = null; menu.ExternalTrainingStart = null; }
+        if (menu != null) { menu.TrainingStarted -= OnStarted; menu.TrainingStartAllowed = null; menu.TrainingStartBlockedReason = null; menu.ExternalTrainingStart = null; }
         if (bridgeWave != null) bridgeWave.Completed -= OnCompleted;
         else if (taiko != null) taiko.Completed -= OnCompleted;
         else if (taikoNightAction != null) taikoNightAction.Completed -= OnCompleted;

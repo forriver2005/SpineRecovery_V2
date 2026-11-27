@@ -106,7 +106,7 @@ public static class ClinicalPrescriptionVerification
         {
             Check(service.SkipRemainingPrescriptionCoaches() == "SideBridge_RingBridge_Dynamic", "Skip both coaches opens left game");
             SpineFlowTrainingSession.MarkPrescriptionGameCompleted(3);
-            Check(service.AdvanceWithinPrescriptionItem() == "SideBridgeOpposite_RingBridge_Dynamic", "Repeated item advances to right game");
+            Check(service.AdvanceWithinPrescriptionItem() == "SideBridgeRight_RingBridge_Dynamic", "Repeated item advances to right game");
             SpineFlowTrainingSession.MarkPrescriptionGameCompleted(3);
             Check((bool)Call(service, "PrepareActionFeedback"), "Repeated item's final side opens survey");
             var result = service.CurrentResult;

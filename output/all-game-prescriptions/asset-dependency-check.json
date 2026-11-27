@@ -1,0 +1,12 @@
+{
+  "stagedAssetsChecked": 136,
+  "packageGuidCount": 11,
+  "unresolved": {},
+  "resolvedUnicodePaths": {
+    "e90aa930a0bfa234794d135856d9ea2d": "Assets/ImageSource/本次得分.png.meta",
+    "dc7f3731207e6c84793dcf886b6ea548": "Assets/Audio/VoicePrompts/请根据教练演示调整动作.mp3.meta",
+    "065a1c9feb73172449b75a20b1978c4c": "Assets/Audio/VoicePrompts/请保持住.mp3.meta",
+    "a9594d717e561064da672e2b3cd39e41": "Assets/Audio/VoicePrompts/开始.mp3.meta",
+    "02ffd1e63823d4a4085a72975a85c055": "Assets/Audio/VoicePrompts/请跟随教练前往下一个动作.mp3.meta"
+  }
+}

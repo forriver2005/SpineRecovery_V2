@@ -87,7 +87,18 @@ public sealed class RhythmHitHapticAdapter : MonoBehaviour
 
     private void HandleHipThrustHit(bool hit)
     {
-        if (hit && hapticController != null)
-            hapticController.PulseOnce(TrackerWearLocation.Abdomen);
+        if(!hit||hapticController==null)return;
+        var action=hipThrustController.RuleScoring!=null?hipThrustController.RuleScoring.recordedAction:null;
+        if(action!=null&&action.IsLimbAction)
+        {
+            Pulse(action.FirstTarget);Pulse(action.SecondTarget);
+        }
+        else hapticController.PulseOnce(TrackerWearLocation.Abdomen);
+    }
+    void Pulse(RhythmBodyTarget target)
+    {
+        hapticController.PulseOnce(target==RhythmBodyTarget.LeftHand?TrackerWearLocation.LeftForearm:
+            target==RhythmBodyTarget.RightHand?TrackerWearLocation.RightForearm:
+            target==RhythmBodyTarget.LeftFoot?TrackerWearLocation.LeftLowerLeg:TrackerWearLocation.RightLowerLeg);
     }
 }

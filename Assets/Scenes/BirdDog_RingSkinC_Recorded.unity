@@ -3955,6 +3955,10 @@ MonoBehaviour:
   skipCalibrationForPreview: 0
   referenceClip: {fileID: -3539842621816718849, guid: a8c57a9b75ce0144a8a8105194a53bc1, type: 3}
   referenceSeconds: 6.8
+  referenceStateName: birddog_start
+  proneBirdDog: 1
+  leftSideBridge: 0
+  rightSideBridge: 0
 --- !u!1 &689656154
 GameObject:
   m_ObjectHideFlags: 0

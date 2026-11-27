@@ -1,0 +1,12 @@
+{
+  "prescriptionContractVersion": 2,
+  "items": [
+    {
+      "itemId": 2026112701,
+      "actionId": "5",
+      "sets": 1,
+      "reps": 1,
+      "holdSeconds": 45
+    }
+  ]
+}

@@ -100,6 +100,8 @@ public sealed class HipThrustTaikoController : MonoBehaviour
     public HipThrustRuleScoring RuleScoring => ruleScoring;
     public HipThrustPrescriptionDose PrescriptionDose => hold30Dose;
     public HipThrustHold30Timeline Hold30Timeline => hold30Timeline;
+    public float PrescribedHoldSeconds => hold30Timeline != null ? hold30Timeline.PrescribedHoldSeconds :
+        hold30Dose != null ? hold30Dose.HoldSeconds : TrainingHoldDuration.DefaultSeconds;
     public bool CanStart => hold30Dose == null || hold30Dose.Total > 0;
     public int CompletedDemonstrations { get; private set; }
     public float PresentationPhaseDuration(HipThrustPhaseTimeline.Sample sample)
@@ -230,7 +232,7 @@ public sealed class HipThrustTaikoController : MonoBehaviour
         int repetitions = cycleCount;
         if (repetitionsText != null && int.TryParse(repetitionsText.text, out int requested)) repetitions = requested;
         passes = Mathf.Clamp(Mathf.CeilToInt(repetitions / (float)cycleCount), 1, 3);
-        hold30Timeline = hold30Dose != null ? new HipThrustHold30Timeline(phaseTimeline, hold30Dose.Total, hold30Dose.preserveRecordedTiming, hold30Dose.skipRecordedPlateauAfterHold, hold30Dose.preserveSourceGaps) : null;
+        hold30Timeline = hold30Dose != null ? new HipThrustHold30Timeline(phaseTimeline, hold30Dose.Total, hold30Dose.preserveRecordedTiming, hold30Dose.skipRecordedPlateauAfterHold, hold30Dose.preserveSourceGaps, holdSeconds: hold30Dose.HoldSeconds) : null;
         recordedRepetitions = hold30Timeline == null ? BuildRecordedRepetitions() : Array.Empty<HipThrustHold30Timeline.Repetition>();
         if (actionRepetitionCount > 0 && hold30Dose == null && phaseTimeline != null)
         {
@@ -500,6 +502,7 @@ public sealed class HipThrustTaikoController : MonoBehaviour
     public void StopMode()
     {
         running = paused = false;
+        ruleScoring?.recordedAction?.Stop();
         coachAnimator.speed = coachPreviewAnimator.speed = 0f;
         ClearNotes();
         if (songClock != null) songClock.StopClock();

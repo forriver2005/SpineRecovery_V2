@@ -19,6 +19,14 @@ public class CoachActionController : MonoBehaviour
     public float HoldElapsedSeconds { get; private set; }
     public int CurrentTotalScoredSegments { get; private set; } = 1;
     public double[] AssessmentDurations { get; private set; } = new double[0];
+    private int prescribedRepetitions;
+    public bool SetRepetitionDose(int count,out string error)
+    {
+        error=null;
+        if(hasStarted)error="请先返回菜单，再更换次数。";
+        else if(count<0||count>100)error="次数须为0–100；0使用默认次数。";
+        if(error!=null)return false;prescribedRepetitions=count;return true;
+    }
     public float SegmentSeconds(string state,float speed)
     {
         if(coachAnimator!=null && coachAnimator.runtimeAnimatorController!=null)
@@ -528,9 +536,11 @@ public class CoachActionController : MonoBehaviour
 
         int pairCount = Mathf.Min(upSegmentStates.Length, downSegmentStates.Length);
         int safeLoopCount = Mathf.Max(1, profile.loopCount);
-        int totalScoredSegments = Mathf.Max(1, safeLoopCount * pairCount * 2);
+        int totalRepetitions = prescribedRepetitions>0?prescribedRepetitions:safeLoopCount*pairCount;
+        safeLoopCount=Mathf.CeilToInt(totalRepetitions/(float)pairCount);
+        int totalScoredSegments = Mathf.Max(1, totalRepetitions * 2);
         CurrentTotalScoredSegments = totalScoredSegments;
-        AssessmentDurations=new double[safeLoopCount*pairCount];
+        AssessmentDurations=new double[totalRepetitions];
         for(int i=0;i<AssessmentDurations.Length;i++)
             AssessmentDurations[i]=SegmentSeconds(upSegmentStates[i%pairCount],profile.upSpeed)+
                 SegmentSeconds(downSegmentStates[i%pairCount],profile.downSpeed);
@@ -541,7 +551,7 @@ public class CoachActionController : MonoBehaviour
 
         for (int loop = 0; loop < safeLoopCount && hasStarted; loop++)
         {
-            for (int pair = 0; pair < pairCount && hasStarted; pair++)
+            for (int pair = 0; pair < pairCount && hasStarted && loop*pairCount+pair<totalRepetitions; pair++)
             {
                 yield return PlaySegmentToEnd(
                     upSegmentStates[pair],

@@ -134,6 +134,13 @@ public sealed partial class GameTrainingAssessment : MonoBehaviour
         int index=0;
         for(int i=1;i<bridgePlan.Length&&now>=bridgePlan[i].start;i++)index=i;
         if(bridgePlan.Length==0)return;
+        if(rules.recordedAction!=null)
+        {
+            var actionHold=rules.recordedAction;
+            Summary.RecordDose(index,actionHold.ValidSeconds,actionHold.LongestSeconds,now>=bridgePlan[index].end,
+                TrainingScoringTolerance.HoldQualified(actionHold.ValidSeconds,Summary.Repetitions[index].targetSeconds,true));
+            return;
+        }
         if(rules.sideBridge!=null)
         {
             var rule=rules.sideBridge.Rule;

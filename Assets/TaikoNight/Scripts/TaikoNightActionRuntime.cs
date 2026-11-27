@@ -334,7 +334,7 @@ namespace TaikoNight
             scorer.SetDifficultyMode(mode);
         }
 
-        private void TogglePause()
+        public void TogglePause()
         {
             if (!running) return;
             TaikoNightPracticeClock.IsPaused = !TaikoNightPracticeClock.IsPaused;

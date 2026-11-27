@@ -49,8 +49,8 @@ public sealed partial class GameTrainingAssessment
             {
                 if(holding<=0)continue;
                 FinalScore.ObserveCoverage(i,holding,valid);
-                bool accepted=rules.sideBridge!=null?rules.sideBridge.Rule.HoldingCorrectly:rules.Rule.HoldingCorrectly;
-                double counter=rules.sideBridge!=null?rules.sideBridge.Rule.RoundFinished?rules.sideBridge.Rule.LastRoundHoldSeconds:rules.sideBridge.Rule.RoundValidHoldSeconds:rules.Rule.ValidHoldSeconds;
+                bool accepted=rules.recordedAction!=null?rules.recordedAction.Accepted:rules.sideBridge!=null?rules.sideBridge.Rule.HoldingCorrectly:rules.Rule.HoldingCorrectly;
+                double counter=rules.recordedAction!=null?rules.recordedAction.ValidSeconds:rules.sideBridge!=null?rules.sideBridge.Rule.RoundFinished?rules.sideBridge.Rule.LastRoundHoldSeconds:rules.sideBridge.Rule.RoundValidHoldSeconds:rules.Rule.ValidHoldSeconds;
                 FinalScore.ObserveHoldCounter(i,holding,valid,accepted,counter);
                 continue;
             }

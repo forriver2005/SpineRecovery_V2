@@ -9,15 +9,19 @@
 | 鸟狗 | `Assets/Scenes/BirdDog_RingSkinC_Recorded.unity` | RingSkinC；伸展、收回 |
 | 死虫 | `Assets/Scenes/DeadBug_RingSkinC_Recorded.unity` | RingSkinC；伸展、收回 |
 | 臀桥 · 新评分 | `Assets/Scenes/HipThrust_RingBridge_NewScoring.unity` | 同一敲鼓视觉与原节奏，换用交付包 A/B 保持评分 |
-| 臀桥 · 保持30秒 | `Assets/Scenes/HipThrust_RingBridge_Hold30.unity` | 同一敲鼓视觉；最高点静止30秒后放下，精确处方次数 |
+| 臀桥 · 保持30秒 | `Assets/Scenes/HipThrust_RingBridge_Hold30.unity` | 同一敲鼓视觉；最高点按处方保持后放下，默认30秒，精确处方次数 |
 | 臀桥 · 曲线跟随 | `Assets/Scenes/BridgeWave_StandardFollow.unity` | 按录制臀桥动作生成四段标准轨道；臀部高度单独控制小球，偏离轨道不触发 HIT |
 | 侧桥 · 动态 | `Assets/Scenes/SideBridge_RingBridge_Dynamic.unity` | 敲鼓；录制节奏与真实动作评分 |
-| 侧桥 · 保持30秒 | `Assets/Scenes/SideBridge_RingBridge_Hold30.unity` | 敲鼓；最高点保持30秒，精确处方次数 |
+| 侧桥 · 保持30秒 | `Assets/Scenes/SideBridge_RingBridge_Hold30.unity` | 敲鼓；最高点按处方保持，默认30秒，精确处方次数 |
 | 敲鼓臀桥 | `Assets/Scenes/HipThrust_TaikoNight_Dynamic.unity` | 星轨敲鼓；抬起、保持、放下 |
 | 卷腹 | `Assets/Scenes/CrunchPractice_TaikoNight.unity` | 星轨敲鼓；卷起、保持、回落 |
 | 卧位猫式 | `Assets/Scenes/LyingCatPractice_TaikoNight.unity` | 星轨敲鼓；拱背、保持、还原 |
 
 游戏支持医生动作串。动作串从首组前的准备倒计时开始，每组完成后休息30秒，再按处方动作、难度、组数和次数切换；`hipthrust` 映射到臀桥新评分场景；`hipthrust_curve`（或 `bridgewave`）进入小球轨道臀桥，支持 `sets` 与 `reps`，并要求躺姿校准和有效传感器信号。接入参数见 [臀桥轨道说明](Assets/BridgeWave/INTEGRATION.md)。鸟狗与死虫保留原有评分检查；新游戏通过对应的实时传感器输入和动作评分器计分。新评分规则和处方接入方法见 [HIPTHRUST_NEW_RULES.md](HIPTHRUST_NEW_RULES.md)。
+
+保持类支持处方字段 `holdSeconds`（每次秒数），省略或0默认30秒。臀桥、左/右侧桥的教练保持、圆环进度、剩余时间和最终分母同步使用该值，组间休息仍为30秒。接入示例见 `HIPTHRUST_NEW_RULES.md`。
+
+新增鸟狗、死虫、卷腹和卧位猫式的圆环保持版；开始、倒计时、暂停、结算和返回复用臀桥保持流程。动作键、D01标识与处方示例见 [RECORDED_HOLD_GAMES.md](RECORDED_HOLD_GAMES.md)。动作选择覆盖16款训练变体，均配循环背景音乐。
 
 ## 最终总分与结算界面
 

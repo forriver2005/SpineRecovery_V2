@@ -31,13 +31,11 @@ public sealed class GameWorkoutScene : MonoBehaviour
         {
             if (bridgeWave != null) return bridgeWave.ReadyForTraining;
             if (taikoNightAction != null) return taikoNightAction.CanStartTraining;
-            bool calibrationScene = actionId == "hipthrust_newscore" || actionId == "hipthrust_hold30" ||
-                actionId == "sidebridge" || actionId == "sidebridge_hold30";
-            return scorer == null || (scorer.CanStartTraining && (!calibrationScene || scorer.HasCurrentUserInput));
+            return scorer == null || (scorer.CanStartTraining && scorer.HasCurrentUserInput);
         }
     }
     public bool IsCalibrationBypassed => bridgeWave != null ? bridgeWave.IsFlowTest : scorer != null && scorer.IsCalibrationBypassed;
-    public string ReadinessStatus => bridgeWave != null ? bridgeWave.input.Message : taikoNightAction != null ? "等待动作传感器连接" : scorer != null && scorer.IsCalibrationBypassed ? "流程预览：已临时跳过校准" : "请按提示完成躺姿校准";
+    public string ReadinessStatus => bridgeWave != null ? bridgeWave.input.Message : taikoNightAction != null ? "等待动作传感器连接" : scorer != null && scorer.IsCalibrationBypassed ? "流程预览：已临时跳过校准" : scorer != null ? scorer.CalibrationInstruction : "请按提示完成姿势校准";
     private GameWorkoutSession session;
     private GameObject panel, uiRoot, workoutToggle;
     private TMP_Text summary, details, status;
@@ -59,7 +57,7 @@ public sealed class GameWorkoutScene : MonoBehaviour
         }
         session = GameWorkoutSession.Instance;
         menu.TrainingStartAllowed = () => session.AllowsStart(this) && (taiko == null || taiko.CanStart) &&
-            (taikoNightAction == null || CanStartTraining);
+            (CanStartTraining || (!session.IsRunning && IsCalibrationBypassed));
         if (taikoNightAction != null)
         {
             menu.ExternalTrainingStart = taikoNightAction.StartFromMenu;
@@ -128,6 +126,12 @@ public sealed class GameWorkoutScene : MonoBehaviour
     public bool PrepareDose(GameWorkoutAction action, out string error)
     {
         error = null;
+        if(action.action=="birddog"||action.action=="deadbug")
+        {
+            if(!coach.SetRepetitionDose(action.reps,out error))return false;
+            if(action.reps>0&&menu.TimesText!=null)menu.TimesText.text=action.reps.ToString();
+            return true;
+        }
         if (bridgeWave != null) return bridgeWave.SetRepetitionDose(action.reps, out error);
         if (taikoNightAction != null) return taikoNightAction.SetRepetitionDose(action.reps, out error);
         if (taiko != null && GameWorkoutPlan.SupportsOptionalReps(action.action))
@@ -135,7 +139,7 @@ public sealed class GameWorkoutScene : MonoBehaviour
         if (!GameWorkoutPlan.RequiresExactReps(action.action)) return true;
         if (taiko == null || taiko.PrescriptionDose == null) { error = "动作的处方次数入口缺失。"; return false; }
         // The session executor already iterates sets. Each loaded run must receive only this set's reps.
-        return taiko.PrescriptionDose.SetDose(1, action.reps, out error);
+        return taiko.PrescriptionDose.SetDose(1, action.reps, action.holdSeconds, out error);
     }
 
     public void StopTraining()
@@ -229,7 +233,7 @@ public sealed class GameWorkoutScene : MonoBehaviour
         if (summary == null) return;
         var plan = session.Plan;
         string current = GameWorkoutPlan.ActionName(actionId);
-        if (plan != null && !session.IsComplete) current = GameWorkoutPlan.ActionName(plan.actions[session.ActionIndex].action);
+        if (plan != null && !session.IsComplete) current = GameWorkoutPlan.ActionName(plan.actions[session.ActionIndex]);
         summary.text = $"动作串  >\n{(session.IsComplete ? "全部完成" : current)}";
         status.text = session.Status;
         if (taikoNightAction != null) taikoNightAction.SetGroupRest(session.RestSecondsRemaining);
@@ -253,7 +257,7 @@ public sealed class GameWorkoutScene : MonoBehaviour
         details.rectTransform.SetSizeWithCurrentAnchors(RectTransform.Axis.Vertical, Mathf.Max(410, details.GetPreferredValues(details.text, 385, 0).y + 20));
     }
 
-    private static string Describe(GameWorkoutAction item) => $"{GameWorkoutPlan.ActionName(item.action)} · {GameWorkoutPlan.DifficultyName(item.difficulty)} · {item.sets} 组" + (item.reps > 0 && (GameWorkoutPlan.RequiresExactReps(item.action) || GameWorkoutPlan.SupportsOptionalReps(item.action)) ? $" × {item.reps} 次" : "");
+    private static string Describe(GameWorkoutAction item) => $"{GameWorkoutPlan.ActionName(item)} · {GameWorkoutPlan.DifficultyName(item.difficulty)} · {item.sets} 组" + (item.reps > 0 && (GameWorkoutPlan.RequiresExactReps(item.action) || GameWorkoutPlan.SupportsOptionalReps(item.action)) ? $" × {item.reps} 次" : "");
 
     private static RectTransform Rect(string name, Transform parent, Vector2 position, Vector2 size)
     {

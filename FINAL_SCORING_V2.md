@@ -22,6 +22,8 @@
 
 `保持达标率 = 100 × 合格保持秒数 / 规定保持秒数`。
 
+保持类 `holdSeconds` 默认为30秒，可由D01 V2处方或动作串定义；每次目标直接来自实际时间轴。比如2次×20秒，整组分母为40秒。
+
 仅观察教练/处方规定的保持窗口。抬起、落下阶段不参与这个比例。每次分别封顶，未做的目标窗口不能从分母删除；也不能用一次长停补偿另一轮。
 
 合格区间与进入/退出确认完全沿用现有动作规则，读取它们已经接受的保持计时，不另设新的动作阈值。因此动作质量在允许区间内的秒数等价计入，不再乘一次姿势质量或合格次数。已确认的有效秒数在短暂调整、计时器重置或暂停后保留。
@@ -42,6 +44,8 @@
 | CrunchPractice_TaikoNight（卷腹敲鼓） | 往复 |
 | LyingCatPractice_TaikoNight（卧位猫式敲鼓） | 往复 |
 | BridgeWave_StandardFollow（臀桥小球） | 往复 |
+| BirdDog_RingBridge_Hold30 / DeadBug_RingBridge_Hold30 | 保持 |
+| Crunch_RingBridge_Hold30 / LyingCat_RingBridge_Hold30 | 保持 |
 | HipThrust_RingBridge_Hold30 | 保持 |
 | SideBridge_RingBridge_Hold30 | 保持 |
 | 本地额外的 SideBridgeRight_RingBridge_Dynamic / Hold30 | 分别通过同一收集器使用往复 / 保持 |

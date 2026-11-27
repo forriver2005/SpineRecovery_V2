@@ -1,0 +1,12 @@
+{
+  "prescriptionContractVersion": 2,
+  "items": [
+    {
+      "itemId": 2026112701,
+      "actionId": "side_bridge",
+      "sets": 1,
+      "reps": 1,
+      "holdSeconds": 0
+    }
+  ]
+}

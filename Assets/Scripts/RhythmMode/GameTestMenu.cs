@@ -10,13 +10,16 @@ using UnityEngine.UI;
 public sealed class GameTestMenu : MonoBehaviour
 {
     public static readonly string[] Scenes = {
-        "BirdDog_RingSkinC_Recorded", "DeadBug_RingSkinC_Recorded",
-        "HipThrust_RingBridge_NewScoring", "HipThrust_RingBridge_Hold30",
-        "SideBridge_RingBridge_Dynamic", "SideBridge_RingBridge_Hold30"
+        "BirdDog_RingSkinC_Recorded", "BirdDog_RingBridge_Hold30", "DeadBug_RingSkinC_Recorded", "DeadBug_RingBridge_Hold30",
+        "HipThrust_RingBridge_NewScoring", "HipThrust_RingBridge_Hold30", "SideBridge_RingBridge_Dynamic", "SideBridge_RingBridge_Hold30",
+        "SideBridgeRight_RingBridge_Dynamic", "SideBridgeRight_RingBridge_Hold30", "CrunchPractice_TaikoNight", "Crunch_RingBridge_Hold30",
+        "LyingCatPractice_TaikoNight", "LyingCat_RingBridge_Hold30", "HipThrust_TaikoNight_Dynamic", "BridgeWave_StandardFollow"
     };
     public static readonly string[] Titles = {
-        "鸟狗式", "死虫式", "臀桥 · 动态", "臀桥 · 保持30秒",
-        "侧桥 · 动态", "侧桥 · 保持30秒"
+        "鸟狗式 · 往复", "鸟狗式 · 保持", "死虫式 · 往复", "死虫式 · 保持",
+        "臀桥 · 动态", "臀桥 · 保持", "左侧桥 · 动态", "左侧桥 · 保持",
+        "右侧桥 · 动态", "右侧桥 · 保持", "卷腹 · 往复", "卷腹 · 保持",
+        "卧位猫式 · 往复", "卧位猫式 · 保持", "臀桥 · 星轨", "臀桥 · 曲线"
     };
     public static bool EnabledForBuild
     {
@@ -30,7 +33,7 @@ public sealed class GameTestMenu : MonoBehaviour
     }
     public GameObject Panel => panel;
     public Button[] GameButtons { get; private set; }
-    public bool IsPaused => entry != null && (entry.taiko != null ? entry.taiko.IsPaused : entry.coach.IsActionPaused);
+    public bool IsPaused => entry != null && (entry.bridgeWave!=null?entry.bridgeWave.State==BridgeWave.BridgeWaveFollowController.RunState.Paused:entry.taikoNightAction!=null?TaikoNight.TaikoNightPracticeClock.IsPaused:entry.taiko != null ? entry.taiko.IsPaused : entry.coach!=null&&entry.coach.IsActionPaused);
     GameWorkoutScene entry;
     GameObject root, panel, menuToggle;
     RectTransform safeArea;
@@ -46,13 +49,13 @@ public sealed class GameTestMenu : MonoBehaviour
     public void Initialize(GameWorkoutScene value)
     {
         entry = value;
-        var calibration = entry.scorer.GetComponent<SupineGameCalibration>();
+        var calibration = entry.scorer!=null?entry.scorer.GetComponent<SupineGameCalibration>():null;
         if (calibration != null) calibration.skipCalibrationForPreview = false;
     }
     void Start()
     {
         root = new GameObject("Test Game Navigation", typeof(RectTransform), typeof(Canvas), typeof(CanvasScaler), typeof(GraphicRaycaster));
-        var canvas = root.GetComponent<Canvas>(); canvas.renderMode = RenderMode.ScreenSpaceOverlay; canvas.sortingOrder = 1500;
+        var canvas = root.GetComponent<Canvas>(); canvas.renderMode = RenderMode.ScreenSpaceOverlay; canvas.sortingOrder = 3000;
         var scaler = root.GetComponent<CanvasScaler>(); scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
         scaler.referenceResolution = new Vector2(1920, 1080); scaler.matchWidthOrHeight = 1;
         safeArea = Box("Safe Area", root.transform, Vector2.zero, Vector2.zero, Color.clear);
@@ -62,20 +65,21 @@ public sealed class GameTestMenu : MonoBehaviour
         var shade = Box("Action Selection", root.transform, Vector2.zero, Vector2.zero, new Color(.025f, .025f, .09f, .94f));
         shade.anchorMin = Vector2.zero; shade.anchorMax = Vector2.one; shade.offsetMin = shade.offsetMax = Vector2.zero;
         panel = shade.gameObject;
-        var card = Box("Card", shade, Vector2.zero, new Vector2(1280, 840), new Color(.12f, .105f, .25f));
+        var card = Box("Card", shade, Vector2.zero, new Vector2(1660, 900), new Color(.12f, .105f, .25f));
         heading = Label("已暂停 · 选择动作", card, new Vector2(0, 340), new Vector2(1160, 75), 46);
         Label("切换动作将结束当前训练，并进入所选游戏的开始界面", card, new Vector2(0, 266), new Vector2(1180, 60), 27);
         GameButtons = new Button[Scenes.Length];
         for (int i = 0; i < Scenes.Length; i++) {
             int index = i;
             GameButtons[i] = MakeButton(Titles[i] + (Scenes[i] == gameObject.scene.name ? "  · 当前" : ""), card,
-                new Vector2(i % 2 == 0 ? -297 : 297, 150 - i / 2 * 140), new Vector2(560, 112), () => SelectGame(index));
+                new Vector2((i%4-1.5f)*390, 150 - i / 4 * 120), new Vector2(370, 96), () => SelectGame(index));
             GameButtons[i].name = "Select " + Scenes[i];
+            var caption=GameButtons[i].GetComponentInChildren<TMP_Text>();caption.enableAutoSizing=true;caption.fontSizeMin=23;caption.fontSizeMax=32;caption.enableWordWrapping=false;
         }
-        connection = Label("", card, new Vector2(0, -238), new Vector2(1180, 66), 24);
+        connection = Label("", card, new Vector2(0, -280), new Vector2(1180, 66), 24);
         connection.color = new Color(.68f, .81f, .92f);
-        resume = MakeButton("继续训练", card, new Vector2(-297, -342), new Vector2(560, 80), Close);
-        MakeButton("返回开始界面", card, new Vector2(297, -342), new Vector2(560, 80), ReturnToMenu);
+        resume = MakeButton("继续训练", card, new Vector2(-297, -380), new Vector2(560, 80), Close);
+        MakeButton("返回开始界面", card, new Vector2(297, -380), new Vector2(560, 80), ReturnToMenu);
         addresses = LocalAddresses();
         panel.SetActive(false);
         Screen.sleepTimeout = SleepTimeout.NeverSleep;
@@ -91,7 +95,7 @@ public sealed class GameTestMenu : MonoBehaviour
         SynchronizePause();
         bool visible = opened || IsPaused;
         panel.SetActive(visible);
-        menuToggle.SetActive(entry.menu.IsTrainingMenuVisible && !visible);
+        menuToggle.SetActive(entry.IsMenuVisible && !visible);
         if (!visible) return;
         heading.text = loading ? "正在切换动作…" : IsPaused ? "已暂停 · 选择动作" : "选择测试动作";
         resume.GetComponentInChildren<TMP_Text>().text = IsPaused ? "继续训练" : "关闭";
@@ -105,14 +109,14 @@ public sealed class GameTestMenu : MonoBehaviour
     public void Open()
     {
         if (loading) return;
-        if (!entry.menu.IsTrainingMenuVisible && !IsPaused) TogglePause();
+        if (!entry.IsMenuVisible && !IsPaused) TogglePause();
         // Countdown cannot be paused by the transport; return to a clean menu.
-        if (!entry.menu.IsTrainingMenuVisible && !IsPaused) entry.StopTraining();
+        if (!entry.IsMenuVisible && !IsPaused) entry.StopTraining();
         opened = true;
         SynchronizePause();
     }
     public void Close() { if (loading) return; opened = false; if (IsPaused) TogglePause(); SynchronizePause(); }
-    void TogglePause() { if (entry.taiko != null) entry.taiko.TogglePause(); else entry.coach.TogglePause(); }
+    void TogglePause() { if(entry.bridgeWave!=null)entry.bridgeWave.TogglePause();else if(entry.taikoNightAction!=null)entry.taikoNightAction.TogglePause();else if (entry.taiko != null) entry.taiko.TogglePause(); else entry.coach.TogglePause(); }
     public void ReturnToMenu()
     {
         if (loading) return;
@@ -134,7 +138,7 @@ public sealed class GameTestMenu : MonoBehaviour
         Time.timeScale = 1;
         SceneManager.LoadSceneAsync(Scenes[index], LoadSceneMode.Single);
     }
-    void OnApplicationPause(bool paused) { if (paused && entry != null && !entry.menu.IsTrainingMenuVisible && !IsPaused) Open(); }
+    void OnApplicationPause(bool paused) { if (paused && entry != null && !entry.IsMenuVisible && !IsPaused) Open(); }
     void OnDestroy() { RestorePause(); if (root != null) Destroy(root); }
     void SynchronizePause()
     {

@@ -42,3 +42,22 @@ https://creativecommons.org/publicdomain/zero/1.0/legalcode
 没有变速、移调或基于音乐节拍修改动作时序。场景音乐音量保留 0.32。
 Unity 使用 Compressed In Memory，保持原有循环播放、开始及停止调用。
 音频测量和场景验证见 output/game-music/。
+新增场景音乐（2026-11-27）
+
+卷腹（往复与圆环保持）：Calm Ambient 1 - Synthwave 4k — The Cynic Project / cynicmusic
+Source: https://opengameart.org/content/calm-ambient-1-synthwave-4k
+Download: https://opengameart.org/sites/default/files/001_Synthwave_4k_0.mp3
+Asset: Crunch_Synthwave4k.ogg
+柔和电子合成器、稳定律动，延续现有星空圆环风格。
+
+卧位猫式（往复与圆环保持）：Calm Ambient 3 - LifeWave 2k — The Cynic Project / cynicmusic
+Source: https://opengameart.org/content/calm-ambient-3-lifewave-2k
+Download: https://opengameart.org/sites/default/files/006_lifeWave2k_0.mp3
+Asset: LyingCat_LifeWave2k.ogg
+舒缓空间氛围，适合慢节奏脊柱活动与静态保持。
+
+两首来源页标注CC0 1.0。下载的是对应页面原始文件，未使用商业扩展作品。
+处理：44.1kHz双声道Ogg，响度目标-22 LUFS、峰值-3 dB，起始0.25秒淡入；不变速、不移调。
+
+新增鸟狗保持沿用Space Arp；死虫保持沿用Crystal Cave；曲线臀桥和星轨臀桥沿用Heavenly Loop；左右侧桥沿用Enchanted Tiki。
+每个游戏已有/新增音乐均随本游戏的开始、暂停、结算和返回停止/恢复，循环播放。

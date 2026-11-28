@@ -12,6 +12,7 @@ public class DeadBugStartMenuController : MonoBehaviour
     public Func<bool> ExternalTrainingStart { get; set; }
     public bool IsFlowTestCalibrationBypassed => poseScorer != null && poseScorer.IsFlowTestCalibrationBypassed;
     public string SelectedDifficultyKey => selectedDifficulty == Difficulty.Simple ? "simple" : selectedDifficulty == Difficulty.Hard ? "hard" : "standard";
+    public Button TrainingStartButton => startButton;
     public bool IsTrainingMenuVisible => menuRoot != null && menuRoot.activeSelf;
     public const float PracticeControlTopY = 100f;
     public const float PracticeControlVerticalSpacing = 100f;
@@ -388,6 +389,15 @@ public class DeadBugStartMenuController : MonoBehaviour
     public void StartTraining()
     {
         if (TrainingStartAllowed != null && !TrainingStartAllowed()) return;
+        if (ExternalTrainingStart != null)
+        {
+            if (!ExternalTrainingStart()) return;
+            TrainingStarted?.Invoke();
+            if (startButton != null) startButton.interactable = false;
+            if (menuRoot != null) menuRoot.SetActive(false);
+            return;
+        }
+
         if (!IsPracticeCoachMode && poseScorer != null && !poseScorer.CanStartTraining)
         {
             ApplyCalibrationGate();
@@ -395,15 +405,6 @@ public class DeadBugStartMenuController : MonoBehaviour
             {
                 poseScorer.BeginCalibration();
             }
-            return;
-        }
-
-        if (ExternalTrainingStart != null)
-        {
-            if (!ExternalTrainingStart()) return;
-            TrainingStarted?.Invoke();
-            if (startButton != null) startButton.interactable = false;
-            if (menuRoot != null) menuRoot.SetActive(false);
             return;
         }
 

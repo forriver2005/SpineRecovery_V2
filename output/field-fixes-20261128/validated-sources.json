@@ -1,0 +1,16 @@
+{
+  "Assets/Scripts/DeadBugStartMenuController.cs": "b424043a52c813a0335ee0cf78c1083c293e172969c0dc54ebae54d6f79e7371",
+  "Assets/Scripts/Editor/AllGamePrescriptionFlowVerification.cs": "4b9754bf712ec3e426c21d404d113fc5fa8a79926845f2a91761db434bf3713b",
+  "Assets/Scripts/Editor/RecordedHoldGamesBuilder.cs": "e5c03ad3aae2d03fac6d8196ae2e0466c6f5dc9195b47b28ca9a984eb92c099a",
+  "Assets/Scripts/RhythmMode/GameWorkoutScene.cs": "5d77fc0055e7b72e20a5f11c823807b1f5eefa7ffa37711621f818260b5373f4",
+  "Assets/Scripts/RhythmMode/HipThrustRingBridgeView.cs": "87e8ccc3689b6165e4c3adb445d8937363c8b6a7361a33b17812621403904c51",
+  "Assets/Scripts/RhythmMode/RecordedActionHoldScoring.cs": "adda3d4064500ef6daf7d6f2df5a9d9cffc6d03b3221bb062792e60917a348dc",
+  "Assets/Scripts/RhythmMode/RecordedHoldPreparation.cs": "f724d10fb74a2c918aa04a15c6ff5b268acb5e73d8b51284a523a9d43eea4e35",
+  "Assets/TaikoNight/Scripts/TaikoNightActionRuntime.cs": "06f2a48d0723ac7b85d0c99d59942e7e69cbc1683bdf943172ec75c4fdff5d50",
+  "Assets/TaikoNight/Scripts/TaikoNightSelection.cs": "f82747dfe8bd275897d4773af20202e1723902c6fd582ad156cecb2005e26356",
+  "Assets/Scripts/Editor/CorrectCatHoldRecording.cs": "e340d76fef2828436ee0b7cdf9a9ea9e81077bbf3be32bc48ff5618e95355844",
+  "Assets/Scripts/Editor/FieldFeedbackVerification.cs": "75685c544b9d2a205d63fbf057b176812ec1ce608d6518cc986a1cfd9bca75b4",
+  "Assets/Scripts/RhythmMode/CrunchPreparationCalibration.cs": "645402b0d3efb8cbec44f377a2b4897eda69e94dc54311f7aad9a45fa3989047",
+  "Assets/Scripts/RhythmMode/HoldCalibrationControls.cs": "ded23e248d38707339384fe5b3dd8774695f73e304e9b820f739a9909b1ceffd",
+  "Assets/Scripts/RhythmMode/RelaxedPreparation.cs": "f1d29914054353b9cc4218795920bdc9240ef0e00b5a77013f23923b9ff08668"
+}

@@ -45,7 +45,7 @@ public static class RecordedHoldGamesBuilder
                 string resource=i==2?RecordedCrunchCoachMotion.ResourcePath:RecordedLyingCatCoachMotion.ResourcePath;
                 var package=JsonUtility.FromJson<CoachMotionPackage>(Resources.Load<TextAsset>(resource).text);var frames=package.segments[0].frames;
                 int Frame(float seconds)=>Enumerable.Range(0,frames.Length).OrderBy(n=>Mathf.Abs(frames[n].time-seconds)).First();
-                int first=Frame(i==2?43:24),top=Frame(i==2?48.5f:29.5f),lower=Frame(i==2?50:30),last=Frame(i==2?52.4f:34);
+                int first=Frame(i==2?43:30),top=Frame(i==2?48.5f:34),lower=Frame(i==2?50:36),last=Frame(i==2?52.4f:40);
                 routine=RecordedCoachMotionImporter.Bake("hold_routine",frames,first,last,package.fps,0,false);AssetDatabase.CreateAsset(routine,folder+"Routine.anim");
                 boundaries=new[]{0,last-first};peaks=new[]{top-first};lowerStarts=new[]{lower-first};
                 start=RecordedCoachMotionImporter.Bake("hold_start",new[]{frames[first],frames[first]},0,1,30,0,false);

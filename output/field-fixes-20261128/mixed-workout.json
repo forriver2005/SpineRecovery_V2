@@ -1,0 +1,53 @@
+{
+    "actions": [
+        {
+            "action": "crunch",
+            "difficulty": "simple",
+            "sets": 1,
+            "reps": 1,
+            "holdSeconds": 0.0
+        },
+        {
+            "action": "crunch_hold30",
+            "difficulty": "standard",
+            "sets": 2,
+            "reps": 1,
+            "holdSeconds": 3.0
+        },
+        {
+            "action": "lyingcat_hold30",
+            "difficulty": "hard",
+            "sets": 1,
+            "reps": 1,
+            "holdSeconds": 4.0
+        },
+        {
+            "action": "birddog_hold30",
+            "difficulty": "simple",
+            "sets": 1,
+            "reps": 1,
+            "holdSeconds": 2.0
+        },
+        {
+            "action": "deadbug_hold30",
+            "difficulty": "standard",
+            "sets": 1,
+            "reps": 1,
+            "holdSeconds": 3.0
+        },
+        {
+            "action": "hipthrust_hold30",
+            "difficulty": "hard",
+            "sets": 1,
+            "reps": 1,
+            "holdSeconds": 4.0
+        },
+        {
+            "action": "hipthrust_curve",
+            "difficulty": "simple",
+            "sets": 1,
+            "reps": 1,
+            "holdSeconds": 0.0
+        }
+    ]
+}

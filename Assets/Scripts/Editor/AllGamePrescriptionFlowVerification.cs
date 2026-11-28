@@ -13,7 +13,9 @@ public static class AllGamePrescriptionFlowVerification
 {
     const string Flag="AllGamePrescriptionFlowVerification",Output="output/all-game-prescriptions/";
     const BindingFlags P=BindingFlags.Instance|BindingFlags.NonPublic;
-    static readonly string[] Keys={"birddog","birddog_hold30","deadbug","deadbug_hold30","hipthrust","hipthrust_hold30","sidebridge","sidebridge_hold30","rightsidebridge","rightsidebridge_hold30","crunch","crunch_hold30","lying_cat","lyingcat_hold30","hipthrust_taiko","hipthrust_curve"};
+    static readonly string[] AllKeys={"birddog","birddog_hold30","deadbug","deadbug_hold30","hipthrust","hipthrust_hold30","sidebridge","sidebridge_hold30","rightsidebridge","rightsidebridge_hold30","crunch","crunch_hold30","lying_cat","lyingcat_hold30","hipthrust_taiko","hipthrust_curve"};
+    static string[] Keys => SessionState.GetBool("FieldRegression",false)
+        ? new[]{"crunch","crunch_hold30","lyingcat_hold30","birddog_hold30","deadbug_hold30","hipthrust_hold30","hipthrust_curve"}:AllKeys;
     static GameWorkoutScene entry;static Animator patient,coach;static AvatarMotionSource input;
     static HumanPoseHandler from,to;
     static int index,stage,checks,lastAction=-1,lastSet=-1,completedSets;
@@ -22,9 +24,11 @@ public static class AllGamePrescriptionFlowVerification
     static string runtimeException;
     static AllGamePrescriptionFlowVerification(){if(SessionState.GetBool(Flag,false)){EditorApplication.update+=Tick;Application.logMessageReceived+=ObserveLog;}}
     [MenuItem("Tools/Training/Verify All Prescriptions and Workouts")]
-    public static void Run()
+    public static void Run(){SessionState.SetBool("FieldRegression",false);StartRun();}
+    public static void RunFieldRegression(){SessionState.SetBool("FieldRegression",true);StartRun();}
+    static void StartRun()
     {
-        Directory.CreateDirectory(Output);File.WriteAllText(Output+"verification.txt","All 16 training scenes: public JSON doses and real UI/executor. Synthetic calibrated patient; no hardware/network doctor delivery claim. Playback speed=4, countdown=5 game seconds, workout rests=30 real seconds.\n");
+        Directory.CreateDirectory(Output);File.WriteAllText(Output+"verification.txt",$"{Keys.Length} training scenes: public JSON doses and real UI/executor. Synthetic calibrated patient; no hardware/network doctor delivery claim. Playback speed=4, countdown=5 game seconds, workout rests=30 real seconds.\n");
         index=stage=checks=completedSets=0;entry=null;began=sceneBegan=EditorApplication.timeSinceStartup;
         EditorSceneManager.OpenScene("Assets/Scenes/"+GameWorkoutPlan.SceneFor(Keys[0])+".unity");SessionState.SetBool(Flag,true);EditorApplication.update+=Tick;EditorApplication.isPlaying=true;
     }
@@ -52,6 +56,12 @@ public static class AllGamePrescriptionFlowVerification
             if(entry.taiko!=null&&entry.GetComponent<TrainingResultView>()?.Root==null)return;
             if(!SetupInput())return;
             Feed();
+            var preparation=entry.taikoNightAction!=null?entry.taikoNightAction.Preparation:null;
+            if(preparation!=null&&!preparation.Ready&&entry.IsMenuVisible)
+            {
+                if(!preparation.Running)preparation.Begin();
+                return;
+            }
             if(stage>=10){Workout();return;}
             Check(entry.gameObject.scene.name==GameWorkoutPlan.SceneFor(Keys[index]),"Wrong standalone scene");
             if(stage==0)
@@ -162,7 +172,7 @@ public static class AllGamePrescriptionFlowVerification
         }
         if(session.IsComplete)
         {
-            Check(completedSets==17,"Mixed workout completed wrong number of sets: "+completedSets);Time.timeScale=1;Log("PASS mixed JSON workout: all 16 game scenes, 17 sets, per-action difficulty/reps/holdSeconds, real 30s rests and automatic transitions.");
+            Check(completedSets==Keys.Length+1,"Mixed workout completed wrong number of sets: "+completedSets);Time.timeScale=1;Log($"PASS mixed JSON workout: {Keys.Length} game scenes, {Keys.Length+1} sets, per-action difficulty/reps/holdSeconds, real 30s rests and automatic transitions.");
             ResultPanel().ReturnButton.onClick.Invoke();Check(entry.IsMenuVisible,"Final workout return failed");Log("PASS ALL GAME FLOWS checks="+checks);Finish(0);return;
         }
         Check(session.IsRunning,"Workout stopped unexpectedly: "+session.Status);
@@ -173,7 +183,7 @@ public static class AllGamePrescriptionFlowVerification
                 completionSeen=true;completedSets++;CheckCompletedDose();restBegan=EditorApplication.timeSinceStartup;
                 Check(session.RestSecondsRemaining==30||session.RestSecondsRemaining==29,"Unexpected rest duration");Check(!session.AllowsStart(entry),"Manual restart allowed during rest");
                 int a=session.ActionIndex,s=session.CompletedSets;session.OnSetCompleted(entry);Check(a==session.ActionIndex&&s==session.CompletedSets,"Duplicate completion advanced plan");
-                Log($"PASS workout set {completedSets}/17 {action.action}: completion once, next action={a}, rest=30s.");
+                Log($"PASS workout set {completedSets}/{Keys.Length+1} {action.action}: completion once, next action={a}, rest=30s.");
             }
             return;
         }

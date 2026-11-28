@@ -30,10 +30,11 @@ namespace TaikoNight
         Action workout;
         Func<bool> flowTestWithoutTracker;
         Func<bool> calibrationReady;
+        Func<string> calibrationStatus;TMP_Text calibrationLabel;
 
         public static TaikoNightSelection Create(Animator patient, TMP_FontAsset font, string title, string steps,
             Action<string> change, Func<int> dose, Action begin, Action workout = null,
-            Func<bool> flowTestWithoutTracker = null, Func<bool> calibrationReady = null)
+            Func<bool> flowTestWithoutTracker = null, Func<bool> calibrationReady = null, Func<string> calibrationStatus = null)
         {
             var host = new GameObject("Taiko Difficulty Selection", typeof(RectTransform), typeof(Canvas), typeof(CanvasScaler), typeof(GraphicRaycaster));
             var canvas = host.GetComponent<Canvas>();
@@ -47,7 +48,7 @@ namespace TaikoNight
             view.patient = patient; view.font = font; view.title = title; view.steps = steps;
             view.change = change; view.readDose = dose; view.begin = begin; view.workout = workout;
             view.flowTestWithoutTracker = flowTestWithoutTracker;
-            view.calibrationReady = calibrationReady;
+            view.calibrationReady = calibrationReady;view.calibrationStatus=calibrationStatus;
             view.Build();
             return view;
         }
@@ -79,8 +80,12 @@ namespace TaikoNight
             Bind("Return", OpenGames);
             var planButton = ExtraButton(panel, "动作串  >\n" + title, new Color(.19f,.29f,.40f), 0, 0, 210, 100, OpenWorkout, 25);
             Corner(planButton, false);
-            var gamesButton = ExtraButton(panel, "动作选择", new Color(.25f,.22f,.42f), 0, 0, 225, 75, OpenGames, 29);
-            Corner(gamesButton, true);
+            if(FindObjectOfType<GameTestMenu>()==null)
+            {
+                var gamesButton = ExtraButton(panel, "动作选择", new Color(.25f,.22f,.42f), 0, 0, 225, 75, OpenGames, 29);
+                Corner(gamesButton, true);
+            }
+            if(calibrationStatus!=null)calibrationLabel=Label(panel,"",-400,-300,600,90,23,Ink);
             SetDifficulty("standard");
             RefreshInput();
         }
@@ -113,6 +118,7 @@ namespace TaikoNight
         }
         void RefreshInput()
         {
+            if(calibrationLabel!=null)calibrationLabel.text=calibrationStatus?.Invoke()??"";
             bool tracking = HasTracking();
             bool flowTest = !tracking && flowTestWithoutTracker != null && flowTestWithoutTracker();
             bool ready = HasInput();

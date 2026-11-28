@@ -31,7 +31,11 @@ public sealed class HipThrustRingBridgeView : MonoBehaviour
     TMP_Text countdownSource, countdownNumber, coachPhase, coachTiming;
     TMP_Text ruleHint;
     RectTransform assessmentPanel,holdProgress;
-    TMP_Text qualityMetric,holdMetric,repetitionMetric;
+    TMP_Text qualityMetric,holdMetric,repetitionMetric,continuousMetric;
+    bool IsTimedHold => transport.PrescriptionDose!=null&&!transport.PrescriptionDose.preserveRecordedTiming;
+    public string HoldMetricText=>holdMetric!=null?holdMetric.text:"";
+    public string HoldTargetText=>qualityMetric!=null?qualityMetric.text:"";
+    public string ContinuousMetricText=>continuousMetric!=null?continuousMetric.text:"";
     readonly Image[] phaseBadges = new Image[3];
     readonly TMP_Text[] phaseBadgeLabels = new TMP_Text[3];
     string[] PhaseNames => transport.RuleScoring!=null&&transport.RuleScoring.recordedAction!=null
@@ -69,10 +73,11 @@ public sealed class HipThrustRingBridgeView : MonoBehaviour
         SetVisible(visible);
         if (!visible) return;
         RenderAtSourceFrame(transport.IsRunning ? transport.SourceTime * transport.PhaseTimeline.sourceClip.frameRate : 0);
+        score.enabled=combo.enabled=!IsTimedHold;
         score.text = transport.Score.ToString("N0", System.Globalization.CultureInfo.InvariantCulture);
         if(transport.RuleScoring!=null&&transport.RuleScoring.sideBridge!=null&&!transport.IsRunning)score.text="0";
         combo.text = transport.RuleScoring != null ?
-            (transport.RuleScoring.sideBridge!=null?"HOLD / 100":"LAST " + transport.RuleScoring.LastRoundBest.ToString("0")) : transport.ConsecutiveHits + " COMBO";
+            (IsTimedHold||transport.RuleScoring.sideBridge!=null?"HOLD / 100":"LAST " + transport.RuleScoring.LastRoundBest.ToString("0")) : transport.ConsecutiveHits + " COMBO";
         // The mobile bootstrap converts canvases on scene load. This HUD belongs
         // to the artwork camera's render texture, so retain its world-space scale.
         hud.renderMode = RenderMode.WorldSpace;
@@ -126,7 +131,20 @@ public sealed class HipThrustRingBridgeView : MonoBehaviour
             if (transport.PrescriptionDose != null && transport.RuleScoring.sideBridge==null)
                 ruleHint.text = $"示范 {transport.CompletedDemonstrations}/{transport.PrescriptionDose.Total} 次 · " + ruleHint.text;
         }
-        if(assessmentPanel!=null)
+        if(assessmentPanel!=null&&IsTimedHold)
+        {
+            var dose=transport.PrescriptionDose;var summary=transport.Assessment?.FinalScore;
+            bool active=transport.IsRunning&&summary!=null&&summary.Kind==FinalTrainingScore.Mode.TimedHold;
+            int repetition=active?Mathf.Min(transport.CompletedDemonstrations,summary.Planned-1):0;
+            var attempt=active&&repetition>=0?summary.Attempts[repetition]:null;
+            double target=dose.HoldSeconds,valid=attempt!=null?attempt.hold:0,continuous=attempt!=null?attempt.continuous:0;
+            qualityMetric.text=$"每次目标 {target:0.##} 秒 · 第 {repetition+1}/{dose.Total} 次";
+            holdMetric.text=$"累计有效 {valid:0.0} / {target:0.##} 秒";
+            continuousMetric.text=transport.IsRunning&&!transport.RuleScoring.InputFresh?"等待动作数据":$"当前连续 {continuous:0.0} 秒";
+            repetitionMetric.text=$"连续达标 {(active?summary.ContinuousCompleted:0)}/{dose.Total} 次";
+            holdProgress.anchorMax=new Vector2(target>0?Mathf.Clamp01((float)(valid/target)):0,1);
+        }
+        else if(assessmentPanel!=null)
         {
             var side=transport.RuleScoring.sideBridge;var rule=side.Rule;
             bool started=transport.IsRunning;
@@ -203,14 +221,15 @@ public sealed class HipThrustRingBridgeView : MonoBehaviour
             coachTiming.name="Coach Timing";
             if (transport.RuleScoring != null)
                 ruleHint=Label(root.transform,"保持位计分 · 满分 100",Vector2.zero,new Vector2(240,20),11);
-            if(transport.RuleScoring!=null&&transport.RuleScoring.sideBridge!=null)
+            if(transport.RuleScoring!=null&&(IsTimedHold||transport.RuleScoring.sideBridge!=null))
             {
                 assessmentPanel=Panel(root.transform,"Measured Side Bridge",new Color(.055f,.055f,.16f,.96f));
-                qualityMetric=Label(assessmentPanel,"动作质量 — / 100",new Vector2(0,25),new Vector2(210,20),14);
-                holdMetric=Label(assessmentPanel,"有效保持",new Vector2(0,4),new Vector2(210,18),12);
+                qualityMetric=Label(assessmentPanel,"动作质量 — / 100",new Vector2(0,IsTimedHold?37:25),new Vector2(216,20),IsTimedHold?12:14);
+                holdMetric=Label(assessmentPanel,"有效保持",new Vector2(0,IsTimedHold?15:4),new Vector2(216,18),12);
+                if(IsTimedHold)continuousMetric=Label(assessmentPanel,"当前连续 0.0 秒",new Vector2(0,-7),new Vector2(216,18),12);
                 repetitionMetric=Label(assessmentPanel,"合格次数",new Vector2(0,-28),new Vector2(218,18),11);
                 var track=Panel(assessmentPanel,"Measured Hold Progress",new Color(.2f,.21f,.36f));
-                Layout(track,new Vector2(0,-11),new Vector2(194,4));
+                Layout(track,new Vector2(0,IsTimedHold?-46:-11),new Vector2(194,4));
                 holdProgress=Panel(track,"Fill",PhaseColors[1]);
                 holdProgress.anchorMin=holdProgress.anchorMax=Vector2.zero;holdProgress.offsetMin=holdProgress.offsetMax=Vector2.zero;
             }
@@ -248,7 +267,7 @@ public sealed class HipThrustRingBridgeView : MonoBehaviour
         Place(pauseButton, new Vector2(40,30), new Vector2(44,44));
         Place(menuButton, new Vector2(65,369), new Vector2(94,28));
         Place(previewPanelRect, new Vector2(720,217), new Vector2(224,185));
-        if(assessmentPanel!=null)Place(assessmentPanel,new Vector2(720,78),new Vector2(224,82));
+        if(assessmentPanel!=null)Place(assessmentPanel,new Vector2(720,IsTimedHold?65:78),new Vector2(224,IsTimedHold?108:82));
         Place(coachPhase.rectTransform,new Vector2(720,329),new Vector2(220,25));
         Place(coachTiming.rectTransform,new Vector2(720,353),new Vector2(220,20));
         if(ruleHint!=null) Place(ruleHint.rectTransform,new Vector2(714,376),new Vector2(250,20));

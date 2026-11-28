@@ -256,8 +256,8 @@ object UnifiedMobileBridge {
                 val source = JSONObject(payload.toJson())
                 val action = requireNotNull(order.singleItem)
                 val coachScene = when (action.actionId) {
-                    "bird_dog" -> if (user.profile?.gender == UserGender.Male) "maleBirdDogPractice" else "BirdDogPractice"
-                    else -> if (user.profile?.gender == UserGender.Male) "maleDeadBugPractice" else "DeadBugPractice"
+                    "bird_dog" -> "BirdDogPractice"
+                    else -> "DeadBugPractice"
                 }
                 val gameScene = if (action.actionId == "bird_dog") "BirdDogMinimal" else "SpineV2Minimal"
                 val actions = source.getJSONObject("trainingPlan").getJSONArray("recommendedActions")

@@ -51,7 +51,7 @@ object SpineFlowProtocol {
 
     /** 日常训练由推荐动作决定首次进入的教练场景。 */
     const val DEAD_BUG_PRACTICE_TARGET_SCENE = "DeadBugPractice"
-    const val MALE_DEAD_BUG_PRACTICE_TARGET_SCENE = "maleDeadBugPractice"
+    const val MALE_DEAD_BUG_PRACTICE_TARGET_SCENE = DEAD_BUG_PRACTICE_TARGET_SCENE
     const val BIRD_DOG_PRACTICE_TARGET_SCENE = "BirdDogPractice"
 
     /** 数据驱动场景：动作由下发的动作包决定，而非场景内导入的动画。 */

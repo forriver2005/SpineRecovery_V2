@@ -49,9 +49,7 @@ public sealed class SpineFlowTrainingSession : MonoBehaviour
     private const string DeadBugSceneName = "DeadBug";
     private const string DeadBugPracticeSceneName = "DeadBugPractice";
     private const string MaleDeadBugSceneName = "maleDeadBug 1";
-    private const string MaleDeadBugPracticeSceneName = "maleDeadBugPracticeOld";
     private const string BirdDogPracticeSceneName = "BirdDogPractice";
-    private const string MaleBirdDogPracticeSceneName = "maleBirdDogPracticeOld";
     private const string HipThrustPracticeSceneName = "HipThrustPractice";
     private const string MaleHipThrustPracticeSceneName = "maleHipThrustPractice";
     private const string UnifiedPracticeSceneName = "testPractice";
@@ -463,16 +461,12 @@ public sealed class SpineFlowTrainingSession : MonoBehaviour
             .Replace(" ", string.Empty);
         if (actionId.Contains("birddog"))
         {
-            return IsMaleMobileSession
-                ? MaleBirdDogPracticeSceneName
-                : BirdDogPracticeSceneName;
+            return BirdDogPracticeSceneName;
         }
 
         if (actionId.Contains("deadbug"))
         {
-            return IsMaleMobileSession
-                ? MaleDeadBugPracticeSceneName
-                : DeadBugPracticeSceneName;
+            return DeadBugPracticeSceneName;
         }
 
         if (actionId.Contains("hipthrust") || actionId.Contains("glutebridge") ||
@@ -489,6 +483,18 @@ public sealed class SpineFlowTrainingSession : MonoBehaviour
 
     public static string ResolveSceneForGender(string sceneName, bool isMale)
     {
+        // Both profiles use the current recorded courses. Accept scene names from older mobile payloads.
+        switch (sceneName)
+        {
+            case "DeadBugPracticeOld":
+            case "maleDeadBugPractice":
+            case "maleDeadBugPracticeOld":
+                return DeadBugPracticeSceneName;
+            case "BirdDogPracticeOld":
+            case "maleBirdDogPractice":
+            case "maleBirdDogPracticeOld":
+                return BirdDogPracticeSceneName;
+        }
         if (string.Equals(sceneName, "SideBridgeOppositePractice", StringComparison.Ordinal))
             return sceneName;
 
@@ -500,19 +506,9 @@ public sealed class SpineFlowTrainingSession : MonoBehaviour
             return sceneName;
         }
 
-        if (string.Equals(sceneName, DeadBugPracticeSceneName, StringComparison.Ordinal))
-        {
-            return MaleDeadBugPracticeSceneName;
-        }
-
         if (string.Equals(sceneName, DeadBugSceneName, StringComparison.Ordinal))
         {
             return MaleDeadBugSceneName;
-        }
-
-        if (string.Equals(sceneName, BirdDogPracticeSceneName, StringComparison.Ordinal))
-        {
-            return MaleBirdDogPracticeSceneName;
         }
 
         if (string.Equals(sceneName, HipThrustPracticeSceneName, StringComparison.Ordinal))
@@ -1737,9 +1733,7 @@ public sealed class SpineFlowTrainingSession : MonoBehaviour
         return RecordedAlternatingCoachMode.IsRecordedScene(sceneName) || LumbarCoachMode.ForScene(sceneName) != null ||
             string.Equals(sceneName, ActionLibrarySceneName, StringComparison.Ordinal) ||
             string.Equals(sceneName, DeadBugPracticeSceneName, StringComparison.Ordinal) ||
-            string.Equals(sceneName, MaleDeadBugPracticeSceneName, StringComparison.Ordinal) ||
             string.Equals(sceneName, BirdDogPracticeSceneName, StringComparison.Ordinal) ||
-            string.Equals(sceneName, MaleBirdDogPracticeSceneName, StringComparison.Ordinal) ||
             string.Equals(sceneName, HipThrustPracticeSceneName, StringComparison.Ordinal) ||
             string.Equals(sceneName, MaleHipThrustPracticeSceneName, StringComparison.Ordinal) ||
             string.Equals(sceneName, UnifiedPracticeSceneName, StringComparison.Ordinal);
@@ -1750,9 +1744,7 @@ public sealed class SpineFlowTrainingSession : MonoBehaviour
         return RecordedAlternatingCoachMode.IsRecordedScene(sceneName) || LumbarCoachMode.ForScene(sceneName) != null ||
             string.Equals(sceneName, ActionLibrarySceneName, StringComparison.Ordinal) ||
             string.Equals(sceneName, DeadBugPracticeSceneName, StringComparison.Ordinal) ||
-            string.Equals(sceneName, MaleDeadBugPracticeSceneName, StringComparison.Ordinal) ||
             string.Equals(sceneName, BirdDogPracticeSceneName, StringComparison.Ordinal) ||
-            string.Equals(sceneName, MaleBirdDogPracticeSceneName, StringComparison.Ordinal) ||
             string.Equals(sceneName, HipThrustPracticeSceneName, StringComparison.Ordinal) ||
             string.Equals(sceneName, MaleHipThrustPracticeSceneName, StringComparison.Ordinal);
     }

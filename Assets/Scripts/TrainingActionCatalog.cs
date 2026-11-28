@@ -41,6 +41,7 @@ public static class TrainingActionCatalog
     public static Entry ForGame(string scene) => Array.Find(Entries, entry => entry.Game == scene);
     public static Entry ForCoach(string scene)
     {
+        scene = SpineFlowTrainingSession.ResolveSceneForGender(scene, false);
         if (scene != null && scene.StartsWith("male", StringComparison.Ordinal)) scene = scene.Substring(4);
         return Array.Find(Entries, entry => entry.Coach == scene);
     }

@@ -38,9 +38,10 @@ public sealed class SceneLoadingOverlay : MonoBehaviour
         panelRect.anchorMax = Vector2.one;
         panelRect.offsetMin = panelRect.offsetMax = Vector2.zero;
 
-        TMP_Text title = CreateText(panel.transform, "正在加载", 42, new Vector2(0, 70));
+        TMP_FontAsset font = Resources.Load<TMP_FontAsset>("CoachFlow/SourceHanSansSC-Heavy SDF");
+        TMP_Text title = CreateText(panel.transform, font, "正在加载", 42, new Vector2(0, 70));
         title.alignment = TextAlignmentOptions.Center;
-        TMP_Text detail = CreateText(panel.transform, "正在准备训练场景", 24, new Vector2(0, 10));
+        TMP_Text detail = CreateText(panel.transform, font, "正在准备训练场景", 24, new Vector2(0, 10));
         detail.alignment = TextAlignmentOptions.Center;
 
         GameObject bar = new GameObject("ProgressBar", typeof(RectTransform), typeof(Image));
@@ -62,11 +63,11 @@ public sealed class SceneLoadingOverlay : MonoBehaviour
         fillRect.pivot = new Vector2(0, 0.5f);
         fillRect.sizeDelta = new Vector2(0, 0);
 
-        progressLabel = CreateText(panel.transform, "0%", 22, new Vector2(0, -95));
+        progressLabel = CreateText(panel.transform, font, "0%", 22, new Vector2(0, -95));
         progressLabel.alignment = TextAlignmentOptions.Center;
     }
 
-    private TMP_Text CreateText(Transform parent, string value, float size, Vector2 position)
+    private TMP_Text CreateText(Transform parent, TMP_FontAsset font, string value, float size, Vector2 position)
     {
         GameObject textObject = new GameObject("Text", typeof(RectTransform), typeof(TextMeshProUGUI));
         textObject.transform.SetParent(parent, false);
@@ -75,6 +76,7 @@ public sealed class SceneLoadingOverlay : MonoBehaviour
         rect.sizeDelta = new Vector2(900, 70);
         rect.anchoredPosition = position;
         TMP_Text text = textObject.GetComponent<TMP_Text>();
+        text.font = font;
         text.text = value;
         text.fontSize = size;
         text.color = Color.white;

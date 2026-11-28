@@ -2077,17 +2077,17 @@ public partial class PoseScorer : MonoBehaviour
         guidancePartsToHighlight.Clear();
         foreach (BodyPart part in AllGuidanceParts)
         {
-            if (continuousObservationActive && guidanceInputIsFresh && !HasHardPoseConstraint() &&
+            bool reached = continuousObservationActive && guidanceInputIsFresh && !HasHardPoseConstraint() &&
                 currentSegmentInfo.segmentKind == TrainingSegmentKind.CoreAction &&
                 (UsesCoachTargetCriterion || !UsesLumbarTeaching || !lumbarTeachingProfile.positiveHighlightAtTarget) &&
                 currentSegmentInfo.poseGuidanceRule.GetRole(part) ==
                     PoseGuidanceRegionRole.Active &&
                 (UsesCoachTargetCriterion || guidancePartValidity[part]) && HasPositiveTargetTracking(part) &&
                 (UsesCoachTargetCriterion ? IsCoachTargetReached(part) :
-                    UsesHipThrustTeaching ? diagnostics.Get(part).shouldActivate : guidancePartShouldClear[part]))
-            {
-                guidancePartsToHighlight.Add(part);
-            }
+                    UsesHipThrustTeaching ? diagnostics.Get(part).shouldActivate : guidancePartShouldClear[part]);
+            if (part == BodyPart.Torso && UsesCoachTargetCriterion && UsesLumbarTeaching)
+                reached = ConfirmLumbarPositiveTarget(reached, Time.unscaledDeltaTime);
+            if (reached) guidancePartsToHighlight.Add(part);
         }
 
         UpdateGuidancePartColors(diagnostics);
@@ -2128,7 +2128,8 @@ public partial class PoseScorer : MonoBehaviour
         bool modelGuidanceShown = enableModelSurfaceHighlight &&
             modelBodyPartHighlighter != null &&
             (UsesHipThrustTeaching
-                ? modelBodyPartHighlighter.ShowHipPelvis(HipThrustHeightReadyColor)
+                ? modelBodyPartHighlighter.ShowHipPelvis(
+                    HipThrustHeightReadyColor, coachController != null && coachController.IsHoldingAtSegment)
                 : modelBodyPartHighlighter.Show(guidancePartColors));
         if (modelGuidanceShown)
         {
@@ -2146,8 +2147,8 @@ public partial class PoseScorer : MonoBehaviour
     private bool ShowRecordedDeadBugAllLimbFeedback()
     {
         if (!RecordedAlternatingCoachMode.IsRecordedScene(gameObject.scene.name) ||
-            (currentSegmentInfo.segmentKind != TrainingSegmentKind.Preparation &&
-             currentSegmentInfo.segmentKind != TrainingSegmentKind.CoreAction))
+            currentSegmentInfo.segmentKind != TrainingSegmentKind.Preparation ||
+            !guidanceInputIsFresh || HasHardPoseConstraint())
         {
             return false;
         }
@@ -2353,7 +2354,7 @@ public partial class PoseScorer : MonoBehaviour
 
     private bool IsRecordedDeadBugScene =>
         guidanceExercise == PoseGuidanceExercise.DeadBug &&
-        gameObject.scene.name == "DeadBugPractice";
+        RecordedAlternatingCoachMode.IsDeadBugScene(gameObject.scene.name);
 
     private bool TryCaptureTargetedExerciseGeometry(
         out TargetedExercisePoseGeometry geometry)

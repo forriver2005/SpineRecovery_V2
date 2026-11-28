@@ -36,11 +36,13 @@ internal sealed class CoachTargetCriterion
     readonly string action;
     readonly AnatomicalMotionScoringEngine capture = new AnatomicalMotionScoringEngine(new AnatomicalMotionScoringSettings());
     readonly HipThrustHoldGeometry hip = new HipThrustHoldGeometry();
-    readonly SideBridgePoseGeometry side = new SideBridgePoseGeometry();
+    readonly SideBridgePoseGeometry side;
 
     public CoachTargetCriterion(Animator coach, Animator user, CoachMotionPackage package)
     {
         action = package.actionId;
+        side = new SideBridgePoseGeometry(action == "side_bridge_right"
+            ? SideBridgePoseGeometry.SupportSide.Right : SideBridgePoseGeometry.SupportSide.Left);
         references = new Reference[package.segments.Length];
         using (var patient = new PatientPoseReference(coach, user))
         using (var handler = new HumanPoseHandler(coach.avatar, coach.transform))
@@ -58,12 +60,12 @@ internal sealed class CoachTargetCriterion
                     Floor(coach, out r.front, out _);
                     patient.Apply();
                     hip.TryMeasurePose(patient.Animator, out r.hipRest);
-                    SideBridgePoseGeometry.TryMeasure(patient.Animator, out r.sideRest);
+                    SideBridgePoseGeometry.TryMeasure(patient.Animator, side.Side, out r.sideRest);
                     frames[frames.Length - 1].ApplyTo(ref pose); handler.SetHumanPose(ref pose);
                     r.target = capture.CaptureRawPose(coach);
                     patient.Apply();
                     hip.TryMeasurePose(patient.Animator, out r.hipTarget);
-                    SideBridgePoseGeometry.TryMeasure(patient.Animator, out r.sideTarget);
+                    SideBridgePoseGeometry.TryMeasure(patient.Animator, side.Side, out r.sideTarget);
                     references[i] = r;
                 }
                 if (action == "dead_bug" || action == "bird_dog")
@@ -95,7 +97,8 @@ internal sealed class CoachTargetCriterion
         if (segment < 0 || segment >= references.Length) return false;
         var r = references[preparation ? 0 : segment];
         if (action == "hip_thrust") return part == BodyPart.Torso && HipReached(user, r, difficulty);
-        if (action == "side_bridge") return part == BodyPart.Torso && SideReached(user, r, difficulty);
+        if (action == "side_bridge" || action == "side_bridge_right")
+            return part == BodyPart.Torso && SideReached(user, r, difficulty);
         // RhythmMovementRange endpoint quality and RhythmPoseJudge acceptance,
         // evaluated against the lesson's authored poses rather than game notes.
         if (part == BodyPart.Torso || !Floor(user, out float front, out float tilt) ||
@@ -133,9 +136,9 @@ internal sealed class CoachTargetCriterion
     bool SideReached(Animator user, Reference r, string difficulty)
     {
         // SideBridgePoseScoring: support, weighted quality and amplitude limits.
-        if (r.sideRest == null || r.sideTarget == null || !SideBridgePoseGeometry.TryMeasure(user, out var actual) ||
+        if (r.sideRest == null || r.sideTarget == null || !SideBridgePoseGeometry.TryMeasure(user, side.Side, out var actual) ||
             !side.SetTargets(r.sideRest, r.sideTarget, r.sideRest.lift, r.sideTarget.lift) ||
-            !SideBridgePoseGeometry.HasStableSupport(actual, r.sideTarget)) return false;
+            !side.HasStableSupportForSide(actual, r.sideTarget)) return false;
         float progress = side.Progress(actual);
         float tolerance = difficulty == "simple" ? 1.6f : difficulty == "hard" ? 1.05f : 1.25f;
         float quality = Mathf.Min(side.Quality(actual, r.sideTarget, tolerance),

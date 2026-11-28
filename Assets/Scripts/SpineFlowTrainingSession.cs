@@ -47,11 +47,11 @@ public sealed class SpineFlowTrainingSession : MonoBehaviour
     private const string ScoreSummaryDetail = "MEASURED_AR_SCORE_SUMMARY";
     private const string MissingDetail = "AR_DETAILS_UNAVAILABLE";
     private const string DeadBugSceneName = "DeadBug";
-    private const string DeadBugPracticeSceneName = "DeadBugPractice";
+    private const string DeadBugPracticeSceneName = CoachModeNavigation.DeadBugCoachScene;
     private const string MaleDeadBugSceneName = "maleDeadBug 1";
-    private const string MaleDeadBugPracticeSceneName = "maleDeadBugPracticeOld";
-    private const string BirdDogPracticeSceneName = "BirdDogPractice";
-    private const string MaleBirdDogPracticeSceneName = "maleBirdDogPracticeOld";
+    private const string MaleDeadBugPracticeSceneName = CoachModeNavigation.MaleDeadBugCoachScene;
+    private const string BirdDogPracticeSceneName = CoachModeNavigation.BirdDogCoachScene;
+    private const string MaleBirdDogPracticeSceneName = CoachModeNavigation.MaleBirdDogCoachScene;
     private const string HipThrustPracticeSceneName = "HipThrustPractice";
     private const string MaleHipThrustPracticeSceneName = "maleHipThrustPractice";
     private const string UnifiedPracticeSceneName = "testPractice";
@@ -372,7 +372,10 @@ public sealed class SpineFlowTrainingSession : MonoBehaviour
     /// </summary>
     public static string ResolveSceneForMobileSession(string sceneName)
     {
-        string genderScene = ResolveSceneForGender(sceneName, IsMaleMobileSession);
+        bool isMale = HasMobileSession
+            ? IsMaleMobileSession
+            : sceneName?.StartsWith("male", StringComparison.Ordinal) == true;
+        string genderScene = ResolveSceneForGender(sceneName, isMale);
 
         if (string.Equals(genderScene, ActionLibrarySceneName, StringComparison.Ordinal))
         {
@@ -428,7 +431,7 @@ public sealed class SpineFlowTrainingSession : MonoBehaviour
 
         LumbarCoachProfile lumbar = LumbarCoachMode.ForAction(action.actionId);
         if (lumbar != null)
-            return IsMaleMobileSession ? "male" + lumbar.sceneName : lumbar.sceneName;
+            return ResolveSceneForGender(lumbar.sceneName, IsMaleMobileSession);
 
         string actionId = action.actionId.Trim().ToLowerInvariant()
             .Replace("-", string.Empty)
@@ -462,8 +465,19 @@ public sealed class SpineFlowTrainingSession : MonoBehaviour
 
     public static string ResolveSceneForGender(string sceneName, bool isMale)
     {
-        if (string.Equals(sceneName, "SideBridgeOppositePractice", StringComparison.Ordinal))
-            return sceneName;
+        switch (sceneName)
+        {
+            case "DeadBugPracticeOld":
+            case "maleDeadBugPracticeOld":
+            case DeadBugPracticeSceneName:
+            case MaleDeadBugPracticeSceneName:
+                return isMale ? MaleDeadBugPracticeSceneName : DeadBugPracticeSceneName;
+            case "BirdDogPracticeOld":
+            case "maleBirdDogPracticeOld":
+            case BirdDogPracticeSceneName:
+            case MaleBirdDogPracticeSceneName:
+                return isMale ? MaleBirdDogPracticeSceneName : BirdDogPracticeSceneName;
+        }
 
         LumbarCoachProfile lumbar = LumbarCoachMode.ForScene(sceneName);
         if (lumbar != null)
@@ -473,19 +487,9 @@ public sealed class SpineFlowTrainingSession : MonoBehaviour
             return sceneName;
         }
 
-        if (string.Equals(sceneName, DeadBugPracticeSceneName, StringComparison.Ordinal))
-        {
-            return MaleDeadBugPracticeSceneName;
-        }
-
         if (string.Equals(sceneName, DeadBugSceneName, StringComparison.Ordinal))
         {
             return MaleDeadBugSceneName;
-        }
-
-        if (string.Equals(sceneName, BirdDogPracticeSceneName, StringComparison.Ordinal))
-        {
-            return MaleBirdDogPracticeSceneName;
         }
 
         if (string.Equals(sceneName, HipThrustPracticeSceneName, StringComparison.Ordinal))

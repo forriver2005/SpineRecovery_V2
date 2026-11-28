@@ -9,10 +9,13 @@ using UnityEngine.SceneManagement;
 public static class CoachModeNavigation
 {
     public const string DeadBugCoachScene = "DeadBugPractice";
+    public const string MaleDeadBugCoachScene = "maleDeadBugPractice";
     public const string BirdDogCoachScene = "BirdDogPractice";
+    public const string MaleBirdDogCoachScene = "maleBirdDogPractice";
     public const string HipThrustCoachScene = "HipThrustPractice";
     public const string SideBridgeCoachScene = "SideBridgePractice";
     public const string SideBridgeRightCoachScene = "SideBridgeOppositePractice";
+    public const string MaleSideBridgeRightCoachScene = "maleSideBridgeOppositePractice";
     private const string CrunchCoachScene = "CurlUpPractice";
     private const string LyingCatCoachScene = "CatCamelPractice";
 
@@ -40,6 +43,9 @@ public static class CoachModeNavigation
 
     public static bool HasReplayGameReturn => !string.IsNullOrWhiteSpace(replayGameScene);
 
+    public static bool IsRightSideBridgeCoachScene(string scene) =>
+        scene == SideBridgeRightCoachScene || scene == MaleSideBridgeRightCoachScene;
+
     public static IEnumerable<(string Scene, string Title)> GetGameVersionsForCoach(string coachScene)
     {
         coachScene = NormalizeSceneName(coachScene);
@@ -59,10 +65,12 @@ public static class CoachModeNavigation
         switch (NormalizeSceneName(coachScene))
         {
             case DeadBugCoachScene:
+            case MaleDeadBugCoachScene:
             case "maleDeadBugPracticeOld":
                 gameScene = DeadBugGameScene;
                 return true;
             case BirdDogCoachScene:
+            case MaleBirdDogCoachScene:
             case "maleBirdDogPracticeOld":
                 gameScene = BirdDogGameScene;
                 return true;
@@ -75,6 +83,7 @@ public static class CoachModeNavigation
                 gameScene = SideBridgeGameScene;
                 return true;
             case SideBridgeRightCoachScene:
+            case MaleSideBridgeRightCoachScene:
                 gameScene = SideBridgeRightGameScene;
                 return true;
             default:

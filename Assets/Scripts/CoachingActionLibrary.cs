@@ -79,13 +79,7 @@ public sealed class CoachingActionLibrary : MonoBehaviour
 
     private static bool IsPracticeScene(string sceneName)
     {
-        return RecordedAlternatingCoachMode.IsRecordedScene(sceneName) || LumbarCoachMode.ForScene(sceneName) != null ||
-            sceneName == "DeadBugPractice" ||
-            sceneName == "BirdDogPractice" ||
-            sceneName == "maleDeadBugPracticeOld" ||
-            sceneName == "maleBirdDogPracticeOld" ||
-            sceneName == "HipThrustPractice" ||
-            sceneName == "maleHipThrustPractice";
+        return sceneName != null && PracticeSessionController.IsCurrentCoachScene(sceneName);
     }
 
     private static void OnSceneLoaded(Scene scene, LoadSceneMode mode)
@@ -312,7 +306,18 @@ public sealed class CoachingActionLibrary : MonoBehaviour
         label.raycastTarget = false;
     }
 
-    private static string ResolvePracticeScene(Entry entry)
+    private static string ResolvePracticeScene(Entry entry) =>
+        ResolvePracticeGender(GetPracticeScene(entry));
+
+    private static string ResolvePracticeGender(string sceneName)
+    {
+        bool isMale = SpineFlowTrainingSession.HasMobileSession
+            ? SpineFlowTrainingSession.IsMaleMobileSession
+            : returnScene?.StartsWith("male", StringComparison.Ordinal) == true;
+        return SpineFlowTrainingSession.ResolveSceneForGender(sceneName, isMale);
+    }
+
+    private static string GetPracticeScene(Entry entry)
     {
         if (entry == null) return null;
 
@@ -553,7 +558,7 @@ public sealed class CoachingActionLibrary : MonoBehaviour
 
         string destination = IsPracticeScene(returnScene)
             ? returnScene : SpineFlowTrainingSession.CurrentCoachScene;
-        if (!IsPracticeScene(destination)) destination = "DeadBugPractice";
+        if (!IsPracticeScene(destination)) destination = ResolvePracticeGender(CoachModeNavigation.DeadBugCoachScene);
         if (!Application.CanStreamedLevelBeLoaded(destination))
         {
             Debug.LogError($"Action library return scene is unavailable: {destination}");

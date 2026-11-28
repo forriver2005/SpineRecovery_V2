@@ -1,0 +1,15 @@
+Field feedback regression: real callbacks + UI, synthetic patient frames.
+PASS Crunch_RingBridge_Hold30: no-data rejected, actual relaxed-pose calibration completed, visible automatic-calibration status.
+PASS Crunch_RingBridge_Hold30: target/current repetition/cumulative valid/continuous/qualified count shown; signal loss and reset covered.
+PASS LyingCat_RingBridge_Hold30: no-data rejected, actual relaxed-pose calibration completed, visible automatic-calibration status.
+PASS cat direction: rounded-back frame accepted; previous head-up/concave frame rejected.
+PASS LyingCat_RingBridge_Hold30: target/current repetition/cumulative valid/continuous/qualified count shown; signal loss and reset covered.
+PASS BirdDog_RingBridge_Hold30: no-data rejected, actual relaxed-pose calibration completed, visible automatic-calibration status.
+PASS BirdDog_RingBridge_Hold30: target/current repetition/cumulative valid/continuous/qualified count shown; signal loss and reset covered.
+PASS DeadBug_RingBridge_Hold30: no-data rejected, actual relaxed-pose calibration completed, visible automatic-calibration status.
+PASS DeadBug_RingBridge_Hold30: target/current repetition/cumulative valid/continuous/qualified count shown; signal loss and reset covered.
+PASS HipThrust_RingBridge_Hold30: no-data rejected, actual relaxed-pose calibration completed, visible automatic-calibration status.
+PASS HipThrust_RingBridge_Hold30: target/current repetition/cumulative valid/continuous/qualified count shown; signal loss and reset covered.
+PASS CrunchPractice_TaikoNight: no-data rejected, actual relaxed-pose calibration completed, visible automatic-calibration status.
+PASS dynamic crunch: external Start ignores hidden legacy calibration, actual countdown and return work.
+PASS all field feedback cases, checks=45059

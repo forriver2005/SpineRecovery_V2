@@ -48,6 +48,11 @@ namespace BridgeWave
             game.controlledClock = true;
             ApplyPrescriptionDose();
             ResetSession();
+            if (SpineRecovery.App.AppBootstrap.Instance?.Training.IsPrescribedTraining == true)
+            {
+                var guide = startMenu.GetComponentInChildren<GamingGuideButtonController>(true);
+                if (guide != null) guide.gameObject.SetActive(false);
+            }
             startMenu.TrainingStartAllowed = () => CanStart;
             startMenu.ExternalTrainingStart = () => { Begin(); return State == RunState.Countdown; };
             pauseButton.onClick.AddListener(TogglePause);

@@ -35,7 +35,7 @@ public sealed class GameWorkoutScene : MonoBehaviour
         }
     }
     public bool IsCalibrationBypassed => bridgeWave != null ? bridgeWave.IsFlowTest : scorer != null && scorer.IsCalibrationBypassed;
-    public string ReadinessStatus => bridgeWave != null ? bridgeWave.input.Message : taikoNightAction != null ? "等待动作传感器连接" : scorer != null && scorer.IsCalibrationBypassed ? "流程预览：已临时跳过校准" : scorer != null ? scorer.CalibrationInstruction : "请按提示完成姿势校准";
+    public string ReadinessStatus => bridgeWave != null ? bridgeWave.input.Message : taikoNightAction != null ? taikoNightAction.CalibrationStatus : scorer != null && scorer.IsCalibrationBypassed ? "流程预览：已临时跳过校准" : scorer != null ? scorer.CalibrationInstruction : "请按提示完成姿势校准";
     private GameWorkoutSession session;
     private GameObject panel, uiRoot, workoutToggle;
     private TMP_Text summary, details, status;

@@ -7,6 +7,7 @@ public sealed class RecordedHoldPreparation : MonoBehaviour
     readonly AnatomicalMotionScoringEngine reader=new AnatomicalMotionScoringEngine(new AnatomicalMotionScoringSettings());
     Dictionary<HumanBodyBones,Vector3> reference;
     float front,tilt;
+    public RecordedActionHoldScoring.ActionKind Kind { get; set; }
     static readonly HumanBodyBones[] Required={HumanBodyBones.LeftUpperArm,HumanBodyBones.RightUpperArm,HumanBodyBones.LeftUpperLeg,HumanBodyBones.RightUpperLeg,HumanBodyBones.LeftLowerLeg,HumanBodyBones.RightLowerLeg};
     public bool Capture(Animator coach)
     {
@@ -16,7 +17,14 @@ public sealed class RecordedHoldPreparation : MonoBehaviour
     public bool Matches(Animator patient)
     {
         if(reference==null||!DeadBugGamingPoseScorer.FloorOrientation(patient,out float actualFront,out float actualTilt))return false;
-        if(Mathf.Abs(actualTilt-tilt)>.35f||Mathf.Abs(actualFront-front)>.45f||actualFront*front<0)return false;
+        if(Kind==RecordedActionHoldScoring.ActionKind.Crunch||Kind==RecordedActionHoldScoring.ActionKind.LyingCat)
+        {
+            if(actualFront*front<=0||Mathf.Abs(actualTilt)>.85f)return false;
+        }
+        else if(Mathf.Abs(actualTilt-tilt)>.35f||Mathf.Abs(actualFront-front)>.45f||actualFront*front<0)return false;
+        // Preparation is a relaxed support posture, not an exact copy of the actor's limb angles.
+        if(Kind==RecordedActionHoldScoring.ActionKind.Crunch)return RelaxedPreparation.IsSupineBentKnee(patient);
+        if(Kind==RecordedActionHoldScoring.ActionKind.LyingCat)return RelaxedPreparation.IsFourPoint(patient);
         var pose=reader.CaptureRawPose(patient);
         foreach(var bone in Required)
             if(!pose.TryGetValue(bone,out var actual)||!reference.TryGetValue(bone,out var target)||Vector3.Angle(actual,target)>35f)return false;

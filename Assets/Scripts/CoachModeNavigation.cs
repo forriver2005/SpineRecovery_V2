@@ -1,10 +1,10 @@
 using System;
+using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 
 /// <summary>
-/// Keeps the four game/coaching routes in one place so buttons do not fall back
-/// to the legacy DeadBug/BirdDog scene names.
+/// Connects game variants to the coaching scene for the same movement.
 /// </summary>
 public static class CoachModeNavigation
 {
@@ -13,6 +13,8 @@ public static class CoachModeNavigation
     public const string HipThrustCoachScene = "HipThrustPractice";
     public const string SideBridgeCoachScene = "SideBridgePractice";
     public const string SideBridgeRightCoachScene = "SideBridgeOppositePractice";
+    private const string CrunchCoachScene = "CurlUpPractice";
+    private const string LyingCatCoachScene = "CatCamelPractice";
 
     public const string DeadBugGameScene = "DeadBug_RingSkinC_Recorded";
     public const string BirdDogGameScene = "BirdDog_RingSkinC_Recorded";
@@ -22,7 +24,6 @@ public static class CoachModeNavigation
 
     private static string replayPracticeScene;
     private static string replayGameScene;
-    private static string preferredGameScene;
     private static string tutorialScene;
     private static string tutorialDifficulty;
 
@@ -39,7 +40,21 @@ public static class CoachModeNavigation
 
     public static bool HasReplayGameReturn => !string.IsNullOrWhiteSpace(replayGameScene);
 
-    public static bool TryGetGameSceneForCoach(string coachScene, out string gameScene)
+    public static IEnumerable<(string Scene, string Title)> GetGameVersionsForCoach(string coachScene)
+    {
+        coachScene = NormalizeSceneName(coachScene);
+        for (int i = 0; i < GameTestMenu.Scenes.Length; i++)
+        {
+            string gameScene = GameTestMenu.Scenes[i];
+            if (TryGetCoachSceneForGame(gameScene, out string match) &&
+                (coachScene == match || coachScene == SpineFlowTrainingSession.ResolveSceneForGender(match, true)))
+            {
+                yield return (gameScene, GameTestMenu.Titles[i]);
+            }
+        }
+    }
+
+    private static bool TryGetDefaultGameSceneForCoach(string coachScene, out string gameScene)
     {
         var entry = TrainingActionCatalog.ForCoach(coachScene);
         if (entry != null) { gameScene = entry.Game; return true; }
@@ -77,17 +92,21 @@ public static class CoachModeNavigation
         switch (NormalizeSceneName(gameScene))
         {
             case DeadBugGameScene:
+            case "DeadBug_RingBridge_Hold30":
             case "SpineV2Minimal":
             case "DeadBugGaming":
                 coachScene = DeadBugCoachScene;
                 return true;
             case BirdDogGameScene:
+            case "BirdDog_RingBridge_Hold30":
             case "BirdDogMinimal":
             case "BirdDogGaming":
                 coachScene = BirdDogCoachScene;
                 return true;
             case HipThrustGameScene:
             case "HipThrust_RingBridge_Hold30":
+            case "HipThrust_TaikoNight_Dynamic":
+            case "BridgeWave_StandardFollow":
             case "HipThrust_RingBridge_Recorded":
             case "HipThrustMinimal":
             case "HipTrustGaming":
@@ -98,8 +117,18 @@ public static class CoachModeNavigation
                 coachScene = SideBridgeCoachScene;
                 return true;
             case SideBridgeRightGameScene:
+            case "SideBridgeOpposite_RingBridge_Dynamic":
+            case "SideBridgeOpposite_RingBridge_Hold30":
             case "SideBridgeRight_RingBridge_Hold30":
                 coachScene = SideBridgeRightCoachScene;
+                return true;
+            case "CrunchPractice_TaikoNight":
+            case "Crunch_RingBridge_Hold30":
+                coachScene = CrunchCoachScene;
+                return true;
+            case "LyingCatPractice_TaikoNight":
+            case "LyingCat_RingBridge_Hold30":
+                coachScene = LyingCatCoachScene;
                 return true;
             default:
                 coachScene = null;
@@ -109,7 +138,8 @@ public static class CoachModeNavigation
 
     public static bool IsSupportedCoachScene(string sceneName)
     {
-        return TryGetGameSceneForCoach(sceneName, out _);
+        using (var games = GetGameVersionsForCoach(sceneName).GetEnumerator())
+            return games.MoveNext();
     }
 
     public static bool IsSupportedGameScene(string sceneName)
@@ -117,7 +147,7 @@ public static class CoachModeNavigation
         return TryGetCoachSceneForGame(sceneName, out _);
     }
 
-    public static void OpenCoachFromGame(string gameScene = null)
+    public static void OpenCoachFromGame(string gameScene = null, string difficulty = null)
     {
         string source = string.IsNullOrWhiteSpace(gameScene)
             ? SceneManager.GetActiveScene().name
@@ -128,10 +158,8 @@ public static class CoachModeNavigation
             return;
         }
 
-        preferredGameScene = IsConcreteGameScene(source)
-            ? source
-            : ResolveDefaultGameScene(coachScene);
-        tutorialDifficulty = UnityEngine.Object.FindObjectOfType<DeadBugStartMenuController>(true)?.SelectedDifficultyKey ?? "standard";
+        tutorialDifficulty = difficulty ??
+            UnityEngine.Object.FindObjectOfType<DeadBugStartMenuController>(true)?.SelectedDifficultyKey ?? "standard";
         tutorialScene = SpineFlowTrainingSession.ResolveSceneForMobileSession(coachScene);
         UnityEngine.Object.FindObjectOfType<GameWorkoutSession>(true)?.Cancel();
         LoadScene(coachScene);
@@ -152,22 +180,29 @@ public static class CoachModeNavigation
 
     public static void OpenGameFromCoach(string coachScene = null)
     {
-        string source = string.IsNullOrWhiteSpace(coachScene)
-            ? SceneManager.GetActiveScene().name
-            : coachScene;
-        if (!TryGetGameSceneForCoach(source, out string gameScene))
-        {
-            Debug.LogWarning($"[CoachModeNavigation] No game scene for coach '{source}'.");
-            return;
-        }
-
         var training = SpineRecovery.App.AppBootstrap.Instance?.Training;
+        string gameScene;
         if (training?.IsV2Prescription == true)
         {
             gameScene = training.AdvancePrescriptionCoach();
             if (gameScene == null) return;
         }
-        else gameScene = ResolvePreferredGameScene(source, gameScene);
+        else
+        {
+            string source = string.IsNullOrWhiteSpace(coachScene) ? SceneManager.GetActiveScene().name : coachScene;
+            if (!TryGetDefaultGameSceneForCoach(source, out gameScene))
+            {
+                Debug.LogWarning($"[CoachModeNavigation] No game scene for coach '{source}'.");
+                return;
+            }
+        }
+        StopCurrentPractice();
+        LoadScene(gameScene);
+    }
+
+    public static void OpenSelectedGameFromCoach(string gameScene)
+    {
+        if (SpineRecovery.App.AppBootstrap.Instance?.Training.IsPrescribedTraining == true) return;
         StopCurrentPractice();
         LoadScene(gameScene);
     }
@@ -205,13 +240,12 @@ public static class CoachModeNavigation
     public static void OpenReplayFromCoach()
     {
         string coachScene = SceneManager.GetActiveScene().name;
-        if (!TryGetGameSceneForCoach(coachScene, out string gameScene))
+        if (!TryGetDefaultGameSceneForCoach(coachScene, out string gameScene))
         {
             Debug.LogWarning($"[CoachModeNavigation] Replay return is unavailable for '{coachScene}'.");
             return;
         }
 
-        gameScene = ResolvePreferredGameScene(coachScene, gameScene);
         StopCurrentPractice();
         replayPracticeScene = coachScene;
         replayGameScene = gameScene;
@@ -259,37 +293,6 @@ public static class CoachModeNavigation
         }
 
         SceneLoadingOverlay.Load(resolved);
-    }
-
-    private static string ResolvePreferredGameScene(string coachScene, string fallback)
-    {
-        return IsConcreteGameScene(preferredGameScene) &&
-            TryGetCoachSceneForGame(preferredGameScene, out string preferredCoach) &&
-            string.Equals(
-                NormalizeSceneName(preferredCoach),
-                NormalizeSceneName(coachScene),
-                StringComparison.Ordinal)
-            ? preferredGameScene
-            : fallback;
-    }
-
-    private static string ResolveDefaultGameScene(string coachScene)
-    {
-        return TryGetGameSceneForCoach(coachScene, out string gameScene)
-            ? gameScene
-            : null;
-    }
-
-    private static bool IsConcreteGameScene(string sceneName)
-    {
-        return TrainingActionCatalog.ForGame(sceneName) != null || string.Equals(sceneName, DeadBugGameScene, StringComparison.Ordinal) ||
-            string.Equals(sceneName, BirdDogGameScene, StringComparison.Ordinal) ||
-            string.Equals(sceneName, HipThrustGameScene, StringComparison.Ordinal) ||
-            string.Equals(sceneName, SideBridgeGameScene, StringComparison.Ordinal) ||
-            string.Equals(sceneName, SideBridgeRightGameScene, StringComparison.Ordinal) ||
-            string.Equals(sceneName, "HipThrust_RingBridge_Hold30", StringComparison.Ordinal) ||
-            string.Equals(sceneName, "SideBridge_RingBridge_Hold30", StringComparison.Ordinal) ||
-            string.Equals(sceneName, "SideBridgeRight_RingBridge_Hold30", StringComparison.Ordinal);
     }
 
     private static string NormalizeSceneName(string sceneName)

@@ -1,0 +1,27 @@
+Final score v2: settlement-only model and scene replay; no physical device validation.
+UNIT 30 fps: target95/process0/return95 -> 90.25, complete=1.
+UNIT 60 fps: target95/process0/return95 -> 90.25, complete=1.
+UNIT 120 fps: target95/process0/return95 -> 90.25, complete=1.
+PASS pure: 80/5/15, frame rate invariance, 27/30=90, 5/30=16.7, cumulative/continuous separation, no input, coverage and bounded filtering.
+SCENE BirdDog_RingSkinC_Recorded 30fps Repetition: score=100.00, target=100.0, process=100.0, return=100.0, coverage=1.000, hold=0.000/0.000, complete=8/8
+SCENE BirdDog_RingSkinC_Recorded 60fps Repetition: score=100.00, target=100.0, process=100.0, return=100.0, coverage=1.000, hold=0.000/0.000, complete=8/8
+ZERO PROCESS BirdDog_RingSkinC_Recorded: score=95, complete=8
+SCENE DeadBug_RingSkinC_Recorded 30fps Repetition: score=99.77, target=99.7, process=100.0, return=100.0, coverage=1.000, hold=0.000/0.000, complete=8/8
+SCENE DeadBug_RingSkinC_Recorded 60fps Repetition: score=99.57, target=99.5, process=100.0, return=100.0, coverage=1.000, hold=0.000/0.000, complete=8/8
+ZERO PROCESS DeadBug_RingSkinC_Recorded: score=95, complete=8
+SCENE HipThrust_RingBridge_NewScoring 30fps Repetition: score=100.00, target=100.0, process=100.0, return=100.0, coverage=1.000, hold=0.000/11.400, complete=8/8
+SCENE HipThrust_RingBridge_NewScoring 60fps Repetition: score=100.00, target=100.0, process=100.0, return=100.0, coverage=1.000, hold=0.000/11.400, complete=8/8
+ZERO PROCESS HipThrust_RingBridge_NewScoring: score=95, complete=8
+SCENE HipThrust_RingBridge_Hold30 30fps TimedHold: score=100.00, target=0.0, process=0.0, return=0.0, coverage=1.000, hold=119.999/120.000, complete=0/4
+SCENE HipThrust_RingBridge_Hold30 60fps TimedHold: score=100.00, target=0.0, process=0.0, return=0.0, coverage=1.000, hold=119.999/120.000, complete=0/4
+GAP HipThrust_RingBridge_Hold30: score=99, valid=118.80, longest=15.00, continuous=0
+SCENE SideBridge_RingBridge_Dynamic 30fps Repetition: score=100.00, target=100.0, process=100.0, return=100.0, coverage=1.000, hold=0.000/16.700, complete=3/3
+SCENE SideBridge_RingBridge_Dynamic 60fps Repetition: score=100.00, target=100.0, process=100.0, return=100.0, coverage=1.000, hold=0.000/16.700, complete=3/3
+ZERO PROCESS SideBridge_RingBridge_Dynamic: score=95, complete=3
+SCENE SideBridge_RingBridge_Hold30 30fps TimedHold: score=100.00, target=0.0, process=0.0, return=0.0, coverage=1.000, hold=90.000/90.000, complete=0/3
+SCENE SideBridge_RingBridge_Hold30 60fps TimedHold: score=100.00, target=0.0, process=0.0, return=0.0, coverage=1.000, hold=90.000/90.000, complete=0/3
+GAP SideBridge_RingBridge_Hold30: score=99, valid=89.10, longest=15.00, continuous=0
+SCENE HipThrust_TaikoNight_Dynamic 30fps Repetition: score=100.00, target=100.0, process=100.0, return=100.0, coverage=1.000, hold=0.000/15.400, complete=8/8
+SCENE HipThrust_TaikoNight_Dynamic 60fps Repetition: score=100.00, target=100.0, process=100.0, return=100.0, coverage=1.000, hold=0.000/15.400, complete=8/8
+ZERO PROCESS HipThrust_TaikoNight_Dynamic: score=95, complete=8
+PASS all shared game scenes. Checks=1994

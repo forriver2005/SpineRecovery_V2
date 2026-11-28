@@ -18,7 +18,7 @@ MonoBehaviour:
   repeatEndFrame: 300
   cycles:
   - liftStartFrame: 0
-    holdStartFrame: 165
+    holdStartFrame: 120
     lowerStartFrame: 180
     lowerEndFrame: 300
     lowHeight: 0
@@ -29,39 +29,39 @@ MonoBehaviour:
     - serializedVersion: 3
       time: 0
       value: 0
-      inSlope: 0.006060606
-      outSlope: 0.006060606
+      inSlope: 0
+      outSlope: 0.008333334
       tangentMode: 69
       weightedMode: 0
-      inWeight: 0.33333334
-      outWeight: 0.33333334
+      inWeight: 0
+      outWeight: 0
     - serializedVersion: 3
-      time: 165
+      time: 120
       value: 1
-      inSlope: 0.006060606
-      outSlope: -0.00006666581
+      inSlope: 0.008333334
+      outSlope: -0.000016666452
       tangentMode: 69
       weightedMode: 0
-      inWeight: 0.33333334
-      outWeight: 0.33333334
+      inWeight: 0
+      outWeight: 0
     - serializedVersion: 3
       time: 180
       value: 0.999
-      inSlope: -0.00006666581
+      inSlope: -0.000016666452
       outSlope: -0.008325
       tangentMode: 69
       weightedMode: 0
-      inWeight: 0.33333334
-      outWeight: 0.33333334
+      inWeight: 0
+      outWeight: 0
     - serializedVersion: 3
       time: 300
       value: 0
       inSlope: -0.008325
-      outSlope: -0.008325
+      outSlope: 0
       tangentMode: 69
       weightedMode: 0
-      inWeight: 0.33333334
-      outWeight: 0.33333334
+      inWeight: 0
+      outWeight: 0
     m_PreInfinity: 2
     m_PostInfinity: 2
     m_RotationOrder: 4

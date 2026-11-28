@@ -16,7 +16,7 @@ namespace TaikoNight
         readonly Button[] difficulties = new Button[3];
         RectTransform panel, dialog;
         Button start;
-        TMP_Text startLabel, times, resultLabel;
+        TMP_Text startLabel, times, resultLabel, calibrationLabel;
         TMP_FontAsset font;
         AvatarMotionSource source;
         Animator patient;
@@ -30,11 +30,12 @@ namespace TaikoNight
         Func<bool> flowTestWithoutTracker;
         Func<bool> calibrationReady;
         Func<string> startBlockedReason;
+        Func<string> calibrationStatus;
 
         public static TaikoNightSelection Create(Animator patient, TMP_FontAsset font, string title, string steps,
             Action<string> change, Func<int> dose, Action begin, Action workout = null,
             Func<bool> flowTestWithoutTracker = null, Func<bool> calibrationReady = null,
-            Func<string> startBlockedReason = null)
+            Func<string> startBlockedReason = null, Func<string> calibrationStatus = null)
         {
             var host = new GameObject("Taiko Difficulty Selection", typeof(RectTransform), typeof(Canvas), typeof(CanvasScaler), typeof(GraphicRaycaster));
             var canvas = host.GetComponent<Canvas>();
@@ -50,6 +51,7 @@ namespace TaikoNight
             view.flowTestWithoutTracker = flowTestWithoutTracker;
             view.calibrationReady = calibrationReady;
             view.startBlockedReason = startBlockedReason;
+            view.calibrationStatus = calibrationStatus;
             view.Build();
             return view;
         }
@@ -90,9 +92,14 @@ namespace TaikoNight
             var planButton = ExtraButton(panel, "动作串  >\n" + title, new Color(.19f,.29f,.40f), 0, 0, 210, 100, OpenWorkout, 25);
             Corner(planButton, false);
             planButton.gameObject.SetActive(!Prescribed);
-            var gamesButton = ExtraButton(panel, "动作选择", new Color(.25f,.22f,.42f), 0, 0, 225, 75, OpenGames, 29);
-            Corner(gamesButton, true);
-            gamesButton.gameObject.SetActive(SpineRecovery.App.AppBootstrap.Instance?.Training.CurrentPlan == null);
+            if (FindObjectOfType<GameTestMenu>() == null &&
+                SpineRecovery.App.AppBootstrap.Instance?.Training.CurrentPlan == null)
+            {
+                var gamesButton = ExtraButton(panel, "动作选择", new Color(.25f,.22f,.42f), 0, 0, 225, 75, OpenGames, 29);
+                Corner(gamesButton, true);
+            }
+            if (calibrationStatus != null)
+                calibrationLabel = Label(panel, "", -400, -300, 600, 90, 23, Ink);
             SetDifficulty(Prescribed ? SpineRecovery.App.AppBootstrap.Instance.Training.CurrentPrescriptionDifficulty : "standard");
             RefreshInput();
         }
@@ -129,6 +136,7 @@ namespace TaikoNight
         }
         void RefreshInput()
         {
+            if (calibrationLabel != null) calibrationLabel.text = calibrationStatus?.Invoke() ?? "";
             bool tracking = HasTracking();
             bool flowTest = !Prescribed && !tracking && flowTestWithoutTracker != null && flowTestWithoutTracker();
             bool ready = HasInput();
@@ -166,6 +174,11 @@ namespace TaikoNight
         }
         void OpenGuide()
         {
+            if (SpineRecovery.App.AppBootstrap.Instance?.Training.IsPrescribedTraining != true)
+            {
+                CoachModeNavigation.OpenCoachFromGame(gameObject.scene.name, difficulty);
+                return;
+            }
             OpenDialog("查看教程");
             Label(dialog, steps, 0, 30, 1080, 80, 42, Ink);
             Label(dialog, "跟随左侧教练动作。保持段结束后，跟随教练放下。\n传感器记录到达标动作时，鼓面会亮起。", 0, -75, 1080, 120, 30, Ink);

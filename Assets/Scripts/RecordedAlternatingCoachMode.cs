@@ -13,18 +13,22 @@ public static class RecordedAlternatingCoachMode
         SceneManager.sceneLoaded += OnSceneLoaded;
     }
 
-    public static bool IsRecordedScene(string name) => name == "DeadBugPractice" || name == "BirdDogPractice";
+    public static bool IsDeadBugScene(string name) =>
+        name == CoachModeNavigation.DeadBugCoachScene || name == CoachModeNavigation.MaleDeadBugCoachScene;
+
+    public static bool IsRecordedScene(string name) => IsDeadBugScene(name) ||
+        name == CoachModeNavigation.BirdDogCoachScene || name == CoachModeNavigation.MaleBirdDogCoachScene;
 
     private static void OnSceneLoaded(Scene scene, LoadSceneMode mode)
     {
-        bool deadBug = scene.name == "DeadBugPractice";
-        bool birdDog = scene.name == "BirdDogPractice";
-        if (!deadBug && !birdDog) return;
+        if (!IsRecordedScene(scene.name)) return;
+        bool deadBug = IsDeadBugScene(scene.name);
         var source = Resources.Load<TextAsset>(deadBug ? "ActionLibrary/Motions/clip_29" : "CoachMotions/BirdDogRecordedSides");
         string json = source?.text;
         if (string.IsNullOrEmpty(json)) return;
         var recording = JsonUtility.FromJson<CoachMotionPackage>(json);
         var package = recording.segments.Length == 1 ? Build(recording, deadBug) : recording;
+        SpineFlowTrainingSession.CacheMotionPackage(package);
         foreach (var root in scene.GetRootGameObjects())
         {
             var coach = root.GetComponentInChildren<SegmentedCoachController>(true);

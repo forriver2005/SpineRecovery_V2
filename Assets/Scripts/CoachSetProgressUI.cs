@@ -94,7 +94,7 @@ public class CoachSetProgressUI : MonoBehaviour
         string action = VoicePromptManager.GetPracticeActionKey();
         string name = action == "deadbug" ? "死虫" : action == "birddog" ? "鸟狗" :
             action == "hipthrust" ? "臀桥" : action == "catcamel" ? "卧位猫式" :
-            action == "sidebridge" ? "侧桥" : action == "curlup" ? "卷腹" : "动作课程";
+            action == "sidebridge" ? GetLessonActionTitle(action) : action == "curlup" ? "卷腹" : "动作课程";
         progressText.text = stage == "动作讲解"
             ? GetLessonActionTitle(action)
             : $"{name} · {stage}";
@@ -163,7 +163,7 @@ public class CoachSetProgressUI : MonoBehaviour
 
     private static string FormatTarget(CoachGuidanceLimb limbs)
     {
-        if (UnityEngine.SceneManagement.SceneManager.GetActiveScene().name == "SideBridgeOppositePractice")
+        if (CoachModeNavigation.IsRightSideBridgeCoachScene(UnityEngine.SceneManagement.SceneManager.GetActiveScene().name))
             return " · 右侧支撑 · 躯干";
         if (limbs == CoachGuidanceLimb.None)
         {
@@ -171,8 +171,7 @@ public class CoachSetProgressUI : MonoBehaviour
             {
                 case "hipthrust": return " · 臀部";
                 case "catcamel": return " · 背部";
-                case "sidebridge": return UnityEngine.SceneManagement.SceneManager.GetActiveScene().name == "SideBridgeOppositePractice"
-                    ? " · 右侧支撑 · 躯干" : " · 左侧支撑 · 躯干";
+                case "sidebridge": return " · 左侧支撑 · 躯干";
                 case "curlup": return " · 上背";
                 default: return string.Empty;
             }
@@ -193,7 +192,8 @@ public class CoachSetProgressUI : MonoBehaviour
             case "birddog": return "鸟狗式";
             case "hipthrust": return "臀桥";
             case "catcamel": return "卧位猫式";
-            case "sidebridge": return "侧桥";
+            case "sidebridge": return CoachModeNavigation.IsRightSideBridgeCoachScene(
+                UnityEngine.SceneManagement.SceneManager.GetActiveScene().name) ? "右侧桥" : "侧桥";
             case "curlup": return "卷腹";
             default: return "动作";
         }

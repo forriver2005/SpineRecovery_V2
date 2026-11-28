@@ -47,9 +47,11 @@ public sealed class SpineFlowTrainingSession : MonoBehaviour
     private const string ScoreSummaryDetail = "MEASURED_AR_SCORE_SUMMARY";
     private const string MissingDetail = "AR_DETAILS_UNAVAILABLE";
     private const string DeadBugSceneName = "DeadBug";
-    private const string DeadBugPracticeSceneName = "DeadBugPractice";
+    private const string DeadBugPracticeSceneName = CoachModeNavigation.DeadBugCoachScene;
     private const string MaleDeadBugSceneName = "maleDeadBug 1";
-    private const string BirdDogPracticeSceneName = "BirdDogPractice";
+    private const string MaleDeadBugPracticeSceneName = CoachModeNavigation.MaleDeadBugCoachScene;
+    private const string BirdDogPracticeSceneName = CoachModeNavigation.BirdDogCoachScene;
+    private const string MaleBirdDogPracticeSceneName = CoachModeNavigation.MaleBirdDogCoachScene;
     private const string HipThrustPracticeSceneName = "HipThrustPractice";
     private const string MaleHipThrustPracticeSceneName = "maleHipThrustPractice";
     private const string UnifiedPracticeSceneName = "testPractice";
@@ -395,7 +397,10 @@ public sealed class SpineFlowTrainingSession : MonoBehaviour
     /// </summary>
     public static string ResolveSceneForMobileSession(string sceneName)
     {
-        string genderScene = ResolveSceneForGender(sceneName, IsMaleMobileSession);
+        bool isMale = HasMobileSession
+            ? IsMaleMobileSession
+            : sceneName?.StartsWith("male", StringComparison.Ordinal) == true;
+        string genderScene = ResolveSceneForGender(sceneName, isMale);
 
         if (string.Equals(genderScene, ActionLibrarySceneName, StringComparison.Ordinal))
         {
@@ -453,7 +458,7 @@ public sealed class SpineFlowTrainingSession : MonoBehaviour
         if (entry != null) return ResolveSceneForGender(entry.Coach, IsMaleMobileSession);
         LumbarCoachProfile lumbar = LumbarCoachMode.ForAction(action.actionId);
         if (lumbar != null)
-            return IsMaleMobileSession ? "male" + lumbar.sceneName : lumbar.sceneName;
+            return ResolveSceneForGender(lumbar.sceneName, IsMaleMobileSession);
 
         string actionId = action.actionId.Trim().ToLowerInvariant()
             .Replace("-", string.Empty)
@@ -461,12 +466,12 @@ public sealed class SpineFlowTrainingSession : MonoBehaviour
             .Replace(" ", string.Empty);
         if (actionId.Contains("birddog"))
         {
-            return BirdDogPracticeSceneName;
+            return ResolveSceneForGender(BirdDogPracticeSceneName, IsMaleMobileSession);
         }
 
         if (actionId.Contains("deadbug"))
         {
-            return DeadBugPracticeSceneName;
+            return ResolveSceneForGender(DeadBugPracticeSceneName, IsMaleMobileSession);
         }
 
         if (actionId.Contains("hipthrust") || actionId.Contains("glutebridge") ||
@@ -483,20 +488,19 @@ public sealed class SpineFlowTrainingSession : MonoBehaviour
 
     public static string ResolveSceneForGender(string sceneName, bool isMale)
     {
-        // Both profiles use the current recorded courses. Accept scene names from older mobile payloads.
         switch (sceneName)
         {
             case "DeadBugPracticeOld":
-            case "maleDeadBugPractice":
             case "maleDeadBugPracticeOld":
-                return DeadBugPracticeSceneName;
+            case DeadBugPracticeSceneName:
+            case MaleDeadBugPracticeSceneName:
+                return isMale ? MaleDeadBugPracticeSceneName : DeadBugPracticeSceneName;
             case "BirdDogPracticeOld":
-            case "maleBirdDogPractice":
             case "maleBirdDogPracticeOld":
-                return BirdDogPracticeSceneName;
+            case BirdDogPracticeSceneName:
+            case MaleBirdDogPracticeSceneName:
+                return isMale ? MaleBirdDogPracticeSceneName : BirdDogPracticeSceneName;
         }
-        if (string.Equals(sceneName, "SideBridgeOppositePractice", StringComparison.Ordinal))
-            return sceneName;
 
         LumbarCoachProfile lumbar = LumbarCoachMode.ForScene(sceneName);
         if (lumbar != null)

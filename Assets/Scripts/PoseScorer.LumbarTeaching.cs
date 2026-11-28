@@ -71,7 +71,11 @@ public partial class PoseScorer
         }
 
         bool isInsideEnterBand = progress >= lumbarTeachingProfile.feedbackEnterMin && progress <= lumbarTeachingProfile.feedbackEnterMax;
+        return ConfirmLumbarPositiveTarget(isInsideEnterBand, Time.deltaTime);
+    }
 
+    private bool ConfirmLumbarPositiveTarget(bool isInsideEnterBand, float deltaTime)
+    {
         if (!lumbarPositiveHighlightCandidateActive)
         {
             if (!isInsideEnterBand)
@@ -88,7 +92,7 @@ public partial class PoseScorer
         }
 
         lumbarPositiveHighlightStableSeconds += Mathf.Clamp(
-            Time.deltaTime,
+            deltaTime,
             0f,
             0.1f);
         if (lumbarPositiveHighlightStableSeconds >= lumbarTeachingProfile.feedbackStableSeconds)

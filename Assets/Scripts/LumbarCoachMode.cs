@@ -1,4 +1,5 @@
 using System;
+using System;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.SceneManagement;
@@ -18,6 +19,7 @@ public sealed class LumbarCoachProfile
     public TrackerWearLocation[] targetHapticLocations;
     public HumanBodyBones[][] targetHapticMovementBones;
     public bool positiveHighlightAtTarget;
+    public bool rightSupport;
     public float[] recordedStart, recordedTarget;
     public float feedbackEnterMin = 0.88f, feedbackEnterMax = 1.12f;
     public float feedbackReleaseMin = 0.78f, feedbackReleaseMax = 1.22f;
@@ -62,22 +64,7 @@ public static class LumbarCoachMode
                 HumanBodyBones.RightUpperArm, HumanBodyBones.LeftLowerArm, HumanBodyBones.RightLowerArm }),
             movementBones = TrunkMotion
         },
-        new LumbarCoachProfile
-        {
-            actionId = "side_bridge", displayName = "侧桥", sceneName = "SideBridgePractice", clip = 27,
-            from = 14f, peak = 17f, returnFrom = 23f, to = 26f,
-            preparation = "侧卧支撑准备，先看清示范侧别",
-            instruction = "按录制侧别短暂撑起，正常呼吸；可随时回落",
-            recovery = "缓慢放下骨盆，回到侧卧支撑位休息",
-            active = PoseGuidanceRegionMask.Torso, support = BothLegs | PoseGuidanceRegionMask.LeftArm,
-            targetHapticLocations = new[] { TrackerWearLocation.Abdomen },
-            targetHapticMovementBones = new[]
-                { Join(TrunkMotion, new[] { HumanBodyBones.LeftUpperLeg, HumanBodyBones.RightUpperLeg }) },
-            positiveHighlightAtTarget = true,
-            feedbackEnterMin = 0.88f, feedbackEnterMax = 1.12f, feedbackReleaseMin = 0.78f, feedbackReleaseMax = 1.22f, feedbackStableSeconds = 0.2f,
-            scoringBones = Join(Torso, Legs, new[] { HumanBodyBones.LeftUpperArm, HumanBodyBones.LeftLowerArm }),
-            movementBones = Join(TrunkMotion, new[] { HumanBodyBones.LeftUpperLeg, HumanBodyBones.RightUpperLeg })
-        },
+        CreateSideBridgeProfile(false),
         new LumbarCoachProfile
         {
             actionId = "curl_up", displayName = "卷腹", sceneName = "CurlUpPractice", clip = 28,
@@ -92,13 +79,39 @@ public static class LumbarCoachMode
             feedbackEnterMin = 0.86f, feedbackEnterMax = 1.10f, feedbackReleaseMin = 0.78f, feedbackReleaseMax = 1.18f, feedbackStableSeconds = 0.20f,
             scoringBones = Join(Torso, Legs), movementBones = TrunkMotion
         },
+        CreateSideBridgeProfile(true)
     };
+
+    private static LumbarCoachProfile CreateSideBridgeProfile(bool rightSupport)
+    {
+        var movement = Join(TrunkMotion, new[] { HumanBodyBones.LeftUpperLeg, HumanBodyBones.RightUpperLeg });
+        var supportArm = rightSupport
+            ? new[] { HumanBodyBones.RightUpperArm, HumanBodyBones.RightLowerArm }
+            : new[] { HumanBodyBones.LeftUpperArm, HumanBodyBones.LeftLowerArm };
+        return new LumbarCoachProfile
+        {
+            actionId = rightSupport ? "side_bridge_right" : "side_bridge",
+            displayName = rightSupport ? "右侧桥" : "侧桥",
+            sceneName = rightSupport ? CoachModeNavigation.SideBridgeRightCoachScene : CoachModeNavigation.SideBridgeCoachScene,
+            rightSupport = rightSupport, clip = 27,
+            from = 14f, peak = 17f, returnFrom = 23f, to = 26f,
+            preparation = rightSupport ? "右侧卧，右前臂支撑准备" : "侧卧支撑准备，先看清示范侧别",
+            instruction = "按录制侧别短暂撑起，正常呼吸；可随时回落",
+            recovery = "缓慢放下骨盆，回到侧卧支撑位休息",
+            active = PoseGuidanceRegionMask.Torso,
+            support = BothLegs | (rightSupport ? PoseGuidanceRegionMask.RightArm : PoseGuidanceRegionMask.LeftArm),
+            targetHapticLocations = new[] { TrackerWearLocation.Abdomen },
+            targetHapticMovementBones = new[] { movement },
+            positiveHighlightAtTarget = true,
+            scoringBones = Join(Torso, Legs, supportArm),
+            movementBones = movement
+        };
+    }
 
     public static LumbarCoachProfile ForScene(string scene)
     {
         foreach (LumbarCoachProfile profile in Profiles)
-            if (scene == profile.sceneName || scene == "male" + profile.sceneName ||
-                (profile.actionId == "side_bridge" && scene == "SideBridgeOppositePractice")) return profile;
+            if (scene == profile.sceneName || scene == "male" + profile.sceneName) return profile;
         return null;
     }
 
@@ -113,6 +126,8 @@ public static class LumbarCoachMode
         if (id == "catcamel" || id == "catcow") return Profiles[0];
         if (id == "sideplank" || id == "sidebridge") return Profiles[1];
         if (id == "curlup" || id == "crunch") return Profiles[2];
+        if (id == "rightsidebridge" || id == "rightsidebridgehold30" || id == "sidebridgerighthold30")
+            return Profiles[3];
         return null;
     }
 
@@ -149,7 +164,7 @@ public static class LumbarCoachMode
             if (scorer != null)
             {
                 scorer.ConfigureLumbarTeaching(profile);
-                if (profile.actionId == "side_bridge")
+                if (profile.actionId == "side_bridge" || profile.rightSupport)
                 {
                     foreach (var coachRoot in scene.GetRootGameObjects())
                     {
@@ -167,6 +182,8 @@ public static class LumbarCoachMode
         CoachMotionFrame[] up = Slice(recorded.segments[0].frames, profile.from, profile.peak);
         CoachMotionFrame[] down = Slice(recorded.segments[0].frames, profile.returnFrom, profile.to);
         if (up.Length < 2 || down.Length < 2) return null;
+        if (profile.rightSupport)
+            MirrorSideBridge(up, down);
         CoachMotionFrame.AlignSegmentEndpoints(
             down,
             up[up.Length - 1],
@@ -176,7 +193,7 @@ public static class LumbarCoachMode
         return new CoachMotionPackage
         {
             actionId = profile.actionId, displayName = profile.displayName,
-            packageId = "clip_" + profile.clip + "_teaching", packageVersion = "1",
+            packageId = "clip_" + profile.clip + (profile.rightSupport ? "_right_teaching" : "_teaching"), packageVersion = "1",
             sourceClipName = recorded.sourceClipName, fps = recorded.fps, setCount = 1,
             segments = new[]
             {
@@ -186,6 +203,42 @@ public static class LumbarCoachMode
                 Segment(profile, "舒适放松结束，可暂停或结束练习", new[] { Copy(down[down.Length - 1], 0f) }, false)
             }
         };
+    }
+
+    private static void MirrorSideBridge(CoachMotionFrame[] up, CoachMotionFrame[] down)
+    {
+        string[] names = HumanTrait.MuscleName;
+        var leftIndices = new List<int>();
+        var rightIndices = new List<int>();
+        var midlineIndices = new List<int>();
+        for (int i = 0; i < names.Length; i++)
+        {
+            if (names[i].StartsWith("Left", StringComparison.Ordinal))
+            {
+                leftIndices.Add(i);
+                rightIndices.Add(Array.IndexOf(names, "Right" + names[i].Substring(4)));
+            }
+            else if (!names[i].StartsWith("Right", StringComparison.Ordinal) &&
+                     names[i].EndsWith("Left-Right", StringComparison.Ordinal))
+            {
+                midlineIndices.Add(i);
+            }
+        }
+
+        foreach (var frames in new[] { up, down })
+        foreach (CoachMotionFrame frame in frames)
+        {
+            for (int i = 0; i < leftIndices.Count; i++)
+            {
+                int left = leftIndices[i], right = rightIndices[i];
+                (frame.muscles[left], frame.muscles[right]) = (frame.muscles[right], frame.muscles[left]);
+            }
+            foreach (int index in midlineIndices)
+                frame.muscles[index] = -frame.muscles[index];
+            frame.bodyPosition.x = -frame.bodyPosition.x;
+            Quaternion rotation = frame.bodyRotation;
+            frame.bodyRotation = new Quaternion(rotation.x, -rotation.y, -rotation.z, rotation.w);
+        }
     }
 
     private static CoachMotionSegment Segment(LumbarCoachProfile profile, string label, CoachMotionFrame[] frames, bool core)

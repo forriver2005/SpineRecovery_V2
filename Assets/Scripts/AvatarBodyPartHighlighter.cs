@@ -35,6 +35,7 @@ public sealed class AvatarBodyPartHighlighter : MonoBehaviour
     private Material runtimeMaterial;
     private MaterialPropertyBlock colorPropertyBlock;
     private bool isBuilt;
+    private bool hipPelvisBuiltAtTarget;
     private float nextAutomaticBuildAttemptTime;
     private int buildAttemptCount;
 
@@ -103,6 +104,7 @@ public sealed class AvatarBodyPartHighlighter : MonoBehaviour
         }
 
         targetAnimator = animator;
+        hipPelvisBuiltAtTarget = false;
         Rebuild();
     }
 
@@ -122,10 +124,28 @@ public sealed class AvatarBodyPartHighlighter : MonoBehaviour
         }
     }
 
-    public void Rebuild()
+    public void Rebuild() => Rebuild(false);
+
+    private void Rebuild(bool pelvisOnly)
     {
         buildAttemptCount++;
-        ClearGeneratedOverlays();
+        if (pelvisOnly && overlays.TryGetValue(BodyPart.HipPelvis, out var pelvisRenderers))
+        {
+            foreach (SkinnedMeshRenderer renderer in pelvisRenderers)
+            {
+                if (renderer == null) continue;
+                renderer.enabled = false;
+                generatedMeshes.Remove(renderer.sharedMesh);
+                DisposeUnityObject(renderer.sharedMesh);
+                DisposeUnityObject(renderer.gameObject);
+            }
+            pelvisRenderers.Clear();
+        }
+        else
+        {
+            pelvisOnly = false;
+            ClearGeneratedOverlays();
+        }
         if (targetAnimator == null)
         {
             ScheduleAutomaticBuildRetry();
@@ -138,7 +158,7 @@ public sealed class AvatarBodyPartHighlighter : MonoBehaviour
             ScheduleAutomaticBuildRetry();
             return;
         }
-        InitializePartLists();
+        if (!pelvisOnly) InitializePartLists();
 
         SkinnedMeshRenderer[] sources =
             targetAnimator.GetComponentsInChildren<SkinnedMeshRenderer>(true);
@@ -164,7 +184,7 @@ public sealed class AvatarBodyPartHighlighter : MonoBehaviour
 
             try
             {
-                BuildOverlaysForRenderer(source);
+                BuildOverlaysForRenderer(source, pelvisOnly);
             }
             catch (UnityException exception)
             {
@@ -201,8 +221,16 @@ public sealed class AvatarBodyPartHighlighter : MonoBehaviour
         return ShowParts(parts);
     }
 
-    public bool ShowHipPelvis(Color color)
+    public bool ShowHipPelvis(Color color, bool holdingAtTarget)
     {
+        if (holdingAtTarget && !hipPelvisBuiltAtTarget && targetAnimator != null)
+        {
+            // Build the pose-dependent mask once at the held target, after
+            // the lift and the tracked skin have settled.
+            hipPelvisBuiltAtTarget = true;
+            Rebuild(true);
+        }
+
         if (!EnsureBuiltForDisplay())
         {
             Hide();
@@ -356,7 +384,7 @@ public sealed class AvatarBodyPartHighlighter : MonoBehaviour
 #endif
     }
 
-    private void BuildOverlaysForRenderer(SkinnedMeshRenderer source)
+    private void BuildOverlaysForRenderer(SkinnedMeshRenderer source, bool pelvisOnly)
     {
         Mesh sourceMesh = source.sharedMesh;
         BoneWeight[] weights = sourceMesh.boneWeights;
@@ -366,7 +394,7 @@ public sealed class AvatarBodyPartHighlighter : MonoBehaviour
             return;
         }
 
-        BodyPart[] parts =
+        BodyPart[] parts = pelvisOnly ? new[] { BodyPart.HipPelvis } : new[]
         {
             BodyPart.LeftArm,
             BodyPart.RightArm,
@@ -429,35 +457,36 @@ public sealed class AvatarBodyPartHighlighter : MonoBehaviour
         bool[] inHipPelvisRegion)
     {
         float[] result = new float[weights.Length];
+        var pelvisBones = new bool[bones.Length];
+        for (int i = 0; i < bones.Length; i++)
+            pelvisBones[i] = bones[i] != null && IsHipPelvisBone(bones[i]);
+
         for (int index = 0; index < weights.Length; index++)
         {
             if (!inHipPelvisRegion[index]) continue;
             BoneWeight weight = weights[index];
             result[index] =
-                GetHipPelvisWeight(weight.boneIndex0, weight.weight0, bones) +
-                GetHipPelvisWeight(weight.boneIndex1, weight.weight1, bones) +
-                GetHipPelvisWeight(weight.boneIndex2, weight.weight2, bones) +
-                GetHipPelvisWeight(weight.boneIndex3, weight.weight3, bones);
+                GetHipPelvisWeight(weight.boneIndex0, weight.weight0, pelvisBones) +
+                GetHipPelvisWeight(weight.boneIndex1, weight.weight1, pelvisBones) +
+                GetHipPelvisWeight(weight.boneIndex2, weight.weight2, pelvisBones) +
+                GetHipPelvisWeight(weight.boneIndex3, weight.weight3, pelvisBones);
         }
 
         return result;
     }
 
-    private float GetHipPelvisWeight(int index, float weight, Transform[] bones)
-    {
-        if (weight <= 0f || index < 0 || index >= bones.Length || bones[index] == null)
-        {
-            return 0f;
-        }
+    private static float GetHipPelvisWeight(int index, float weight, bool[] pelvisBones) =>
+        weight > 0f && index >= 0 && index < pelvisBones.Length && pelvisBones[index] ? weight : 0f;
 
-        Transform bone = bones[index];
+    private bool IsHipPelvisBone(Transform bone)
+    {
         // Skin around the pelvis can be weighted to lower torso bones too;
-        // the spatial pelvis mask above keeps this out of the upper trunk.
-        bool pelvisBone = ClassifyBone(bone) == BodyPart.Torso ||
-            IsInBranch(bone, HumanBodyBones.LeftUpperLeg) ||
-            IsInBranch(bone, HumanBodyBones.RightUpperLeg) ||
+        // the spatial mask bounds the trunk, while the lower-leg branches
+        // stay excluded when bent legs bring feet close to the pelvis.
+        return ClassifyBone(bone) == BodyPart.Torso ||
+            (IsInBranch(bone, HumanBodyBones.LeftUpperLeg) && !IsInBranch(bone, HumanBodyBones.LeftLowerLeg)) ||
+            (IsInBranch(bone, HumanBodyBones.RightUpperLeg) && !IsInBranch(bone, HumanBodyBones.RightLowerLeg)) ||
             ContainsAny(bone.name.ToLowerInvariant(), "pelvis", "glute", "butt");
-        return pelvisBone ? weight : 0f;
     }
 
     private bool[] BuildHipPelvisRegion(
@@ -692,10 +721,11 @@ public sealed class AvatarBodyPartHighlighter : MonoBehaviour
                          vertexWeights[b] +
                          vertexWeights[c]) / 3f;
                     // Pelvis is a subregion of torso/legs, not a competing body
-                    // part. Equal bone weights must not discard its surface.
+                    // part. Keep triangles with at least half their weight in
+                    // the pelvis mask and proximal bones.
                     if (part == BodyPart.HipPelvis)
                     {
-                        if (averageWeight >= Mathf.Max(minimumTriangleWeight, 0.36f))
+                        if (averageWeight >= Mathf.Max(minimumTriangleWeight, 0.5f))
                         {
                             var pelvis = trianglesByPart[BodyPart.HipPelvis];
                             pelvis.Add(a); pelvis.Add(b); pelvis.Add(c);

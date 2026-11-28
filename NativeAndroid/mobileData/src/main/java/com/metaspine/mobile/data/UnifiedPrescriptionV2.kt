@@ -75,10 +75,11 @@ internal object UnifiedPrescriptionV2 {
                     .put("prescriptionPosition", item.position)
                     .put("sceneName", if (coach) exercise.coach else exercise.game))
             }
-            exercises.forEach { add(it, true, 1, if (exercises.size == 2) 2 else 4) }
-            if (exercises.size == 2) repeat(item.sets) {
-                exercises.forEach { add(it, false, 1, item.reps) }
-            } else add(exercises.single(), false, item.sets, item.reps)
+            for (exercise in exercises) {
+                add(exercise, true, 1, if (exercises.size == 2) 2 else 4)
+                if (exercises.size == 2) repeat(item.sets) { add(exercise, false, 1, item.reps) }
+                else add(exercise, false, item.sets, item.reps)
+            }
         }
         return actions
     }

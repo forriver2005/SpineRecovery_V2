@@ -15,20 +15,22 @@ class ClinicalPrescriptionTest {
         return order.copy(resourceManifestSha256 = order.computeManifestSha256())
     }
 
-    @Test fun sideBridgeRunsBothCoachesThenAlternatingGameSets() {
+    @Test fun sideBridgeRunsEachCoachBeforeAllGamesOnThatSide() {
         for (sets in listOf(1, 2, 20)) {
             val order = order().let { it.copy(items = listOf(it.items.single().copy(sets = sets))) }
             val actions = UnifiedPrescriptionV2.actionsFor(order)
             assertEquals(2 + sets * 2, actions.length())
             for (index in 0 until actions.length()) {
                 val step = actions.getJSONObject(index)
+                val onLeft = index <= sets
+                val coach = index == 0 || index == sets + 1
                 assertEquals(7L, step.getLong("prescriptionItemId"))
                 assertEquals("侧桥", step.getString("actionName"))
                 assertEquals(1, step.getInt("sets"))
-                assertEquals(if (index < 2) 2 else 3, step.getInt("reps"))
-                assertEquals(if (index < 2) "coach_training" else "game_training", step.getString("arTaskType"))
-                assertEquals(if (index < 2) (if (index == 0) "SideBridgePractice" else "SideBridgeOppositePractice")
-                    else (if (index % 2 == 0) "SideBridge_RingBridge_Dynamic" else "SideBridgeRight_RingBridge_Dynamic"), step.getString("sceneName"))
+                assertEquals(if (coach) 2 else 3, step.getInt("reps"))
+                assertEquals(if (coach) "coach_training" else "game_training", step.getString("arTaskType"))
+                assertEquals(if (coach) (if (onLeft) "SideBridgePractice" else "SideBridgeOppositePractice")
+                    else (if (onLeft) "SideBridge_RingBridge_Dynamic" else "SideBridgeRight_RingBridge_Dynamic"), step.getString("sceneName"))
             }
         }
         for (key in listOf("dead_bug", "bird_dog", "hip_thrust", "curl_up", "cat_camel")) {
@@ -46,9 +48,9 @@ class ClinicalPrescriptionTest {
             assertEquals("HipThrust_RingBridge_Hold30", bridge.getJSONObject(1).getString("sceneName"))
             assertEquals(seconds, bridge.getJSONObject(1).getInt("holdSeconds"))
             val side = UnifiedPrescriptionV2.actionsFor(order("side_bridge", seconds))
-            assertEquals("SideBridge_RingBridge_Hold30", side.getJSONObject(2).getString("sceneName"))
-            assertEquals("SideBridgeRight_RingBridge_Hold30", side.getJSONObject(3).getString("sceneName"))
-            assertEquals(seconds, side.getJSONObject(3).getInt("holdSeconds"))
+            assertEquals("SideBridge_RingBridge_Hold30", side.getJSONObject(1).getString("sceneName"))
+            assertEquals("SideBridgeRight_RingBridge_Hold30", side.getJSONObject(4).getString("sceneName"))
+            assertEquals(seconds, side.getJSONObject(4).getInt("holdSeconds"))
         }
     }
 
@@ -91,18 +93,21 @@ class ClinicalPrescriptionTest {
             .put("prescriptionJson", order.toJson().toString()).put("actions", actions)
             .put("startedAt", "2026-11-27T01:02:03.000Z")
         val measurements = JSONArray()
-        for (index in 0 until count) measurements.put(JSONObject()
-            .put("prescriptionItemId", 7).put("trainingMode", if (index < 2) "coach" else "game")
-            .put("prescriptionModeCompleted", index !in skip).put("prescriptionModeSkipped", index in skip)
-            .put("completedRepetitions", if (index in skip) 0 else if (index < 2) 2 else 3)
-            .put("durationSeconds", 5).put("scoreAvailable", false))
+        for (index in 0 until count) {
+            val step = actions.getJSONObject(index)
+            measurements.put(JSONObject()
+                .put("prescriptionItemId", 7).put("trainingMode", step.getString("arTaskType").removeSuffix("_training"))
+                .put("prescriptionModeCompleted", index !in skip).put("prescriptionModeSkipped", index in skip)
+                .put("completedRepetitions", if (index in skip) 0 else step.getInt("reps"))
+                .put("durationSeconds", 5).put("scoreAvailable", false))
+        }
         val record = TrainingHistoryRecord("bilateral", "2026-11-27T01:03:03.000Z", "", null, planJson = plan.toString())
         return requireNotNull(UnifiedPrescriptionV2.result(record, JSONObject()
             .put("userId", "patient").put("actionResults", measurements)))
     }
 
     @Test fun bilateralResultsSumBothSidesAndRequireBothGames() {
-        val leftOnly = snapshot(2)
+        val leftOnly = snapshot(3)
         assertFalse(leftOnly.getBoolean("completed"))
         val complete = snapshot(6)
         val modes = complete.getJSONArray("itemResults").getJSONObject(0).getJSONArray("modeResults")
@@ -113,7 +118,7 @@ class ClinicalPrescriptionTest {
     }
 
     @Test fun skippedCoachesRemainSkippedWhileCompletedGamesFinishPrescription() {
-        val result = snapshot(6, setOf(0, 1))
+        val result = snapshot(6, setOf(0, 3))
         val modes = result.getJSONArray("itemResults").getJSONObject(0).getJSONArray("modeResults")
         assertTrue(result.getBoolean("completed"))
         assertEquals("SKIPPED", modes.getJSONObject(0).getString("status"))
@@ -123,7 +128,7 @@ class ClinicalPrescriptionTest {
         System.getenv("SPINE_RX_FIXTURE_DIR")?.let { folder ->
             java.io.File(folder).mkdirs()
             java.io.File(folder, "bilateral-skipped.json").writeText(result.toString(2))
-            java.io.File(folder, "bilateral-interrupted.json").writeText(snapshot(2).toString(2))
+            java.io.File(folder, "bilateral-interrupted.json").writeText(snapshot(3).toString(2))
         }
     }
 }

@@ -45,11 +45,10 @@ class BuiltInPrescriptionTest {
             assertEquals(exercise.coach, actions.getJSONObject(0).getString("sceneName"))
             val variants = UnifiedPrescriptionV2.exercisesFor(order.items.single())
             val bilateral = variants.size == 2
-            val firstGame = if (bilateral) 2 else 1
-            assertEquals(variants.first().game, actions.getJSONObject(firstGame).getString("sceneName"))
+            assertEquals(variants.first().game, actions.getJSONObject(1).getString("sceneName"))
             for (index in 0 until actions.length()) {
                 val action = actions.getJSONObject(index)
-                val coach = index < firstGame
+                val coach = index == 0 || (bilateral && index == actions.length() / 2)
                 assertEquals(if (coach || bilateral) 1 else 2, action.getInt("sets"))
                 assertEquals(if (coach) (if (bilateral) 2 else 4) else 3, action.getInt("reps"))
                 val holding = variants.first().key.endsWith("hold30")

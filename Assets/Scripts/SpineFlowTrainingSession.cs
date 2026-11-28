@@ -657,8 +657,11 @@ public sealed class SpineFlowTrainingSession : MonoBehaviour
         {
             long itemId = unifiedActions[unifiedActionOffset].prescriptionItemId;
             int expected = 0, completed = 0;
-            foreach (var action in unifiedActions)
+            for (int index = 0; index < unifiedActionOffset; index++)
+            {
+                var action = unifiedActions[index];
                 if (action.prescriptionItemId == itemId && ResolveMode(action) == "coach") expected++;
+            }
             foreach (var action in previousPrescriptionActions)
                 if (action.prescriptionItemId == itemId && action.trainingMode == "coach" &&
                     (action.prescriptionModeCompleted || action.prescriptionModeSkipped)) completed++;

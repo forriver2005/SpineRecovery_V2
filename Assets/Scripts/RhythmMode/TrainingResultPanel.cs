@@ -34,7 +34,7 @@ public sealed class TrainingResultPanel : MonoBehaviour
         ReturnButton.onClick.AddListener(ReturnOrContinue);
         var training=SpineRecovery.App.AppBootstrap.Instance?.Training;
         bool prescribed=training?.IsV2Prescription==true;
-        var caption=Label(prescribed?(training.HasNextStepInItem?"继续下一组":"填写本动作问卷"):"返回选择",new Vector2(0,-390),new Vector2(350,65),30);
+        var caption=Label(prescribed?training.GameContinueLabel:"返回选择",new Vector2(0,-390),new Vector2(350,65),30);
         if(prescribed&&!training.HasNextStepInItem&&training.HasNextPrescriptionItem)
         {
             buttonRect.anchoredPosition+=Vector2.left*205;

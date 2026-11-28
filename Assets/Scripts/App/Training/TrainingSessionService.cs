@@ -29,7 +29,7 @@ namespace SpineRecovery.App
         private bool openingSurvey;
         // Pending questionnaires from the former left/right pair format keep
         // their original indices. New prescriptions always use grouped stages.
-        private bool LegacyBilateralPairs => CurrentPlan.actions.GroupBy(a => a.prescriptionItemId).Any(g =>
+        private bool LegacyBilateralPairs => !CurrentPlan.feedbackGroupedByPrescriptionItem && CurrentPlan.actions.GroupBy(a => a.prescriptionItemId).Any(g =>
             g.Count() > 2 && g.ElementAt(1).arTaskType == "game_training" && g.Skip(2).Any(a => a.arTaskType == "coach_training"));
         private TrainingAction[] PrescriptionItems => LegacyBilateralPairs
             ? CurrentPlan.actions.Where((a, index) => index % 2 == 0).ToArray()
@@ -61,10 +61,13 @@ namespace SpineRecovery.App
         public bool HasNextPrescriptionItem => IsV2Prescription && CurrentItemIndex + 1 < FeedbackActionCount;
         public bool HasNextStepInItem => IsV2Prescription && actionOffset + 1 < CurrentPlan.actions.Length &&
             CurrentPlan.actions[actionOffset + 1].prescriptionItemId == CurrentStep.prescriptionItemId;
-        public string CoachContinueLabel => HasNextStepInItem && CurrentPlan.actions[actionOffset + 1].arTaskType == "coach_training"
-            ? "继续下一侧教练" : "进入本项游戏";
+        private bool NextStepIsCoach => HasNextStepInItem && CurrentPlan.actions[actionOffset + 1].arTaskType == "coach_training";
+        public string CoachContinueLabel => NextStepIsCoach ? "继续下一侧教练" : "进入本项游戏";
+        public string GameContinueLabel => NextStepIsCoach ? "继续下一侧教练" : HasNextStepInItem ? "继续下一组" : "填写本动作问卷";
         public string CurrentPrescriptionGameScene => !IsV2Prescription ? null : CurrentStep.arTaskType == "game_training"
-            ? CurrentStep.sceneName : CurrentPlan.actions.First(a => a.prescriptionItemId == CurrentStep.prescriptionItemId && a.arTaskType == "game_training").sceneName;
+            ? CurrentStep.sceneName : CurrentPlan.actions.Skip(actionOffset + 1).First(a =>
+                a.prescriptionItemId == CurrentStep.prescriptionItemId && a.arTaskType == "game_training" &&
+                TrainingActionCatalog.Find(a.actionId) == TrainingActionCatalog.Find(CurrentStep.actionId)).sceneName;
         public bool AllowsPrescriptionCoach(string scene) => !IsV2Prescription ||
             CurrentStep.arTaskType == "coach_training" && SameCoachScene(CurrentStep.sceneName, scene);
 
@@ -204,6 +207,7 @@ namespace SpineRecovery.App
         public static bool PreparePrescriptionPlan(TrainingPlan plan)
         {
             if (!PrescriptionSequence.IsValid(plan)) return false;
+            plan.feedbackGroupedByPrescriptionItem = true;
             foreach (var action in plan.actions)
                 if (action.arTaskType == "coach_training")
                     action.sceneName = SpineFlowTrainingSession.ResolveSceneForGender(action.sceneName, plan.gender == "male");

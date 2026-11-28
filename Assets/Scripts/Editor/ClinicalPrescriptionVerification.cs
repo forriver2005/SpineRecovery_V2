@@ -34,38 +34,45 @@ public static class ClinicalPrescriptionVerification
                 string left = hold ? "side_bridge_hold30" : "side_bridge";
                 string right = hold ? "side_bridge_right_hold30" : "side_bridge_right";
                 var steps = new System.Collections.Generic.List<TrainingAction>();
-                foreach (string key in new[] { left, right }) { var a = Action(key, true); a.reps = 2; a.actionName = "侧桥"; steps.Add(a); }
-                for (int group = 0; group < sets; group++) foreach (string key in new[] { left, right })
-                { var a = Action(key, false); a.sets = 1; a.holdSeconds = hold ? 45 : 0; steps.Add(a); }
+                foreach (string key in new[] { left, right })
+                {
+                    var coach = Action(key, true); coach.reps = 2; coach.actionName = "侧桥"; steps.Add(coach);
+                    for (int group = 0; group < sets; group++)
+                    { var a = Action(key, false); a.sets = 1; a.holdSeconds = hold ? 45 : 0; steps.Add(a); }
+                }
                 var plan = new TrainingPlan { accountId = "clinical-test", patientId = "clinical-test", sessionId = "bilateral-test",
                     prescriptionOrderId = 19, prescriptionContractVersion = 2, gender = "female", actions = steps.ToArray() };
                 Check(TrainingSessionService.PreparePrescriptionPlan(plan), "Bilateral sequence validates: " + sets + " sets, hold=" + hold);
+                plan = JsonUtility.FromJson<TrainingPlan>(JsonUtility.ToJson(plan));
                 Set(service, "CurrentPlan", plan);
                 Check(service.FeedbackActionCount == 1, "Both sides and every set own one questionnaire");
                 Check(SpineFlowTrainingSession.BeginUnifiedTraining(plan), "Bilateral session starts");
-                Check(service.AdvancePrescriptionCoach() == null, "Unfinished coach cannot advance");
                 for (int side = 0; side < 2; side++)
                 {
+                    var entry = TrainingActionCatalog.Find(side == 0 ? left : right);
+                    var otherSide = TrainingActionCatalog.Find(side == 0 ? right : left);
+                    Check(service.AllowsPrescriptionCoach(entry.Coach) && service.CurrentPrescriptionGameScene == entry.Game,
+                        "Coach and planned game are on the correct side");
+                    Check(service.AdvancePrescriptionCoach() == null, "Unfinished coach cannot advance on either side");
                     Check(SpineFlowTrainingSession.GetPlannedTrainingVolume("coach", 9, 9).TotalRepetitions == 2, "Each side coach has exactly two repetitions");
                     // Exercise both successful coach completion and explicit skipping.
                     if (sets == 1) SpineFlowTrainingSession.EndCoachTraining(null, 0, 0, 2, CoachTimelineStatus.Completed, CoachEndReason.NormalCompletion);
                     else practice.SkipToPrescriptionGame();
-                    string next = service.AdvancePrescriptionCoach();
-                    Check(next == (side == 0 ? "SideBridgeOppositePractice" : TrainingActionCatalog.Find(left).Game), "Coach order is left then right then left game");
-                }
-                for (int group = 0; group < sets * 2; group++)
-                {
-                    string scene = TrainingActionCatalog.Find(group % 2 == 0 ? left : right).Game;
-                    Check(service.AllowsPrescriptionGame(scene), "Current left/right game is startable after both coaches");
-                    Check(!service.AllowsPrescriptionGame(TrainingActionCatalog.Find(group % 2 == 0 ? right : left).Game), "Wrong side is blocked");
-                    Check(SpineFlowTrainingSession.GetPlannedTrainingVolume("game", 9, 9).TotalRepetitions == 3, "Only one prescribed set runs on each side");
-                    SpineFlowTrainingSession.MarkPrescriptionGameCompleted(2);
-                    Check(!SpineFlowTrainingSession.CurrentPrescriptionGameCompleted, "Partial set cannot advance");
-                    SpineFlowTrainingSession.MarkPrescriptionGameCompleted(3);
-                    if (group + 1 < sets * 2)
+                    Check(service.AdvancePrescriptionCoach() == entry.Game, "Each coach opens its own side's game");
+                    for (int group = 0; group < sets; group++)
                     {
-                        Check(!(bool)Call(service, "PrepareActionFeedback"), "No questionnaire between sides or sets");
-                        Check(service.AdvanceWithinPrescriptionItem() == TrainingActionCatalog.Find(group % 2 == 0 ? right : left).Game, "Game sets alternate left and right");
+                        Check(service.AllowsPrescriptionGame(entry.Game) && !service.AllowsPrescriptionGame(otherSide.Game),
+                            "Only the current side's game is startable");
+                        Check(SpineFlowTrainingSession.GetPlannedTrainingVolume("game", 9, 9).TotalRepetitions == 3, "Each game runs one prescribed set");
+                        SpineFlowTrainingSession.MarkPrescriptionGameCompleted(2);
+                        Check(!SpineFlowTrainingSession.CurrentPrescriptionGameCompleted, "Partial set cannot advance");
+                        SpineFlowTrainingSession.MarkPrescriptionGameCompleted(3);
+                        if (group + 1 < sets || side == 0)
+                        {
+                            Check(!(bool)Call(service, "PrepareActionFeedback"), "No questionnaire between sides or sets");
+                            Check(service.AdvanceWithinPrescriptionItem() == (group + 1 < sets ? entry.Game : otherSide.Coach),
+                                "Complete all sets on this side before changing sides");
+                        }
                     }
                 }
                 Check(service.AdvanceWithinPrescriptionItem() == null && (bool)Call(service, "PrepareActionFeedback"), "Only final right set opens questionnaire");
@@ -90,8 +97,8 @@ public static class ClinicalPrescriptionVerification
 
     private static void VerifyRepeatedBilateralItems(TrainingSessionService service)
     {
-        var steps = Enumerable.Range(0, 2).SelectMany(position => new[] { true, false }.SelectMany(coach =>
-            new[] { "side_bridge", "side_bridge_right" }.Select(key => {
+        var steps = Enumerable.Range(0, 2).SelectMany(position => new[] { "side_bridge", "side_bridge_right" }.SelectMany(key =>
+            new[] { true, false }.Select(coach => {
                 var action = Action(key, coach); action.prescriptionItemId = 70 + position;
                 action.prescriptionPosition = position; action.sets = 1; action.reps = coach ? 2 : 3;
                 action.holdSeconds = 0; action.actionName = "侧桥"; return action;
@@ -104,9 +111,10 @@ public static class ClinicalPrescriptionVerification
         Check(service.FeedbackActionCount == 2, "Two prescribed side bridges need two surveys, not four");
         for (int item = 0; item < 2; item++)
         {
-            Check(service.SkipRemainingPrescriptionCoaches() == "SideBridge_RingBridge_Dynamic", "Skip both coaches opens left game");
+            Check(service.SkipRemainingPrescriptionCoaches() == "SideBridge_RingBridge_Dynamic", "Skipping left coach opens left game");
             SpineFlowTrainingSession.MarkPrescriptionGameCompleted(3);
-            Check(service.AdvanceWithinPrescriptionItem() == "SideBridgeRight_RingBridge_Dynamic", "Repeated item advances to right game");
+            Check(service.AdvanceWithinPrescriptionItem() == plan.actions[item * 4 + 2].sceneName, "Left game advances to right coach");
+            Check(service.SkipRemainingPrescriptionCoaches() == "SideBridgeRight_RingBridge_Dynamic", "Skipping right coach opens right game");
             SpineFlowTrainingSession.MarkPrescriptionGameCompleted(3);
             Check((bool)Call(service, "PrepareActionFeedback"), "Repeated item's final side opens survey");
             var result = service.CurrentResult;

@@ -30,6 +30,7 @@ namespace SpineRecovery.App
         public long prescriptionOrderId;
         public string prescriptionJson;
         public int prescriptionContractVersion;
+        public bool feedbackGroupedByPrescriptionItem;
         public string actionId;
         public string targetScene;
         public TrainingAction[] actions = Array.Empty<TrainingAction>();

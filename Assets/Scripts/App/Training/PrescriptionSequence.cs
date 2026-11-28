@@ -20,15 +20,15 @@ namespace SpineRecovery.App
                 var first = TrainingActionCatalog.Find(steps[0].actionId);
                 if (first == null) return false;
                 bool bilateral = first.Key == "side_bridge" || first.Key == "side_bridge_hold30";
-                int coaches = bilateral ? 2 : 1;
                 if (bilateral ? steps.Length < 4 || steps.Length > 42 || steps.Length % 2 != 0 : steps.Length != 2) return false;
+                int rightStart = bilateral ? steps.Length / 2 : steps.Length;
                 for (int i = 0; i < steps.Length; i++)
                 {
                     var action = steps[i];
                     var entry = TrainingActionCatalog.Find(action.actionId);
-                    string expectedKey = bilateral && i % 2 == 1
+                    string expectedKey = i >= rightStart
                         ? (first.Key.EndsWith("hold30") ? "side_bridge_right_hold30" : "side_bridge_right") : first.Key;
-                    bool coach = i < coaches;
+                    bool coach = i == 0 || i == rightStart;
                     if (entry == null || entry.Key != expectedKey || action.arTaskType != (coach ? "coach_training" : "game_training")) return false;
                     if (coach)
                     {
@@ -38,7 +38,7 @@ namespace SpineRecovery.App
                     else if (action.sceneName != entry.Game || action.sets < 1 || action.sets > 20 ||
                         bilateral && action.sets != 1 || action.reps < 1 || action.reps > 100 ||
                         action.holdSeconds < 0 || action.holdSeconds > 600 ||
-                        action.reps != steps[coaches].reps || action.holdSeconds != steps[coaches].holdSeconds) return false;
+                        action.reps != steps[1].reps || action.holdSeconds != steps[1].holdSeconds) return false;
                 }
             }
             return true;

@@ -59,14 +59,15 @@ public static class BilateralGameRuntimeVerification
                 typeof(SpineFlowTrainingSession).GetField("instance", Private).SetValue(null, live);
                 var plan = new TrainingPlan { accountId = "runtime-fixture", patientId = "runtime-fixture", sessionId = "runtime-fixture",
                     startedAt = "2026-11-28T00:00:00.000Z", prescriptionOrderId = 1, prescriptionContractVersion = 2,
-                    gender = "female", actions = new[] { Action(Key, true), Action(RightKey, true), Action(Key, false), Action(RightKey, false) } };
+                    gender = "female", actions = new[] { Action(Key, true), Action(Key, false), Action(RightKey, true), Action(RightKey, false) } };
                 Check(TrainingSessionService.PreparePrescriptionPlan(plan), "Runtime plan validates");
                 SetAuto(service, "CurrentPlan", plan);
                 Check(SpineFlowTrainingSession.BeginUnifiedTraining(plan), "Runtime session starts");
-                Check(service.SkipRemainingPrescriptionCoaches() == TrainingActionCatalog.Find(Key).Game, "Pause skip skips both coaches and opens left game");
+                Check(service.SkipRemainingPrescriptionCoaches() == TrainingActionCatalog.Find(Key).Game, "Pause skip opens left game");
                 SpineFlowTrainingSession.MarkPrescriptionGameCompleted(3);
-                string right = service.AdvanceWithinPrescriptionItem();
-                Check(right == TrainingActionCatalog.Find(RightKey).Game, "Left game leads to official right game");
+                Check(service.AdvanceWithinPrescriptionItem() == TrainingActionCatalog.Find(RightKey).Coach, "Left game leads to right coach");
+                string right = service.SkipRemainingPrescriptionCoaches();
+                Check(right == TrainingActionCatalog.Find(RightKey).Game, "Right coach leads to the official right game");
                 SceneManager.LoadScene(right);
                 stage = 1; started = EditorApplication.timeSinceStartup; return;
             }

@@ -29,6 +29,7 @@ public class DeadBugStartMenuController : MonoBehaviour
     public Func<bool> ExternalTrainingStart { get; set; }
     public bool IsFlowTestCalibrationBypassed => poseScorer != null && poseScorer.IsFlowTestCalibrationBypassed;
     public string SelectedDifficultyKey => selectedDifficulty == Difficulty.Simple ? "simple" : selectedDifficulty == Difficulty.Hard ? "hard" : "standard";
+    public Button TrainingStartButton => startButton;
     public bool IsTrainingMenuVisible => menuRoot != null && menuRoot.activeSelf;
 
     private enum Difficulty
@@ -518,6 +519,16 @@ public class DeadBugStartMenuController : MonoBehaviour
     {
         if (TrainingStartAllowed != null && !TrainingStartAllowed()) return;
 
+        // Game scenes copied from practice can still carry the old coach components.
+        if (ExternalTrainingStart != null)
+        {
+            if (!ExternalTrainingStart()) return;
+            TrainingStarted?.Invoke();
+            if (startButton != null) startButton.interactable = false;
+            if (menuRoot != null) menuRoot.SetActive(false);
+            return;
+        }
+
         if (IsPracticeCoachMode && practiceSessionController != null)
         {
             SpineFlowTrainingSession.AcknowledgePracticeStartConfirmation();
@@ -532,15 +543,6 @@ public class DeadBugStartMenuController : MonoBehaviour
             {
                 poseScorer.BeginCalibration();
             }
-            return;
-        }
-
-        if (ExternalTrainingStart != null)
-        {
-            if (!ExternalTrainingStart()) return;
-            TrainingStarted?.Invoke();
-            if (startButton != null) startButton.interactable = false;
-            if (menuRoot != null) menuRoot.SetActive(false);
             return;
         }
 

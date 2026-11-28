@@ -38,7 +38,10 @@ public sealed class RecordedActionHoldScoring : MonoBehaviour
     void Awake()
     {
         // Install only for these four opt-in scenes; legacy calibration stays unchanged.
-        if(calibration.GetComponent<RecordedHoldPreparation>()==null)calibration.gameObject.AddComponent<RecordedHoldPreparation>();
+        var preparation=calibration.GetComponent<RecordedHoldPreparation>()??calibration.gameObject.AddComponent<RecordedHoldPreparation>();
+        preparation.Kind=kind;
+        var controls=calibration.GetComponent<HoldCalibrationControls>()??calibration.gameObject.AddComponent<HoldCalibrationControls>();
+        controls.scorer=calibration;controls.menu=transport.GetComponent<HipThrustPrescriptionDose>().menu;
     }
 
     public bool Begin(string level)

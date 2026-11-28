@@ -1,0 +1,17 @@
+All 16 training scenes: public JSON doses and real UI/executor. Synthetic calibrated patient; no hardware/network doctor delivery claim. Playback speed=4, countdown=5 game seconds, workout rests=30 real seconds.
+PASS standalone crunch: JSON sets=2, per-run reps=2, hold=0; sensor gate, actual 5s countdown, pause, natural completion, shared result.
+PASS standalone crunch_hold30: JSON sets=2, per-run reps=2, hold=3; sensor gate, actual 5s countdown, pause, natural completion, shared result.
+PASS standalone lyingcat_hold30: JSON sets=2, per-run reps=2, hold=3; sensor gate, actual 5s countdown, pause, natural completion, shared result.
+PASS standalone birddog_hold30: JSON sets=2, per-run reps=2, hold=3; sensor gate, actual 5s countdown, pause, natural completion, shared result.
+PASS standalone deadbug_hold30: JSON sets=2, per-run reps=2, hold=3; sensor gate, actual 5s countdown, pause, natural completion, shared result.
+PASS standalone hipthrust_hold30: JSON sets=2, per-run reps=2, hold=3; sensor gate, actual 5s countdown, pause, natural completion, shared result.
+PASS standalone hipthrust_curve: JSON sets=2, per-run reps=2, hold=0; sensor gate, actual 5s countdown, pause, natural completion, shared result.
+PASS workout set 1/8 crunch: completion once, next action=1, rest=30s.
+PASS workout set 2/8 crunch_hold30: completion once, next action=1, rest=30s.
+PASS workout set 3/8 crunch_hold30: completion once, next action=2, rest=30s.
+PASS workout set 4/8 lyingcat_hold30: completion once, next action=3, rest=30s.
+PASS workout set 5/8 birddog_hold30: completion once, next action=4, rest=30s.
+PASS workout set 6/8 deadbug_hold30: completion once, next action=5, rest=30s.
+PASS workout set 7/8 hipthrust_hold30: completion once, next action=6, rest=30s.
+PASS mixed JSON workout: 7 game scenes, 8 sets, per-action difficulty/reps/holdSeconds, real 30s rests and automatic transitions.
+PASS ALL GAME FLOWS checks=1816922
